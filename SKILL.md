@@ -37,10 +37,26 @@ idea 发现、方案生成到方案复核的完整链路，并支持四个子流
 
 | Mode | 名称 | 作用 | 可独立调用 | 可被谁调用 |
 |---|---|---|---|---|
-| **A** | `idea-discovery` | 基础文献调研 + 多子代理头脑风暴，产出 idea 候选 | 是 | — |
+| **A** | `idea-discovery` | 文献调研 + 多子代理头脑风暴产出 idea 候选，**并做 idea 级创新性/可行性审核** | 是 | — |
 | **B** | `proposal-generation` | 基于 idea 做创新性与可行性研究，产出方案 | 是 | 接 A 之后 |
-| **C** | `proposal-review` | 复核已有方案与审阅内容的正确性与创新性 | 是 | 接 B，或接上一次 C 继续复核 |
+| **C** | `proposal-review` | 复核**已成型方案**的正确性与可行性，并守创新性底线（防复现） | 是 | 接 B，或接上一次 C 继续复核 |
 | **D** | `literature-survey` | 补充文献、扩大检索范围 | 是 | 被 A/B/C 调用，也可单独调用 |
+
+### A 与 C 的分工（不重叠）
+
+> **A 管"值得做吗"（概念级），C 管"做对了吗"（方案级）。**
+
+| 维度 | Mode A（idea 级） | Mode C（方案级） |
+|---|---|---|
+| 对象 | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
+| 可行性 | 概念可行性：路线是否成立 | 工程可行性：具体做法能否跑通、变量是否可控 |
+| 正确性 | 前提是否自洽 | 方法正确性：推导/实现/指标/统计是否成立 |
+| 创新性 | 方向是否已被覆盖、是否非平凡 | 方案是否**实质复现**已有工作（防复现） |
+| 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现检查） |
+| 深度 | 快筛：双评分 + 致命反驳 | 深审：七子代理 + 交叉质询 + 中位数 |
+
+**A 偏文献调研与方法研究；C 偏基于方法的正确性审核，但 C 必须显式给出复现风险等级
+——做得很扎实的复现仍是拒稿理由。**
 
 **解析规则：**
 
@@ -51,6 +67,18 @@ idea 发现、方案生成到方案复核的完整链路，并支持四个子流
 3. mode 之外的参数按该 Mode 的输入约定解析（见下）。
 4. 若用户显式给了多个 Mode（如 `mode=A,B,C`），按 A → B → C 顺序串联执行，
    中间状态通过 `state.json` 片段传递（见 §5）。
+
+**启动前置动作（每次调用都做）：**
+
+1. **读项目根目录的 `AGENTS.md`**（若存在）—— 其布局、命名、公用部分约定优先于本
+   Skill 默认约定。
+2. **确定路线**（`routeA` / `routeB` / …）。用户未指定时反问；若只有一条路线则用它。
+3. **读该路线的 `INDEX.md`**，了解进度、已证实/已证伪结论、TODO 与 Warnings。
+4. 若路线或 `INDEX.md` 不存在，按
+   [references/project-layout.md](references/project-layout.md) §7 的检查清单手工建立
+   （目录 + `INDEX.md`）后再开工。
+
+> 详细约定见 [references/project-layout.md](references/project-layout.md)。
 
 **各 Mode 详细流程：**
 
@@ -65,30 +93,58 @@ idea 发现、方案生成到方案复核的完整链路，并支持四个子流
 
 以下三条是硬约束，任何 Mode 都不得违反。执行前先确认，输出时自检。
 
-### 1.1 文献检索：先本地，后 arxiv，429 必须等待
+### 1.1 文献检索：先本地，后 arxiv —— **但禁止只停留在本地**
 
 ```
 Step 1: 搜索本地文献库 ./local_literature/
-        命中 → 直接返回，标注 source="local"，不再请求 arxiv
-Step 2: 本地未命中 → 调用 Python arxiv 包
+        命中 → 纳入结果，标注 source="local" —— 但流程继续，不得在此返回
+Step 2: 调用 Python arxiv 包
+        ★ 即使 Step 1 已命中，只要触发下述任一条件，本步必须执行
         命中 → 拉取元数据与摘要，缓存到本地库，标注 source="arxiv"
-Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取已有内容
+Step 3: 信息不足 → 仅补充缺失字段，不重复拉取已有内容
+Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 ```
+
+**⚠️ 强制扩检触发条件（命中任一即必须查 arxiv 并扩大范围）：**
+
+| # | 触发条件 | 最低等级 |
+|---|---|---|
+| T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
+| T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
+| T3 | **可行性不确定**（能不能做、资源够不够、是否已有不可能性结果） | L2 强化 |
+| T4 | 新颖性判定（Mode B 的 B1、Mode C 的 S-Lit/S-Nov） | **L3 穷尽** |
+| T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
+| T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
+| T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
+
+**遇到卡点时第一动作是检索，不是硬推：** 理论说不清、证不出来、不确定能不能做时，
+必须先检索 ① 该问题本身是否已有定理/反例/不可能性结果 ② 所用工具在其他领域的处理
+③ **负结果文献**。检索后仍无解，写入 `INDEX.md` 的 Warnings 并标注待核实。
+
+**禁止推断：** 本地未命中 ≠ 不存在；arxiv 本轮未命中 ≠ 无人研究过；429 中断 ≠ 检索完整。
+未完成 L3 前，文档中只能写 **"据本次检索未见（检索式见附录）"**，
+**不得**使用"首次提出"。
 
 **429 处理：** 捕获限流错误后按指数退避等待 `10s → 20s → 40s → 80s → 160s`，
 最多重试 5 次；**重试期间不得发起任何新的 arxiv 请求**；5 次后仍失败则返回本地
-已有结果，并标注"arxiv 暂时不可用，以下结果仅来自本地库"。
+已有结果，标注"arxiv 暂时不可用，以下结果仅来自本地库"，**并在 INDEX.md 的 Warnings
+记录"检索未达饱和"**。
 
-完整规范、目录格式约定与可直接运行的实现见
-[references/literature-policy.md](references/literature-policy.md) 与
+完整规范（含 L1/L2/L3 尽职调查等级与饱和判据）见
+[references/literature-policy.md](references/literature-policy.md)，实现见
 [scripts/literature_search.py](scripts/literature_search.py)。
 
 ### 1.2 顶会标准锚定
 
 所有创新性判定必须引用 CVPR / ICML / NeurIPS 的具体标准；所有贡献必须标注类型
 （General / Theory / Use-Inspired / Concept & Feasibility / Negative Results 或
-方法 / 理论 / 实证 / 问题定义）；所有"首次提出"声称必须经 S-Lit 核实。
+方法 / 理论 / 实证 / 问题定义）。
 标准全文见 [references/venue-standards.md](references/venue-standards.md)。
+
+**创新性声明的额外约束（强化）：** 所有"首次提出"声称必须① 先完成 T1 的 **L3 穷尽
+检索**，② 由 **S-Lit 核实**，必要时由 **S-Nov 独立复核**，③ 留存**负检索记录**
+（检索式 + 命中数 + 为何不足以否定）。三项缺一，只能写"据本次检索未见"，
+**不得**写"首次提出"。无法确认的标注 **"待核实"**。
 
 ### 1.3 输出规范
 
@@ -99,6 +155,41 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 - 每条"没做到 / 缺乏"必须关联**具体未建立的结构性质或未满足的理论条件**，
   禁止模糊表述。
 
+### 1.4 项目组织与文档落盘（所有 Mode 强制）
+
+**方案与审阅记录必须落盘到 `docs/`，以人类可读的 Markdown 存储，并按路线分开管理。**
+
+```
+<项目根目录>/
+├── AGENTS.md              # 共享契约；存在则优先遵循
+├── docs/
+│   ├── routeA/            # A001-idea-discovery.md, A001-review.md, A002-proposal.md …
+│   └── routeB/            # B001-proposal.md, B001-review.md …
+├── routeA/
+│   ├── INDEX.md           # ★ 必需：文档索引 + 进度（已证实/已证伪/TODO/Bugs/Warnings）
+│   └── code/
+├── routeB/
+│   └── INDEX.md
+└── shared/                # 跨路线公用部分，按 AGENTS.md 规范
+```
+
+**四条硬性规则：**
+
+1. **先读 `AGENTS.md`。** 项目根目录存在 `AGENTS.md` 时，其约定优先于本 Skill 默认。
+2. **文档集中且分路线：** 人类可读文档放 `docs/routeX/`，命名为
+   `<路线字母><NNN>-<slug>.md`，审阅记录为 `<NNN>-review.md`（接续复核 `-review-2.md`）。
+   序号按路线独立递增、永不复用；审阅记录不占新序号。
+   > 注意：文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D 无关；产出该文档的
+   > Mode 记在 frontmatter 的 `mode` 字段。
+3. **每条路线必须有 `INDEX.md`**，且每次产出后必须更新。进度必须包含：
+   **已证实 / 已证伪 / TODO / Bugs / Warnings**，以及文档索引与变更日志。
+   被证伪的假设**不得删除**；"检索未达饱和"必须记入 Warnings。
+4. **机器状态不进 docs。** `state.json` 放 `.research-idea-pipeline/`，日志放 `logs/`；
+   docs 正文只放结论与依据。
+
+完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
+骨架的检查清单）。
+
 ---
 
 ## 2. 共享资源索引
@@ -107,10 +198,13 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 |---|---|---|
 | 子代理角色库 | [references/roles.md](references/roles.md) | R-CVPR / R-ICML / R-NeurIPS / A-Author / A-Experimenter / S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS 三视角锚定标准 |
-| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 本地优先、arxiv 调用、429 退避、缓存、目录格式 |
-| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可直接运行的 local-first + 429 backoff 实现 |
+| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、缓存 |
+| 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
+| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：本地+arxiv 并集、`--level`、`--exhaustive`、`--also-query`、429 backoff |
 | 状态传递模板 | [templates/state.template.json](templates/state.template.json) | `state.json` 片段结构 |
-| 串联示例 | [examples/](examples/) | A→B→C、接续 C、单独 D 的示例调用与产物形状 |
+| 项目契约模板 | [templates/AGENTS.template.md](templates/AGENTS.template.md) | 项目自建 `AGENTS.md` 时的骨架参考（可选；不叫 AGENTS.md 以免被自动加载） |
+| 路线索引模板 | [templates/INDEX.md](templates/INDEX.md) | 每条路线 `INDEX.md` 的骨架（含已证实/已证伪/TODO/Bugs/Warnings） |
+| 串联示例 | [examples/](examples/) | A→B→C、接续 C、单独 D、多路线目录管理的示例 |
 
 ---
 
@@ -121,10 +215,15 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 
 | Mode | 派遣子代理 |
 |---|---|
-| A | R-CVPR、R-ICML、R-NeurIPS、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea） |
+| A | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（A5）**：三审稿人（创新性）+ S-Lit、S-Nov（重叠度/新颖性）+ S-Feas（概念可行性）+ S-Theory（前提自洽）+ S-Devil（致命反驳） |
 | B | R-CVPR、R-ICML、R-NeurIPS（创新性）；S-Lit（先前工作核实）；S-Feas（可行性）；S-Theory（理论基础）；投稿人视角展开提案；实验设计者视角展开实验 |
-| C | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit、S-Repro（七子代理严格审查 + 交叉质询） |
+| C | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（七子代理严格审查 + 交叉质询） |
 | D | 无（执行者直接完成检索与归纳） |
+
+**职责边界：** 不派遣 S-Repro 到 Mode A（idea 阶段无代码可复现）；A5 的审核是
+**概念级快筛**，不要与 Mode C 的方案级深审重复。详见
+[mode-a](references/mode-a-idea-discovery.md) §A0 与
+[mode-c](references/mode-c-proposal-review.md) §C0。
 
 **派遣原则：** 子代理必须**独立产出**，不得互相抄袭结论；汇总时去重并保留来源标注。
 交叉质询（Mode C）要求每个子代理对其余子代理的评分提出至少一条质疑或补充。
@@ -137,11 +236,17 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 
 - **输入：** 研究领域关键词；已有参考文献（可选）；资源约束（可选）。
 - **流程：** A1 基础文献调研（调用 Mode D 或内联执行）→ A2 深度局限性分析 →
-  A3 多子代理头脑风暴 → A4 发散策略约束 → A5 输出编号 idea 清单。
+  A3 多子代理头脑风暴 → A4 发散策略约束 →
+  **A5 idea 级创新性与可行性审核（强制）** → A6 输出 → A7 落盘。
 - **发散策略约束：** 每个 idea 必须通过以下**至少一种**策略推导：
   *问题重构 / 假设挑战 / 跨域迁移 / 反向思考 / 组合创新*。
-- **交付物：** idea 候选清单（**不少于 10 个**）+ 技术路线归纳表 + 创新性边界界定
-  （红海 / 蓝海苗头 / 无人区）。
+- **A5 审核（新增，不可跳过）：** 对每个候选 idea 给出 **创新性评分 + 可行性评分 +
+  重叠度 + 致命反驳 + 推荐优先级**；进入 shortlist 的 idea 必须完成 **L3 穷尽检索**
+  （否则只能写"据本次检索未见"）。**不派遣 S-Repro。**
+- **交付物：** idea 候选清单（**不少于 10 个，每个都带审核结论**）+ 技术路线归纳表
+  + 创新性边界界定 + **推荐 shortlist（3—5 个）+ 淘汰清单**。
+- **落盘：** `docs/routeX/<R>NNN-idea-discovery.md`，并更新该路线 `INDEX.md`
+  （文档索引；被放弃的 idea 记入**已证伪**；未核实的无人区声称记 Warnings）。
 
 ### Mode B — proposal-generation
 
@@ -151,23 +256,33 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
   （S-Feas + S-Theory）→ B3 论文格式展开 → B4 实验流程设计 → B5 输出。
 - **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
   + 风险清单。
+- **落盘：** `docs/routeX/<R>NNN-proposal.md` + `<R>NNN-experiment-plan.md`，
+  并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
 
 ### Mode C — proposal-review
 
 - **输入：** 待复核方案（来自 Mode B 或用户提供）；上一次审阅内容（可选，用于接续
   复核）；关键参考文献（可选）。
-- **流程：** C1 判断复核类型（首次 / 接续）→ C2 七子代理严格审查 → C3 交叉质询与
-  共识形成 → C4 复核结论 → C5 接续复核规则。
-- **交付物：** 七子代理评审意见 + 交叉质询记录 + 审查结论卡片 + 横向对比表 +
-  （接续复核时）变更追踪表。
+- **定位：** 对象是**已成型方案**；主战场是**方法正确性与工程可行性**；创新性维度
+  以**防复现**为核心目的（见 §A/C 分工）。
+- **流程：** C1 判断复核类型（首次 / 接续）→ C2 七子代理严格审查（含**防复现检查**）
+  → C3 交叉质询与共识形成 → C4 复核结论 → C5 接续复核规则。
+- **交付物：** 七子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
+  + 横向对比表 +（接续复核时）变更追踪表。
+- **落盘：** `docs/routeX/<被审ID>-review.md`（接续复核用 `-review-2.md`），
+  并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
+  待补 → TODO；未缓解的致命风险 / 复现风险高 → Warnings。
 
 ### Mode D — literature-survey
 
 - **输入：** 检索关键词或研究问题；检索范围（时间范围、会议范围、数量上限）；
-  是否强制刷新本地缓存（默认**否**）。
-- **流程：** D1 本地检索 → D2 arxiv 补充检索 → D3 范围扩大策略 → D4 输出。
+  尽职调查等级（L1/L2/L3，默认按触发条件自动判定）。
+- **流程：** D1 本地检索 → D2 **arxiv 强制补充检索**（不得因本地命中而跳过）→
+  D3 范围扩大策略 → D4 饱和判定与输出。
 - **交付物：** 文献列表（含来源标注）+ 检索过程记录（含 429 等待日志）+ 本地缓存
-  更新记录。
+  更新记录 + 尽职调查等级达成情况。
+- **落盘：** `docs/routeX/<R>NNN-literature-survey.md`（含负检索记录），
+  并更新该路线 `INDEX.md`；**检索未达饱和必须记入 Warnings**。
 
 ---
 
@@ -206,21 +321,40 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 - Mode C 接续复核时，读取上一次 Mode C 的 `review_output` 与 `open_questions`。
 - 任意 Mode 调用 Mode D 时，传递 `query` 与 `scope`。
 
-**落地约定：** 状态写入工作目录下的 `.research-idea-pipeline/state-<mode>-<timestamp>.json`；
-串联调用时后一个 Mode 读取前一个 Mode 的片段。若用户未要求持久化，则在回复末尾
-以 JSON 代码块给出该片段即可。
+**落地约定：**
+
+- **机器状态**写入 `.research-idea-pipeline/state-<mode>-<timestamp>.json`；串联调用时
+  后一个 Mode 读取前一个 Mode 的片段。若用户未要求持久化，也在回复末尾以 JSON
+  代码块给出该片段。
+- **人类可读产出**写入 `docs/routeX/`（方案、审阅记录、文献报告），并**同步更新该
+  路线的 `INDEX.md`**。详见 [references/project-layout.md](references/project-layout.md)。
 
 ---
 
 ## 6. 执行自检清单（每次输出前）
 
 - [ ] mode 已明确，且与该 Mode 的输入约定一致。
-- [ ] 文献检索走了"先本地后 arxiv"，每条结果标注了 `source`。
+- [ ] **已读项目 `AGENTS.md` 与目标路线的 `INDEX.md`**，并遵循其约定。
+- [ ] 文献检索：**先本地后 arxiv，且没有只停留在本地**——本地命中后仍执行了 arxiv
+      检索（除非用户显式 `--local-only`）。
+- [ ] 已判定触发条件（T1—T7）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
+- [ ] 每条文献结果标注了 `source`；结果集是本地 + arxiv 的并集。
 - [ ] 若发生 429，输出了等待日志，且退避符合 `10→20→40→80→160s`、上限 5 次。
-- [ ] arxiv 结果已写入 `./local_literature/cache/`。
+- [ ] arxiv 结果已写入缓存。
 - [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
-- [ ] 所有"首次提出"声称已由 S-Lit 核实，或标注"待核实"。
+- [ ] **Mode A：每个 idea 都带 A5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
+      没有"只给 idea 不给审核"；且未误派 S-Repro。
+- [ ] **Mode C：结论卡片给出了复现风险等级**，并回答了"设计层面贡献 vs 实现层面改进"；
+      复现风险 = 高时总体判定不为"高"。
+- [ ] 所有"首次提出"声称**已完成 L3 穷尽检索**、经 S-Lit 核实、附负检索记录，
+      否则已降级为"据本次检索未见"或标注"待核实"。
+- [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
+- [ ] **方案/审阅记录已落盘到 `docs/routeX/`**，命名符合 `<R><NNN>-<slug>.md` /
+      `<NNN>-review.md`。
+- [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
+      变更日志。
+- [ ] 未达饱和的检索、未缓解的风险已记入 `INDEX.md` 的 Warnings。
 - [ ] 已附 `state.json` 片段与 `next_mode_suggestion`。
 
 ---
@@ -229,11 +363,19 @@ Step 3: 本地命中但信息不足 → 仅补充缺失字段，不重复拉取�
 
 1. **为什么用 Mode 而非单一流程？** 四个能力需可独立、可串联；Mode 化让每个子流程
    有清晰输入输出，并通过 `state.json` 传递状态，避免重复劳动。
-2. **为什么文献检索必须"先本地后 arxiv"？** 本地检索零成本、零延迟、无 429 风险；
-   arxiv 是补充手段而非首选，缓存进一步减少重复请求。
+2. **为什么文献检索"先本地后 arxiv"，但禁止停在本地？** 顺序上先本地是为了省成本、
+   省延迟、避开 429；但本地库是历史缓存的子集、天然有偏，**不能作为"不存在"的证据**。
+   凡是支撑创新性声明、理论判断、可行性判断的检索，必须扩到 arxiv 并达到饱和。
+   把工具的局限当成世界的性质，是本流水线要防的最主要错误。
 3. **为什么 429 要指数退避？** 429 通常意味着短时限流；指数退避比固定等待更高效，
-   也比立即重试更礼貌；5 次上限避免无限阻塞。
+   也比立即重试更礼貌；5 次上限避免无限阻塞。失败时必须降级标注"检索未达饱和"，
+   不能让不完整的检索伪装成完整结论。
 4. **为什么 Mode C 支持接续复核？** 接续复核聚焦上次未解决问题与新增变更，避免
    重复完整审查，同时用"变更追踪表"保证审查连续性。
 5. **为什么角色不变？** 本 Skill 只做编排，角色定义、评分维度、审查视角全部沿用
    统一角色库，保证审查标准的一致性。
+6. **为什么要按路线分离目录并强制 INDEX.md？** 一个项目常有并行的多条技术路线；
+   代码混在一起会互相污染，进度散在对话里会丢失。路线隔离 + 统一入口 INDEX 让
+   并行推进可管理、可交接。
+7. **为什么 INDEX.md 要区分"已证实"与"已证伪"？** 负结果常被丢弃，导致后人重复
+   踩坑。把证伪结论与 TODO/Bugs/Warnings 一起固化为项目资产，是最省算力的做法。

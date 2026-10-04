@@ -126,7 +126,25 @@
 
 ---
 
-## B6. 输出后
+## B6. 文档落盘与 INDEX 更新（强制）
+
+1. **写文档（可拆两份）：**
+   - 方案：`docs/routeX/<R>NNN-proposal.md`
+   - 实验计划：`docs/routeX/<R>NNN-experiment-plan.md`
+2. **frontmatter：** `mode: B / type: proposal | experiment-plan / status / created`。
+3. **更新该路线 `INDEX.md`：**
+   - §2 文档索引：新增两行；
+   - §3 已证实：B1/S-Lit 已核实的结论；
+   - §4 已证伪：被 S-Lit/S-Theory 否定的假设；
+   - §5 TODO：实验优先级与依赖 → 转成 TODO 条目，标注 P0/P1 与依赖；
+   - §6 Bugs：已知的工程障碍（如基线跑不通）；
+   - §7 Warnings：**未缓解的风险、未完成 L3 的"首次提出"声称**；
+   - §8 关键依赖与风险：数据/算力/外部依赖；
+   - §9 变更日志。
+4. **创新性声明的门禁：** 若 B1 要用"首次提出"，必须已完成 T1 的 **L3 穷尽检索**
+   并附负检索记录；否则降级为"据本次检索未见"，或记入 Warnings。
+
+## B7. 输出后
 
 1. 附 `state.json` 片段，`next_mode_suggestion: "C"`。
 2. 建议进入 Mode C，并提示：若需要接续复核，请保留本次输出作为 `review_output`

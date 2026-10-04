@@ -14,8 +14,23 @@
         "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results",
         "source_agent": "R-CVPR | R-ICML | R-NeurIPS | A-Author | A-Experimenter | S-Devil",
         "addresses_limitation": "",
-        "main_attack_surface": ""
+        "main_attack_surface": "",
+        "review": {
+          "innovation": null,
+          "feasibility": null,
+          "closest_prior_work": "",
+          "overlap": "足够 | 边缘 | 不足",
+          "search_level": "L1 | L2 | L3",
+          "theory_premise": "自洽 | 有缺口 | 不适用",
+          "devil_objection": "",
+          "objection_mitigable": null,
+          "priority": "高 | 中 | 低 | 建议放弃"
+        }
       }
+    ],
+    "shortlist": [],
+    "rejected": [
+      { "id": "I7", "reason": "重叠不足 / 可行性过低 / 致命反驳不可缓解" }
     ],
     "literature_used": [
       { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "" }
@@ -88,6 +103,18 @@
       "S-Repro": { "score": null, "opinion": "" }
     },
     "median_score": null,
+    "correctness_verdict": "成立 | 有缺口 | 不成立",
+    "reproduction_risk": {
+      "level": "低 | 中 | 高",
+      "closest_prior_work": "",
+      "increment_type": "设计改变 | 实现优化 | 无实质增量",
+      "search_level": "L1 | L2 | L3",
+      "checklist": {
+        "one_to_one_match": "有 | 部分 | 无",
+        "touches_new_property": null,
+        "dataset_or_backbone_only": null
+      }
+    },
     "cross_examination": [
       { "from": "", "to": "", "original_score": null, "issue": "", "resolved": false }
     ],
