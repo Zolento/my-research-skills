@@ -11,7 +11,7 @@
   4. 每条结果必须标注 source="local" 或 source="arxiv"。
   5. 5 次重试仍失败 —— 返回本地已有结果，并标注
      "arxiv 暂时不可用，以下结果仅来自本地库"（视为检索未达饱和）。
-  6. --exhaustive 执行 D3 范围扩大直到饱和（§3.3），每轮结果按本轮参数单独缓存；
+  6. --exhaustive 执行 A3 范围扩大直到饱和（§3.3），每轮结果按本轮参数单独缓存；
      --level L1|L2|L3 校验尽职调查等级（§3.1）；
      --also-query 追加同义词/上位词/否定式检索式。
   7. --limit 控制最终返回条数（--max 只控制每次 arxiv 查询的条数）。
@@ -54,7 +54,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 MAX_RETRIES = 5
 BASE_WAIT = 10  # 秒；退避序列 10 → 20 → 40 → 80 → 160
-DEFAULT_LOCAL_DIR = os.environ.get("RESEARCH_LOCAL_LITERATURE", "./local_literature")
+DEFAULT_LOCAL_DIR = os.environ.get("RESEARCH_LOCAL_LITERATURE", "./docs/refs")
 DEFAULT_CACHE_DIR = os.environ.get("RESEARCH_LIT_CACHE")  # 为空则由 <local-dir>/cache 决定
 RATE_LIMIT_NOTE = "arxiv 暂时不可用，以下结果仅来自本地库"
 PARTIAL_ARXIV_NOTE = (
@@ -507,7 +507,7 @@ def search_literature(
           "total_results_before_limit": int,
           "truncated": int,
           "negative_search_record": [...],  # 逐检索式的负检索记录（L2/L3 必需）
-          "escalations": [...],          # D3 范围扩大记录
+          "escalations": [...],          # A3 范围扩大记录
           "saturation": {...},
           "level_report": {...},
         }
@@ -591,16 +591,16 @@ def search_literature(
     arxiv_hits = [hit for q in queries for hit in arxiv_by_query[q]]
     merged = _merge_unique(local_hits, arxiv_hits)
 
-    # --- Step 3: 范围扩大（D3）与饱和判定（§3.3） ---
+    # --- Step 3: 范围扩大（A3）与饱和判定（§3.3） ---
     saturated = False
     saturation_reason = "未启动扩大检索"
     if exhaustive and arxiv_available:
         zero_streak = 0
         plan = [
-            {"round": 2, "action": "放宽时间范围（D3 第 ② 级）", "from_year": None, "to_year": None, "max": max_results},
-            {"round": 3, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 2},
-            {"round": 4, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 4},
-            {"round": 5, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 8},
+            {"round": 2, "action": "放宽时间范围（A3 第 ② 级）", "from_year": None, "to_year": None, "max": max_results},
+            {"round": 3, "action": "增加 max_results（A3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 2},
+            {"round": 4, "action": "增加 max_results（A3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 4},
+            {"round": 5, "action": "增加 max_results（A3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 8},
         ]
         for step_plan in plan:
             before = len(merged)
@@ -839,7 +839,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--also-query", action="append", default=[], metavar="QUERY",
-        help="追加检索式（同义词/上位词/否定式），可重复；用于 D3 第 ① 级扩大",
+        help="追加检索式（同义词/上位词/否定式），可重复；用于 A3 第 ① 级扩大",
     )
     parser.add_argument(
         "--exhaustive", action="store_true",

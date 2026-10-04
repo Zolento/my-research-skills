@@ -24,7 +24,7 @@
 
 - 匹配字段：标题、摘要、关键词、全文（`.md` / `.json`）。
 - 命中条目标注 `source="local"`，**纳入结果集**。
-- **本地命中不结束流程。** 继续执行 D2。
+- **本地命中不结束流程。** 继续执行 A2。
 
 ## A2. arxiv 强制补充检索
 
@@ -46,7 +46,7 @@
 - **严格处理 429**：指数退避 `10s → 20s → 40s → 80s → 160s`，最多 5 次；
   重试期间不发起新请求；5 次失败则回退本地结果并标注
   **"arxiv 暂时不可用，以下结果仅来自本地库"**，同时判定为**检索未达饱和**。
-- 结果**必须缓存**到 `./local_literature/cache/{query_hash}.json`。
+- 结果**必须缓存**到 `./docs/refs/cache/{query_hash}.json`。
 - **结果集 = 本地 + arxiv 的并集**，每条标注 `source`。
 - 建议直接调用 [../scripts/literature_search.py](../scripts/literature_search.py)；
   创新性声明场景用 `--level L3 --exhaustive --also-query ...`。
@@ -135,7 +135,7 @@
 
 ## A6. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `docs/routeX/<R>NNN-literature-survey.md`，内容 = 检索范围 +
+1. **写文档：** `docs/<R>NNN-literature-survey.md`，内容 = 检索范围 +
    检索式与结果表 + 文献列表 + **负检索记录** + 429 日志 + 饱和判定。
 2. **frontmatter：** `mode: A / type: literature-survey / status / created`。
 3. **更新该路线 `INDEX.md`：**
@@ -145,7 +145,7 @@
    - §5 TODO：待核实的会议论文集条目；
    - §7 Warnings：**检索未达饱和必须记入**；
    - §9 变更日志。
-4. **机器状态**写入 `.research-idea-pipeline/state-D-<ts>.json`，不入 docs。
+4. **机器状态**写入 `.research-idea-pipeline/state-A-<ts>.json`，不入 docs。
 
 ## A7. 输出后
 

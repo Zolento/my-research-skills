@@ -106,7 +106,7 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 ### 1.1 文献检索：先本地，后 arxiv —— **但禁止只停留在本地**
 
 ```
-Step 1: 搜索本地文献库 ./local_literature/
+Step 1: 搜索本地文献库 ./docs/refs/
         命中 → 纳入结果，标注 source="local" —— 但流程继续，不得在此返回
 Step 2: 调用 Python arxiv 包
         ★ 即使 Step 1 已命中，只要触发下述任一条件，本步必须执行
@@ -122,7 +122,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定**（能不能做、资源够不够、是否已有不可能性结果） | L2 强化 |
-| T4 | 新颖性判定（Mode C 的 C1、Mode D 的 S-Lit/S-Nov、Mode E 的 S-Lit） | **L3 穷尽** |
+| T4 | 新颖性判定（Mode C 的 C1、Mode D 的 S-Lit、Mode E 的 S-Lit/S-Nov） | **L3 穷尽** |
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
@@ -167,36 +167,49 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ### 1.4 项目组织与文档落盘（所有 Mode 强制）
 
-**方案与审阅记录必须落盘到 `docs/`，以人类可读的 Markdown 存储，并按路线分开管理。**
+**所有路线的方案与审阅记录必须落盘到项目根目录的 `docs/`（扁平、集中），以人类可读的
+Markdown 存储；参考文献放 `docs/refs/`。**
 
 ```
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
-├── docs/
-│   ├── routeA/            # A001-idea-discovery.md, A001-review.md, A002-proposal.md …
-│   └── routeB/            # B001-proposal.md, B001-review.md …
+├── docs/                  # ★ 所有路线的文档集中于此（扁平，不分子目录）
+│   ├── A001-literature-survey.md
+│   ├── A002-ideas.md
+│   ├── A003-proposal.md
+│   ├── A004-experiment-plan.md
+│   ├── A005-narrative-I1.md
+│   ├── A003-review.md
+│   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
+│   └── refs/              # ★ 参考文献（= 本地文献库根目录 papers/ cache/ index.json）
 ├── routeA/
-│   ├── INDEX.md           # ★ 必需：文档索引 + 进度（已证实/已证伪/TODO/Bugs/Warnings）
+│   ├── INDEX.md           # ★ 必需：索引到 ../docs/A*
 │   └── code/
 ├── routeB/
 │   └── INDEX.md
-└── shared/                # 跨路线公用部分，按 AGENTS.md 规范
+├── shared/                # 跨路线公用代码/笔记，按 AGENTS.md 规范
+└── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
 
-**四条硬性规则：**
+**五条硬性规则：**
 
 1. **先读 `AGENTS.md`。** 项目根目录存在 `AGENTS.md` 时，其约定优先于本 Skill 默认。
-2. **文档集中且分路线：** 人类可读文档放 `docs/routeX/`，命名为
-   `<R><NNN>-<slug>.md`（`<R>` = 路线字母，如 `A`），审阅记录为 `<R><NNN>-review.md`
-   （接续复核 `-review-2.md`）。序号按路线独立递增、永不复用；审阅记录不占新序号。
-   > 注意：文档 ID 前缀 `<R>` 是**路线编号**，与 Mode B/B/C/D 无关。Mode C 在
-   > `routeA` 产出的方案是 `A002` 而**不是** `B002`；产出该文档的 Mode 记在
-   > frontmatter 的 `mode` 字段。
-3. **每条路线必须有 `INDEX.md`**，且每次产出后必须更新。进度必须包含：
-   **已证实 / 已证伪 / TODO / Bugs / Warnings**，以及文档索引与变更日志。
+2. **文档集中（扁平）：** 所有路线的文档都放**根目录 `docs/`**，**不再按路线分子
+   目录**；路线靠**文件名前缀**（`A*` / `B*`）区分，**序号仍按路线独立递增、永不复用**。
+   `slug` 只能取：`literature-survey` / `ideas` / `proposal` / `experiment-plan` /
+   `narrative-I<n>`。
+3. **审阅意见挂在被审 ID 上：** `<被审ID>-review.md`；接续复核 `-review-2.md`。
+   **审阅记录不占新序号。**
+   > 注意：文档 ID 前缀是**路线编号**，与 Mode A/B/C/D/E 无关。Mode C 在 `routeA`
+   > 产出的方案是 `A003` 而**不是** `C003`；产出该文档的 Mode 记在 frontmatter 的
+   > `mode` 字段。
+4. **每条路线必须有 `INDEX.md`**（如 `routeA/INDEX.md`），且每次产出后必须更新。
+   进度必须包含：**已证实 / 已证伪 / TODO / Bugs / Warnings**，以及文档索引
+   （含 **Idea 追踪 / 叙事追踪 / 审阅追踪**）与变更日志。
    被证伪的假设**不得删除**；"检索未达饱和"必须记入 Warnings。
-4. **机器状态不进 docs。** `state.json` 放 `.research-idea-pipeline/`，日志放 `logs/`；
-   docs 正文只放结论与依据。
+5. **参考文献集中：** 论文元数据/笔记/缓存一律放 **`docs/refs/`**（脚本默认
+   `--local-dir ./docs/refs`）；机器状态 `state.json` 放 `.research-idea-pipeline/`，
+   日志放 `logs/`——**都不进 docs 正文**。
 
 完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
 骨架的检查清单）。
@@ -228,7 +241,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 |---|---|
 | A | 无（执行者直接完成检索与归纳） |
 | B | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：三审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
-| C | R-CVPR、R-ICML、R-NeurIPS（创新性）；S-Lit（先前工作核实）；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
+| C | R-CVPR、R-ICML、R-NeurIPS（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
 | D | **叙事审核五子代理**：R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Lit（每套叙事默认 5 个，至少 3 个；idea 多时可加 S-Feas / S-Repro） |
 | E | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（七子代理严格审查 + 交叉质询） |
 
@@ -253,7 +266,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
   A3 范围扩大策略 → A4 饱和判定与输出。
 - **交付物：** 文献列表（含来源标注）+ 检索过程记录（含 429 等待日志）+ 本地缓存
   更新记录 + 尽职调查等级达成情况。
-- **落盘：** `docs/routeX/<R>NNN-literature-survey.md`（含负检索记录），
+- **落盘：** `docs/<R>NNN-literature-survey.md`（含负检索记录），
   并更新该路线 `INDEX.md`；**检索未达饱和必须记入 Warnings**。
 
 ### Mode B — idea-discovery
@@ -270,7 +283,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
   INDEX 的 Warnings。**不派遣 S-Repro。**
 - **交付物：** idea 候选清单（**不少于 10 个，每个都带审核结论**）+ 技术路线归纳表
   + 创新性边界界定 + **推荐 shortlist（3—5 个）+ 淘汰清单**。
-- **落盘：** `docs/routeX/<R>NNN-idea-discovery.md`，并更新该路线 `INDEX.md`
+- **落盘：** `docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
   （文档索引；被放弃的 idea 记入**已证伪**；未核实的无人区声称记 Warnings）。
 
 ### Mode C — proposal-generation
@@ -281,7 +294,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
   （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
 - **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
   + 风险清单。
-- **落盘：** `docs/routeX/<R>NNN-proposal.md` + `<R>NNN-experiment-plan.md`（各占独立序号），
+- **落盘：** `docs/<R>NNN-proposal.md` + `docs/<R>NNN-experiment-plan.md`（各占独立序号），
   并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
 
 ### Mode D — narrative-generation
@@ -290,12 +303,12 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
   关键参考文献（可选）；目标会议（可选）；资源约束（可选）。
 - **定位：** **基于 idea + 方案建立多种顶会风格的叙事逻辑，并拉起子代理评审**；
   决定"怎么讲才不被判增量"。字母顺序上位于方案生成与方案复核之间。
-- **流程：** D1 信息完整性检查 → D2 叙事套路锚定（每 idea ≥4 套）→
-  D3 五段式叙事生成（含跨域五步升级）→ D4 五子代理评审 →
-  D5 交叉质询与共识 → D6 最佳叙事推荐。
+- **流程：** D0.1 信息完整性检查 → D1 叙事套路锚定（每 idea ≥4 套）→
+  D2 每套叙事的生成（含跨域五步升级、五段式、包装前后对照）→ D3 五子代理评审 →
+  D4 交叉质询与共识（逐维度中位数）→ D5 最佳叙事推荐。
 - **交付物：** 多套路叙事清单（每 idea **≥4 套**，每套主线 **≥300 字**）+
   五子代理独立评审意见 + 交叉质询记录 + 最佳叙事推荐 + 横向对比表 + 最终优先级建议。
-- **落盘：** `docs/routeX/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
+- **落盘：** `docs/<R>NNN-narrative-I<n>.md`，并更新该路线 `INDEX.md`
   （被覆盖的叙事套路 → **已证伪**；最佳叙事 → **已证实**；综合评分 <3 → Warnings）。
 
 ### Mode E — proposal-review
@@ -308,7 +321,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
   → E3 交叉质询与共识形成 → E4 复核结论 → E5 接续复核规则。
 - **交付物：** 七子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
   + 横向对比表 +（接续复核时）变更追踪表。
-- **落盘：** `docs/routeX/<被审ID>-review.md`（接续复核用 `-review-2.md`），
+- **落盘：** `docs/<被审ID>-review.md`（接续复核用 `-review-2.md`），
   并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
   待补 → TODO；未缓解的致命风险 / 复现风险高 → Warnings。
 
@@ -360,7 +373,7 @@ E 方案复核。
 - **机器状态**写入 `.research-idea-pipeline/state-<mode>-<timestamp>.json`；串联调用时
   后一个 Mode 读取前一个 Mode 的片段。若用户未要求持久化，也在回复末尾以 JSON
   代码块给出该片段。
-- **人类可读产出**写入 `docs/routeX/`（方案、审阅记录、文献报告），并**同步更新该
+- **人类可读产出**写入 `docs/`（方案、审阅记录、文献报告），并**同步更新该
   路线的 `INDEX.md`**。详见 [references/project-layout.md](references/project-layout.md)。
 
 ---
@@ -387,7 +400,7 @@ E 方案复核。
       否则已降级为"据本次检索未见"或标注"待核实"。
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
-- [ ] **方案/审阅记录已落盘到 `docs/routeX/`**，命名符合 `<R><NNN>-<slug>.md` /
+- [ ] **方案/审阅记录已落盘到 `docs/`**，命名符合 `<R><NNN>-<slug>.md` /
       `<ID>-review.md`；且**文档前缀 = 路线字母**（不随 Mode 变化）。
 - [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
       变更日志。
@@ -416,8 +429,9 @@ E 方案复核。
    叙事位置。** 叙事包装不是夸大，而是**重新定位**。
 6. **为什么角色不变？** 本 Skill 只做编排，角色定义、评分维度、审查视角全部沿用
    统一角色库，保证审查标准的一致性。
-7. **为什么要按路线分离目录并强制 INDEX.md？** 一个项目常有并行的多条技术路线；
-   代码混在一起会互相污染，进度散在对话里会丢失。路线隔离 + 统一入口 INDEX 让
-   并行推进可管理、可交接。
+7. **为什么按路线分离代码、却把文档集中到根目录 `docs/`？** 代码必须隔离（避免互相
+   import 与状态污染），但文档集中才方便跨路线检索、对比与交接。折中办法是：
+   **代码分目录、文档扁平集中**，用**文件名前缀**（`A*` / `B*`）承担路线隔离，因此
+   前缀不可省。参考文献统一放 `docs/refs/`，与检索脚本的本地库路径一致。
 8. **为什么 INDEX.md 要区分"已证实"与"已证伪"？** 负结果常被丢弃，导致后人重复
    踩坑。把证伪结论与 TODO/Bugs/Warnings 一起固化为项目资产，是最省算力的做法。

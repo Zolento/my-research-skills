@@ -129,7 +129,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 ## 落盘
 
 ```
-docs/routeA/A003-literature-survey.md      ← 本报告（含负检索记录与饱和判定）
+docs/A003-literature-survey.md      ← 本报告（含负检索记录与饱和判定）
 routeA/INDEX.md                            ← 更新文档索引 / TODO / Warnings
 ```
 

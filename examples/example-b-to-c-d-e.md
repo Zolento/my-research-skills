@@ -34,7 +34,7 @@
 | I1 | 假设挑战 | 用扩散过程的可逆性约束组合优化搜索空间 | 现有方法把扩散当采样器，未利用可逆性作可行性约束 | Concept & Feasibility | R-ICML | 4 | 3 | 足够 | 高 |
 | I7 | 组合创新 | 把 A 的注意力机制搬到 B 的图搜索 | 仅换模块，无新结构性质 | Use-Inspired | A-Author | 2 | 4 | 不足 | 建议放弃 |
 
-**落盘：** `docs/routeA/A002-idea-discovery.md` + 更新 `routeA/INDEX.md`
+**落盘：** `docs/A002-ideas.md` + 更新 `routeA/INDEX.md`
 
 → `next_mode_suggestion: "C"`
 
@@ -60,7 +60,7 @@
 
 > 贡献编号用 **K1/K2**（不用 C1），避免与 Mode C 的章节号 C1—C7 混淆。
 
-**落盘：** `docs/routeA/A003-proposal.md` + `A004-experiment-plan.md` + 更新 INDEX
+**落盘：** `docs/A003-proposal.md` + `A004-experiment-plan.md` + 更新 INDEX
 
 → `next_mode_suggestion: "D"`
 
@@ -86,14 +86,15 @@
 
 **产物片段（套路对比）：**
 
-| idea | 套路 | R-CVPR 方法/可验证 | R-ICML 原创/严谨 | R-NeurIPS 洞察/重要 | S-Devil 反驳 | S-Lit 结论 | 综合中位数 |
+| idea | 套路 | R-CVPR 方法/可验证 | R-ICML 原创/严谨 | R-NeurIPS 洞察/重要 | S-Devil 反驳→稳健度 | S-Lit 结论 | 综合中位数 |
 |---|---|---|---|---|---|---|---|
-| I1 | N2 瓶颈突破 | 4 / 3 | 4 / 3 | 4 / 3 | 2 | 部分重叠 | **3.5** |
-| I1 | N3 跨域迁移 | 3 / 3 | 3 / 4 | 3 / 3 | 3 | 部分重叠 | 3.0 |
-| I1 | N5 统一框架 | 2 / 2 | 3 / 2 | 3 / 3 | 4 | 部分重叠 | **2.5（否决）** |
+| I1 | N2 瓶颈突破 | 4 / 3 | 4 / 3 | 4 / 3 | 2 → **4** | 部分重叠 | **4.0** |
+| I1 | N3 跨域迁移 | 3 / 3 | 3 / 4 | 3 / 3 | 3 → **3** | 部分重叠 | 3.0 |
+| I1 | N5 统一框架 | 2 / 2 | 3 / 2 | 3 / 3 | 4 → **2** | 部分重叠 | **否决** |
 
-> **N5 被一票否决**：可验证性与理论严谨性中位数 ≤ 2 —— 即使它有故事性也不推荐。
-> **不得只看创新性**（见 [mode-d §D4.1](../references/mode-d-narrative-generation.md)）。
+> **N5 被一票否决**：可验证性、理论严谨性、新颖性稳健度中位数均 ≤ 2 —— 即使它有
+> 故事性也不推荐。**不得只看创新性**（见 [mode-d §D4.1](../references/mode-d-narrative-generation.md)）。
+> **S-Devil 列方向相反**（5 = 完全无新颖性），聚合前须做 `稳健度 = 6 − 反驳分` 归一化。
 
 **包装前后对照（N2）：**
 
@@ -103,7 +104,7 @@
 | 包装后 | 现有离散扩散方法共享**"可逆性仅作采样技巧"**这一假设，导致在置换约束下**结构性失效**；我们移除该假设 | Mode C 提案 §1 的失效分析 + 实验 E2 |
 | 判定 | 只改参照系，未改事实 | 每句都能在提案中找到证据 ✓ |
 
-**落盘：** `docs/routeA/A005-narrative.md` + 更新 INDEX（被覆盖套路 → 已证伪）
+**落盘：** `docs/A005-narrative-I1.md` + 更新 INDEX（被覆盖套路 → 已证伪）
 
 → `next_mode_suggestion: "C | E"`
 
@@ -137,7 +138,7 @@
 4. **E3** 交叉质询：每人至少一条质疑；评分差 ≥2 分记录分歧；汇总取**中位数**。
 5. **E4** 结论卡片（含**复现风险等级**与**方法正确性判定**）。
 
-**落盘：** `docs/routeA/A003-review.md` + 更新 INDEX（结论翻译成进度条目）
+**落盘：** `docs/A003-review.md` + 更新 INDEX（结论翻译成进度条目）
 
 ---
 
@@ -149,12 +150,12 @@ routeA/
 ├── code/
 └── experiments/
 
-docs/routeA/
+docs/
 ├── A001-literature-survey.md             # Mode A（按需）
-├── A002-idea-discovery.md                # Mode B（含 B5 审核）
+├── A002-ideas.md                         # Mode B（含 I1..In 与 B5 审核）
 ├── A003-proposal.md                      # Mode C
 ├── A004-experiment-plan.md               # Mode C
-├── A005-narrative.md                     # Mode D（≥4 套叙事 + 最佳推荐）
+├── A005-narrative-I1.md                  # Mode D（idea I1 的 ≥4 套叙事 + 最佳推荐）
 └── A003-review.md                        # Mode E（含复现风险等级）
 ```
 

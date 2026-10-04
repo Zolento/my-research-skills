@@ -1,8 +1,11 @@
-# 缓存与运行时产物
-local_literature/cache/*.json
-local_literature/papers/*.json
-!local_literature/papers/.gitkeep
-!local_literature/cache/.gitkeep
+# 参考文献库的生成物（按需保留，默认不提交缓存与大文件）
+docs/refs/cache/*.json
+!docs/refs/cache/.gitkeep
+docs/refs/papers/*.json
+docs/refs/papers/*.md
+!docs/refs/papers/.gitkeep
+
+# 机器状态
 .research-idea-pipeline/
 
 # Python

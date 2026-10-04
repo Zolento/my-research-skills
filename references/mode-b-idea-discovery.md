@@ -21,7 +21,7 @@
 | **审查深度** | 快筛：双评分 + 致命反驳 | 深审：七子代理 + 交叉质询 + 中位数 |
 | **产出** | 排序后的 shortlist + 淘汰理由 | 审查结论卡片 + 修改建议 |
 
-**一句话记法：A 管**"值得做吗"**，C 管**"做对了吗"**。**
+**一句话记法：B 管"值得做吗"，E 管"做对了吗"。**
 
 ---
 
@@ -44,7 +44,7 @@
 - **注意：本次调研支撑后续的创新性审核，属于 T4/T5 触发场景**，因此本地命中后
   仍必须执行 arxiv 检索；**进入 shortlist 的 idea 必须完成 L3 穷尽检索**
   （唯一例外是 arxiv 不可用，见 §B5.2）。
-- 建议检索量：`max_results ≥ 20`；不足时按 Mode A 的 D3 策略扩大范围。
+- 建议检索量：`max_results ≥ 20`；不足时按 Mode A 的 A3 策略扩大范围。
 - **产出：**
   1. **技术路线归纳表** —— 把文献聚类为 3—6 条技术路线。
   2. **创新性边界** —— 分为三区：
@@ -212,8 +212,8 @@
 
 ## B7. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `docs/routeX/<R>NNN-idea-discovery.md`（ID 按
-   [project-layout.md](project-layout.md) §2.2 扫描现有最大序号 +1）。
+1. **写文档：** `docs/<R>NNN-ideas.md`（ID 按
+   [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 shortlist + 淘汰清单 + 创新性边界界定。
 2. **frontmatter：** `id / route / mode: B / type: idea-discovery / status / created`。

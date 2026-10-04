@@ -8,7 +8,7 @@
 
 ```
 调用 research-idea-pipeline，mode=E（接续）
-输入：proposal=上一步输出，review_output=上一次 C 的输出
+输入：proposal=上一步输出，review_output=上一次 E 的输出
 ```
 
 ## 触发判定
@@ -49,4 +49,4 @@
 ## 结论要求
 
 即使大部分问题已解决，只要有**未收敛的分歧**或**未缓解的致命风险**，就必须在
-结论卡片中显式保留，并将 `next_mode_suggestion` 设为 `"C"`。
+结论卡片中显式保留，并将 `next_mode_suggestion` 设为 `"E"`。

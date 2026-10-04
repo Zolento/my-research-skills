@@ -43,7 +43,7 @@ research-idea-pipeline/
 │   ├── example-a-standalone.md       # 单独文献调研
 │   ├── example-followup-review.md    # 接续复核
 │   └── example-project-layout.md     # 多路线目录与文档管理
-└── local_literature/                 # 本地文献库格式示例
+└── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
 ```
 
 ---
@@ -128,22 +128,31 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 ```
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
-├── docs/
-│   ├── routeA/            # A001-literature-survey.md, A002-idea-discovery.md,
-│   │                      # A003-proposal.md, A005-narrative.md, A003-review.md
-│   └── routeB/
+├── docs/                  # ★ 所有路线的文档集中于此（扁平，不分子目录）
+│   ├── A001-literature-survey.md
+│   ├── A002-ideas.md      # 含 I1..In 与 B5 审核
+│   ├── A003-proposal.md
+│   ├── A004-experiment-plan.md
+│   ├── A005-narrative-I1.md
+│   ├── A003-review.md
+│   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
+│   └── refs/              # ★ 参考文献（= 本地文献库根目录）
+│       ├── papers/  cache/  index.json
 ├── routeA/
-│   ├── INDEX.md           # ★ 必需：文档索引 + 进度
+│   ├── INDEX.md           # ★ 必需：索引到 ../docs/A*
 │   └── code/
 ├── routeB/
 │   └── INDEX.md
-├── shared/                # 跨路线公用部分
+├── shared/                # 跨路线公用代码/笔记
 └── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
 
 | 规则 | 说明 |
 |---|---|
-| 命名 | `docs/<routeX>/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review.md`，接续为 `-review-2.md` |
+| 命名 | `docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review.md`，接续为 `-review-2.md` |
+| 存放 | **所有路线共用根目录 `docs/`（扁平）**，靠文件名前缀区分路线；参考文献在 `docs/refs/` |
+| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative-I<n>` |
+| 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A—E 无关；Mode 记在 frontmatter |
 | INDEX.md | 每条路线必需，每次产出后更新 |
@@ -180,10 +189,10 @@ python3 scripts/literature_search.py --query "..." --local-only
 | `--limit` | 不截断 | 最终返回条数上限（截断时保留本地优先顺序，并报告截断量） |
 | `--from-year` / `--to-year` | 无 | 年份过滤（含端点；启用过滤时**年份未知的条目被排除**） |
 | `--level {L1,L2,L3}` | 无 | 尽职调查等级，输出达成情况（饱和只对 L2/L3 是硬要求） |
-| `--exhaustive` | 关 | 自动执行 D3 第 ②④ 级扩大检索直到饱和 |
-| `--also-query` | 无 | 追加检索式（可重复）；D3 第 ①③ 级需人工构造 |
+| `--exhaustive` | 关 | 自动执行 A3 第 ②④ 级扩大检索直到饱和 |
+| `--also-query` | 无 | 追加检索式（可重复）；A3 第 ①③ 级需人工构造 |
 | `--local-only` | 关 | **显式**只用本地（违反默认规则；**不得用于支撑创新性声明**） |
-| `--local-dir` | `./local_literature` | 本地库；亦可用 `RESEARCH_LOCAL_LITERATURE` |
+| `--local-dir` | `./docs/refs` | 本地库；亦可用 `RESEARCH_LOCAL_LITERATURE` |
 | `--cache-dir` | `<local-dir>/cache` | 缓存目录；亦可用 `RESEARCH_LIT_CACHE` |
 | `--refresh` | 关 | 跳过缓存（仍查本地与 arxiv，可与 `--exhaustive` 同用） |
 | `--json` / `--quiet` | 关 | JSON 输出 / 静默 |
@@ -198,10 +207,13 @@ python3 scripts/literature_search.py --query "..." --local-only
 
 ---
 
-## 本地文献库格式
+## 参考文献库格式（`docs/refs/`）
+
+**参考文献统一放项目根目录的 `docs/refs/`**，它同时就是检索脚本的本地文献库根目录
+（脚本默认 `--local-dir ./docs/refs`）。
 
 ```
-local_literature/
+docs/refs/
 ├── papers/{paper_id}.json     # title/authors/abstract/year/venue/url/keywords
 ├── papers/{paper_id}.md       # 可选：全文或笔记（参与全文匹配）
 ├── cache/{query_hash}.json    # arxiv 查询缓存（键含 max_results 与年份）
@@ -214,7 +226,7 @@ local_literature/
 
 每个 Mode 输出附加 `state.json` 片段（模板见
 [templates/state.template.json](templates/state.template.json)，键名 = Mode 字母 A—E）。
-机器状态写入 `.research-idea-pipeline/`，人类可读产出写入 `docs/routeX/`。
+机器状态写入 `.research-idea-pipeline/`，人类可读产出写入 `docs/`。
 
 接续规则：
 

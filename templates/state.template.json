@@ -126,7 +126,7 @@
     "mode": "D",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
-    "doc_id": "A004",
+    "doc_id": "A005",
     "target_venue": "CVPR | ICML | NeurIPS",
     "narratives": [
       {
@@ -137,13 +137,13 @@
           "R-CVPR": { "method": null, "verifiability": null },
           "R-ICML": { "originality": null, "rigor": null },
           "R-NeurIPS": { "insight": null, "importance": null, "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results" },
-          "S-Devil": { "novelty_rebuttal": null, "fatal_weaknesses": [] },
+          "S-Devil": { "novelty_rebuttal": null, "novelty_robustness": null, "fatal_weaknesses": [] },
           "S-Lit": { "verdict": "确认新颖 | 部分重叠 | 已被覆盖", "closest_prior_work": [] }
         },
         "dimension_medians": {},
         "median": null,
         "vetoed": false,
-        "veto_reason": "任一维度中位数 ≤ 2 则不得推荐为最佳",
+        "veto_reason": "门禁(S-Lit 已被覆盖 / 不可缓解的致命缺陷) 或 任一归一化维度中位数 ≤ 2",
         "packaging": {
           "before": "我们提出了新模块 B",
           "after": "现有方法依赖假设 X，我们移除了 X",

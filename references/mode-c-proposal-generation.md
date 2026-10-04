@@ -119,7 +119,7 @@
 | 交付物 | 规格 |
 |---|---|
 | **论文提案** | **1500—2000 字**（中文按等量内容计） |
-| **实验流程计划书** | 覆盖 B4 全部 14 节（0—13） |
+| **实验流程计划书** | 覆盖 C4 全部 14 节（0—13） |
 | **创新性判定** | 三视角 + S-Lit 核实结论 |
 | **可行性评分** | 1—5 + 理由 |
 | **风险清单** | 含缓解方案与残余风险 |
@@ -129,13 +129,13 @@
 ## C6. 文档落盘与 INDEX 更新（强制）
 
 1. **写文档（两份，各占独立序号）：**
-   - 方案：`docs/routeX/<R>NNN-proposal.md`
-   - 实验计划：`docs/routeX/<R>NNN-experiment-plan.md`（取下一个可用序号）
-   每份文档都按 project-layout.md §2.2 扫描现有最大序号 +1，**序号永不复用**。
+   - 方案：`docs/<R>NNN-proposal.md`
+   - 实验计划：`docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
+   每份文档都按 project-layout.md §2.6 扫描现有最大序号 +1，**序号永不复用**。
 2. **frontmatter：** `mode: C / type: proposal | experiment-plan / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增两行；
-   - §3 已证实：B1/S-Lit 已核实的结论；
+   - §3 已证实：C1/S-Lit 已核实的结论；
    - §4 已证伪：被 S-Lit/S-Theory 否定的假设；
    - §5 TODO：实验优先级与依赖 → 转成 TODO 条目，标注 P0/P1 与依赖；
    - §6 Bugs：已知的工程障碍（如基线跑不通）；

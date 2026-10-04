@@ -31,7 +31,7 @@
 
 ```
 Step 1: 本地检索
-  路径 ./local_literature/（可配置，见 §8）
+  路径 ./docs/refs/（可配置，见 §8）
   匹配：标题、摘要、关键词、全文（若为 Markdown/JSON）
   命中：纳入结果集，标注 source="local" —— 但流程继续，不得在此返回
 
@@ -159,8 +159,8 @@ import time
 import os
 import json
 
-LOCAL_DIR = "./local_literature/"
-CACHE_DIR = "./local_literature/cache/"
+LOCAL_DIR = "./docs/refs/"
+CACHE_DIR = "./docs/refs/cache/"
 MAX_RETRIES = 5
 BASE_WAIT = 10  # 秒
 
@@ -219,7 +219,7 @@ def cache_results(query, results): ...
 | arxiv 成为**默认执行** | 脚本默认同时查本地与 arxiv，不再因本地命中而短路 |
 | 新增 `--local-only` | **显式**声明只用本地（离线场景）；使用时必须提示"违反默认检索规则" |
 | 新增 `--exhaustive` | 自动执行多轮扩大检索，直到饱和（§3.3） |
-| 新增 `--also-query` | 追加同义词/上位词/否定式检索式（D3 第 ① 级） |
+| 新增 `--also-query` | 追加同义词/上位词/否定式检索式（A3 第 ① 级） |
 | 新增 `--level {L1,L2,L3}` | 按 §3.1 校验并记录尽职调查等级（饱和只对 L2/L3 是硬要求） |
 | 新增 `--limit` | 控制**最终返回**条数（`--max` 只控制每次 arxiv 查询条数） |
 | 缓存键含检索参数 | 见 §5.2 第 3 条 |
@@ -248,7 +248,7 @@ def cache_results(query, results): ...
 ## 7. 本地文献库格式约定
 
 ```
-./local_literature/
+./docs/refs/
   ├── papers/
   │   ├── {paper_id}.json      # 元数据：title/authors/abstract/year/venue/url
   │   └── {paper_id}.md        # 可选：全文或笔记
@@ -280,14 +280,15 @@ def cache_results(query, results): ...
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `--local-dir` / `RESEARCH_LOCAL_LITERATURE` | `./local_literature/` | 本地文献库根目录（相对**用户工作目录**） |
+| `--local-dir` / `RESEARCH_LOCAL_LITERATURE` | `./docs/refs/` | 本地文献库根目录（相对**用户工作目录**） |
 | `--cache-dir` / `RESEARCH_LIT_CACHE` | `<local-dir>/cache/` | arxiv 查询缓存目录 |
 | `--refresh` | 关 | 强制跳过缓存（仍查本地与 arxiv） |
 | `--max` | 20 | 每次 arxiv 查询的条数上限 |
 | `--limit` | 不截断 | 最终返回条数上限（截断保留本地优先顺序） |
 
-> 公用文献库属于**跨路线公用资源**，按 [project-layout.md](project-layout.md) 应放在
-> 项目根目录的 `shared/` 下管理，并在 AGENTS.md 中声明。
+> 参考文献属于**跨路线公用资源**，统一放项目根目录的 **`docs/refs/`** 下
+> （见 [project-layout.md](project-layout.md) §1）；不要散落到 `routeX/` 或项目根目录。
+> 脚本默认 `--local-dir ./docs/refs`，因此无需额外配置。
 
 ---
 
