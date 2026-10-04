@@ -207,7 +207,7 @@ def cache_results(query, results): ...
    `urllib.error.HTTPError`（`.code`）或带 `.response.status_code` 的异常。实现脚本
    兼容捕获 `status` / `code` / `status_code` 及异常文本中的 `429`。
 2. **`hash(query)` 跨进程不稳定**（受 `PYTHONHASHSEED` 影响），不能作缓存文件名。
-   实现脚本改用 `hashlib.md5(query)[:16]`。
+   实现脚本改用 `hashlib.md5(query | max_results | from_year | to_year)[:16]`。
 3. **缓存键必须包含检索参数。** 伪代码只按 `query` 建键，会导致"先用 `--max 20`
    跑一次，再用 `--max 100` 复跑却命中旧的 20 条"，直接损害 L3 与扩检索的质量。
    实现脚本的缓存键为 `md5(query | max_results | from_year | to_year)`。

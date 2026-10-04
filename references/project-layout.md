@@ -88,7 +88,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 | `idea-discovery` | `ideas` | `<R><NNN>-ideas.md` | B |
 | `proposal` | `proposal` | `<R><NNN>-proposal.md` | C |
 | `experiment-plan` | `experiment-plan` | `<R><NNN>-experiment-plan.md` | C（独立序号） |
-| `narrative` | `narrative-<I<n>>` | `<R><NNN>-narrative-I1.md` | D（**每个 idea 一份**） |
+| `narrative` | `narrative-I<n>` | `<R><NNN>-narrative-I<n>.md` | D（**每个 idea 一份**） |
 | `review` | —（特殊，见 §2.3） | `<被审ID>-review.md` | E（或 D 的叙事审核） |
 
 ```
@@ -177,7 +177,7 @@ docs/<被审ID>-review-3.md     # 第 3 轮
 3. **序号按路线独立递增**，不跨路线共享：`routeA` 是 A001/A002/…，
    `routeB` 是 B001/B002/…。
 4. **审阅文档不占用新序号**（见 §2.3）。
-5. 文件放进 `docs/` 子目录做物理隔离，ID 前缀保证跨路线引用无歧义
+5. 文件**全部平铺在 `docs/` 下**（唯一子目录是 `docs/refs/`），ID 前缀保证跨路线引用无歧义
    （INDEX.md 链接、审阅引用、git 检索都靠它）。
 
 ### 2.6 分配规则
@@ -205,6 +205,7 @@ parent: A001                # 可选：上游文档
 supersedes: null            # 可选：被本文件取代的文档
 review_of: null             # 仅审阅文档：被审文档 ID，如 A002
 review_round: null          # 仅审阅文档：第几轮（1,2,3…）
+also_reviewed: []           # 仅审阅文档：同一轮还覆盖了哪些文档 ID
 reviewers: []               # 可选：参与的子代理角色
 ---
 ```
@@ -233,7 +234,7 @@ reviewers: []               # 可选：参与的子代理角色
 ```markdown
 # routeA — INDEX
 
-> 一句话状态：当前处于 Mode C，方案 A002 已产出待审。
+> 一句话状态：当前处于 Mode C，方案 A003 已产出待审。
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
@@ -274,10 +275,12 @@ reviewers: []               # 可选：参与的子代理角色
 | A003 | 2 | A003-review-2.md | 4 | 低 | 致命风险已缓解 |
 
 ## 3. 已证实（Confirmed）
-> 有明确证据支持的结论。每条必须带证据链接。
+> 有明确证据支持的结论。每条必须带证据链接，引用写作 `<文档ID>/<子编号>`。
+> **行号说明：** 下列各表的 `#` 列是**表内行号**（Confirmed 用 C、Falsified 用 F、
+> TODO 用 T、Bugs 用 B、Warnings 用 W），**与 Mode 章节号、触发条件 T1—T7 无关**。
 | # | 结论 | 证据 | 日期 |
 |---|---|---|---|
-| C1 | 离散扩散可表示组合约束 | [A002](../docs/A002-ideas.md) §2；实验 E1 | 2025-01-01 |
+| C1 | 离散扩散可表示组合约束 | [A002/I1](../docs/A002-ideas.md) §2；实验 A004/E1 | 2025-01-01 |
 
 ## 4. 已证伪（Falsified）
 > 被实验或文献否定的假设。**负结果同样是要保管的资产**，不要删。
@@ -311,13 +314,13 @@ reviewers: []               # 可选：参与的子代理角色
 ## 9. 变更日志
 | 日期 | 变更 | 文档 |
 |---|---|---|
-| 2025-01-02 | 新增方案 A002 | A002 |
+| 2025-01-02 | 新增方案 A003 | A003 |
 ```
 
 ### 4.2 维持规则
 
 - **已证实 / 已证伪** 必须区分开：证伪的假设**不得删除**，留在表里并注明处置。
-- **Warnings 中的"检索未达饱和"** 条目，只有在重跑检索达到 §3.3 饱和判据后才能关闭。
+- **Warnings 中的"检索未达饱和"** 条目，只有在重跑检索达到 [literature-policy.md](literature-policy.md) §3.3 的饱和判据后才能关闭。
 - **Bugs** 必须可复现（给出命令或脚本路径）。
 - INDEX 里的链接必须**指向真实存在的文件**，不要写占位路径。
 - `最后更新` 字段每次改动都要刷新。

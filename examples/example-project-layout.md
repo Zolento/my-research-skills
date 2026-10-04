@@ -76,10 +76,10 @@ docs/B002-ideas.md           ← routeB 的 idea 清单（同一目录，靠 B �
 
 ```yaml
 ---
-id: A002
+id: A003
 route: routeA
 mode: C                 # A | B | C | D | E —— 产出该文档的 Mode
-type: proposal          # idea-discovery | proposal | experiment-plan | review | literature-survey
+type: proposal          # idea-discovery | proposal | experiment-plan | narrative | review | literature-survey
 status: draft           # draft | in-review | reviewed | superseded
 created: 2025-01-01
 updated: 2025-01-02
@@ -87,6 +87,7 @@ parent: A001
 supersedes: null
 review_of: null         # 仅审阅文档
 review_round: null      # 仅审阅文档
+also_reviewed: []       # 同一轮还覆盖的文档 ID
 reviewers: []
 ---
 ```
@@ -100,7 +101,7 @@ reviewers: []
 ```markdown
 # routeA — INDEX
 
-> 一句话状态：当前处于 Mode C，方案 A002 已产出待审。
+> 一句话状态：当前处于 Mode C，方案 A003 已产出待审。
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
@@ -119,10 +120,30 @@ reviewers: []
 | A003 | [A003-proposal.md](../docs/A003-proposal.md) | proposal | C | in-review | 待第 1 轮审阅 |
 | A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 中位数 4 |
 
+### 2.1 Idea 追踪
+| Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
+|---|---|---|---|---|
+| I1 | 已进方案 | A002/I1 → A003 | N2 | 复现风险低 |
+| I7 | **已淘汰** | A002/I7 | — | 重叠不足（[作者, 会议/年份]） |
+
+### 2.2 叙事追踪
+| Idea | 叙事文档 | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
+|---|---|---|---|---|---|
+| I1 | A005 | N2/N3/N5/N9 | **N2** | 4.0 | 否（N5 被否决） |
+
+### 2.3 审阅追踪
+| 被审文档 | 轮次 | 文件 | 中位数 | 复现风险 | 结论 |
+|---|---|---|---|---|---|
+| A003 | 1 | A003-review.md | 4 | 低 | 推荐优先级高 |
+
 ## 3. 已证实（Confirmed）
+
+> 下表 `#` 列为**表内行号**（Confirmed 的 C1、Falsified 的 F1、TODO 的 T1、Bugs 的 B1、
+> Warnings 的 W1），**与 Mode 章节号 / 触发条件 T1—T7 无关**。
+
 | # | 结论 | 证据 | 日期 |
 |---|---|---|---|
-| C1 | 离散扩散可表示组合约束 | A001 §2；实验 E1 | 2025-01-01 |
+| C1 | 离散扩散可表示组合约束 | A002/I1 §2；实验 A004/E1 | 2025-01-01 |
 
 ## 4. 已证伪（Falsified）
 | # | 假设 | 否定证据 | 处置 | 日期 |
@@ -154,7 +175,7 @@ reviewers: []
 ## 9. 变更日志
 | 日期 | 变更 | 文档 |
 |---|---|---|
-| 2025-01-02 | 新增方案 A002 | A002 |
+| 2025-01-02 | 新增方案 A003 | A003 |
 ```
 
 **维持规则：**
