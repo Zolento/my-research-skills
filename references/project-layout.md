@@ -127,8 +127,8 @@ docs/<被审ID>-review-2.md     # 第 2 轮（接续复核）
 docs/<被审ID>-review-3.md     # 第 3 轮
 ```
 
-- `<被审ID>` 可以是 `-proposal.md`、`-experiment-plan.md`、`-narrative-I1.md`
-  **任一文档的 ID**。
+- `<被审ID>` 是被审**文档的 ID**（不是文件名），可以是任意类型的文档：
+  方案（`A003`）、实验计划（`A004`）、叙事（`A005`）等。
 - 文件名里**不出现** Mode 字母，避免与路线字母混淆。
 - **一轮复核覆盖多个文档时**（如同时审 proposal + experiment-plan）：
   挂在**主文档**（proposal 或 narrative）的 ID 上，其余文档写进 frontmatter 的
