@@ -64,21 +64,34 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 
 ## 2. 文档命名与 ID 分配
 
+> **记法：** `<routeX>` = 路线目录（如 `routeA`）；`<R>` = 该路线对应的**大写路线
+> 字母**（如 `A`），等同于下文的 `<ROUTE>`；`<NNN>` = 三位序号；
+> `<ID>` = 完整文档 ID（如 `A002`）。
+
 ### 2.1 命名格式
 
 ```
-docs/<routeX>/<ROUTE><NNN>-<slug>.md        # 交付物文档
-docs/<routeX>/<ROUTE><NNN>-review.md        # 第 1 次审阅记录
-docs/<routeX>/<ROUTE><NNN>-review-2.md      # 第 2 次审阅（接续复核）
-docs/<routeX>/<ROUTE><NNN>-review-3.md      # 第 3 次审阅
+docs/<routeX>/<R><NNN>-<slug>.md        # 交付物文档
+docs/<routeX>/<R><NNN>-review.md        # 第 1 次审阅记录
+docs/<routeX>/<R><NNN>-review-2.md      # 第 2 次审阅（接续复核）
+docs/<routeX>/<R><NNN>-review-3.md      # 第 3 次审阅
 ```
 
-- `<ROUTE>`：路线字母（A/B/C…），与 `routeX` 对应。
+- `<R>`（= `<ROUTE>`）：**路线字母**（A/B/C…），与 `routeX` 一一对应。
 - `<NNN>`：该路线内**三位递增序号**，从 `001` 开始，**只增不减、永不复用**。
 - `<slug>`：kebab-case 英文短描述，如 `proposal`、`experiment-plan`、
   `idea-discovery`、`literature-survey`。
 - **审阅文档不占用新序号**，永远挂在被审文档的 ID 上（`A002-review.md`）。
 - 接续复核递增 `-review-2`、`-review-3`，并在 frontmatter 里写 `review_round`。
+
+**硬规则（不随 Mode 变化）：**
+
+1. **文档 ID 前缀 = 所属路线的字母。** `routeA` 下的文档一律 `A` 开头，
+   `routeB` 下一律 `B` 开头；**绝不允许** `routeB` 下出现 `A0xx`。
+2. **前缀与产出该文档的 Mode 无关。** Mode B 在 `routeA` 产出的方案仍是 `A002`，
+   **不是** `B002`。Mode 记在 frontmatter 的 `mode` 字段。
+3. **序号按路线独立递增**，不跨路线共享：`routeA` 是 A001/A002/…，
+   `routeB` 是 B001/B002/…。
 
 **示例（对应你给的命名）：**
 
@@ -235,11 +248,11 @@ reviewers: []               # 可选：参与的子代理角色
 
 | Mode | 产出文档 | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
-| **A** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<routeD>/<R>001-idea-discovery.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
-| **B** | 论文提案 | `docs/<routeD>/<R>00N-proposal.md` | 对应 `INDEX.md` |
-| **B** | 实验流程计划书 | `docs/<routeD>/<R>00N-experiment-plan.md` | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
-| **C** | 审阅记录（**含复现风险等级**） | `docs/<routeD>/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
-| **D** | 文献调研报告（含负检索记录） | `docs/<routeD>/<R>00N-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
+| **A** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<routeX>/<R>001-idea-discovery.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
+| **B** | 论文提案 | `docs/<routeX>/<R>00N-proposal.md` | 对应 `INDEX.md` |
+| **B** | 实验流程计划书 | `docs/<routeX>/<R>00N-experiment-plan.md` | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
+| **C** | 审阅记录（**含复现风险等级**） | `docs/<routeX>/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
+| **D** | 文献调研报告（含负检索记录） | `docs/<routeX>/<R>00N-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
 | 任意 | 机器状态 | `.research-idea-pipeline/state-<mode>-<ts>.json` | 不入 docs |
 
 **审阅结论对进度的映射：** Mode C 的结论要**翻译成进度条目**——
@@ -282,5 +295,6 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 **自检：**
 
 - INDEX 里的每个链接都指向真实存在的文件；
+- **每条路线下的文档 ID 前缀与该路线字母一致**（`routeB/` 下不得出现 `A0xx`）；
 - 每条路线都含全部必需章节（文档索引、已证实、已证伪、TODO、Bugs、Warnings、变更日志）；
 - 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新。

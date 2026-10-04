@@ -177,10 +177,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 1. **先读 `AGENTS.md`。** 项目根目录存在 `AGENTS.md` 时，其约定优先于本 Skill 默认。
 2. **文档集中且分路线：** 人类可读文档放 `docs/routeX/`，命名为
-   `<路线字母><NNN>-<slug>.md`，审阅记录为 `<NNN>-review.md`（接续复核 `-review-2.md`）。
-   序号按路线独立递增、永不复用；审阅记录不占新序号。
-   > 注意：文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D 无关；产出该文档的
-   > Mode 记在 frontmatter 的 `mode` 字段。
+   `<R><NNN>-<slug>.md`（`<R>` = 路线字母，如 `A`），审阅记录为 `<R><NNN>-review.md`
+   （接续复核 `-review-2.md`）。序号按路线独立递增、永不复用；审阅记录不占新序号。
+   > 注意：文档 ID 前缀 `<R>` 是**路线编号**，与 Mode A/B/C/D 无关。Mode B 在
+   > `routeA` 产出的方案是 `A002` 而**不是** `B002`；产出该文档的 Mode 记在
+   > frontmatter 的 `mode` 字段。
 3. **每条路线必须有 `INDEX.md`**，且每次产出后必须更新。进度必须包含：
    **已证实 / 已证伪 / TODO / Bugs / Warnings**，以及文档索引与变更日志。
    被证伪的假设**不得删除**；"检索未达饱和"必须记入 Warnings。
@@ -319,7 +320,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 - Mode B 读取 Mode A 的 `idea_candidates`。
 - Mode C 读取 Mode B 的 `proposal` 与 `experiment_plan`。
 - Mode C 接续复核时，读取上一次 Mode C 的 `review_output` 与 `open_questions`。
-- 任意 Mode 调用 Mode D 时，传递 `query` 与 `scope`。
+- 任意 Mode 调用 Mode D 时，传递 `query` 与 `scope`（并指定尽职调查等级 `level`）。
 
 **落地约定：**
 
@@ -351,7 +352,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
 - [ ] **方案/审阅记录已落盘到 `docs/routeX/`**，命名符合 `<R><NNN>-<slug>.md` /
-      `<NNN>-review.md`。
+      `<ID>-review.md`；且**文档前缀 = 路线字母**（不随 Mode 变化）。
 - [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
       变更日志。
 - [ ] 未达饱和的检索、未缓解的风险已记入 `INDEX.md` 的 Warnings。

@@ -114,30 +114,35 @@
 
 ## 4. Mode × 角色 派遣矩阵
 
-| 角色 | A | B | C | D |
-|---|:--:|:--:|:--:|:--:|
-| R-CVPR | ● | ● | ● | |
-| R-ICML | ● | ● | ● | |
-| R-NeurIPS | ● | ● | ● | |
-| A-Author | ● | ● | | |
-| A-Experimenter | ● | ● | | |
-| S-Lit | | ● | ● | |
-| S-Nov | | | | |
-| S-Theory | | ● | | |
-| S-Feas | | ● | ● | |
-| S-Devil | ● | | ● | |
-| S-Repro | | | ● | |
+**图例：** ● 派遣 ／ ○ 按需派遣 ／ — 不派遣
 
-> **S-Nov 按需派遣：** 当 S-Lit 判定为"边缘"，或存在"首次提出"声称时，在
+| 角色 | A·头脑风暴(A3) | A·idea 审核(A5) | B | C | D |
+|---|:--:|:--:|:--:|:--:|:--:|
+| R-CVPR | ● | ● | ● | ● | — |
+| R-ICML | ● | ● | ● | ● | — |
+| R-NeurIPS | ● | ● | ● | ● | — |
+| A-Author | ● | — | ● | — | — |
+| A-Experimenter | ● | — | ● | — | — |
+| S-Lit | — | ● | ● | ● | — |
+| S-Nov | — | ○ | ○ | ○ | — |
+| S-Theory | — | ○ | ● | — | — |
+| S-Feas | — | ● | ● | ● | — |
+| S-Devil | ● | ● | — | ● | — |
+| S-Repro | — | — | — | ● | — |
+
+> **S-Nov 按需派遣（○）：** 当 S-Lit 判定为"边缘"，或存在"首次提出"声称时，在
 > **Mode A（A5）/ Mode B / Mode C** 中追加 S-Nov 做独立新颖性核验（避免与 S-Lit
 > 同源偏差）。
+>
+> **S-Theory 在 A5 按需（○）：** 仅当该 idea 含理论声称时才派；在 Mode B 的 B2 属
+> 常规派遣（●）。
 >
 > **S-Repro 只在 Mode C 出现。** Mode A 的审核对象是一句话级 idea，没有代码可复现；
 > 把 S-Repro 派到 A 属于职责错配。
 >
 > **A5 与 C2 的深度不同：** A5 是概念级快筛（双评分 + 一条致命反驳），不要求交叉
 > 质询、不要求每人 200 字；C2 是方案级深审，要求七子代理、交叉质询、中位数评分。
-> 详见 [mode-a](mode-a-idea-discovery.md) §A0 与 [mode-c](mode-c-proposal-review.md) §C0。
+> 详见 [mode-a](mode-a-idea-discovery.md) §A5 与 [mode-c](mode-c-proposal-review.md) §C2。
 
 ---
 

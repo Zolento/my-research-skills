@@ -198,13 +198,16 @@ def extract_metadata(paper): ...
 def cache_results(query, results): ...
 ```
 
-### 5.2 对伪代码的两点工程修正
+### 5.2 对伪代码的三点工程修正
 
 1. **`arxiv.HTTPError` 并非 arxiv 包稳定导出的异常。** 实际 429 多为
    `urllib.error.HTTPError`（`.code`）或带 `.response.status_code` 的异常。实现脚本
    兼容捕获 `status` / `code` / `status_code` 及异常文本中的 `429`。
 2. **`hash(query)` 跨进程不稳定**（受 `PYTHONHASHSEED` 影响），不能作缓存文件名。
    实现脚本改用 `hashlib.md5(query)[:16]`。
+3. **缓存键必须包含检索参数。** 伪代码只按 `query` 建键，会导致"先用 `--max 20`
+   跑一次，再用 `--max 100` 复跑却命中旧的 20 条"，直接损害 L3 与扩检索的质量。
+   实现脚本的缓存键为 `md5(query | max_results | from_year | to_year)`。
 
 ### 5.3 本版新增的行为变更
 
@@ -215,6 +218,8 @@ def cache_results(query, results): ...
 | 新增 `--exhaustive` | 自动执行多轮扩大检索，直到饱和（§3.3） |
 | 新增 `--also-query` | 追加同义词/上位词/否定式检索式（D3 第 ① 级） |
 | 新增 `--level {L1,L2,L3}` | 按 §3.1 校验并记录尽职调查等级 |
+| 缓存键含检索参数 | 见 §5.2 第 3 条 |
+| `--refresh` 与 `--exhaustive` 可同时使用 | 早前版本在 `--refresh` 下会静默跳过扩大检索，已修正 |
 
 ---
 

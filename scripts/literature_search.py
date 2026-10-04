@@ -81,13 +81,22 @@ def tokenize(text: str) -> List[str]:
     return [t.lower() for t in _TOKEN_RE.findall(text) if t.lower() not in _STOPWORDS]
 
 
-def query_hash(query: str) -> str:
-    """稳定的查询哈希。
+def query_hash(
+    query: str,
+    max_results: Optional[int] = None,
+    from_year: Optional[int] = None,
+    to_year: Optional[int] = None,
+) -> str:
+    """稳定的查询哈希（含会影响结果的检索参数）。
 
-    注意：Python 内建 hash() 受 PYTHONHASHSEED 影响，跨进程不稳定，不能用于
-    缓存文件名（见 literature-policy.md §2.1）。此处使用 md5。
+    注意两点：
+    1. Python 内建 hash() 受 PYTHONHASHSEED 影响，跨进程不稳定，不能用于缓存文件名
+       （见 literature-policy.md §5.2）。此处使用 md5。
+    2. 缓存键**必须包含 max_results 与年份过滤**：若只按 query 建键，用更大的
+       --max 复跑会命中旧的、更小的结果集，直接损害 L3 / 扩检索的质量。
     """
-    return hashlib.md5(query.strip().lower().encode("utf-8")).hexdigest()[:16]
+    key = f"{query.strip().lower()}|{max_results}|{from_year}|{to_year}"
+    return hashlib.md5(key.encode("utf-8")).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -285,12 +294,20 @@ def search_arxiv(
 # Step 3：缓存
 # ---------------------------------------------------------------------------
 
-def cache_results(query: str, results: List[Dict[str, Any]], cache_dir: Path) -> Path:
-    """把 arxiv 结果写入 <cache_dir>/{query_hash}.json。"""
+def cache_results(
+    query: str,
+    results: List[Dict[str, Any]],
+    cache_dir: Path,
+    max_results: Optional[int] = None,
+    from_year: Optional[int] = None,
+    to_year: Optional[int] = None,
+) -> Path:
+    """把 arxiv 结果写入 <cache_dir>/{query_hash}.json（键含检索参数）。"""
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / f"{query_hash(query)}.json"
+    cache_path = cache_dir / f"{query_hash(query, max_results, from_year, to_year)}.json"
     payload = {
         "query": query,
+        "params": {"max_results": max_results, "from_year": from_year, "to_year": to_year},
         "cached_at": datetime.now(timezone.utc).isoformat(),
         "count": len(results),
         "results": results,
@@ -300,9 +317,18 @@ def cache_results(query: str, results: List[Dict[str, Any]], cache_dir: Path) ->
     return cache_path
 
 
-def read_cache(query: str, cache_dir: Path) -> Optional[List[Dict[str, Any]]]:
-    """读取查询缓存；缓存中的 arxiv 结果仍标注 source="arxiv"。"""
-    cache_path = cache_dir / f"{query_hash(query)}.json"
+def read_cache(
+    query: str,
+    cache_dir: Path,
+    max_results: Optional[int] = None,
+    from_year: Optional[int] = None,
+    to_year: Optional[int] = None,
+) -> Optional[List[Dict[str, Any]]]:
+    """读取查询缓存；缓存中的 arxiv 结果仍标注 source="arxiv"。
+
+    缓存键含 max_results 与年份过滤，因此换了 --max / --from-year 不会命中旧结果。
+    """
+    cache_path = cache_dir / f"{query_hash(query, max_results, from_year, to_year)}.json"
     if not cache_path.is_file():
         return None
     try:
@@ -444,7 +470,7 @@ def search_literature(
     arxiv_available = True
     for q in queries:
         if use_cache and not refresh:
-            cached = read_cache(q, cache_dir)
+            cached = read_cache(q, cache_dir, max_results, from_year, to_year)
             if cached is not None:
                 steps.append({"step": "cache", "query": q, "hits": len(cached)})
                 arxiv_hits.extend(cached)
@@ -465,7 +491,7 @@ def search_literature(
         steps.append({"step": "arxiv", "query": q, "hits": len(hits)})
         arxiv_hits.extend(hits)
         if hits:
-            cache_path = cache_results(q, hits, cache_dir)
+            cache_path = cache_results(q, hits, cache_dir, max_results, from_year, to_year)
             cache_updates.append(f"{cache_path} ({len(hits)} 条)")
             steps.append({"step": "cache_write", "query": q, "hits": len(hits)})
 
@@ -474,7 +500,7 @@ def search_literature(
     # --- Step 3: 范围扩大（D3）与饱和判定（§3.3） ---
     saturated = False
     saturation_reason = "未启动扩大检索"
-    if exhaustive and arxiv_available and not refresh:
+    if exhaustive and arxiv_available:
         zero_streak = 0
         plan = [
             {"round": 2, "action": "放宽时间范围", "from_year": None, "to_year": None, "max": max_results},
@@ -524,8 +550,6 @@ def search_literature(
                 break
         if not saturated and arxiv_available:
             saturation_reason = "扩大检索轮次已用尽；新增仍非零，建议追加同义词检索式"
-    elif exhaustive and refresh:
-        saturation_reason = "--refresh 已开启，扩大检索跳过"
     elif arxiv_available:
         saturation_reason = "未启用 --exhaustive；本地+arxiv 单轮检索"
 
@@ -715,6 +739,8 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"  实际 检索式 {lvl['actual']['queries']} 个 / 结果 {lvl['actual']['results']} 条")
         if lvl["gaps"]:
             print(f"- 未达标项：{', '.join(lvl['gaps'])}")
+            if "saturated" in lvl["gaps"] and not args.exhaustive:
+                print("- 提示：L2/L3 要求达到饱和判据，请加上 --exhaustive 与更多 --also-query")
         if payload["note"]:
             print(f"\n> ⚠️ {payload['note']}")
             print("> ⚠️ 检索未达饱和 —— 请记入 INDEX.md 的 Warnings。")

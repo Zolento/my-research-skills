@@ -198,17 +198,19 @@ local_literature/
 
 ---
 
-## 相对原规范的三点工程修正
+## 相对原规范的四点工程修正
 
-原规范中有三处在真实环境会失效，已修正并记录在
-[literature-policy.md §2.1 / §5.3](references/literature-policy.md)：
+原规范中有四处在真实环境会失效，已修正并记录在
+[literature-policy.md §5.2 / §5.3](references/literature-policy.md)：
 
 1. **`arxiv.HTTPError` 并非 arxiv 包稳定导出的异常。** 实际 429 多为
    `urllib.error.HTTPError`（`.code`）或带 `.response.status_code` 的异常。
    脚本兼容捕获 `status` / `code` / `status_code` 及异常文本中的 `429`。
 2. **`hash(query)` 跨进程不稳定**（受 `PYTHONHASHSEED` 影响），不能作缓存文件名。
-   改用 `hashlib.md5(query)[:16]`。
-3. **"本地命中即返回"被取消。** 本地检索改为起点而非终点；默认取本地 + arxiv 的
+   改用 `hashlib.md5(...)[:16]`。
+3. **缓存键必须含检索参数。** 只按 query 建键会导致"用更大的 `--max` 复跑却命中旧的
+   小结果集"，直接损害 L3 与扩检索质量。缓存键 = `md5(query|max|from_year|to_year)`。
+4. **"本地命中即返回"被取消。** 本地检索改为起点而非终点；默认取本地 + arxiv 的
    并集，只有显式 `--local-only` 才跳过 arxiv（并打印规则违反提示）。
 
 ---

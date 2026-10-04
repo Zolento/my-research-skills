@@ -43,6 +43,8 @@
 ## 3. 命名与文档规则
 
 - 文档 ID：`<路线字母><三位序号>`，如 `A001`、`B012`；序号按路线独立递增、永不复用。
+  **前缀 = 所属路线字母，不随产出它的 Mode 变化**（Mode B 在 routeA 产出的是 `A002`，
+  不是 `B002`；Mode 记在 frontmatter 的 `mode` 字段）。
 - 交付物：`docs/<routeX>/<ID>-<slug>.md`
 - 审阅记录：`docs/<routeX>/<被审ID>-review.md`；接续复核为 `-review-2.md`。
 - 每份文档必须有 YAML frontmatter（`id/route/mode/type/status/created`）。
