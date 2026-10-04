@@ -187,8 +187,9 @@
 | **S-Lit** | 文献定位核验员：核实叙事声称的新颖性是否真实 | 最接近先前工作列表（**≥5 篇**）、新颖性核实结论（确认新颖 / 部分重叠 / 已被覆盖）、意见 **≥200 字** |
 
 **按需追加（参照 [roles.md](roles.md) §4）：** idea 数量多、或叙事涉及资源/伦理时，
-可加派 **S-Feas**（可行性）与 **S-Repro**（可复现性与伦理）；加派后其评分同样进入
-§D4.1 的归一化维度向量。
+可加派 **S-Feas**（可行性评分 1—5，高 = 好）与 **S-Repro**（只输出可复现性核对结论与
+风险清单，**不产生 1—5 分，不进入中位数向量**）。S-Feas 的评分并入 §D4.1 的归一化
+维度向量；S-Repro 的结论按 §D4.1 第 1 步门禁处理。
 
 ### D3.1 各子代理的审核指令
 
@@ -299,7 +300,7 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
 
 命中任一即**直接否决该套叙事**，不论其他维度多高：
 
-1. **S-Lit 判定"已被覆盖"** → 否决（[venue-standards.md](venue-standards.md) §6 范畴）；
+1. **S-Lit 判定"已被覆盖"** → 否决（[venue-standards.md](venue-standards.md) §5 创新性判定范畴）；
 2. **S-Devil 指出的致命弱点含"不可缓解的根本缺陷"** → 否决；
 3. **任一门禁项标注"存在评审分歧"且未收敛** → 不得推荐为最佳。
 
@@ -445,7 +446,8 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
     }
   ],
   "cross_examination": [
-    {"idea_id": "I1", "pattern": "N2", "dimension": "新颖性", "agents": ["R-ICML", "S-Devil"], "resolved": true}
+    {"idea_id": "I1", "pattern": "N2", "dimension": "理论严谨性", "agents": ["R-ICML", "S-Devil"],
+     "issue": "T1 依赖未验证的有界性假设", "resolved": true}
   ],
   "best_narrative": [
     {"idea_id": "I1", "pattern": "N2", "median": 4.0, "best_venue": "ICML", "runner_up": "N3", "fatal_defect": false}

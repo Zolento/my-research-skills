@@ -169,6 +169,7 @@
   ],
   "rate_limit_log": ["[429] 限流，等待 10s 后重试（第 1 次）"],
   "cache_updates": ["docs/refs/cache/ab12cd34ef56.json (12 条)"],
+  "called_by": "standalone | B | C | D | E",
   "open_questions": ["arxiv 未命中的会议论文需人工补充"],
   "next_mode_suggestion": null
 }

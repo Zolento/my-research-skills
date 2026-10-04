@@ -352,7 +352,7 @@ reviewers: []               # 可选：参与的子代理角色
 | **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
 | **C** | 论文提案 | `docs/<R>NNN-proposal.md` | 对应 `INDEX.md` |
 | **C** | 实验流程计划书 | `docs/<R>NNN-experiment-plan.md`（**取其独立序号，通常紧随 proposal 之后**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
-| **D** | 多套路叙事清单（≥4 套/idea）+ 五子代理评审 + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `docs/<R>NNN-narrative-I<n>.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
+| **D** | 多套路叙事清单（≥4 套/idea）+ ≥3 子代理评审（默认 5） + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `docs/<R>NNN-narrative-I<n>.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
 | **E** | 审阅记录（**含复现风险等级**） | `docs/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
 | 任意 | 机器状态 | `.research-idea-pipeline/state-<mode>-<ts>.json` | 不入 docs |
 

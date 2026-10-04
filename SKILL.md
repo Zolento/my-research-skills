@@ -243,7 +243,7 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 | B | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：三审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
 | C | R-CVPR、R-ICML、R-NeurIPS（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
 | D | **叙事审核五子代理**：R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Lit（每套叙事默认 5 个，至少 3 个；idea 多时可加 S-Feas / S-Repro） |
-| E | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（七子代理严格审查 + 交叉质询） |
+| E | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（**七子代理**严格审查 + 交叉质询）；**S-Nov（按需，S-Lit 判"边缘"或涉及"首次"时）** |
 
 **职责边界：** 不派遣 S-Repro 到 Mode B（idea 阶段无代码可复现）；B5 的审核是
 **概念级快筛**，不要与 Mode E 的方案级深审重复。详见

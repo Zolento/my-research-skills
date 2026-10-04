@@ -934,12 +934,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         sat, lvl = payload["saturation"], payload["level_report"]
         print("\n## 饱和与尽职调查")
         print(f"- 饱和：{'是' if sat['saturated'] else '否'}（{sat['reason']}）")
-        print(f"- 等级 {lvl['level']}：{'达成' if lvl['achieved'] else '未达成'}"
-              f"  实际 检索式 {lvl['actual']['queries']} 个 / 结果 {lvl['actual']['results']} 条")
-        if lvl["gaps"]:
-            print(f"- 未达标项：{', '.join(lvl['gaps'])}")
-            if "saturated" in lvl["gaps"] and not args.exhaustive:
-                print("- 提示：L2/L3 要求达到饱和判据，请加上 --exhaustive 与更多 --also-query")
+        actual = f"实际 检索式 {lvl['actual']['queries']} 个 / 结果 {lvl['actual']['results']} 条"
+        if args.level:
+            print(f"- 等级 {lvl['level']}：{'达成' if lvl['achieved'] else '未达成'}  {actual}")
+            if lvl["gaps"]:
+                print(f"- 未达标项：{', '.join(lvl['gaps'])}")
+                if "saturated" in lvl["gaps"] and not args.exhaustive:
+                    print("- 提示：L2/L3 要求达到饱和判据，请加上 --exhaustive 与更多 --also-query")
+        else:
+            # 未指定 --level 时不做等级判定，避免误报「L1 未达成」
+            print(f"- 未指定 --level，未做等级判定；{actual}")
+            print("- 提示：若本次检索要支撑创新性声明，请显式传 `--level L3 --exhaustive`")
         if payload["note"]:
             print(f"\n> ⚠️ {payload['note']}")
             print("> ⚠️ 检索未达饱和 —— 请记入 INDEX.md 的 Warnings。")

@@ -49,7 +49,7 @@
 
 ---
 
-## C3. 论文格式展开（投稿人视角）
+## C3. 论文格式展开（由 **A-Author** 执笔）
 
 按以下结构输出提案，**必须逐节作答，不得跳过**：
 
@@ -77,7 +77,7 @@
 
 ---
 
-## C4. 实验流程设计（实验设计者视角）
+## C4. 实验流程设计（由 **A-Experimenter** 执笔）
 
 按以下 **14 节（0—13）** 结构输出。逐节作答，缺节即视为交付不完整。
 
@@ -159,7 +159,7 @@
   "doc_id": "A003",
   "idea_id": "I3",
   "idea": "…",
-  "proposal": {"background": "…", "contributions": [{"text": "…", "type": "方法"}], "related_work": [], "motivation": "…", "experiments": [], "conclusions": "…"},
+  "proposal": {"background": "…", "contributions": [{"id": "K1", "text": "…", "type": "方法"}], "related_work": [], "motivation_why_not_before": "…", "experiments": [], "conclusions": "…"},
   "experiment_plan": {"contribution_experiment_map": [], "hypotheses": [], "datasets": [], "baselines": [], "metrics": [], "ablation_matrix": [], "budget": "…", "reproducibility": []},
   "novelty_verdict": {"R-CVPR": "中", "R-ICML": "高", "R-NeurIPS": "中", "S-Lit_overlap": "足够"},
   "feasibility_score": 4,

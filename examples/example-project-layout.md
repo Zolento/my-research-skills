@@ -110,14 +110,16 @@ reviewers: []
 | 研究问题 | 离散扩散如何约束组合优化搜索空间 |
 | 核心假设 | 可逆性可作为硬可行性约束 |
 | 目标会议 | ICML |
-| 当前阶段 | Mode C |
+| 当前阶段 | Mode D |
 | 推荐优先级 | 中 |
 
 ## 2. 文档索引
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
 | A002 | [A002-ideas.md](../docs/A002-ideas.md) | idea-discovery | B | reviewed | 12 个 idea（含 B5 审核） |
-| A003 | [A003-proposal.md](../docs/A003-proposal.md) | proposal | C | in-review | 待第 1 轮审阅 |
+| A003 | [A003-proposal.md](../docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1..Kn |
+| A004 | [A004-experiment-plan.md](../docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1..E7 |
+| A005 | [A005-narrative-I1.md](../docs/A005-narrative-I1.md) | narrative | D | reviewed | idea I1 的 4 套叙事，最佳 N2 |
 | A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 中位数 4 |
 
 ### 2.1 Idea 追踪

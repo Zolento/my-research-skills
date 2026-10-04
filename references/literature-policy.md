@@ -283,6 +283,7 @@ def cache_results(query, results): ...
 | `--local-dir` / `RESEARCH_LOCAL_LITERATURE` | `./docs/refs/` | 本地文献库根目录（相对**用户工作目录**） |
 | `--cache-dir` / `RESEARCH_LIT_CACHE` | `<local-dir>/cache/` | arxiv 查询缓存目录 |
 | `--refresh` | 关 | 强制跳过缓存（仍查本地与 arxiv） |
+| `--no-cache` | 关 | 不读缓存，但结果仍写入缓存 |
 | `--max` | 20 | 每次 arxiv 查询的条数上限 |
 | `--limit` | 不截断 | 最终返回条数上限（截断保留本地优先顺序） |
 
@@ -319,7 +320,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 python3 scripts/literature_search.py --query "..." --max 50 --limit 20
 ```
 
-**退出码：** `0` 正常；`1` 硬错误（含参数错误、缓存目录不可用、渲染失败）；
+**退出码：** `0` 正常；`1` 硬错误（含参数错误、渲染失败）；
 `2` arxiv 不可用、已回退本地结果（检索视为未饱和）。
 
 **输出：** 文献列表（含 `source`）+ 检索过程记录（每轮检索式与命中）+ 429 等待日志

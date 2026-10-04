@@ -80,7 +80,7 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 1. 从[十套套路](references/narrative-patterns.md)中为每个 idea 选 **≥4 套**生成叙事；
 2. 跨域类 idea 强制走**五步升级**（结构性缺陷 → 结构同构 → 迁移合法性 → 新算法 → 实证）；
 3. 拉起 **5 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / S-Devil / S-Lit）打分；
-4. **综合评分必须覆盖全部维度，不得只看创新性**；任一维度中位数 ≤ 2 一票否决；
+4. **综合评分必须覆盖全部维度，不得只看创新性**；**聚合前先做极性归一化**（S-Devil 的反驳分是 5=完全无新颖性、越低越好，须转为**新颖性稳健度 = 6 − 反驳分**），**归一化后任一维度中位数 ≤ 2** 一票否决（见 [mode-d §D4.1](references/mode-d-narrative-generation.md)）；
 5. 完成**叙事包装 = 重新定位，不是夸大**：只改参照系，不改事实，每句声称都要能在
    方案里找到证据。
 
@@ -195,9 +195,10 @@ python3 scripts/literature_search.py --query "..." --local-only
 | `--local-dir` | `./docs/refs` | 本地库；亦可用 `RESEARCH_LOCAL_LITERATURE` |
 | `--cache-dir` | `<local-dir>/cache` | 缓存目录；亦可用 `RESEARCH_LIT_CACHE` |
 | `--refresh` | 关 | 跳过缓存（仍查本地与 arxiv，可与 `--exhaustive` 同用） |
+| `--no-cache` | 关 | 不读缓存（结果仍会写入缓存） |
 | `--json` / `--quiet` | 关 | JSON 输出 / 静默 |
 
-**退出码：** `0` 正常；`1` 硬错误（含参数错误、缓存目录不可用、渲染失败）；`2` arxiv
+**退出码：** `0` 正常；`1` 硬错误（含参数错误、渲染失败）；`2` arxiv
 不可用、已回退本地结果（**检索未达饱和**）。
 
 **依赖：** `arxiv`（`pip install arxiv`）。未安装时自动回退本地结果，不会崩溃。
