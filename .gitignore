@@ -1,0 +1,17 @@
+# 缓存与运行时产物
+local_literature/cache/*.json
+local_literature/papers/*.json
+!local_literature/papers/.gitkeep
+!local_literature/cache/.gitkeep
+.research-idea-pipeline/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/

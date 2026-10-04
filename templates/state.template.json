@@ -1,0 +1,135 @@
+{
+  "_schema": "research-idea-pipeline/state@1",
+  "_usage": "每个 Mode 输出时附加对应片段；串联调用时后一个 Mode 读取前一个 Mode 的片段。可写入 ./.research-idea-pipeline/state-<mode>-<timestamp>.json。",
+  "A": {
+    "mode": "A",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "domain_keywords": [],
+    "idea_candidates": [
+      {
+        "id": "I1",
+        "strategy": "问题重构 | 假设挑战 | 跨域迁移 | 反向思考 | 组合创新",
+        "one_liner": "",
+        "difference_from_prior_work": "",
+        "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results",
+        "source_agent": "R-CVPR | R-ICML | R-NeurIPS | A-Author | A-Experimenter | S-Devil",
+        "addresses_limitation": "",
+        "main_attack_surface": ""
+      }
+    ],
+    "literature_used": [
+      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "" }
+    ],
+    "innovation_boundary": {
+      "red_ocean": [],
+      "blue_ocean": [],
+      "no_mans_land": []
+    },
+    "open_questions": [],
+    "next_mode_suggestion": "B"
+  },
+  "B": {
+    "mode": "B",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "idea_id": "I1",
+    "idea": "",
+    "proposal": {
+      "background": "",
+      "contributions": [{ "text": "", "type": "方法 | 理论 | 实证 | 问题定义" }],
+      "related_work": [{ "ref": "", "difference": "" }],
+      "motivation_why_not_before": "",
+      "experiments": [],
+      "conclusions": ""
+    },
+    "experiment_plan": {
+      "info_completeness": "",
+      "contribution_experiment_map": [{ "contribution": "C1", "experiment": "E1" }],
+      "hypotheses": [{ "id": "H1", "statement": "", "falsification": "" }],
+      "datasets": [],
+      "baselines": [],
+      "metrics": [],
+      "statistics": "",
+      "experiment_cards": [],
+      "ablation_matrix": [],
+      "robustness": "",
+      "budget": "",
+      "reproducibility": [],
+      "expected_results": "",
+      "priority_dependencies": [],
+      "presentation_plan": ""
+    },
+    "novelty_verdict": {
+      "R-CVPR": "",
+      "R-ICML": "",
+      "R-NeurIPS": "",
+      "S-Lit_overlap": "足够 | 边缘 | 不足",
+      "venue_standard_cited": ""
+    },
+    "feasibility_score": null,
+    "risk_list": [
+      { "risk": "", "type": "工程 | 理论 | 数据 | 时间", "probability": "", "impact": "", "mitigation": "", "residual": "" }
+    ],
+    "literature_used": [],
+    "open_questions": [],
+    "next_mode_suggestion": "C"
+  },
+  "C": {
+    "mode": "C",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "review_type": "first | follow-up",
+    "proposal_ref": "state-B-<timestamp>.json",
+    "review_output": {
+      "R-CVPR": { "score": null, "opinion": "" },
+      "R-ICML": { "score": null, "opinion": "" },
+      "R-NeurIPS": { "score": null, "opinion": "" },
+      "S-Devil": { "score": null, "opinion": "" },
+      "S-Feas": { "score": null, "opinion": "" },
+      "S-Lit": { "score": null, "opinion": "" },
+      "S-Repro": { "score": null, "opinion": "" }
+    },
+    "median_score": null,
+    "cross_examination": [
+      { "from": "", "to": "", "original_score": null, "issue": "", "resolved": false }
+    ],
+    "disagreements": [
+      { "dimension": "", "agents": [], "scores": [], "unresolved": true }
+    ],
+    "verdict": {
+      "priority": "高 | 中 | 低 | 建议放弃",
+      "best_venue": "CVPR | ICML | NeurIPS",
+      "core_strengths": [],
+      "fatal_risks": [{ "risk": "", "mitigable": true, "path": "" }],
+      "revision_suggestions": []
+    },
+    "change_tracking": [
+      { "previous_issue": "", "type": "", "previous_status": "", "resolved": false, "evidence": "" }
+    ],
+    "score_delta": [
+      { "agent": "", "previous": null, "current": null, "delta": "", "reason": "" }
+    ],
+    "open_questions": [],
+    "next_mode_suggestion": "C"
+  },
+  "D": {
+    "mode": "D",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "query": "",
+    "scope": {
+      "from_year": null,
+      "to_year": null,
+      "venues": [],
+      "max_results": 20
+    },
+    "literature_used": [
+      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "", "relevance": "高 | 中 | 低" }
+    ],
+    "retrieval_log": [
+      { "round": 1, "query": "", "hits": 0, "escalation": null }
+    ],
+    "rate_limit_log": ["本轮无 429"],
+    "cache_updates": [],
+    "called_by": "standalone | A | B | C",
+    "open_questions": [],
+    "next_mode_suggestion": null
+  }
+}
