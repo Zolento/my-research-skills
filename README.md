@@ -1,8 +1,14 @@
 # research-idea-pipeline
 
-面向 **CVPR / ICML / NeurIPS** 投稿的研究创意全流程辅助 Skill。覆盖从文献调研、
-idea 发现（含 idea 级审核）、方案生成到方案复核的完整链路。可单独调用任一 Mode，
-也可串联调用。
+面向 **CVPR / ICML / NeurIPS** 投稿的研究创意全流程辅助 Skill。覆盖文献调研、idea
+发现（含 idea 级审核）、方案生成、**多套路叙事生成与审稿**、方案复核的完整链路。
+可单独调用任一 Mode，也可串联调用。
+
+**字母顺序 = 工作流顺序：**
+
+```
+A 文献调研 → B idea 发现 → C 方案生成 → D 叙事生成 → E 方案复核
+```
 
 > **状态：已构建，待审核。** 本项目尚未安装到任何 skills 目录
 > （`~/.claude/skills/`、`~/.agents/skills/` 等）。
@@ -16,44 +22,47 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：mode 分发 + 全局不变量 + 状态传递
 ├── README.md                         # 本文件
 ├── references/
-│   ├── roles.md                      # 11 个共享子代理角色
+│   ├── roles.md                      # 11 个共享子代理角色 + Mode D 叙事审核量表
 │   ├── venue-standards.md            # CVPR / ICML / NeurIPS 标准 + 防复现标准
+│   ├── narrative-patterns.md         # 十套叙事套路 + 跨域五步升级 + 叙事包装
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
-│   ├── mode-a-idea-discovery.md      # Mode A：发现 + idea 级审核（A0—A8）
-│   ├── mode-b-proposal-generation.md # Mode B（B1—B7）
-│   ├── mode-c-proposal-review.md     # Mode C：方案级正确性 + 防复现（C0—C8）
-│   └── mode-d-literature-survey.md   # Mode D（D1—D7）
+│   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
+│   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
+│   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
+│   ├── mode-d-narrative-generation.md# Mode D：多套路叙事 + 五子代理审稿（D0—D8）
+│   └── mode-e-proposal-review.md     # Mode E：方案级正确性 + 防复现（E0—E8）
 ├── scripts/
 │   └── literature_search.py          # 可运行检索器（本地+arxiv 并集 / 429 backoff / 缓存）
 ├── templates/
-│   ├── AGENTS.template.md            # 项目契约骨架（可选）
 │   ├── INDEX.md                      # 路线 INDEX.md 骨架（必需）
-│   └── state.template.json           # state.json 片段模板
+│   └── state.template.json           # state.json 片段模板（键 = A—E）
 ├── examples/
-│   ├── example-a-to-b-to-c.md        # 串联调用
+│   ├── example-b-to-c-d-e.md         # 主链路串联
+│   ├── example-d-narrative.md        # 多套路叙事与选型
+│   ├── example-a-standalone.md       # 单独文献调研
 │   ├── example-followup-review.md    # 接续复核
-│   ├── example-d-standalone.md       # 单独文献调研
 │   └── example-project-layout.md     # 多路线目录与文档管理
 └── local_literature/                 # 本地文献库格式示例
 ```
 
 ---
 
-## 四个 Mode
+## 五个 Mode
 
 | Mode | 名称 | 作用 | 可独立调用 | 可被谁调用 |
 |---|---|---|---|---|
-| **A** | `idea-discovery` | 文献调研 + 多子代理头脑风暴产出 idea，**并做 idea 级创新性/可行性审核** | 是 | — |
-| **B** | `proposal-generation` | 基于 idea 做创新性与可行性研究，产出方案 | 是 | 接 A 之后 |
-| **C** | `proposal-review` | 复核**已成型方案**的正确性与可行性，并守创新性底线（防复现） | 是 | 接 B，或接上一次 C |
-| **D** | `literature-survey` | 补充文献、扩大检索范围 | 是 | 被 A/B/C 调用，也可单独调用 |
+| **A** | `literature-survey` | 补充文献、扩大检索范围 | 是 | 被 B/C/D/E 调用，也可单独调用 |
+| **B** | `idea-discovery` | 文献调研 + 多子代理头脑风暴产出 idea，**并做 idea 级创新性/可行性审核** | 是 | 接 A 之后 |
+| **C** | `proposal-generation` | 基于 idea 做创新性与可行性研究，产出方案 | 是 | 接 B 之后 |
+| **D** | `narrative-generation` | **基于 idea + 方案**生成多种顶会风格叙事逻辑，并拉起子代理评审，筛出最佳叙事 | 是 | 接 B（仅 idea）或接 C（推荐） |
+| **E** | `proposal-review` | 复核**已成型方案**的正确性与可行性，并守创新性底线（防复现） | 是 | 接 C/D，或接上一次 E |
 
-### A 与 C 的分工
+### 各阶段的分工
 
-> **A 管"值得做吗"（概念级），C 管"做对了吗"（方案级）。**
+> **B 决定"做不做"，C 决定"做什么"，D 决定"怎么讲"，E 决定"做得对不对"。**
 
-| 维度 | Mode A | Mode C |
+| 维度 | Mode B（idea 级） | Mode E（方案级） |
 |---|---|---|
 | 对象 | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | 可行性 | 概念可行性：路线是否成立 | 工程可行性：具体做法能否跑通、变量是否可控 |
@@ -62,7 +71,18 @@ research-idea-pipeline/
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
 | 深度 | 快筛：双评分 + 致命反驳 | 深审：七子代理 + 交叉质询 + 中位数 |
 
-Mode C 的结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**。
+Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**。
+
+### Mode D：多套路叙事（本 Skill 的差异化能力）
+
+同一 idea 在不同叙事下，审稿人的接收意愿差异显著。Mode D 因此：
+
+1. 从[十套套路](references/narrative-patterns.md)中为每个 idea 选 **≥4 套**生成叙事；
+2. 跨域类 idea 强制走**五步升级**（结构性缺陷 → 结构同构 → 迁移合法性 → 新算法 → 实证）；
+3. 拉起 **5 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / S-Devil / S-Lit）打分；
+4. **综合评分必须覆盖全部维度，不得只看创新性**；任一维度中位数 ≤ 2 一票否决；
+5. 完成**叙事包装 = 重新定位，不是夸大**：只改参照系，不改事实，每句声称都要能在
+   方案里找到证据。
 
 ---
 
@@ -77,7 +97,7 @@ Mode C 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定** | L2 强化 |
-| T4 | 新颖性判定（B1、C2.2） | **L3 穷尽** |
+| T4 | 新颖性判定（C1、D3.2、E2.2） | **L3 穷尽** |
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
@@ -94,7 +114,7 @@ Mode C 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 ### 2. 顶会标准锚定
 
 创新性判定必须引用 CVPR / ICML / NeurIPS 的具体标准；贡献必须标注类型；
-"首次提出"必须经 S-Lit 核实。Mode C 另有**防复现六项检查**与复现风险等级。
+"首次提出"必须经 S-Lit 核实。Mode E 另有**防复现六项检查**与复现风险等级。
 
 ### 3. 输出规范
 
@@ -109,8 +129,9 @@ Mode C 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
 ├── docs/
-│   ├── routeA/            # A001-idea-discovery.md, A002-proposal.md, A002-review.md
-│   └── routeB/            # B001-proposal.md, B001-review.md
+│   ├── routeA/            # A001-literature-survey.md, A002-idea-discovery.md,
+│   │                      # A003-proposal.md, A005-narrative.md, A003-review.md
+│   └── routeB/
 ├── routeA/
 │   ├── INDEX.md           # ★ 必需：文档索引 + 进度
 │   └── code/
@@ -124,7 +145,7 @@ Mode C 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 |---|---|
 | 命名 | `docs/<routeX>/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review.md`，接续为 `-review-2.md` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
-| 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A/B/C/D 无关；Mode 记在 frontmatter |
+| 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A—E 无关；Mode 记在 frontmatter |
 | INDEX.md | 每条路线必需，每次产出后更新 |
 | 进度必须包含 | **已证实 / 已证伪 / TODO / Bugs / Warnings** + 文档索引 + 变更日志 |
 | 负结果 | 被证伪的假设**不得删除**，保留并注明处置 |
@@ -148,29 +169,32 @@ python3 scripts/literature_search.py --query "discrete diffusion combinatorial o
     --also-query "limits of diffusion model combinatorial optimization" \
     --json
 
-# 离线：显式只用本地（会打印规则违反提示）
+# 离线：显式只用本地（会打印规则违反提示；不得支撑创新性声明）
 python3 scripts/literature_search.py --query "..." --local-only
 ```
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `--query` / `-q` | 必填 | 检索关键词或研究问题 |
-| `--max` / `-n` | `20` | 最多返回条数 |
-| `--from-year` / `--to-year` | 无 | 年份过滤（含端点） |
-| `--level {L1,L2,L3}` | 无 | 尽职调查等级，输出达成情况 |
-| `--exhaustive` | 关 | 自动执行 D3 扩大检索直到饱和 |
-| `--also-query` | 无 | 追加检索式（可重复） |
-| `--local-only` | 关 | **显式**只用本地（违反默认规则，会警告） |
+| `--query` / `-q` | 必填 | 检索关键词或研究问题（支持中文） |
+| `--max` / `-n` | `20` | **每次 arxiv 查询**的条数上限；本地命中不受此限制 |
+| `--limit` | 不截断 | 最终返回条数上限（截断时保留本地优先顺序，并报告截断量） |
+| `--from-year` / `--to-year` | 无 | 年份过滤（含端点；启用过滤时**年份未知的条目被排除**） |
+| `--level {L1,L2,L3}` | 无 | 尽职调查等级，输出达成情况（饱和只对 L2/L3 是硬要求） |
+| `--exhaustive` | 关 | 自动执行 D3 第 ②④ 级扩大检索直到饱和 |
+| `--also-query` | 无 | 追加检索式（可重复）；D3 第 ①③ 级需人工构造 |
+| `--local-only` | 关 | **显式**只用本地（违反默认规则；**不得用于支撑创新性声明**） |
 | `--local-dir` | `./local_literature` | 本地库；亦可用 `RESEARCH_LOCAL_LITERATURE` |
-| `--refresh` | 关 | 跳过缓存（仍查本地与 arxiv） |
+| `--cache-dir` | `<local-dir>/cache` | 缓存目录；亦可用 `RESEARCH_LIT_CACHE` |
+| `--refresh` | 关 | 跳过缓存（仍查本地与 arxiv，可与 `--exhaustive` 同用） |
 | `--json` / `--quiet` | 关 | JSON 输出 / 静默 |
 
-**退出码：** `0` 正常；`1` 硬错误；`2` arxiv 不可用、已回退本地结果（**检索未达饱和**）。
+**退出码：** `0` 正常；`1` 硬错误（含参数错误、缓存目录不可用、渲染失败）；`2` arxiv
+不可用、已回退本地结果（**检索未达饱和**）。
 
 **依赖：** `arxiv`（`pip install arxiv`）。未安装时自动回退本地结果，不会崩溃。
 
 **输出：** 文献列表（含 `source`）+ 检索过程记录 + 429 等待日志 + 缓存更新记录 +
-范围扩大记录 + **饱和判定与等级达成情况** + 负检索记录。
+范围扩大记录 + **逐检索式的负检索记录** + **饱和判定与等级达成情况**。
 
 ---
 
@@ -180,7 +204,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 local_literature/
 ├── papers/{paper_id}.json     # title/authors/abstract/year/venue/url/keywords
 ├── papers/{paper_id}.md       # 可选：全文或笔记（参与全文匹配）
-├── cache/{query_hash}.json    # arxiv 查询缓存
+├── cache/{query_hash}.json    # arxiv 查询缓存（键含 max_results 与年份）
 └── index.json                 # 可选
 ```
 
@@ -189,12 +213,16 @@ local_literature/
 ## 状态传递
 
 每个 Mode 输出附加 `state.json` 片段（模板见
-[templates/state.template.json](templates/state.template.json)）。机器状态写入
-`.research-idea-pipeline/`，人类可读产出写入 `docs/routeX/`。
+[templates/state.template.json](templates/state.template.json)，键名 = Mode 字母 A—E）。
+机器状态写入 `.research-idea-pipeline/`，人类可读产出写入 `docs/routeX/`。
 
-接续规则：B 读 A 的 `idea_candidates`（含 `review` 评分）；C 读 B 的 `proposal` +
-`experiment_plan`；接续 C 读上一次 C 的 `review_output` + `open_questions`；
-任意 Mode 调用 D 时传递 `query` + `scope` + `level`。
+接续规则：
+
+- Mode C 读取 Mode B 的 `idea_candidates`（含 B5 的 `review` 评分）。
+- Mode D 读取 Mode B 的 idea 与 Mode C 的 `proposal`。
+- Mode E 读取 Mode C 的 `proposal` + `experiment_plan`，以及 Mode D 的最佳叙事推荐。
+- 接续 E 读取上一次 E 的 `review_output` + `open_questions`。
+- 任意 Mode 调用 Mode A 时，传递 `query` + `scope` + `level`。
 
 ---
 
@@ -223,4 +251,4 @@ local_literature/
 ln -s "$PWD/research-idea-pipeline" ~/.claude/skills/research-idea-pipeline
 ```
 
-安装后通过 `mode=A|B|C|D` 触发调用。
+安装后通过 `mode=A|B|C|D|E` 触发调用。

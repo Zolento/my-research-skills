@@ -11,9 +11,10 @@
   4. 每条结果必须标注 source="local" 或 source="arxiv"。
   5. 5 次重试仍失败 —— 返回本地已有结果，并标注
      "arxiv 暂时不可用，以下结果仅来自本地库"（视为检索未达饱和）。
-  6. --exhaustive 执行 D3 范围扩大直到饱和（§3.3）；
+  6. --exhaustive 执行 D3 范围扩大直到饱和（§3.3），每轮结果按本轮参数单独缓存；
      --level L1|L2|L3 校验尽职调查等级（§3.1）；
      --also-query 追加同义词/上位词/否定式检索式。
+  7. --limit 控制最终返回条数（--max 只控制每次 arxiv 查询的条数）。
 
 用法：
     # 默认：本地 + arxiv 并集
@@ -25,12 +26,12 @@
         --also-query "score-based generative model discrete optimization" \
         --also-query "limits of diffusion model combinatorial optimization"
 
-    # 离线：显式只用本地（会打印规则违反提示）
+    # 离线：显式只用本地（会打印规则违反提示，不得支撑创新性声明）
     python literature_search.py --query "..." --local-only
 
 退出码：
     0  正常（本地 + arxiv 成功）
-    1  硬错误（参数错误、本地库不可读等）
+    1  硬错误（参数错误、本地库不可读、渲染失败等）
     2  arxiv 不可用，已回退到本地结果（检索未达饱和）
 """
 
@@ -54,9 +55,14 @@ from typing import Any, Callable, Dict, List, Optional
 MAX_RETRIES = 5
 BASE_WAIT = 10  # 秒；退避序列 10 → 20 → 40 → 80 → 160
 DEFAULT_LOCAL_DIR = os.environ.get("RESEARCH_LOCAL_LITERATURE", "./local_literature")
+DEFAULT_CACHE_DIR = os.environ.get("RESEARCH_LIT_CACHE")  # 为空则由 <local-dir>/cache 决定
 RATE_LIMIT_NOTE = "arxiv 暂时不可用，以下结果仅来自本地库"
+PARTIAL_ARXIV_NOTE = (
+    "arxiv 在扩检索阶段中断，结果不完整（含中断前的 arxiv 结果）；检索未达饱和"
+)
 
-_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9\-]+", re.IGNORECASE)
+_LATIN_RE = re.compile(r"[a-z0-9][a-z0-9\-]+", re.IGNORECASE)
+_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]+")
 _STOPWORDS = {
     "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "with",
     "via", "using", "use", "from", "by", "is", "are", "be", "as", "at",
@@ -74,11 +80,67 @@ def _noop_log(message: str) -> None:
     pass
 
 
+def _cjk_tokens(text: str) -> List[str]:
+    """中文没有空格分词：整段 + 二元组，使部分重合也能命中。"""
+    out: List[str] = []
+    for run in _CJK_RE.findall(text):
+        out.append(run)
+        if len(run) > 2:
+            out.extend(run[i:i + 2] for i in range(len(run) - 1))
+    return out
+
+
 def tokenize(text: str) -> List[str]:
-    """小写分词并去停用词，用于本地关键词匹配。"""
+    """小写分词并去停用词；同时支持拉丁词与中文。
+
+    ⚠️ 只匹配 ASCII 会让中文检索完全失效（本 Skill 的文档与多数查询是中文），
+    因此中文走"整段 + 二元组"的分词策略。
+    """
     if not text:
         return []
-    return [t.lower() for t in _TOKEN_RE.findall(text) if t.lower() not in _STOPWORDS]
+    low = text.lower()
+    latin = [t for t in _LATIN_RE.findall(low) if t not in _STOPWORDS]
+    return latin + _cjk_tokens(low)
+
+
+def _coerce_year(value: Any) -> Optional[int]:
+    """把 2019 / \"2019\" / \"2019-05\" 统一成 int；无法解析返回 None。"""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        match = re.search(r"(?:19|20)\d{2}", value)
+        return int(match.group(0)) if match else None
+    return None
+
+
+def _in_year_range(
+    year: Optional[int], from_year: Optional[int], to_year: Optional[int],
+) -> bool:
+    """年份过滤。
+
+    ⚠️ 启用过滤时，年份未知的条目一律**排除**：否则 isinstance 守卫会让过滤被静默
+    跳过，用户以为筛了年份其实没有。
+    """
+    if from_year is None and to_year is None:
+        return True
+    if year is None:
+        return False
+    if from_year is not None and year < from_year:
+        return False
+    if to_year is not None and year > to_year:
+        return False
+    return True
+
+
+def _keywords_text(value: Any) -> str:
+    """keywords 既可能是数组也可能是字符串；字符串不能被逐字符 join。"""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        return " ".join(str(v) for v in value if v)
+    return ""
 
 
 def query_hash(
@@ -142,29 +204,32 @@ def search_local(
     local_dir: Path,
     from_year: Optional[int] = None,
     to_year: Optional[int] = None,
+    entries: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """在本地文献库中按关键词匹配标题 / 摘要 / 关键词 / 全文。
 
     命中条目标注 source="local"。
+    `entries` 可由调用方预先读入并复用，避免每个检索式都重读磁盘。
     """
     q_tokens = set(tokenize(query))
     if not q_tokens:
         return []
 
-    hits: List[Dict[str, Any]] = []
-    for record in _read_paper_entries(local_dir / "papers"):
-        year = record.get("year")
-        if from_year is not None and isinstance(year, int) and year < from_year:
-            continue
-        if to_year is not None and isinstance(year, int) and year > to_year:
+    if entries is None:
+        entries = _read_paper_entries(local_dir / "papers")
+
+    hit_records: List[Dict[str, Any]] = []
+    for record in entries:
+        year = _coerce_year(record.get("year"))
+        if not _in_year_range(year, from_year, to_year):
             continue
 
         # 字段权重：标题 > 关键词 > 摘要 > 全文
         weighted_fields = [
-            (record.get("title", ""), 3.0),
-            (" ".join(record.get("keywords", []) or []), 2.5),
-            (record.get("abstract", ""), 1.5),
-            (record.get("_fulltext", ""), 1.0),
+            (record.get("title") or "", 3.0),
+            (_keywords_text(record.get("keywords")), 2.5),
+            (record.get("abstract") or "", 1.5),
+            (record.get("_fulltext") or "", 1.0),
         ]
 
         score = 0.0
@@ -176,9 +241,9 @@ def search_local(
                 matched |= overlap
                 score += weight * len(overlap)
 
-        # 短语整体命中额外加权
+        # 短语整体命中额外加权（中文尤其依赖这一项）
         haystack = " ".join(
-            str(record.get(k, "")) for k in ("title", "abstract", "_fulltext")
+            str(record.get(k) or "") for k in ("title", "abstract", "_fulltext")
         ).lower()
         if query.strip().lower() in haystack:
             score += 5.0
@@ -187,10 +252,10 @@ def search_local(
             hit = {k: v for k, v in record.items() if not k.startswith("_")}
             hit["_score"] = round(score, 3)
             hit["matched_terms"] = sorted(matched)
-            hits.append(hit)
+            hit_records.append((score, hit))
 
-    hits.sort(key=lambda r: r.get("_score", 0.0), reverse=True)
-    return hits
+    hit_records.sort(key=lambda pair: pair[0], reverse=True)
+    return [hit for _, hit in hit_records]
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +266,10 @@ def _status_of(exc: BaseException) -> Optional[int]:
     """从异常中尽力提取 HTTP 状态码。
 
     arxiv 包并不稳定导出 arxiv.HTTPError；实际多为 urllib.error.HTTPError
-    （.code）或带 .response.status_code 的异常。详见 literature-policy.md §2.1。
+    （.code）或带 .response.status_code 的异常。详见 literature-policy.md §5.2。
+
+    文本兜底只认"看起来像 HTTP 状态"的消息（要求 status/code/http 前缀），
+    否则 "paper 2401.429 missing" 这类无关数字会触发 5 轮、共 310 秒的假退避。
     """
     for attr in ("status", "status_code", "code"):
         value = getattr(exc, attr, None)
@@ -212,7 +280,11 @@ def _status_of(exc: BaseException) -> Optional[int]:
         value = getattr(response, "status_code", None)
         if isinstance(value, int):
             return value
-    match = re.search(r"\b(429|4\d{2}|5\d{2})\b", str(exc))
+    match = re.search(
+        r"(?:status|code|http)[^0-9]{0,16}\b(4\d{2}|5\d{2})\b",
+        str(exc),
+        re.IGNORECASE,
+    )
     if match:
         return int(match.group(1))
     return None
@@ -268,10 +340,7 @@ def search_arxiv(
             results: List[Dict[str, Any]] = []
             for paper in client.results(search):
                 meta = extract_metadata(paper)
-                year = meta.get("year")
-                if from_year is not None and isinstance(year, int) and year < from_year:
-                    continue
-                if to_year is not None and isinstance(year, int) and year > to_year:
+                if not _in_year_range(meta.get("year"), from_year, to_year):
                     continue
                 results.append(meta)
             return results
@@ -359,7 +428,7 @@ LEVEL_REQUIREMENTS: Dict[str, Dict[str, Any]] = {
 
 LOCAL_ONLY_NOTE = (
     "仅使用本地库（--local-only）：违反默认检索规则——本地检索不得作为终点，"
-    "本地结果不构成任何不存在性证据。"
+    "本地结果不构成任何不存在性证据，**不得用于支撑创新性声明（T1）**。"
 )
 
 
@@ -369,16 +438,22 @@ def _level_report(
     n_results: int,
     arxiv_available: bool,
     saturated: bool,
+    escalation_attempted: bool = False,
 ) -> Dict[str, Any]:
-    """按 §3.1 校验尽职调查等级达成情况。"""
+    """按 §3.1 校验尽职调查等级达成情况。
+
+    ⚠️ 饱和（§3.3）**只对 L2/L3 是硬要求**：L1 不要求扩检索，若把 saturated 作为
+    所有等级的硬检查，任何未开 --exhaustive 的普通检索都会报"L1 未达成"。
+    """
     name = level or "L1"
     req = LEVEL_REQUIREMENTS.get(name, LEVEL_REQUIREMENTS["L1"])
     checks = {
         "queries": n_queries >= req["min_queries"],
         "results": n_results >= req["min_results"],
         "arxiv": arxiv_available or not req["require_arxiv"],
-        "saturated": saturated,
     }
+    if name in ("L2", "L3"):
+        checks["saturated"] = saturated
     return {
         "level": name,
         "requirements": req,
@@ -387,6 +462,7 @@ def _level_report(
             "results": n_results,
             "arxiv_available": arxiv_available,
             "saturated": saturated,
+            "escalation_attempted": escalation_attempted,
         },
         "checks": checks,
         "achieved": all(checks.values()),
@@ -407,12 +483,17 @@ def search_literature(
     also_queries: Optional[List[str]] = None,
     exhaustive: bool = False,
     level: Optional[str] = None,
+    limit: Optional[int] = None,
     log: Log = _noop_log,
 ) -> Dict[str, Any]:
     """本地 + arxiv 合并检索（含 429 退避、缓存、扩检与饱和判定）。
 
     ★ 默认不因本地命中而短路：只要未显式 `local_only`，都会查询 arxiv。
       这是 literature-policy.md §0 对原规范的强化。
+
+    Args:
+        max_results: 传给 arxiv 的单次查询条数上限（本地命中不受此限制）。
+        limit: 可选，最终返回条数上限（None = 不截断）。截断时保留本地优先的顺序。
 
     Returns:
         {
@@ -423,7 +504,9 @@ def search_literature(
           "cache_updates": [...],
           "note": str | None,
           "arxiv_available": bool,
-          "negative_search_record": [...],  # 负检索记录（L2/L3 必需）
+          "total_results_before_limit": int,
+          "truncated": int,
+          "negative_search_record": [...],  # 逐检索式的负检索记录（L2/L3 必需）
           "escalations": [...],          # D3 范围扩大记录
           "saturation": {...},
           "level_report": {...},
@@ -436,44 +519,53 @@ def search_literature(
     escalations: List[Dict[str, Any]] = []
 
     queries = [query] + [q for q in (also_queries or []) if q and q.strip()]
+    local_by_query: Dict[str, List[Dict[str, Any]]] = {q: [] for q in queries}
+    arxiv_by_query: Dict[str, List[Dict[str, Any]]] = {q: [] for q in queries}
 
     def capture(message: str) -> None:
         if message.startswith("[429]") or message.startswith("[arxiv-error]"):
             rate_limit_log.append(message)
         log(message)
 
-    # --- Step 1: 本地检索（纳入结果，但不作为终点） ---
-    local_hits: List[Dict[str, Any]] = []
+    def try_cache(q: str, hits: List[Dict[str, Any]],
+                  mx: Optional[int], fy: Optional[int], ty: Optional[int]) -> None:
+        """缓存写入失败**不得**中断检索（缓存目录只读/被占用很常见）。"""
+        try:
+            path = cache_results(q, hits, cache_dir, mx, fy, ty)
+        except OSError as exc:
+            log(f"[warn] 缓存写入失败（不影响本次结果）：{exc}")
+            return
+        cache_updates.append(f"{path} ({len(hits)} 条)")
+        steps.append({"step": "cache_write", "query": q, "hits": len(hits)})
+
+    # --- Step 1: 本地检索（纳入结果，但不作为终点） ---    # 本地库只读一次，在所有检索式之间复用（避免 O(检索式 × 文件数) 的重复 IO）
+    entries = _read_paper_entries(local_dir / "papers")
     for q in queries:
-        hits = search_local(q, local_dir, from_year, to_year)
+        hits = search_local(q, local_dir, from_year, to_year, entries=entries)
         steps.append({"step": "local", "query": q, "hits": len(hits)})
-        local_hits.extend(hits)
+        local_by_query[q].extend(hits)
+
+    local_hits = [hit for q in queries for hit in local_by_query[q]]
+    per_query: Dict[str, List[Dict[str, Any]]] = dict(local_by_query)
 
     if local_only:
         merged = _merge_unique(local_hits)
-        return {
-            "query": query,
-            "results": merged,
-            "steps": steps,
-            "rate_limit_log": rate_limit_log or ["本轮无 429"],
-            "cache_updates": [],
-            "note": LOCAL_ONLY_NOTE,
-            "arxiv_available": True,
-            "negative_search_record": _negative_record(queries, merged),
-            "escalations": [],
-            "saturation": {"saturated": False, "reason": "local-only 模式下不做饱和判定"},
-            "level_report": _level_report(level, len(queries), len(merged), False, False),
-        }
+        return _finish(
+            query=query, merged=merged, steps=steps, rate_limit_log=rate_limit_log,
+            cache_updates=[], note=LOCAL_ONLY_NOTE, arxiv_available=True,
+            per_query=per_query, escalations=[],
+            saturation={"saturated": False, "reason": "local-only 模式下不做饱和判定"},
+            level=level, limit=limit, escalation_attempted=False,
+        )
 
     # --- Step 2: arxiv 检索（每个检索式一次；命中缓存则跳过） ---
-    arxiv_hits: List[Dict[str, Any]] = []
     arxiv_available = True
     for q in queries:
         if use_cache and not refresh:
             cached = read_cache(q, cache_dir, max_results, from_year, to_year)
             if cached is not None:
                 steps.append({"step": "cache", "query": q, "hits": len(cached)})
-                arxiv_hits.extend(cached)
+                arxiv_by_query[q].extend(cached)
                 continue
 
         try:
@@ -489,12 +581,14 @@ def search_literature(
             break  # arxiv 不可用时不再发起新请求
 
         steps.append({"step": "arxiv", "query": q, "hits": len(hits)})
-        arxiv_hits.extend(hits)
-        if hits:
-            cache_path = cache_results(q, hits, cache_dir, max_results, from_year, to_year)
-            cache_updates.append(f"{cache_path} ({len(hits)} 条)")
-            steps.append({"step": "cache_write", "query": q, "hits": len(hits)})
+        arxiv_by_query[q].extend(hits)
+        # 空结果同样缓存：否则冷门/罕见检索式每次都要重打 arxiv
+        try_cache(q, hits, max_results, from_year, to_year)
 
+    for q in queries:
+        per_query[q] = _merge_unique(local_by_query[q], arxiv_by_query[q])
+
+    arxiv_hits = [hit for q in queries for hit in arxiv_by_query[q]]
     merged = _merge_unique(local_hits, arxiv_hits)
 
     # --- Step 3: 范围扩大（D3）与饱和判定（§3.3） ---
@@ -503,10 +597,10 @@ def search_literature(
     if exhaustive and arxiv_available:
         zero_streak = 0
         plan = [
-            {"round": 2, "action": "放宽时间范围", "from_year": None, "to_year": None, "max": max_results},
-            {"round": 3, "action": "增加 max_results", "from_year": None, "to_year": None, "max": max_results * 2},
-            {"round": 4, "action": "再次增加 max_results", "from_year": None, "to_year": None, "max": max_results * 4},
-            {"round": 5, "action": "再次增加 max_results", "from_year": None, "to_year": None, "max": max_results * 8},
+            {"round": 2, "action": "放宽时间范围（D3 第 ② 级）", "from_year": None, "to_year": None, "max": max_results},
+            {"round": 3, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 2},
+            {"round": 4, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 4},
+            {"round": 5, "action": "增加 max_results（D3 第 ④ 级）", "from_year": None, "to_year": None, "max": max_results * 8},
         ]
         for step_plan in plan:
             before = len(merged)
@@ -514,18 +608,23 @@ def search_literature(
             failed = False
             for q in queries:
                 try:
-                    round_hits.extend(
-                        search_arxiv(
-                            q, max_results=step_plan["max"],
-                            from_year=step_plan["from_year"], to_year=step_plan["to_year"],
-                            log=capture,
-                        )
+                    q_hits = search_arxiv(
+                        q, max_results=step_plan["max"],
+                        from_year=step_plan["from_year"], to_year=step_plan["to_year"],
+                        log=capture,
                     )
                 except Exception as exc:  # noqa: BLE001
                     arxiv_available = False
                     steps.append({"step": "arxiv", "query": q, "hits": 0, "error": str(exc)})
                     failed = True
                     break
+                round_hits.extend(q_hits)
+                arxiv_by_query[q].extend(q_hits)
+                # 扩检索结果按本轮参数单独缓存，否则下次 --exhaustive 会命中更小的集合
+                try_cache(
+                    q, q_hits, step_plan["max"],
+                    step_plan["from_year"], step_plan["to_year"],
+                )
             merged = _merge_unique(merged, round_hits)
             gained = len(merged) - before
             escalations.append({
@@ -540,6 +639,8 @@ def search_literature(
                 "hits": len(round_hits),
                 "new_unique": gained,
             })
+            for q in queries:
+                per_query[q] = _merge_unique(local_by_query[q], arxiv_by_query[q])
             if failed:
                 saturation_reason = "arxiv 调用失败，检索未达饱和"
                 break
@@ -553,11 +654,49 @@ def search_literature(
     elif arxiv_available:
         saturation_reason = "未启用 --exhaustive；本地+arxiv 单轮检索"
 
-    if not arxiv_available:
-        note: Optional[str] = RATE_LIMIT_NOTE
+    # --- 回退说明：区分"完全没有 arxiv 结果"与"扩检索中途失败" ---
+    if arxiv_available:
+        note: Optional[str] = None
+    elif any(hit.get("source") == "arxiv" for hit in merged):
+        note = PARTIAL_ARXIV_NOTE
     else:
-        note = None
+        note = RATE_LIMIT_NOTE
 
+    return _finish(
+        query=query, merged=merged, steps=steps, rate_limit_log=rate_limit_log,
+        cache_updates=cache_updates, note=note, arxiv_available=arxiv_available,
+        per_query=per_query, escalations=escalations,
+        saturation={"saturated": saturated, "reason": saturation_reason},
+        level=level, limit=limit, escalation_attempted=bool(escalations),
+    )
+
+
+def _finish(
+    query: str,
+    merged: List[Dict[str, Any]],
+    steps: List[Dict[str, Any]],
+    rate_limit_log: List[str],
+    cache_updates: List[str],
+    note: Optional[str],
+    arxiv_available: bool,
+    per_query: Dict[str, List[Dict[str, Any]]],
+    escalations: List[Dict[str, Any]],
+    saturation: Dict[str, Any],
+    level: Optional[str],
+    limit: Optional[int],
+    escalation_attempted: bool,
+) -> Dict[str, Any]:
+    """组装返回值：套用 --limit、生成负检索记录与等级报告。"""
+    total_before_limit = len(merged)
+    truncated = 0
+    if limit is not None and limit >= 0 and total_before_limit > limit:
+        merged = merged[:limit]
+        truncated = total_before_limit - limit
+
+    gaps_level = _level_report(
+        level, len(per_query), total_before_limit, arxiv_available,
+        bool(saturation.get("saturated")), escalation_attempted,
+    )
     return {
         "query": query,
         "results": merged,
@@ -566,42 +705,63 @@ def search_literature(
         "cache_updates": cache_updates,
         "note": note,
         "arxiv_available": arxiv_available,
-        "negative_search_record": _negative_record(queries, merged),
+        "total_results_before_limit": total_before_limit,
+        "truncated": truncated,
+        "negative_search_record": _negative_record(list(per_query), per_query),
         "escalations": escalations,
-        "saturation": {"saturated": saturated, "reason": saturation_reason},
-        "level_report": _level_report(
-            level, len(queries), len(merged), arxiv_available, saturated,
-        ),
+        "saturation": saturation,
+        "level_report": gaps_level,
     }
 
 
 def _negative_record(
-    queries: List[str], results: List[Dict[str, Any]],
+    queries: List[str],
+    per_query: Dict[str, List[Dict[str, Any]]],
 ) -> List[Dict[str, Any]]:
-    """负检索记录：每个检索式命中了什么、来自哪里。
+    """负检索记录：**每个检索式各自**命中了什么、来自哪里。
 
-    用于支撑"据本次检索未见"这类措辞（literature-policy.md §2.1）。
+    用于支撑"据本次检索未见"这类措辞（literature-policy.md §2.1）：
+    该措辞要求"检索式列表 + **每式命中数** + 为何不足以否定目标声明"。
+    ⚠️ 早前实现把全局总数复制给每个检索式，导致该证据不成立。
     """
-    by_source: Dict[str, int] = {}
-    for item in results:
-        src = str(item.get("source", "?"))
-        by_source[src] = by_source.get(src, 0) + 1
-    return [
-        {"query": q, "total_hits": len(results), "by_source": by_source}
-        for q in queries
-    ]
+    record: List[Dict[str, Any]] = []
+    for q in queries:
+        hits = per_query.get(q, [])
+        by_source: Dict[str, int] = {}
+        for item in hits:
+            src = str(item.get("source", "?"))
+            by_source[src] = by_source.get(src, 0) + 1
+        record.append({
+            "query": q,
+            "total_hits": len(hits),
+            "by_source": by_source,
+            # 脚本无法判定"为何不足以否定"，必须由执行者填写
+            "why_not_conclusive": "",
+        })
+    return record
+
+
+def _dedup_key(item: Dict[str, Any]) -> str:
+    """去重键：归一化 arXiv URL/ID 后再比，避免 http/https、有无 vN 造成的重复。"""
+    url = str(item.get("url") or "").strip().lower()
+    if url:
+        url = re.sub(r"^https?://", "", url)
+        url = re.sub(r"v\d+$", "", url)            # .../2401.01234v2 → .../2401.01234
+        url = url.rstrip("/")
+        return url
+    paper_id = str(item.get("paper_id") or "").strip().lower()
+    if paper_id:
+        return paper_id
+    return re.sub(r"\W+", "", str(item.get("title") or "").lower())
 
 
 def _merge_unique(*groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """按标题/URL 去重合并，保留首次出现的来源标注。"""
+    """按归一化 URL/ID/标题去重合并，保留首次出现的来源标注。"""
     merged: List[Dict[str, Any]] = []
     seen: set = set()
     for group in groups:
         for item in group:
-            key = (
-                str(item.get("url") or "").strip().lower()
-                or re.sub(r"\W+", "", str(item.get("title", "")).lower())
-            )
+            key = _dedup_key(item)
             if key and key in seen:
                 continue
             if key:
@@ -619,11 +779,18 @@ def _render_table(results: List[Dict[str, Any]], limit: int = 30) -> str:
         return "（无命中）"
     lines = []
     for i, r in enumerate(results[:limit], 1):
+        # 本地库可能字段缺失或为 null，渲染不能因此崩溃
         authors = r.get("authors") or []
+        if isinstance(authors, str):
+            authors = [authors]
         first_author = authors[0] if authors else "?"
-        year = r.get("year") or (str(r.get("published", ""))[:4] or "?")
-        venue = r.get("venue") or "arXiv"
-        title = r.get("title", "").strip() or "(无标题)"
+        year = r.get("year")
+        if not year:
+            published = str(r.get("published") or "")
+            match = re.search(r"(?:19|20)\d{2}", published)
+            year = match.group(0) if match else "?"
+        venue = r.get("venue") or r.get("source") or "?"
+        title = (r.get("title") or "").strip() or "(无标题)"
         lines.append(f"{i:>2}. [{first_author} et al., {venue} {year}] {title}")
         lines.append(f"    来源: {r.get('source', '?')}    {r.get('url', '')}")
     if len(results) > limit:
@@ -631,24 +798,44 @@ def _render_table(results: List[Dict[str, Any]], limit: int = 30) -> str:
     return "\n".join(lines)
 
 
+class _Parser(argparse.ArgumentParser):
+    """让参数错误返回 1，与"arxiv 不可用"的退出码 2 区分开。"""
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        self.print_usage(sys.stderr)
+        print(f"错误：{message}", file=sys.stderr)
+        sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Research Idea Pipeline 文献检索（先本地，后 arxiv，429 指数退避）",
+    parser = _Parser(
+        description="Research Idea Pipeline 文献检索（先本地，后 arxiv；本地命中不是终点）",
     )
     parser.add_argument("--query", "-q", required=True, help="检索关键词或研究问题")
-    parser.add_argument("--max", "-n", type=int, default=20, help="最多返回条数（默认 20）")
+    parser.add_argument(
+        "--max", "-n", type=int, default=20,
+        help="每次 arxiv 查询的条数上限（默认 20）。本地命中不受此限制；"
+             "最终返回条数请用 --limit 控制",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None,
+        help="最终返回条数上限（默认不截断；截断时保留本地优先顺序）",
+    )
     parser.add_argument("--from-year", type=int, default=None, help="起始年份（含）")
     parser.add_argument("--to-year", type=int, default=None, help="结束年份（含）")
     parser.add_argument(
         "--local-dir", default=DEFAULT_LOCAL_DIR,
         help=f"本地文献库根目录（默认 {DEFAULT_LOCAL_DIR}，亦可用 RESEARCH_LOCAL_LITERATURE）",
     )
-    parser.add_argument("--cache-dir", default=None, help="缓存目录（默认 <local-dir>/cache）")
+    parser.add_argument(
+        "--cache-dir", default=DEFAULT_CACHE_DIR,
+        help="缓存目录（默认 <local-dir>/cache，亦可用 RESEARCH_LIT_CACHE）",
+    )
     parser.add_argument("--refresh", action="store_true", help="强制跳过缓存（仍查本地与 arxiv）")
     parser.add_argument("--no-cache", action="store_true", help="不使用缓存（仍会写入）")
     parser.add_argument(
         "--local-only", action="store_true",
-        help="★ 显式只用本地库（离线场景）。违反默认检索规则，结果不构成不存在性证据",
+        help="★ 显式只用本地库（离线场景）。违反默认检索规则，结果不得用于支撑创新性声明",
     )
     parser.add_argument(
         "--also-query", action="append", default=[], metavar="QUERY",
@@ -690,6 +877,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             also_queries=args.also_query,
             exhaustive=args.exhaustive,
             level=args.level,
+            limit=args.limit,
             log=log,
         )
     except Exception as exc:  # noqa: BLE001
@@ -699,6 +887,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     payload = {
         "query": outcome["query"],
         "count": len(outcome["results"]),
+        "total_results_before_limit": outcome["total_results_before_limit"],
+        "truncated": outcome["truncated"],
         "results": outcome["results"],
         "retrieval_log": outcome["steps"],
         "rate_limit_log": outcome["rate_limit_log"] or ["本轮无 429"],
@@ -712,10 +902,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    else:
+        return 0 if outcome["arxiv_available"] else 2
+
+    # 渲染阶段同样要防脏数据：本地库可能有 null 字段
+    try:
         print(f"# 检索：{args.query}")
-        print(f"# 命中：{payload['count']} 条\n")
-        print(_render_table(outcome["results"]))
+        print(f"# 命中：{payload['count']} 条"
+              + (f"（截断自 {payload['total_results_before_limit']} 条）"
+                 if payload["truncated"] else "") + "\n")
+        print(_render_table(outcome["results"], limit=args.limit or 30))
         print("\n## 检索过程记录")
         for step in outcome["steps"]:
             extra = f"  错误: {step['error']}" if step.get("error") else ""
@@ -732,6 +927,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             for item in payload["escalations"]:
                 print(f"- 第 {item['round']} 轮 [{item['action']}] max={item['max_results']}"
                       f" → 新增 {item['new_unique']} 条")
+        print("\n## 负检索记录（每式命中数；why 需执行者填写）")
+        for item in payload["negative_search_record"]:
+            print(f"- 「{item['query']}」命中 {item['total_hits']} 条"
+                  f"（来源 {item['by_source'] or '无'}）")
         sat, lvl = payload["saturation"], payload["level_report"]
         print("\n## 饱和与尽职调查")
         print(f"- 饱和：{'是' if sat['saturated'] else '否'}（{sat['reason']}）")
@@ -744,6 +943,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if payload["note"]:
             print(f"\n> ⚠️ {payload['note']}")
             print("> ⚠️ 检索未达饱和 —— 请记入 INDEX.md 的 Warnings。")
+    except (AttributeError, TypeError, KeyError) as exc:
+        log(f"[warn] 渲染失败（--json 仍可用）：{exc}")
+        return 1
 
     return 0 if outcome["arxiv_available"] else 2
 

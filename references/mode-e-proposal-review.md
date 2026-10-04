@@ -1,14 +1,14 @@
-# Mode C — proposal-review（方案审阅复核）
+# Mode E — proposal-review（方案审阅复核）
 
-复核**已成型方案**的正确性与可行性，并守住创新性底线。**可接 Mode B，也可接上一次
-Mode C 继续复核。**
+复核**已成型方案**的正确性与可行性，并守住创新性底线。**可接 Mode C，也可接上一次
+Mode E 继续复核。**
 
-## C0. 定位与边界（先读）
+## E0. 定位与边界（先读）
 
-> **Mode C 的对象是"已成型的方案"，核心问题是"这么做对不对、能不能做成"。
+> **Mode E 的对象是"已成型的方案"，核心问题是"这么做对不对、能不能做成"。
 > 同时必须强调创新性——目的是避免在不知情的情况下**复现别人的方案**。**
 
-| 维度 | Mode A（idea 级，见 [mode-a](mode-a-idea-discovery.md)） | **Mode C（方案级）** |
+| 维度 | Mode B（idea 级，见 [mode-b](mode-b-idea-discovery.md)） | **Mode E（方案级）** |
 |---|---|---|
 | **对象** | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | **核心问题** | 这个概念值得做吗？ | **这个方案做得对吗、能不能做成？** |
@@ -25,7 +25,7 @@ Mode C 继续复核。**
 1. **正确性优先：** C 的主战场是**方法本身的正确性**——推导是否成立、实现是否
    忠实于声称、指标是否测量了声称的东西、统计是否支持结论、实验是否真的能证伪假设。
 2. **创新性必须显式表态：** 即使方案在技术上是正确的，若它实质上是已发表工作的
-   **复现或微小实现变体**，C 必须明确指出，并给出**复现风险等级**（见 §C2.2）。
+   **复现或微小实现变体**，C 必须明确指出，并给出**复现风险等级**（见 §E2.2）。
    一个"做得很扎实的复现"在 CVPR/ICML/NeurIPS 是**拒稿**理由，不是优点。
 
 ---
@@ -34,13 +34,13 @@ Mode C 继续复核。**
 
 | 输入 | 必填 | 说明 |
 |---|---|---|
-| 待复核方案 | ✅ | 来自 Mode B 的 `proposal` + `experiment_plan`，或用户提供 |
+| 待复核方案 | ✅ | 来自 Mode C 的 `proposal` + `experiment_plan`，或用户提供 |
 | 上一次审阅内容 | ❌ | **有 → 接续复核；无 → 首次复核** |
-| 关键参考文献 | ❌ | 缺省时调用 Mode D 定向补充 |
+| 关键参考文献 | ❌ | 缺省时调用 Mode A 定向补充 |
 
 ---
 
-## C1. 判断复核类型
+## E1. 判断复核类型
 
 | 类型 | 触发条件 | 处理方式 |
 |---|---|---|
@@ -52,9 +52,9 @@ Mode C 继续复核。**
 
 ---
 
-## C2. 派遣七子代理严格审查
+## E2. 派遣七子代理严格审查
 
-### C2.1 七子代理分工
+### E2.1 七子代理分工
 
 | 子代理 | 审查焦点 |
 |---|---|
@@ -66,7 +66,7 @@ Mode C 继续复核。**
 | S-Lit | **文献核实、新颖性是否真实、复现风险判定** |
 | S-Repro | 可复现性、伦理风险 |
 
-### C2.2 防复现检查（Anti-Reproduction Check，强制）
+### E2.2 防复现检查（Anti-Reproduction Check，强制）
 
 **由 S-Lit 主责，S-Devil 与 R-NeurIPS 交叉验证。** 逐项作答：
 
@@ -110,12 +110,12 @@ Mode C 继续复核。**
 
 ---
 
-## C3. 交叉质询与共识形成
+## E3. 交叉质询与共识形成
 
 **规则：**
 
 1. **每个子代理对其余子代理的评分提出至少一条质疑或补充。**
-   （六条起；不得只写"同意"。）
+   （七条起：7 个子代理各至少一条；不得只写"同意"。）
 2. **评分差异 ≥ 2 分的维度**，必须记录**分歧点**并尝试协商。
 3. **无法达成共识的，明确标注"存在评审分歧"。**
 4. **汇总取中位数评分**（不用平均数，避免被极端值拉偏）。
@@ -137,7 +137,7 @@ Mode C 继续复核。**
 
 ---
 
-## C4. 复核结论
+## E4. 复核结论
 
 **审查结论卡片（核心交付物）：**
 
@@ -147,7 +147,7 @@ Mode C 继续复核。**
 **总体判定（推荐优先级）：** 高 / 中 / 低 / 建议放弃
 **最适合投稿的会议：** CVPR / ICML / NeurIPS（含理由）
 **综合评分（中位数）：** <x>/5
-**复现风险等级：** 低 / 中 / 高（来自 §C2.2 防复现检查）
+**复现风险等级：** 低 / 中 / 高（来自 §E2.2 防复现检查）
 **方法正确性判定：** 成立 / 有缺口 / 不成立（来自 C2 正确性维度）
 
 **核心优势：**
@@ -176,7 +176,7 @@ Mode C 继续复核。**
 
 ---
 
-## C5. 接续复核规则
+## E5. 接续复核规则
 
 **如果输入包含上一次审阅内容**（`review_output` + `open_questions`）：
 
@@ -202,12 +202,12 @@ Mode C 继续复核。**
 
 ---
 
-## C6. 文档落盘与 INDEX 更新（强制）
+## E6. 文档落盘与 INDEX 更新（强制）
 
 1. **写审阅记录：** `docs/routeX/<被审ID>-review.md`；
    接续复核写 `-review-2.md`、`-review-3.md`（frontmatter 记 `review_round`）。
    **审阅记录不占用新序号**，永远挂在被审文档 ID 上。
-2. **frontmatter：** `mode: C / type: review / review_of: <被审ID> / review_round / status`。
+2. **frontmatter：** `mode: E / type: review / review_of: <被审ID> / review_round / status`。
 3. **把审阅结论翻译成 `INDEX.md` 进度**（这是本 Mode 最容易漏的一步）：
 
    | 审阅结论 | 写入 INDEX |
@@ -223,7 +223,7 @@ Mode C 继续复核。**
 4. **新颖性结论的门禁：** S-Lit/S-Nov 判定"新颖"前必须完成 T4 的 **L3 穷尽检索**；
    未完成则结论只能写"据本次检索未见"，且**不得**给出"复现风险低"，并记入 Warnings。
 
-## C7. 输出
+## E7. 输出
 
 | 交付物 | 说明 |
 |---|---|
@@ -233,16 +233,16 @@ Mode C 继续复核。**
 | **横向对比表** | 多方案时必需 |
 | **变更追踪表** | **仅接续复核时**输出 |
 
-## C8. 输出后
+## E8. 输出后
 
-附 `state.json` 片段。接续复核时 `next_mode_suggestion` 仍可为 `"C"`（若仍有未解决项）。
+附 `state.json` 片段。接续复核时 `next_mode_suggestion` 仍可为 `"E"`（若仍有未解决项）。
 
 ```json
 {
-  "mode": "C",
+  "mode": "E",
   "timestamp": "2025-01-01T00:00:00Z",
   "review_type": "first | follow-up",
-  "proposal_ref": "state-B-<timestamp>.json",
+  "proposal_ref": "state-C-<timestamp>.json",
   "review_output": {
     "R-CVPR": {"score": 3, "opinion": "…"},
     "R-ICML": {"score": 4, "opinion": "…"},
@@ -261,11 +261,24 @@ Mode C 继续复核。**
     "search_level": "L3",
     "checklist": {"one_to_one_match": "部分", "touches_new_property": true}
   },
-  "cross_examination": [{"from": "S-Devil", "to": "R-CVPR", "issue": "…", "resolved": true}],
-  "disagreements": [{"dimension": "理论严谨性", "agents": ["R-ICML", "S-Devil"], "unresolved": true}],
-  "verdict": {"priority": "中", "best_venue": "ICML", "fatal_risks": ["…"]},
+  "cross_examination": [
+    {"from": "S-Devil", "to": "R-CVPR", "original_score": 4, "issue": "…", "resolved": true}
+  ],
+  "disagreements": [
+    {"dimension": "理论严谨性", "agents": ["R-ICML", "S-Devil"], "scores": [4, 2], "unresolved": true}
+  ],
+  "verdict": {
+    "priority": "中",
+    "best_venue": "ICML",
+    "core_strengths": ["…"],
+    "fatal_risks": [{"risk": "…", "mitigable": true, "path": "…"}],
+    "revision_suggestions": ["…"]
+  },
   "change_tracking": [],
+  "score_delta": [
+    {"agent": "R-CVPR", "previous": 2, "current": 4, "delta": "↑2", "reason": "补全消融矩阵"}
+  ],
   "open_questions": ["…"],
-  "next_mode_suggestion": "C"
+  "next_mode_suggestion": "E"
 }
 ```

@@ -1,4 +1,4 @@
-# 示例：单独调用 Mode D（文献调研）
+# 示例：单独调用 Mode A（文献调研）
 
 演示不串接其他 Mode，直接做一次带范围和等级的文献调研。
 
@@ -7,7 +7,7 @@
 ## 调用
 
 ```
-调用 research-idea-pipeline，mode=D
+调用 research-idea-pipeline，mode=A
 输入：query="diffusion model combinatorial optimization",
       scope="NeurIPS 2022-2025",
       level="L3"        # 因为要支撑"是否有人做过"的判断
@@ -82,7 +82,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 
 ---
 
-## D3 范围扩大示例
+## A3 范围扩大示例
 
 `--exhaustive` 自动逐级扩大，直到**连续两轮零新增**：
 
@@ -108,7 +108,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 
 ---
 
-## D4 输出（节选）
+## A4 输出（节选）
 
 | 论文 | 来源 | 会议/年份 | 核心思路 | 关键假设 | 理论工具 | 相关性 |
 |---|---|---|---|---|---|---|

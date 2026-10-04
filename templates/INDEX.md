@@ -19,7 +19,7 @@
 | 研究问题 | |
 | 核心假设 | |
 | 目标会议 | CVPR / ICML / NeurIPS |
-| 当前阶段 | Mode A / B / C / D |
+| 当前阶段 | Mode B / B / C / D |
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
 | 负责范围 | 代码：`routeX/code/`；文档：`docs/routeX/` |
 

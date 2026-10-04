@@ -1,4 +1,4 @@
-# 示例：接续复核（Mode C 接上一次 C）
+# 示例：接续复核（Mode E 接上一次 E）
 
 演示在已有审阅内容的基础上继续复核。
 
@@ -7,13 +7,13 @@
 ## 调用
 
 ```
-调用 research-idea-pipeline，mode=C（接续）
+调用 research-idea-pipeline，mode=E（接续）
 输入：proposal=上一步输出，review_output=上一次 C 的输出
 ```
 
 ## 触发判定
 
-输入中存在上一次的 `review_output`（七子代理意见 + 评分），因此 C1 判定为
+输入中存在上一次的 `review_output`（七子代理意见 + 评分），因此 E1 判定为
 **接续复核**，只做**聚焦复核**而非全量重审。
 
 ## 聚焦范围

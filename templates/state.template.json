@@ -1,11 +1,41 @@
 {
-  "_schema": "research-idea-pipeline/state@1",
-  "_usage": "每个 Mode 输出时附加对应片段；串联调用时后一个 Mode 读取前一个 Mode 的片段。可写入 ./.research-idea-pipeline/state-<mode>-<timestamp>.json。",
+  "_schema": "research-idea-pipeline/state@2",
+  "_usage": "每个 Mode 输出时附加对应片段；串联调用时后一个 Mode 读取前一个 Mode 的片段。可写入 ./.research-idea-pipeline/state-<mode>-<timestamp>.json。键名 = Mode 字母（A 文献调研 / B idea 发现 / C 方案生成 / D 叙事生成 / E 方案复核）。",
   "A": {
     "mode": "A",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
     "doc_id": "A001",
+    "query": "",
+    "scope": {
+      "from_year": null,
+      "to_year": null,
+      "venues": [],
+      "max_results": 20
+    },
+    "level": "L1 | L2 | L3",
+    "level_achieved": null,
+    "saturation": { "saturated": null, "reason": "" },
+    "literature_used": [
+      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "", "relevance": "高 | 中 | 低" }
+    ],
+    "retrieval_log": [
+      { "round": 1, "query": "", "hits": 0, "escalation": null }
+    ],
+    "negative_search_record": [
+      { "query": "", "total_hits": 0, "by_source": {}, "why_not_conclusive": "" }
+    ],
+    "rate_limit_log": ["本轮无 429"],
+    "cache_updates": [],
+    "called_by": "standalone | B | C | D | E",
+    "open_questions": [],
+    "next_mode_suggestion": null
+  },
+  "B": {
+    "mode": "B",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "route": "routeA",
+    "doc_id": "A002",
     "domain_keywords": [],
     "idea_candidates": [
       {
@@ -43,18 +73,18 @@
       "no_mans_land": []
     },
     "open_questions": [],
-    "next_mode_suggestion": "B"
+    "next_mode_suggestion": "C"
   },
-  "B": {
-    "mode": "B",
+  "C": {
+    "mode": "C",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
-    "doc_id": "A002",
+    "doc_id": "A003",
     "idea_id": "I1",
     "idea": "",
     "proposal": {
       "background": "",
-      "contributions": [{ "text": "", "type": "方法 | 理论 | 实证 | 问题定义" }],
+      "contributions": [{ "id": "K1", "text": "", "type": "方法 | 理论 | 实证 | 问题定义" }],
       "related_work": [{ "ref": "", "difference": "" }],
       "motivation_why_not_before": "",
       "experiments": [],
@@ -62,7 +92,7 @@
     },
     "experiment_plan": {
       "info_completeness": "",
-      "contribution_experiment_map": [{ "contribution": "C1", "experiment": "E1" }],
+      "contribution_experiment_map": [{ "contribution": "K1", "experiment": "E1" }],
       "hypotheses": [{ "id": "H1", "statement": "", "falsification": "" }],
       "datasets": [],
       "baselines": [],
@@ -90,15 +120,56 @@
     ],
     "literature_used": [],
     "open_questions": [],
-    "next_mode_suggestion": "C"
+    "next_mode_suggestion": "D"
   },
-  "C": {
-    "mode": "C",
+  "D": {
+    "mode": "D",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
-    "doc_id": "A002-review",
+    "doc_id": "A004",
+    "target_venue": "CVPR | ICML | NeurIPS",
+    "narratives": [
+      {
+        "idea_id": "I1",
+        "pattern": "N2",
+        "pattern_name": "瓶颈突破/移除假设",
+        "scores": {
+          "R-CVPR": { "method": null, "verifiability": null },
+          "R-ICML": { "originality": null, "rigor": null },
+          "R-NeurIPS": { "insight": null, "importance": null, "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results" },
+          "S-Devil": { "novelty_rebuttal": null, "fatal_weaknesses": [] },
+          "S-Lit": { "verdict": "确认新颖 | 部分重叠 | 已被覆盖", "closest_prior_work": [] }
+        },
+        "dimension_medians": {},
+        "median": null,
+        "vetoed": false,
+        "veto_reason": "任一维度中位数 ≤ 2 则不得推荐为最佳",
+        "packaging": {
+          "before": "我们提出了新模块 B",
+          "after": "现有方法依赖假设 X，我们移除了 X",
+          "evidence_ref": "Mode C 的 proposal §2"
+        },
+        "weaknesses": []
+      }
+    ],
+    "cross_examination": [
+      { "idea_id": "", "pattern": "", "dimension": "", "agents": [], "issue": "", "resolved": false }
+    ],
+    "best_narrative": [
+      { "idea_id": "I1", "pattern": "N2", "median": null, "best_venue": "", "runner_up": "N3", "fatal_defect": false }
+    ],
+    "final_advice": { "most_mature": "", "unfixable": "", "repattern_candidate": "" },
+    "literature_used": [],
+    "open_questions": [],
+    "next_mode_suggestion": "C | E"
+  },
+  "E": {
+    "mode": "E",
+    "timestamp": "1970-01-01T00:00:00Z",
+    "route": "routeA",
+    "doc_id": "A003-review",
     "review_type": "first | follow-up",
-    "proposal_ref": "state-B-<timestamp>.json",
+    "proposal_ref": "state-C-<timestamp>.json",
     "review_output": {
       "R-CVPR": { "score": null, "opinion": "" },
       "R-ICML": { "score": null, "opinion": "" },
@@ -141,36 +212,6 @@
       { "agent": "", "previous": null, "current": null, "delta": "", "reason": "" }
     ],
     "open_questions": [],
-    "next_mode_suggestion": "C"
-  },
-  "D": {
-    "mode": "D",
-    "timestamp": "1970-01-01T00:00:00Z",
-    "route": "routeA",
-    "doc_id": "A003",
-    "query": "",
-    "scope": {
-      "from_year": null,
-      "to_year": null,
-      "venues": [],
-      "max_results": 20
-    },
-    "level": "L1 | L2 | L3",
-    "level_achieved": null,
-    "saturation": { "saturated": null, "reason": "" },
-    "literature_used": [
-      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "", "relevance": "高 | 中 | 低" }
-    ],
-    "retrieval_log": [
-      { "round": 1, "query": "", "hits": 0, "escalation": null }
-    ],
-    "negative_search_record": [
-      { "query": "", "total_hits": 0, "why_not_conclusive": "" }
-    ],
-    "rate_limit_log": ["本轮无 429"],
-    "cache_updates": [],
-    "called_by": "standalone | A | B | C",
-    "open_questions": [],
-    "next_mode_suggestion": null
+    "next_mode_suggestion": "E"
   }
 }

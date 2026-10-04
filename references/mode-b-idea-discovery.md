@@ -1,15 +1,15 @@
-# Mode A — idea-discovery（Idea 发现 + Idea 级审核）
+# Mode B — idea-discovery（Idea 发现 + Idea 级审核）
 
 基础文献调研 + 多子代理头脑风暴，产出 idea 候选，**并对每个候选做 idea 级的创新性
 与可行性审核**，最后给出经过筛选的推荐清单。
 
-> **Mode A 的定位是"概念级"。** 它回答 **"这个方向/概念值不值得做"**：
+> **Mode B 的定位是"概念级"。** 它回答 **"这个方向/概念值不值得做"**：
 > 文献上是否已被覆盖、概念上是否非平凡、方法路线上是否成立。
-> 它**不**回答"这个方案做得对不对"——那是 Mode C 的职责（见 §A0）。
+> 它**不**回答"这个方案做得对不对"——那是 Mode E 的职责（见 §B0）。
 
-## A0. 与 Mode C 的分工（必须先明确，避免重复劳动）
+## B0. 与 Mode E 的分工（必须先明确，避免重复劳动）
 
-| 维度 | Mode A（idea 级） | Mode C（方案级） |
+| 维度 | Mode B（idea 级） | Mode E（方案级） |
 |---|---|---|
 | **对象** | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | **核心问题** | 这个概念值得做吗？ | 这个方案做得对吗、能不能做成？ |
@@ -37,13 +37,14 @@
 
 ---
 
-## A1. 基础文献调研（调用 Mode D 或内联执行）
+## B1. 基础文献调研（调用 Mode A 或内联执行）
 
 - 按 [literature-policy.md](literature-policy.md) 规范检索**本地 + arxiv**
-  （先本地，未命中再 arxiv，429 指数退避）。
+  （先本地、再 arxiv；**本地命中不是终点，仍须扩检**，429 指数退避）。
 - **注意：本次调研支撑后续的创新性审核，属于 T4/T5 触发场景**，因此本地命中后
-  仍必须执行 arxiv 检索；进入 shortlist 的 idea 必须达到 **L3 穷尽级**（§A5）。
-- 建议检索量：`max_results ≥ 20`；不足时按 Mode D 的 D3 策略扩大范围。
+  仍必须执行 arxiv 检索；**进入 shortlist 的 idea 必须完成 L3 穷尽检索**
+  （唯一例外是 arxiv 不可用，见 §B5.2）。
+- 建议检索量：`max_results ≥ 20`；不足时按 Mode A 的 D3 策略扩大范围。
 - **产出：**
   1. **技术路线归纳表** —— 把文献聚类为 3—6 条技术路线。
   2. **创新性边界** —— 分为三区：
@@ -59,7 +60,7 @@
 
 ---
 
-## A2. 深度局限性分析
+## B2. 深度局限性分析
 
 逐路线分析三件事：
 
@@ -77,7 +78,7 @@
 
 ---
 
-## A3. 多子代理头脑风暴
+## B3. 多子代理头脑风暴
 
 派遣以下子代理，**各自独立产出 idea 候选**（同一轮内并发派遣，互不可见对方的
 结论，以保证发散度）。角色定义见 [roles.md](roles.md)。
@@ -100,7 +101,7 @@
 
 ---
 
-## A4. 发散策略约束
+## B4. 发散策略约束
 
 **每个 idea 必须通过以下至少一种策略推导，并在输出中标明是哪种：**
 
@@ -117,15 +118,15 @@
 
 ---
 
-## A5. Idea 创新性与可行性审核（强制，不可跳过）
+## B5. Idea 创新性与可行性审核（强制，不可跳过）
 
-**这是 Mode A 与 Mode C 的分界点：A5 是概念级快筛，不是方案级深审。**
+**这是 Mode B 与 Mode E 的分界点：B5 是概念级快筛，不是方案级深审。**
 
 对去重后的**每一个**候选 idea 执行审核。**禁止只给 idea 不给审核。**
 
-### A5.1 派遣
+### B5.1 派遣
 
-| 子代理 | 在 A5 的职责 |
+| 子代理 | 在 B5 的职责 |
 |---|---|
 | R-CVPR | **创新性**：从方法落地角度看是否非平凡（警惕"新颖性谬误"） |
 | R-ICML | **创新性**：是否属于"创造性组合 / 应用新领域 / 移除限制性假设" |
@@ -136,16 +137,19 @@
 | **S-Theory** | **前提自洽性**（仅当 idea 含理论声称时派遣） |
 | **S-Devil** | **一条最致命反驳**（"若只能写一条否掉它的理由"） |
 
-> **不派遣 S-Repro。** idea 阶段没有代码可复现；可复现性审查只在 Mode C 进行。
+> **不派遣 S-Repro。** idea 阶段没有代码可复现；可复现性审查只在 Mode E 进行。
 
-### A5.2 检索门禁
+### B5.2 检索门禁
 
 - 每个 idea 的新颖性判定属于 **T1/T4 触发场景**，S-Lit 必须执行 **L3 穷尽检索**
   （见 [literature-policy.md](literature-policy.md) §3.1）。
-- 未完成 L3 的 idea：**不得**使用"首次提出"，只能写 **"据本次检索未见"**，
-  并标注 **"待核实"**；该 idea 可以进入 shortlist，但必须在 Warnings 留痕。
+- **进入 shortlist 的硬门槛 = 完成 L3。** 未完成 L3 的 idea **不得进入 shortlist**。
+- **唯一例外：** arxiv 因 429/不可用而无法完成 L3（不可控因素）。此时该 idea 可以
+  进入 shortlist，但必须：① 标注"据本次检索未见 · 待核实"；② **不得**使用
+  "首次提出"；③ 记入 `INDEX.md` 的 **Warnings**，并在 arxiv 恢复后补做 L3。
+- 无论哪种情况，未完成 L3 时都**不得**把新颖性判定标为"已核实"。
 
-### A5.3 每个 idea 的审核输出
+### B5.3 每个 idea 的审核输出
 
 ```markdown
 #### I3 审核
@@ -162,7 +166,7 @@
 - **推荐优先级：** 高 / 中 / 低 / 建议放弃
 ```
 
-### A5.4 优先级判定规则
+### B5.4 优先级判定规则
 
 | 优先级 | 条件 |
 |---|---|
@@ -175,7 +179,7 @@
 
 ---
 
-## A6. 输出
+## B6. 输出
 
 **idea 候选清单（核心交付物，≥ 10 个，每个都带审核结论）：**
 
@@ -185,14 +189,14 @@
 | I2 | … | … | … | … | … | … | … | … | … |
 
 **推荐 shortlist（3—5 个）** —— 从"高/中"中挑选，每个附：
-① 解决的具体局限（回指 A2 哪一条）；② 为什么现在能做；③ 最可能被攻击的一点。
+① 解决的具体局限（回指 B2 哪一条）；② 为什么现在能做；③ 最可能被攻击的一点。
 
 **淘汰清单** —— 被放弃的 idea + 淘汰理由（重叠不足 / 可行性过低 / 致命反驳不可缓解）。
 
 **其他交付物：**
 
-- 技术路线归纳表（A1）
-- 创新性边界界定：红海 / 蓝海苗头 / 无人区（A1）
+- 技术路线归纳表（B1）
+- 创新性边界界定：红海 / 蓝海苗头 / 无人区（B1）
 
 **创新性边界界定模板：**
 
@@ -206,33 +210,33 @@
 
 ---
 
-## A7. 文档落盘与 INDEX 更新（强制）
+## B7. 文档落盘与 INDEX 更新（强制）
 
 1. **写文档：** `docs/routeX/<R>NNN-idea-discovery.md`（ID 按
    [project-layout.md](project-layout.md) §2.2 扫描现有最大序号 +1）。
-   内容 = A1 技术路线归纳表 + A2 局限性分析 + A6 idea 清单（**含 A5 审核评分**）
+   内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 shortlist + 淘汰清单 + 创新性边界界定。
-2. **frontmatter：** `id / route / mode: A / type: idea-discovery / status / created`。
+2. **frontmatter：** `id / route / mode: B / type: idea-discovery / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增本文件行；
    - §3 已证实：被 S-Lit 证实"重叠足够"的 idea 方向；
    - §4 已证伪：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea；
-   - §5 TODO：进入 shortlist 的 idea → 转成"进入 Mode B"的任务；"待核实"的无人区
+   - §5 TODO：进入 shortlist 的 idea → 转成"进入 Mode C"的任务；"待核实"的无人区
      条目 → 检索任务；
    - §7 Warnings：**未完成 L3 的"无人区/首次"声称必须记为 Warning**；
    - §9 变更日志。
 
-## A8. 输出后
+## B8. 输出后
 
-1. 附 `state.json` 片段，`next_mode_suggestion: "B"`。
-2. 建议用户从 shortlist 中挑选 1—3 个 idea 进入 Mode B，并把 A2 的局限分析与
-   A5 的审核结论一并传入。
+1. 附 `state.json` 片段，`next_mode_suggestion: "C"`。
+2. 建议用户从 shortlist 中挑选 1—3 个 idea 进入 Mode C，并把 B2 的局限分析与
+   B5 的审核结论一并传入。
 
 **state 片段示例：**
 
 ```json
 {
-  "mode": "A",
+  "mode": "B",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
   "doc_id": "A001",
@@ -242,14 +246,18 @@
       "id": "I1",
       "strategy": "假设挑战",
       "one_liner": "…",
+      "difference_from_prior_work": "…",
       "type": "Concept & Feasibility",
       "source_agent": "R-ICML",
+      "addresses_limitation": "L1 未建立置换等变性",
+      "main_attack_surface": "可逆性约束的松弛误差界未证明",
       "review": {
         "innovation": 4,
         "feasibility": 3,
         "closest_prior_work": "[作者, 会议/年份]",
         "overlap": "足够",
         "search_level": "L3",
+        "theory_premise": "有缺口",
         "devil_objection": "…",
         "objection_mitigable": true,
         "priority": "高"
@@ -261,6 +269,6 @@
   "literature_used": [{"title": "…", "source": "arxiv", "ref": "[作者, 会议/年份]"}],
   "innovation_boundary": {"red_ocean": [], "blue_ocean": [], "no_mans_land": []},
   "open_questions": ["无人区判定未经 S-Lit 复核"],
-  "next_mode_suggestion": "B"
+  "next_mode_suggestion": "C"
 }
 ```

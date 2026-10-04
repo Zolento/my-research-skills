@@ -57,7 +57,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 3. **INDEX.md 必需：** 每条路线根目录必须有 `INDEX.md`，且**每次产出后必须更新**。
 
 > **命名说明：** 路线目录用 `routeA` / `routeB`，其文档 ID 前缀用**大写路线字母**
-> `A` / `B`。此处的 A/B 是**路线编号，与 Mode A/B/C/D 无关**；文档属于哪个 Mode
+> `A` / `B`。此处的 A/B 是**路线编号，与 Mode A/B/C/D/E 无关**；文档属于哪个 Mode
 > 记录在文档 frontmatter 的 `mode` 字段里。
 
 ---
@@ -88,8 +88,8 @@ docs/<routeX>/<R><NNN>-review-3.md      # 第 3 次审阅
 
 1. **文档 ID 前缀 = 所属路线的字母。** `routeA` 下的文档一律 `A` 开头，
    `routeB` 下一律 `B` 开头；**绝不允许** `routeB` 下出现 `A0xx`。
-2. **前缀与产出该文档的 Mode 无关。** Mode B 在 `routeA` 产出的方案仍是 `A002`，
-   **不是** `B002`。Mode 记在 frontmatter 的 `mode` 字段。
+2. **前缀与产出该文档的 Mode 无关。** Mode C 在 `routeA` 产出的方案仍是 `A002`，
+   **不是** `C002`。Mode 记在 frontmatter 的 `mode` 字段。
 3. **序号按路线独立递增**，不跨路线共享：`routeA` 是 A001/A002/…，
    `routeB` 是 B001/B002/…。
 
@@ -122,8 +122,8 @@ docs/<routeX>/<R><NNN>-review-3.md      # 第 3 次审阅
 ---
 id: A002
 route: routeA
-mode: B                     # A | B | C | D —— 产出该文档的 Mode
-type: proposal              # idea-discovery | proposal | experiment-plan | review | literature-survey
+mode: C                     # A | B | C | D | E —— 产出该文档的 Mode
+type: proposal              # idea-discovery | proposal | experiment-plan | narrative | review | literature-survey
 status: draft               # draft | in-review | reviewed | superseded | archived
 created: 2025-01-01
 updated: 2025-01-02
@@ -159,22 +159,23 @@ reviewers: []               # 可选：参与的子代理角色
 ```markdown
 # routeA — INDEX
 
-> 一句话状态：当前处于 Mode B，方案 A002 已产出待审。
+> 一句话状态：当前处于 Mode C，方案 A002 已产出待审。
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
 - 研究问题：
 - 核心假设：
 - 目标会议：CVPR / ICML / NeurIPS
-- 当前阶段：Mode A / B / C / D
+- 当前阶段：Mode A / B / C / D / E
 - 推荐优先级：高 / 中 / 低 / 建议放弃
 
 ## 2. 文档索引
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
-| A001 | [A001-idea-discovery.md](../docs/routeA/A001-idea-discovery.md) | idea-discovery | A | reviewed | 10 个 idea 候选 |
-| A001-review | [A001-review.md](../docs/routeA/A001-review.md) | review | C | reviewed | 七子代理评分中位数 3 |
-| A002 | [A002-proposal.md](../docs/routeA/A002-proposal.md) | proposal | B | in-review | 待第 1 轮审阅 |
+| A001 | [A001-idea-discovery.md](../docs/routeA/A001-idea-discovery.md) | idea-discovery | B | reviewed | 10 个 idea 候选（含 B5 审核） |
+| A002 | [A002-narrative.md](../docs/routeA/A002-narrative.md) | narrative | D | reviewed | 4 套叙事，最佳 N2 |
+| A002-review | [A002-review.md](../docs/routeA/A002-review.md) | review | E | reviewed | 七子代理评分中位数 3 |
+| A003 | [A003-proposal.md](../docs/routeA/A003-proposal.md) | proposal | C | in-review | 待第 1 轮审阅 |
 
 ## 3. 已证实（Confirmed）
 > 有明确证据支持的结论。每条必须带证据链接。
@@ -248,14 +249,15 @@ reviewers: []               # 可选：参与的子代理角色
 
 | Mode | 产出文档 | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
-| **A** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<routeX>/<R>001-idea-discovery.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
-| **B** | 论文提案 | `docs/<routeX>/<R>00N-proposal.md` | 对应 `INDEX.md` |
-| **B** | 实验流程计划书 | `docs/<routeX>/<R>00N-experiment-plan.md` | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
-| **C** | 审阅记录（**含复现风险等级**） | `docs/<routeX>/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
-| **D** | 文献调研报告（含负检索记录） | `docs/<routeX>/<R>00N-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
+| **A** | 文献调研报告（含负检索记录） | `docs/<routeX>/<R>NNN-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
+| **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<routeX>/<R>NNN-idea-discovery.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
+| **C** | 论文提案 | `docs/<routeX>/<R>NNN-proposal.md` | 对应 `INDEX.md` |
+| **C** | 实验流程计划书 | `docs/<routeX>/<R>NNN-experiment-plan.md`（**取其独立序号，通常紧随 proposal 之后**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
+| **D** | 多套路叙事清单（≥4 套/idea）+ 五子代理评审 + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `docs/<routeX>/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
+| **E** | 审阅记录（**含复现风险等级**） | `docs/<routeX>/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
 | 任意 | 机器状态 | `.research-idea-pipeline/state-<mode>-<ts>.json` | 不入 docs |
 
-**审阅结论对进度的映射：** Mode C 的结论要**翻译成进度条目**——
+**审阅结论对进度的映射：** Mode E 的结论要**翻译成进度条目**——
 
 - 结论"某机制成立/已被数据支持" → INDEX **§3 已证实**
 - 结论"某假设被否定/不可行" → INDEX **§4 已证伪**
@@ -263,7 +265,7 @@ reviewers: []               # 可选：参与的子代理角色
 - 结论"致命风险未缓解 / **复现风险高**" → INDEX **§7 Warnings**
 - 复现步骤本身有错 → INDEX **§6 Bugs**
 
-**idea 审核对进度的映射（Mode A5）：** 被判"重叠不足"或致命反驳不可缓解而**放弃**的
+**idea 审核对进度的映射（Mode B5）：** 被判"重叠不足"或致命反驳不可缓解而**放弃**的
 idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 
 ---

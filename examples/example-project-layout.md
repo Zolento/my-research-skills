@@ -57,7 +57,7 @@ docs/routeB/B001-proposal.md
 | 审阅记录 | **不占新序号**，永远挂在被审文档 ID 上（`A002-review.md`） |
 | 接续复核 | 递增 `-review-2`、`-review-3`，frontmatter 的 `review_round` 同步 |
 
-> **注意：** 文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D 无关。
+> **注意：** 文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D/E 无关。
 > 产出该文档的 Mode 记在 frontmatter 的 `mode` 字段里。
 
 ### 每份文档的 frontmatter
@@ -66,7 +66,7 @@ docs/routeB/B001-proposal.md
 ---
 id: A002
 route: routeA
-mode: B                 # A | B | C | D —— 产出该文档的 Mode
+mode: C                 # A | B | C | D —— 产出该文档的 Mode
 type: proposal          # idea-discovery | proposal | experiment-plan | review | literature-survey
 status: draft           # draft | in-review | reviewed | superseded
 created: 2025-01-01
@@ -88,7 +88,7 @@ reviewers: []
 ```markdown
 # routeA — INDEX
 
-> 一句话状态：当前处于 Mode B，方案 A002 已产出待审。
+> 一句话状态：当前处于 Mode C，方案 A002 已产出待审。
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
@@ -97,7 +97,7 @@ reviewers: []
 | 研究问题 | 离散扩散如何约束组合优化搜索空间 |
 | 核心假设 | 可逆性可作为硬可行性约束 |
 | 目标会议 | ICML |
-| 当前阶段 | Mode B |
+| 当前阶段 | Mode C |
 | 推荐优先级 | 中 |
 
 ## 2. 文档索引
@@ -167,7 +167,7 @@ reviewers: []
 | 致命风险未缓解 / **复现风险 = 高** | **§7 Warnings** |
 | 复现步骤本身有错 | **§6 Bugs** |
 
-Mode A5 同理：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea → **§4 已证伪**。
+Mode B5 同理：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea → **§4 已证伪**。
 
 ---
 
