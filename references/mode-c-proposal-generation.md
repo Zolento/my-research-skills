@@ -155,6 +155,8 @@
 {
   "mode": "C",
   "timestamp": "2025-01-01T00:00:00Z",
+  "route": "routeA",
+  "doc_id": "A003",
   "idea_id": "I3",
   "idea": "…",
   "proposal": {"background": "…", "contributions": [{"text": "…", "type": "方法"}], "related_work": [], "motivation": "…", "experiments": [], "conclusions": "…"},

@@ -156,7 +156,7 @@
   "mode": "A",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
-  "doc_id": "A003",
+  "doc_id": "A001",
   "query": "diffusion model combinatorial optimization",
   "scope": {"from_year": 2022, "to_year": 2025, "venues": ["NeurIPS"], "max_results": 20},
   "level": "L3",
@@ -168,7 +168,7 @@
     {"query": "…", "total_hits": 12, "by_source": {"local": 2, "arxiv": 10}, "why_not_conclusive": "命中均针对连续空间，未覆盖离散置换约束"}
   ],
   "rate_limit_log": ["[429] 限流，等待 10s 后重试（第 1 次）"],
-  "cache_updates": ["cache/ab12cd34ef56.json (12 条)"],
+  "cache_updates": ["docs/refs/cache/ab12cd34ef56.json (12 条)"],
   "open_questions": ["arxiv 未命中的会议论文需人工补充"],
   "next_mode_suggestion": null
 }

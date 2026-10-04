@@ -418,7 +418,7 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
   "mode": "D",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
-  "doc_id": "A004",
+  "doc_id": "A005",
   "target_venue": "ICML",
   "narratives": [
     {

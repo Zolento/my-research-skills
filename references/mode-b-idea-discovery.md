@@ -239,7 +239,7 @@
   "mode": "B",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
-  "doc_id": "A001",
+  "doc_id": "A002",
   "domain_keywords": ["diffusion model", "combinatorial optimization"],
   "idea_candidates": [
     {

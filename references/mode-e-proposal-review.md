@@ -241,6 +241,8 @@ Mode E 继续复核。**
 {
   "mode": "E",
   "timestamp": "2025-01-01T00:00:00Z",
+  "route": "routeA",
+  "doc_id": "A003-review",
   "review_type": "first | follow-up",
   "proposal_ref": "state-C-<timestamp>.json",
   "review_output": {
