@@ -376,10 +376,18 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
         "R-CVPR": {"method": 4, "verifiability": 3},
         "R-ICML": {"originality": 4, "rigor": 3},
         "R-NeurIPS": {"insight": 4, "importance": 3, "type": "Theory"},
-        "S-Devil": {"novelty_rebuttal": 2},
-        "S-Lit": {"verdict": "部分重叠"}
+        "S-Devil": {"novelty_rebuttal": 2, "fatal_weaknesses": ["…", "…", "…"]},
+        "S-Lit": {"verdict": "部分重叠", "closest_prior_work": ["[作者, 会议/年份]"]}
       },
+      "dimension_medians": {"method": 4, "verifiability": 3, "originality": 4, "rigor": 3, "insight": 4, "importance": 3, "novelty_rebuttal": 2},
       "median": 3.5,
+      "vetoed": false,
+      "veto_reason": "无维度中位数 ≤ 2",
+      "packaging": {
+        "before": "我们提出了一个可逆性约束模块",
+        "after": "现有离散扩散方法共享\"可逆性仅作采样技巧\"的假设，导致置换约束下结构性失效；我们移除该假设",
+        "evidence_ref": "Mode C 的 proposal §1 失效分析 + 实验 E2"
+      },
       "weaknesses": ["迁移合法性定理依赖未验证的有界性假设"]
     }
   ],
