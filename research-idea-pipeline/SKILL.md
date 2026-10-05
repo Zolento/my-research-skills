@@ -65,17 +65,17 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` |
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
-| **R3** | `dual-discovery` |`literature` / `assumptions` / `failures` / `contract.constraints` | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） |
+| **R3** | `dual-discovery` | 双轨发现：local search ‖ paradigm escape（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） |
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
-| **R6** | `evolution` |`hypotheses` / `uncertainties` / `failures` | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
-| **R7** | `adversarial-assurance` |`claims` / `evidence` / `hypotheses` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
-| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
-| **R9** | `experiment-tree` |`uncertainties`(critical, high 且 high) / `claims` | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` |
+| **R6** | `evolution` | mutation / crossover / simplification / 新 niche | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
+| **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` |
 | **R10** | `metacognitive-repair` | **critical flaw ⇒ state 必须改变** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
 | **R11** | `state-update` | result → claim / uncertainty → next experiment | 全 state | 归并去重 + 跑 `state_check.py` |
 | **R12** | `narrative` | **state 的视图**：六槽位 + presets + 六维 | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |
-| **R13** | `artifact-review` |全 state + artifact | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
+| **R13** | `artifact-review` | artifact-aware 审查（code / logs / failed runs） | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** | `decision` | continue / pivot / archive / submit | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `claims[].status` / `uncertainties[].status` / `hypotheses[].status` |
 
 > **R1 是常驻对象，不是一次调用。** 任何 R 阶段开工前先读 World Model，收工前写回。
@@ -702,14 +702,16 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **输入：** **idea 清单**（来自 R3—R6 或用户提供）+ **方案**（来自 R8，推荐）；
   关键参考文献（可选）；目标会议（可选）；资源约束（可选）。
-- **拆 pre / post（Wave 3）：** **R12-pre**（R8 后、R9 前）只写「若 `H` 被验证，可能成立的 thesis 是…」，
-  **不得决定研究方向**；**R12-post**（R11 后）只读**已核实**的 claim / evidence / 边界 / **失败**，
+- **拆 pre / post（Wave 3）：** **R12-pre 覆盖 D0—D3**（证据台账 / claim graph 复核 / 科学分类 / anchor eligibility），
+  只写「若 `H` 被验证，可能成立的 thesis 是…」，**不得决定研究方向**；
+  **`claims[]` 的创建在 R3，不由本阶段创建**（见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.0）；**R12-post 覆盖 D4—D9**（叙事实现 / 攻击面审核 / venue 校准 / 门禁 / 排序 / 输出），
+  只读**已核实**的 claim / evidence / 边界 / **失败**，
   此时才选 preset 并落 `narrative_view`，且**不得新增 `evidence`、不得提高 `epistemic_status`**。
 - **定位：** **Claim-first, evidence-constrained, narrative-last** —— 先确定**在现有证据下
   最强但不过度**的科学主张，再找最短的故事让审稿人正确理解该主张。
   **这是基于「预期贡献」的叙事预演，不是基于「实测结果」的包装** —— 实验完成后应
   **回到 R12 复核叙事是否仍成立**。字母顺序上位于方案生成与方案复核之间。
-- **流程：** D0 证据台账 → D1 Claim Graph（`C0—C5`）→ D2 科学分类 `(O, T, R)` →
+- **流程（D0—D9 的 pre/post 归属见上）：** D0 证据台账 → D1 claim graph **复核**（**不创建**）→ D2 科学分类 `(O, T, R)` →
   D3 Anchor Eligibility → D4 叙事实现（**2—4 套真正不同的 claim hierarchy**；六槽位
   `S1—S6`；含包装前后对照）→ D5 攻击面审核（**R-Novelty / R-Causal / R-Experimental /
   R-Theory / R-Generalization / R-Utility 六人全部派遣 + S-Lit 恒派 + S-Devil 不打分**）→

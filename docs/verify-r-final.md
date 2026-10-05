@@ -280,3 +280,151 @@ R6/R7/R13 的收工检查上卡死（V4），或写出一个没有 claim 的 wor
    （Lead 已登记为已知未做；本报告只确认其当前状态属实）。
 4. **未评审 Wave 2/3 的科学实质**（island 划分、八攻击面的覆盖面、`S-Integrity` 的四类命中是否穷尽）。
 5. 本报告未修改任何被审文件；未 `git commit`。唯一写入：`docs/verify-r-final.md`。
+
+---
+
+## 7. 增量复核（最后一轮确认，快照 `7f6e043`）
+
+**本轮改动：** 7 个文件（`git diff --stat 61ad5c3 7f6e043`）：SKILL +10、phase-r12 +10、
+phase-r3-r6 +21、phase-r7 +7、phase-r9-r11 +2、policy +24、本报告 +282。
+**快照：** `7f6e043`，被审文件末次 mtime 07:21 前后，其后冻结。**只读**：本次仅追加本节。
+
+### 7.1 M-2（V4 与写集冲突）—— ✅ **完全闭环**
+
+**独立验证方法：** 按三层写表构造**各阶段收工态**（R3 种子 → R6 淘汰 → R7 assurance →
+R8 挂证据 → R9 实验树 → R13 审计），逐个喂 `state_check.py --json`。
+
+```
+post-R3（seed：ungrounded + falsifier）        exit=0  ✅
+post-R6（H2 killed → F1 挂 C2.known_flaws）    exit=0  ✅   ← 原先被 V4 卡死
+post-R7（F2 挂 C1.known_flaws + assurance）    exit=0  ✅   ← 原先被 V4 卡死
+post-R9（X2 failed 双写 + F3 挂 X2）           exit=0  ✅
+post-R13（reviews + experiments[].unexpected） exit=0  ✅   ← 原先被 V4 卡死
+```
+
+`policy §5.0` 规则 2（`:358—361`）＋三层写表给 R6/R7/R9/R13 补的 `known_flaws（把新 `F` 挂上）`
+（`policy:382/383/385/389`、`SKILL:71/72/74/78`、`phase-r3-r6:475`、`phase-r7:457/458`、`phase-r9-r11:207`）
+使 V4 在**每个写 `F` 的阶段内部**即可满足 → **R6/R7/R13 的收工检查现在可以到 0** ✅。
+
+### 7.2 M-1（claims 创建归属）—— ⚠️ **只闭环了一半：V1—V3 可达，但 R8 的 status 转换无合法归属**
+
+**已闭环的部分 ✅：** R3 创建 seed（`phase-r3-r6:356/361`、`policy:355—357`、三层写表 R3 行
+`policy:379` / `SKILL:68` / `phase-r3-r6:473`），seed 要求 `falsifier` 必填 → **V1 可满足**；
+seed 的 `supporting_evidence`/`refuting_evidence` 为空 → **V2 可满足**；seed `status: ungrounded`
+且无 E 引用 → **V3 可满足**（实测 post-R3 exit 0）。`phase-r12:103—110` 新增映射并明写
+「**`claims[]` 不由本文件创建**」✅。
+
+**未闭环的部分 ❌（新 MAJOR）：** `policy §5.0` 规则 1（`:355—357`）写
+「**R8 建契约并更新 status**」，但 R8 的写表**没有 `claims[].status`**
+（`policy:384` / `SKILL:73` / `phase-r8:235` 三层同款），而：
+- `policy:416`：「**只写本阶段的行。** 表中未列出的字段**不得**顺手改」；
+- `SKILL:548`（§1.6）：「改 `claims[].status` **只能经 R10**。Discovery 与 Assurance 都不得直接改」。
+
+**实证（冲突可复现）：**
+
+```
+post-R8（status 保持 ungrounded，仅挂 supporting_evidence=[E1]）  exit=3  rules=['V3']
+post-R8'（status 同步改为 partially-supported）                  exit=0  ✅
+```
+
+即：**R8 若不改 status → V3 报错（收工不了）；若改 status → 违 §1.6 与「只写本阶段的行」**。
+M-1 把「没人创建 claim」修好了，但把阻塞点从 R3 前移到了 R8。
+**建议修法（二选一，一行到两行）：**
+①在 R8 写列补 `claims[].status`（限定为**证据驱动的单向转换**：`ungrounded → supported /
+partially-supported / contradicted`），并在 §1.6 注明「R8 的这一转换是唯一例外，且不得写 `killed`」；
+②或在 `policy §5.0` 规则 1 改为「R8 建契约；`status` 转换在**同一轮 R10** 的 `state_delta` 里完成，
+R8 的收工检查允许 `supporting_evidence` 已挂、`status` 暂未同步」—— 但需同步 `state_check.py` 的 V3
+语义（否则脚本仍判 3）。
+
+### 7.3 本轮编辑留下的**半成品单元格**（新 MAJOR ×2）
+
+Lead 说明「第一遍用正则时单元格被 `|` 截断，改用按单元格定位才成功」——**两处副本仍有残留**，
+而且**三方一致性检查器看不见它们**（它只比较读/写单元格）：
+
+**N-1｜`SKILL.md §0` 五行丢了「作用」列**（被「读」值覆盖）：
+
+```bash
+awk '/^\| Phase \| 名称 \| 作用 \| 读 state \| 写 state \|/{f=1} f&&/^\|/{n=split($0,a,"|");printf "cols=%d %s\n",n-2,substr($0,1,70)}' SKILL.md
+#  R3/R6/R7/R9/R13 五行为 cols=5，但第 3 格 = 读值
+```
+
+| 行 | 作用列现值（错） | 应为 |
+|---|---|---|
+| `SKILL.md:68` R3 | `` `literature` / `assumptions` / `failures` / `contract.constraints` `` | 双轨发现：local search ‖ paradigm escape（**上下文隔离**） |
+| `SKILL.md:71` R6 | `` `hypotheses` / `uncertainties` / `failures` `` | mutation / crossover / simplification / 新 niche |
+| `SKILL.md:72` R7 | `` `claims` / `evidence` / `hypotheses` `` | 六攻击面审核 + 硬门禁 `G1—G5` |
+| `SKILL.md:74` R9 | `` `uncertainties`(critical, high 且 high) / `claims` `` | 实验树 `X1—X6` + EIG 选择 + provenance |
+| `SKILL.md:78` R13 | `全 state + artifact` | artifact-aware 审查（code / logs / failed runs） |
+
+**N-2｜`research-state-policy.md §5` 五行丢了「对应文件」列**（被「写」值覆盖）
+—— 这是 **Wave 2 M-4 修复的回退**（那轮刚把 5 个不存在的文件名改对）：
+
+```python
+# 逐单元格 dump（行 379/382/383/385/389）：
+[0] **R3**  [1] 读  [2] 写  [3] = 写（重复）   ← 原应为 phase-r3-r6-discovery.md
+```
+
+| 行 | 对应文件列现值（错） | 应为 |
+|---|---|---|
+| `policy:379` R3 | 写值重复 | `phase-r3-r6-discovery.md` |
+| `policy:382` R6 | 写值重复 | `phase-r3-r6-discovery.md` |
+| `policy:383` R7 | 写值重复 | `phase-r7-r10-r13-assurance-repair-review.md` |
+| `policy:385` R9 | 写值重复 | `phase-r9-r11-experiment-loop.md` |
+| `policy:389` R13 | 写值重复 | `phase-r7-r10-r13-assurance-repair-review.md` |
+
+**修复动作：** 把这两张表的 10 个单元格按上表回填即可（phase 文件的 3 列表**未被破坏** ✅）。
+
+### 7.4 你指定的四件核验
+
+**① 2 项 MAJOR 是否真闭环：** M-2 ✅ 完全闭环（§7.1 五个探针全 0）；
+M-1 ⚠️ **一半**（创建 ✅ + V1—V3 可达 ✅，但 R8 的 status 转换冲突未解 → §7.2）。
+
+**② 三方 14 阶段读写表逐字一致：** **14/14 ✅**（独立脚本 `rw_compare.py`；唯一「不一致」= R1，
+policy §5 明写 R1 不占行）。
+> ⚠️ 但请连同 §7.3 一起看：**三方检查器只比较「读/写」两格**，所以
+> `SKILL §0` 被覆盖的「作用」格、`policy §5` 被覆盖的「对应文件」格**不在它的检查范围内** ——
+> 这正是两处半成品能存活到本轮的原因。建议把检查器扩成**逐单元格列数 + 关键列非空**。
+
+**③ `phase-r12` 的 D0—D9 ↔ pre/post 映射 vs `SKILL §4`：** **不一致（MINOR-m）**
+- `phase-r12:103—110` 已写明：**D0—D3（证据台账 / claim graph / 科学分类 / anchor eligibility）→ R12-pre**
+  「只**复核与展开**，**不创建**」；**D4—D9 → R12-post**；并有「`claims[]` 不由本文件创建」警告 ✅。
+- `SKILL.md:705` 的 R12 段仍写「**R12-pre**（R8 后、R9 前）**只写**『若 `H` 被验证，可能成立的 thesis 是…』」
+  —— 未提 pre 还负责 **D0—D3 的复核**，也未提「claim 由 R3 创建」；
+  `SKILL.md:712` 的流程行仍以「D0 证据台账 → D1 Claim Graph（`C0—C5`）→ …」开头，
+  读者容易误以为台账 / claim graph 由 R12 创建（与 `policy §5.0` 冲突）。
+- **修法：** 把 `SKILL.md:705—712` 与 `phase-r12:103—110` 对齐（pre 行补「+ 复核 D0—D3；
+  `claims[]` 由 R3 创建，本段只读与标注」）。
+
+**④ 机械面（自跑）：**
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **416 条，0 断链** ✅ |
+| 2 | deprecated-terms | **exit 1，0 命中** ✅ |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | `unittest discover -s scripts -p "test_*.py"` | **116 tests OK** ✅ |
+| 5 | `state_check --selftest` | exit 0 ✅ |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | examples + templates linter | 9/9 硬违规 0 ✅ |
+| 8 | `--list-rules` ↔ `policy §4` | **15 条逐字一致** ✅ |
+
+**本轮 MINOR 声明核验（4/4 落地）：**
+① R3 读列含 `contract.constraints`（`policy:379`/`SKILL:68`/`phase-r3-r6:473`）✅；
+② R9 写列含 `failures`（三层同款）✅；③ `phase-r7:15`「**首轮 R7 审什么**」已补 ✅；
+④ `policy:363`「**终端产物**（无显式读者，不是僵尸字段）」已补 ✅。
+
+### 7.5 最后一轮结论
+
+**仍需修：3 项 MAJOR + 1 项 MINOR，全部是局部修复（10 个表格单元格 + R8 status 归属二选一 + SKILL §4 一段对齐）。**
+
+| 优先级 | 动作 | 位置 |
+|---|---|---|
+| 1 | 回填 `SKILL §0` 五行的「作用」列 | `SKILL.md:68/71/72/74/78` |
+| 2 | 回填 `policy §5` 五行的「对应文件」列（Wave 2 M-4 回退） | `research-state-policy.md:379/382/383/385/389` |
+| 3 | 决定 R8 的 `claims[].status` 转换归属：① 写列补 status + §1.6 例外，或 ② 声明「转换在 R10 完成」并同步 V3 语义 | `policy:355—357`、`policy:384`、`SKILL:73/548`、`phase-r8:235`、`scripts/state_check.py` V3 |
+| 4 | `SKILL §4` 的 R12 段与 `phase-r12:103—110` 对齐 | `SKILL.md:705—712` |
+
+**按你的闸门（「只剩 NIT 才能直接说可交付」）：现在**不能说「三波可交付」** ——
+两处表格单元格损坏是**这一轮新引入**的（其中一处还是 Wave 2 已修内容的回退），
+R8 的 status 归属则是 M-1 修复的收尾。**修完这 4 项（预计 20 分钟内）后，我这边
+没有其它阻断项**：M-2 已完全闭环、V1—V15 全部可达且可满足、三方 14/14、机械面全绿。

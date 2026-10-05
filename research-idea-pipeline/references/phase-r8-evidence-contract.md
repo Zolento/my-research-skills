@@ -232,7 +232,7 @@ Expansion rule
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
+| **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
