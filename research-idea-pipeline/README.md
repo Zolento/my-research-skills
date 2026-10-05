@@ -178,7 +178,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
    **2—4 套真正不同的 claim hierarchy**（**不是**同一主张的四种措辞），每套填满
    **六槽位 `S1—S6`**。跨域类必须做 **anti-application stress test**，迁移合法性按
    **`L1/L2/L3`** 分级 —— **不再要求人人都有 theorem**。
-3. **D5 攻击面审核**：六个**攻击面审稿人**（R-Novelty / R-Causal / R-Experimental /
+3. **R7 攻击面审核**：六个**攻击面审稿人**（R-Novelty / R-Causal / R-Experimental /
    R-Theory / R-Generalization / R-Utility）**全部派遣、不得裁减**；**S-Lit 恒派**
    （L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例）。
 4. **R12 / R13 的 venue calibration**（按 contribution type 校准会议适配，**不是** venue 直接选 preset）
