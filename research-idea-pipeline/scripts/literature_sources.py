@@ -50,6 +50,12 @@ DEFAULT_SOURCES: Tuple[str, ...] = ("arxiv", "openalex", "crossref")
 HTTP_TIMEOUT = 30.0
 RETRY_BASE = 3.0          # 秒
 ARXIV_POLITE_DELAY = 3.0  # arXiv API 的礼貌间隔（秒）
+ARXIV_MAX_RETRIES = 5     # 429 退避：10 → 20 → 40 → 80 → 160 秒
+ARXIV_BASE_WAIT = 10.0
+
+#: 只认"看起来像 HTTP 状态"的文本（要求 status/code/http 前缀），
+#: 否则 "paper 2401.429 missing" 这类无关数字会触发 5 轮共 310 秒的假退避。
+_STATUS_TEXT_RE = re.compile(r"(?:status|code|http)[^0-9]{0,12}(\d{3})", re.IGNORECASE)
 
 _UA = "research-idea-pipeline/1.3 (+https://github.com/Zolento/myskills)"
 _DOI_RE = re.compile(r"10\.\d{4,9}/\S+", re.IGNORECASE)
@@ -122,6 +128,20 @@ def _title_key(title: Optional[str], year: Optional[int]) -> Optional[str]:
         return None
     key = _TITLE_KEY_RE.sub("", str(title).lower())
     return f"t:{key}:{year or ''}" if len(key) >= 8 else None
+
+
+def _http_status(exc: BaseException) -> Optional[int]:
+    """从异常里尽力提取 HTTP 状态码（arxiv 包并不稳定导出 HTTPError）。"""
+    for attr in ("status", "status_code", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None) if response is not None else None
+    if isinstance(status, int):
+        return status
+    match = _STATUS_TEXT_RE.search(str(exc))
+    return int(match.group(1)) if match else None
 
 
 def _polite_wait(source: str, delay: float) -> None:
@@ -251,34 +271,48 @@ class ArxivSource(Source):
             _polite_wait(self.name, self.polite_delay)
 
     def _via_package(self, query, max_results, from_year, to_year, log):
+        """Python 包路径。★ 必须保留 429 指数退避（literature-policy.md §6）。"""
         import arxiv  # type: ignore  # 缺包时抛 ImportError，由 search() 兜底
 
-        client = arxiv.Client()
-        search = arxiv.Search(
-            query=query, max_results=max_results,
-            sort_by=arxiv.SortCriterion.Relevance,
-        )
-        records: List[Dict[str, Any]] = []
-        for paper in client.results(search):
-            year = getattr(paper.published, "year", None)
-            if not _in_range(year, from_year, to_year):
-                continue
-            records.append({
-                "title": _clean(paper.title),
-                "authors": [str(a.name) for a in (paper.authors or [])],
-                "abstract": _clean(paper.summary),
-                "year": year,
-                "venue": None,   # ★ arxiv 元数据不含会议信息
-                "url": paper.entry_id,
-                "doi": normalize_doi(paper.doi),
-                "arxiv_id": normalize_arxiv_id(paper.get_short_id() or paper.entry_id),
-                "openalex_id": None,
-                "cited_by_count": None,
-                "references": [],
-                "keywords": list(paper.categories or []),
-                "sources": [self.name],
-            })
-        return records
+        last_error: Optional[BaseException] = None
+        for attempt in range(ARXIV_MAX_RETRIES):
+            try:
+                client = arxiv.Client()
+                search = arxiv.Search(
+                    query=query, max_results=max_results,
+                    sort_by=arxiv.SortCriterion.Relevance,
+                )
+                records: List[Dict[str, Any]] = []
+                for paper in client.results(search):
+                    year = getattr(paper.published, "year", None)
+                    if not _in_range(year, from_year, to_year):
+                        continue
+                    records.append({
+                        "title": _clean(paper.title),
+                        "authors": [str(a.name) for a in (paper.authors or [])],
+                        "abstract": _clean(paper.summary),
+                        "year": year,
+                        "venue": None,   # ★ arxiv 元数据不含会议信息
+                        "url": paper.entry_id,
+                        "doi": normalize_doi(paper.doi),
+                        "arxiv_id": normalize_arxiv_id(paper.get_short_id() or paper.entry_id),
+                        "openalex_id": None,
+                        "cited_by_count": None,
+                        "references": [],
+                        "keywords": list(paper.categories or []),
+                        "sources": [self.name],
+                    })
+                return records
+            except Exception as exc:  # noqa: BLE001 — 需要按状态码分流
+                last_error = exc
+                if _http_status(exc) == 429 and attempt < ARXIV_MAX_RETRIES - 1:
+                    wait = ARXIV_BASE_WAIT * (2 ** attempt)
+                    log(f"[429] 限流，等待 {wait:.0f}s 后重试（第 {attempt + 1} 次）")
+                    # 退避期间不发起任何新的 arXiv 请求
+                    time.sleep(wait)
+                    continue
+                raise
+        raise RuntimeError(f"arxiv 重试次数耗尽：{last_error}")
 
     def _via_atom(self, query, max_results, from_year, to_year, log):
         """不依赖 Python 包的回退：arXiv 原生 Atom 接口。"""
@@ -378,6 +412,42 @@ class OpenAlexSource(Source):
         payload = http_get_json(url, source=self.name, log=log)
         results = payload.get("results") or []
         return results[0]["id"].rsplit("/", 1)[-1] if results else None
+
+    def resolve_work_id(self, identifier: str, *, log,
+                        mailto: Optional[str] = None) -> Optional[str]:
+        """把 DOI / arXiv ID / OpenAlex ID 解析成 OpenAlex work ID（引文追溯的入口）。"""
+        text = (identifier or "").strip()
+        if not text:
+            return None
+        direct = normalize_openalex_id(text)
+        if direct and re.fullmatch(r"W\d{6,}", text.strip()):
+            return direct
+
+        doi = normalize_doi(text)
+        if doi:
+            params = {"select": "id"}
+            if mailto:
+                params["mailto"] = mailto
+            url = f"{self.API}/works/doi:{urllib.parse.quote(doi)}?{urllib.parse.urlencode(params)}"
+            try:
+                payload = http_get_json(url, source=self.name, log=log)
+                found = normalize_openalex_id(payload.get("id"))
+                if found:
+                    return found
+            except RuntimeError:
+                pass
+
+        arxiv_id = normalize_arxiv_id(text)
+        if arxiv_id:
+            params = {"filter": f"locations.landing_page_url:http://arxiv.org/abs/{arxiv_id}",
+                      "per-page": 1, "select": "id"}
+            if mailto:
+                params["mailto"] = mailto
+            url = f"{self.API}/works?{urllib.parse.urlencode(params)}"
+            payload = http_get_json(url, source=self.name, log=log)
+            results = payload.get("results") or []
+            return normalize_openalex_id(results[0].get("id")) if results else None
+        return direct
 
     def cited_by(self, work_id: str, *, max_results: int, log,
                  mailto: Optional[str] = None) -> List[Dict[str, Any]]:

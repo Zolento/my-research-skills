@@ -144,7 +144,7 @@ class EnvDiscoverTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 def _args(**kw: Any) -> SimpleNamespace:
-    base = {"local_only": False, "check_env": False, "no_reexec": True}
+    base = {"local_only": False, "offline": False, "check_env": False, "no_reexec": True}
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -375,6 +375,66 @@ class YearRangeTests(unittest.TestCase):
     def test_unknown_year_only_passes_without_filter(self):
         self.assertTrue(src._in_range(None, None, None))
         self.assertFalse(src._in_range(None, 2020, None))
+
+
+# ---------------------------------------------------------------------------
+# 4. 源状态与尽职调查等级
+# ---------------------------------------------------------------------------
+
+class SourceStateTests(unittest.TestCase):
+
+    def test_is_degraded_true_for_partial_or_unavailable(self):
+        self.assertFalse(ls.is_degraded({"a": {"state": "ok"}}))
+        self.assertFalse(ls.is_degraded({"a": {"state": "skipped"}}))
+        self.assertTrue(ls.is_degraded({"a": {"state": "unavailable"}}))
+        self.assertTrue(ls.is_degraded({"a": {"state": "partial"}}))
+        self.assertTrue(ls.is_degraded({"a": {"state": "ok"}, "b": {"state": "unavailable"}}))
+
+    def test_degraded_any_source_means_exit_code_2(self):
+        """用户决定：**任一**源降级就算降级（退出码 2），不是全部失败才算。"""
+        state = {"arxiv": {"state": "ok"}, "crossref": {"state": "unavailable"}}
+        self.assertTrue(ls.is_degraded(state))
+
+
+class LevelReportTests(unittest.TestCase):
+
+    ALL_OK = {"arxiv": {"state": "ok"}, "openalex": {"state": "ok"},
+              "crossref": {"state": "ok"}}
+
+    def test_l1_does_not_require_saturation(self):
+        r = ls._level_report("L1", 1, 10, {"arxiv": {"state": "ok"}}, False)
+        self.assertTrue(r["achieved"])
+
+    def test_l2_requires_saturation(self):
+        r = ls._level_report("L2", 4, 30, {"arxiv": {"state": "ok"}}, False)
+        self.assertFalse(r["achieved"])
+        self.assertIn("saturated", r["gaps"])
+
+    def test_needs_at_least_one_online_source(self):
+        dead = {"arxiv": {"state": "unavailable"}, "openalex": {"state": "unavailable"}}
+        r = ls._level_report("L1", 1, 10, dead, False)
+        self.assertFalse(r["achieved"])
+        self.assertIn("online_sources", r["gaps"])
+
+    def test_incomplete_coverage_does_not_block_l3(self):
+        """★ 用户决定：三源全在**不**是硬性要求；覆盖不完整只是单独标记。"""
+        state = {"arxiv": {"state": "ok"}, "openalex": {"state": "unavailable"},
+                 "crossref": {"state": "ok"}}
+        r = ls._level_report("L3", 8, 60, state, True)
+        self.assertTrue(r["achieved"], "覆盖不完整不应阻止 L3 达成")
+        self.assertFalse(r["source_coverage"]["complete"])
+        self.assertEqual(r["source_coverage"]["failed"], ["openalex"])
+        self.assertEqual(r["source_coverage"]["ok"], ["arxiv", "crossref"])
+
+    def test_coverage_complete_when_all_ok(self):
+        r = ls._level_report("L3", 8, 60, self.ALL_OK, True)
+        self.assertTrue(r["source_coverage"]["complete"])
+        self.assertTrue(r["achieved"])
+
+    def test_unmet_queries_and_results_are_reported(self):
+        r = ls._level_report("L3", 2, 5, {"arxiv": {"state": "ok"}}, True)
+        self.assertIn("queries", r["gaps"])
+        self.assertIn("results", r["gaps"])
 
 
 if __name__ == "__main__":
