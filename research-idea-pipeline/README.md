@@ -53,7 +53,8 @@ research-idea-pipeline/
 │   ├── example-d-narrative.md        # 多套路叙事与选型
 │   ├── example-a-standalone.md       # 单独文献调研
 │   ├── example-followup-review.md    # 接续复核
-│   └── example-project-layout.md     # 多路线目录与文档管理
+│   ├── example-project-layout.md     # 多路线目录与文档管理
+│   └── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
 ```
 
