@@ -527,3 +527,106 @@ M-2（V4 全阶段可闭环 ✅）、M-1 的**创建**归属 ✅ 与 **R8 升级
 **一句话：** 机制层面三波已经全部打通（V1—V15 可达可满足、读写闭环、枚举单源、角色闭合、
 视图性正确）；**只剩「新授权与八处旧禁令的措辞同步」这一处自相矛盾**，加上把检查器真正落盘。
 这 9 处改完，我认为可以宣布三波完成并交付用户总结。
+
+---
+
+## 9. 收口确认（快照 `9fc4c66`）
+
+**本轮改动：** 8 个文件（`git diff --stat 95a62c5 9fc4c66`）：
+**6 个被审内容文件**（SKILL +10/−?、roles、phase-r3-r6、phase-r7-r10-r13、phase-r9-r11、policy +4）
+＋ `scripts/test_state_check.py` **+64**（新增 `TestTableIntegrity`）＋ 本报告。**只读复核。**
+
+### 9.1 八处 status 禁令例外 —— ✅ **8/8 全部落地**（逐处现值，`git diff` 自证成立）
+
+| # | 位置 | 现值（节选） |
+|---|---|---|
+| 1 | `SKILL.md:549`（§1.6） | 「改 `claims[].status` **默认只能经 R10**。**唯一例外**：R8 挂证据时可做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`）；**降级与否决**（`contradicted` / `killed`）**仍只能经 R10**」 |
+| 2 | `SKILL.md:99` | 「改 claim 状态**默认只能经 R10**（**例外见 §1.6**：R8 的证据驱动单向升级）」 |
+| 3 | `SKILL.md:739`（§4 R7 段） | 「**assurance 不得直接改 `claims[].status`** —— 只能经 R10（**例外见 §1.6**）」 |
+| 4 | `SKILL.md:783`（§5 回写规则 2） | 同 §1.6 全文（默认 + 唯一例外 + 降级与否决） |
+| 5 | `roles.md:111`（§1B 硬规则 3） | 「不得直接改 `claims[].status` —— 只能经 R10（**例外见 SKILL §1.6**：R8 证据驱动的单向升级）」 |
+| 6 | `phase-r7-…md:423`（R7 硬规则 3） | 「只能经 **R10**（**例外见 ../SKILL.md §1.6**：R8 证据驱动的单向升级）」 |
+| 7 | `phase-r9-r11-…md:178` | 「**`status` 变更只能在这里（经 R10）** —— **例外：R8 的证据驱动单向升级**（见 ../SKILL.md §1.6）」 |
+| 8 | `phase-r3-r6-…md:364—365`（§R3.0 归属表） | 新增 `\| **R8** \| 挂证据时做**证据驱动的单向升级**…\|`；`\| R10 \| **降级与否决的唯一阶段**（`contradicted` / `killed`）\|` |
+| ＋ | `policy §5.0:359—361` | 新增第 3 条：「**升级**由 **R8** 按证据驱动执行；**降级与否决**只能经 R10…八处提及该禁令的地方都已回指本条」 |
+
+`git diff --name-only 95a62c5 9fc4c66` 确实包含 **6 个内容文件**（与你的自证一致）——
+上一轮的「声明已同步、实际只改 SKILL」这次不成立 ✅。
+
+### 9.2 落盘的检查器 —— ❌ **存在，但抓不住它要防的那类损坏（MAJOR）**
+
+**我的独立验证方式：** 把整个 `research-idea-pipeline/` 复制到 `/tmp/verify/tc`，
+在副本里**原样复现本轮的真实损坏**（`SKILL` 的「作用」列 ← 读列；`policy` 的「对应文件」列 ← 写列），
+再跑新增的 4 个用例：
+
+```
+干净副本：        Ran 4 tests … OK
+复现原始损坏后：  Ran 4 tests … OK        ← ❌ 4/4 全过，一处都没报
+你用的反向验证（把文件列改成 phase-nope.md）：FAILED (failures=1) ← ✅ 这条路有效
+```
+
+**根因（两行测试代码）：**
+
+| 位置 | 现值 | 问题 |
+|---|---|---|
+| `scripts/test_state_check.py:690` | `effect, read = cells[2].strip(), cells[4].strip()` | 5 列表格按 `\|` 切分后 **`cells[2]` 是「名称」列**（`dual-discovery`），**`cells[3]` 才是「作用」列**；所以 `:692` 的 `assertNotEqual(effect, read)` 比的是「名称 ≠ 读」，**永远不会触发** |
+| `scripts/test_state_check.py:699` | `if target.startswith("phase-"):` | 真实损坏是「文件列被写值覆盖」——写值不以 `phase-` 开头 → **存在性断言被跳过**；只有人为写成 `phase-nope.md` 才会命中（这正是你的反向验证能过、真实损坏过不了的原因） |
+
+**证明修法有效（我在副本里打补丁后重跑同一处损坏）：**
+
+```
+把 :690 改为 cells[3]，并把 :699 的守卫改为先 assertRegex(target, r"^`?phase-[\w-]+\.md`?$")
+→ Ran 4 tests, FAILED (failures=2)：
+   AssertionError: '`hypotheses` / `uncertainties` / `failures`' == '…' : SKILL R6 作用列被读列覆盖
+   AssertionError: policy R6 对应文件列不是 phase-*.md：…
+```
+即：**两行改动就能让检查器真正覆盖这个盲区**（其余两个用例——列数=6/7/5——保留，它们防的是另一类损坏，仍有效）。
+**注：** `test_policy_readwrite_table_columns` 与 `test_phase_tables_three_columns` 只查列数，
+而本轮真实损坏**列数是正确的**（4/5 列都没变），所以它们同样不会报——这是设计取舍，不算缺陷。
+
+### 9.3 MINOR：`policy §5` 的「补充说明」仍与新归属规则冲突
+
+该段自带免责声明（「不参与逐字比对…**不得**把它当成第二套口径」），但内容与**本轮刚冻结的归属规则**冲突：
+
+| 行 | 现值（节选） | 冲突点 |
+|---|---|---|
+| `policy:401` | 「**R2**：读 `claims[]`、`assumptions[]`、`literature[]`、`uncertainties[]`；写 `literature[]`…、`evidence[]`…、**`claims[]`（缺口类主张 + `supporting_evidence`）**、`uncertainties[]`」 | **给了 `claims[]` 第二个创建者（R2）**，与 §5.0 规则 1「**创建归属 = R3**」冲突；且 R2 的读列表比上表多 `claims[]` |
+| `policy:402` | 「**R3**：读 `claims[]`、`assumptions[]`、`literature[]`、`uncertainties[]`」 | 上表 R3 读 = `literature` / `assumptions` / `failures` / `contract.constraints`（**没有 claims / uncertainties，有 failures**）→ 同阶段两套读口径 |
+
+**修法（两行）：** `:401` 删掉读、写两处 `claims[]`（保留「缺口类主张」的语义可改写为「落 `uncertainties[]`，
+由 R3 转成 `C`」）；`:402` 的读列表与上表逐字对齐。**否则执行者按这段理解，会在 R2 建 claim。**
+
+### 9.4 NIT
+
+| # | 现象 | 位置 | 建议 |
+|---|---|---|---|
+| n-1 | 小节标题写「**两条**归属规则」，正文已是 **3 条** | `policy:353` | 改「三条归属规则」 |
+| n-2 | §R3.0 归属表里 **R8 占两行**（建契约 / 单向升级） | `phase-r3-r6:363—364` | 合并为「建 `claims[].contract`；挂证据时做**证据驱动的单向升级**」 |
+
+### 9.5 机械面（自跑，仓库本体，快照 `9fc4c66`）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **418 条，0 断链** ✅ |
+| 2 | deprecated-terms | **exit 1，0 命中** ✅ |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | `unittest discover -s scripts -p "test_*.py"` | **120 tests OK** ✅（116 + 4，与你的数字一致） |
+| 5 | `state_check --selftest` | exit 0 ✅ |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | examples + templates linter | 9/9 硬违规 0 ✅ |
+| 8 | `--list-rules` ↔ `policy §4` | **15 条逐字一致** ✅ |
+| 9 | 三方 14 阶段读/写格 | **14/14 逐字一致** ✅ |
+
+### 9.6 收口结论
+
+**仍需修：1 项 MAJOR（检查器两行断言）+ 1 项 MINOR（§5 补充说明的 claims 归属）+ 2 项 NIT —— 不能说「三波可交付」。**
+
+| 优先级 | 动作 | 位置 | 量级 |
+|---|---|---|---|
+| 1 | **把检查器修到真能报警**：`cells[2]` → `cells[3]`；文件列改为「必须匹配 `^`?phase-[\w-]+\.md`?$` **且** 文件存在」 | `scripts/test_state_check.py:690`、`:699` | 2 行（我已实证：改后同一处损坏立即报 2 处失败） |
+| 2 | `policy §5` 补充说明：`:401` 去掉 `claims[]`（读+写）、`:402` 读列表与上表对齐 | `policy:401—402` | 2 行 |
+| 3 | NIT：标题「两条」→「三条」；R3.0 表合并 R8 两行 | `policy:353`、`phase-r3-r6:363—364` | 2 行 |
+
+**已确认关闭：** 8/8 status 例外同步 ✅（含 §1.6，这次 `git diff` 自证成立）、`policy §5.0` 第 3 条 ✅、
+`TestTableIntegrity` 已落盘且 120 用例全绿 ✅（但见 §9.2 的有效性缺陷）、
+机械面 9 项全绿 ✅。**除上述 1 MAJOR + 1 MINOR，机制层三波没有其它阻断项。**

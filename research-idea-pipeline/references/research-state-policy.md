@@ -350,7 +350,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ---
 
-### 5.0 两条归属规则（总收官审计 M-1 / M-2）
+### 5.0 三条归属规则（总收官审计 M-1 / M-2）
 
 1. **`claims[]` 的创建归属 = R3。** 每个候选必须产出至少一条 `C`（其 central proposition，
    `status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
@@ -398,8 +398,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 > **不得**把它当成第二套口径。
 >
 - **R0**：读 用户输入、`routeX/INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
-- **R2**：读 `claims[]`、`assumptions[]`、`literature[]`、`uncertainties[]`；写 `literature[]`（`LIT<n>` + `relation`）、`evidence[]`（`kind: literature`、`epistemic_status: Supported`、`source_ref`）、`claims[]`（缺口类主张 + `supporting_evidence`）、`uncertainties[]`（领域饱和度与开放问题）
-- **R3**：读 `claims[]`、`assumptions[]`、`literature[]`、`uncertainties[]`；写 `hypotheses[]`（含五维 `structural_signature`、`niche`、`falsifier`、`expected_information_gain`）、`assumptions[]`（`tacit` → `explicit`）、`uncertainties[]`（新增未知项）
+- **R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（只读，用于定位缺口）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（缺口类主张先落 `U`，由 R3 转成 `C`）
+- **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）
 - **R4**：读 `hypotheses[]`；写 `hypotheses[].niche`（QD archive 的 niche 必填）
 - **R5**：读 `hypotheses[]`；写 `literature[]` / `evidence[]`(kind=literature) —— **由当前候选反向决定下一轮 query**
 - **R6**：读 `hypotheses[]`、`uncertainties[]`、`failures[]`；写 `hypotheses[].status`（`active` / `elite` / `archived` / `killed`）、`expected_information_gain` 更新、`failures[]`（被搁置的假设记 `kind: deprioritized`）、`uncertainties[]`（收敛或新增）

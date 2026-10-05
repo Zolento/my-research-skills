@@ -687,7 +687,7 @@ class TestTableIntegrity(unittest.TestCase):
         self.assertTrue(rows, "SKILL §0 读不到阶段行")
         for stage, cells in rows:
             self.assertEqual(len(cells), 7, f"SKILL {stage} 列数 {len(cells)}")
-            effect, read = cells[2].strip(), cells[4].strip()
+            name, effect, read = cells[2].strip(), cells[3].strip(), cells[4].strip()
             self.assertTrue(effect, f"SKILL {stage} 作用列空")
             self.assertNotEqual(effect, read, f"SKILL {stage} 作用列被读列覆盖")
 
@@ -696,6 +696,9 @@ class TestTableIntegrity(unittest.TestCase):
         for stage, cells in rows:
             target = cells[4].strip().strip("`")
             self.assertTrue(target, f"policy {stage} 对应文件列空")
+            # 真实损坏是「文件列被读/写值覆盖」→ 必须先把格式断言放在存在性之前
+            self.assertRegex(target, r"^(phase-[\w-]+\.md|\.\./SKILL\.md.*)$",
+                             f"policy {stage} 对应文件列不是 phase-*.md：{target[:40]}")
             if target.startswith("phase-"):
                 self.assertTrue((self.ROOT / "references" / target).exists(),
                                 f"policy {stage} 指向不存在的 {target}")
