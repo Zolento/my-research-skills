@@ -1,7 +1,7 @@
-# Research State 政策（R1 权威：八类一等对象、写入时机、引用完整性 V1—V10）
+# Research State 政策（R1 权威：八类一等对象、写入时机、引用完整性 V1—V15）
 
 **本文件是 R1 Research World Model（简称 `state`）的唯一权威定义。** 八类一等对象的 ID 前缀、
-逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V10 都写在这里。各 phase 文件只引用本文件，
+逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V15 都写在这里。各 phase 文件只引用本文件，
 **不得**各自再定义一遍枚举——各写一遍就是新的漂移源。
 
 **权威顺序：** 仓库级 spec [r-architecture-wave1-spec.md](../../docs/r-architecture-wave1-spec.md)
@@ -14,7 +14,7 @@
 **没有 validator，「一等对象」是宣言，不是机制**（spec §2.3）。
 
 **骨架：** [../templates/research-state.template.json](../templates/research-state.template.json)
-（模板自身**必须**通过 V1—V10）。
+（模板自身**必须**通过 V1—V15）。
 
 ---
 
@@ -297,21 +297,21 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 | # | 规则（逐字） | 违规 | 典型反例 |
 |---|---|---|---|
-| V1 | 每个 `C` 的 `falsifier` 非空 | 硬 | `"falsifier": ""`，或写了「无法证伪」 |
-| V2 | `C.supporting_evidence` / `refuting_evidence` 的每个 id 必须存在于 `evidence[]` | 硬 | `"supporting_evidence": ["E9"]`，但 `evidence[]` 里没有 `E9`；或写成 `"E9 (文献)"` |
-| V3 | 无任何 `E` 引用的 `C` 必须 `status: ungrounded`；有 `E` 却标 `ungrounded` 也是违规 | 硬 | 无证据的 `C3` 标 `supported`；有 `E1` 的 `C0` 标 `ungrounded` |
-| V4 | 每条 `F` 必须被至少一个 `claims[].known_flaws` 或 `experiments[].known_flaws` 引用 | 硬 | `F3` 只出现在 `failures[].referenced_by` 里，没有任何 `known_flaws` 指向它 |
-| V5 | `epistemic_status` ∈ 五值；`Hypothesized` / `Unknown` 的条目**不得**出现在 `supporting_evidence` | 硬 | `C0.supporting_evidence: ["E4"]`，而 `E4.epistemic_status: Hypothesized`；或写了 `"observed"`（大小写） |
-| V6 | 每条 `H` 的 `niche` 非空 | 硬 | `"niche": ""`——QD archive 失去前提 |
-| V7 | `U.cheapest_discriminating_test` 必须指向存在的 `X`，或字面量 `TBD` | 硬 | 指向 `X18`，但 `experiments[]` 里没有 `X18`；或写「暂无」 |
-| V8 | `X.parent` 必须是存在的 `X` 或 `null`；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
-| V9 | `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 `X` 或 `TBD` | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
-| V10 | 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure` | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
-| V11 | `stage == "X2"` ⇒ `claim_targeted` 必须为空数组 —— **`X2` 只做基线校准，不得承担 claim 判别** | 硬 | `{"stage":"X2","claim_targeted":["C0"]}` |
-| V12 | `status == "failed"` 的 `X` 必须被某条 `failures[].referenced_by` 引用 —— **失败不得消失** | 硬 | failed 实验没有对应 `F` |
-| V13 | `hypotheses[].island` ∈ `{P1..P6, local}（默认开启 P1—P4，P5/P6 按需）` | 硬 | `"island": "PX"` |
-| V14 | `hypotheses[].generation` 是非负整数 | 硬 | `"generation": "1"` / `-1` |
-| V15 | 每个出现过的 `niche` 至少有一条 `status: elite`（QD archive 不塌成单点） | 硬 | `N5` 下全是 `active` |
+| V1 | 每个 C 的 falsifier 非空 | 硬 | `"falsifier": ""`，或写了「无法证伪」 |
+| V2 | C.supporting_evidence / refuting_evidence 的每个 id 必须存在于 evidence[] | 硬 | `"supporting_evidence": ["E9"]`，但 `evidence[]` 里没有 `E9`；或写成 `"E9 (文献)"` |
+| V3 | 无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规 | 硬 | 无证据的 `C3` 标 `supported`；有 `E1` 的 `C0` 标 `ungrounded` |
+| V4 | 每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用 | 硬 | `F3` 只出现在 `failures[].referenced_by` 里，没有任何 `known_flaws` 指向它 |
+| V5 | epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence | 硬 | `C0.supporting_evidence: ["E4"]`，而 `E4.epistemic_status: Hypothesized`；或写了 `"observed"`（大小写） |
+| V6 | 每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举） | 硬 | `"niche": ""` / `"niche": "N11"`（越界）；**旧描述性 niche 名同样违规**（见 `deprecated-terms.txt`） |
+| V7 | U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD | 硬 | 指向 `X18`，但 `experiments[]` 里没有 `X18`；或写「暂无」 |
+| V8 | X.parent 必须是存在的 X 或 null；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
+| V9 | assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
+| V10 | 每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
+| V11 | stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别 | 硬 | `{"stage":"X2","claim_targeted":["C0"]}` |
+| V12 | status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失） | 硬 | failed 实验没有对应 `F` |
+| V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需） | 硬 | `"island": "PX"` |
+| V14 | hypotheses[].generation 是非负整数 | 硬 | `"generation": "1"` / `-1` |
+| V15 | 每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性） | 硬 | `N5` 下全是 `active` |
 
 **执行契约（spec §2.3）：**
 
@@ -320,8 +320,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | 退出码 | `0` 全部通过；`3` 存在硬违规；`4` 环境不满足（文件缺失、非法 JSON、结构不符等） |
 | `--json` | 输出机器可读结果 |
 | `--check` | 只校验不写（默认行为即只校验） |
-| `--list-rules` | 列出 V1—V10 与判据（本表与它逐字一致） |
-| `--selftest` | 内置自检，V1—V10 全覆盖 |
+| `--list-rules` | 列出 V1—V15 与判据（本表与它逐字一致） |
+| `--selftest` | 内置自检，V1—V15 全覆盖 |
 | 收工门槛 | 退出码**必须**为 `0`；`3` / `4` 都**不得**当作通过 |
 
 **与 `state_check.py` 实现的对应（一一对齐，不得各自解释）：**
@@ -339,8 +339,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 **边界（不得扩大解释）：**
 
-1. V1—V10 覆盖**引用完整性**。§3 的**字段齐备性**（键是否齐备）是另一层硬要求，
-   以 `state_check.py` 的实际实现与审计清单为准——**不得**因为「V1—V10 没查」就省略字段。
+1. V1—V15 覆盖**引用完整性**。§3 的**字段齐备性**（键是否齐备）是另一层硬要求，
+   以 `state_check.py` 的实际实现与审计清单为准——**不得**因为「V1—V15 没查」就省略字段。
 2. V5 只否决 `Hypothesized` / `Unknown` 进 `supporting_evidence`；`Planned` 条目的引用纪律
    见 [claim-first-policy.md](claim-first-policy.md) §2 与 [evidence-policy.md](evidence-policy.md) §3
    ——**不得**当作证据引用（R8 的 Evidence Contract 只收 `Observed` / `Supported`）。
@@ -419,15 +419,15 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | [scoring-policy.md](scoring-policy.md) §3 / §4 | `G1—G5` 门禁、六维排序 | 门禁与排序**读** state：`claims[].supporting_evidence`（`G1`）、`literature[].relation` 与最近前作（`G2`）、`evidence[].epistemic_status`（`G4`）、`hypotheses[].niche` / `experiments[].stage`（实验设计质量）。**state 只存事实与状态，不存评分**；门禁 `fail` 的后果**必须**回写成 `repairs[]` / `claims[].status` / `failures[]`，**不得**只停留在评分表里 |
 | [project-layout.md](project-layout.md) §6（落盘三档）/ §3.1（正文禁令） | 落盘路径与「什么不得贴进正文」 | 机器状态 → `.research-idea-pipeline/<route>/research-state.json`（**常驻、就地覆盖**：每轮只保留一份当前 state；过程快照若需要，放 `.research-idea-pipeline/<route>/` 下的中间产物档）。交付物仍在 `<routeX>/docs/`；**不得**把 state / 原始 JSON 贴进正文（该文件 §3.1 的既有禁令） |
 | [../SKILL.md](../SKILL.md) §1.6（本轮新增） | 「critical flaw ⇒ state change」不变量 | 本文件 §1 硬规则 2 与 §3.9 是它的执行细则；两处措辞**必须**一致 |
-| [../scripts/state_check.py](../scripts/state_check.py) | V1—V10 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
-| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V10（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
+| [../scripts/state_check.py](../scripts/state_check.py) | V1—V15 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
+| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V15（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
 
 **维护规则：**
 
 1. 节号 `§1—§6` **冻结**。新增或移动节属于破坏性变更，**必须**同轮更新本节与全部引用点，
    并在 spec 的变更记录里记一行。
 2. 引用本文件时**必须**写 `research-state-policy.md §N`，**不得**只写「见 state 政策」。
-3. §2 的 ID 前缀、§3 的字段与枚举、§4 的 V1—V10 一旦改动，**必须**同轮扫三处：
+3. §2 的 ID 前缀、§3 的字段与枚举、§4 的 V1—V15 一旦改动，**必须**同轮扫三处：
    `state_check.py`（规则实现）、`research-state.template.json`（骨架）、全部 `phase-*.md`
    （读写时机），**不得**只改一处。
 
@@ -451,7 +451,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ### 3.11 附加槽位（与八类对象同级或挂在对象下，全部已在模板中占位）
 
-**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们（`state_check.py` 忽略未知键；V1—V10 不覆盖形状校验）。**
+**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们（`state_check.py` 忽略未知键；V1—V15 不覆盖形状校验）。**
 旧表述「不得自加字段」的**准确含义是**：**新加字段必须同时改本表、模板与 `state_check.py`**，
 而不是「只准用八类对象」。
 

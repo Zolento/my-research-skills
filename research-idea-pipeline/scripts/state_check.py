@@ -4,7 +4,8 @@
 契约来源
 --------
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
-与 §2.3（引用完整性规则 V1—V15）、§5（R10 处置 / 关闭枚举）。
+与 §2.3（引用完整性规则 V1—V15）、§5（R10 处置 / 关闭枚举）；
+V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4。
 
 **为什么必须有这个脚本：**「八类一等对象」只写在 policy 里，执行者会写成散文。
 没有 validator，"一等对象"是宣言，不是机制。本脚本把 §2.3 的十条规则变成可执行判定，
@@ -25,11 +26,16 @@
     V3  无任何 E 引用的 C 必须 `status: ungrounded`；有 E 却标 `ungrounded` 也是违规
     V4  每条 F 必须被至少一个 `claims[].known_flaws` 或 `experiments[].known_flaws` 引用
     V5  `epistemic_status` ∈ 五值；`Hypothesized` / `Unknown` 的条目不得出现在 `supporting_evidence`
-    V6  每条 H 的 `niche` 非空（QD archive 的前提）
+    V6  每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）
     V7  `U.cheapest_discriminating_test` 必须指向存在的 X，或字面量 `TBD`
     V8  `X.parent` 必须是存在的 X 或 `null`；树不得成环
     V9  `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 X 或 `TBD`
     V10 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure`
+    V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）
+    V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用
+    V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）
+    V14 `hypotheses[].generation` 是非负整数
+    V15 每个出现过的 `niche` 至少一条 `status: elite`
 
 判据补充（口径固定，避免各自解释）：
     * 「非空」= 字符串 strip 后非空；非字符串（数字 / 数组 / null）一律算违规。
@@ -38,12 +44,17 @@
     * V4 只认 `claims[].known_flaws` 与 `experiments[].known_flaws`；`failures[].referenced_by`
       **不构成**引用凭证（spec §2.3 逐字如此）。
     * V7 / V9 的 `TBD` 为精确字面量（strip 后比对，不接受 `tbd` / `TBD 待定`）。
+    * V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）；
+    * V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用；
+    * V13 `hypotheses[].island` ∈ {P1..P6, local}；
+    * V14 `hypotheses[].generation` 是非负整数；
+    * V15 每个出现过的 `niche` 至少一条 `status: elite`；
     * V10 除四字段齐备外，另按 spec §5 强制两个枚举：
       `disposition ∈ REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
-    * V1—V15 之外**不新增**硬规则（spec §2.3 是唯一契约）。
+    * V1—V15 之外**不新增**硬规则（Wave 1 spec §2.3 + Wave 2 spec §4 是唯一契约）。
 
 退出码（与仓库既有脚本一致）：
     0  全部通过
@@ -119,7 +130,7 @@ RULES: Dict[str, str] = {
     "V3": "无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规",
     "V4": "每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用",
     "V5": "epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence",
-    "V6": "每条 H 的 niche 非空",
+    "V6": "每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）",
     "V7": "U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD",
     "V8": "X.parent 必须是存在的 X 或 null；树不得成环",
     "V9": "assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD",

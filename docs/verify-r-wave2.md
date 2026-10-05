@@ -515,3 +515,63 @@ selftest 数值标签、V15 合法反例、deprecated 旧 niche 名 6 项已落�
 
 按你的闸门（「只剩 NIT 才可直接说可交付」），当前**还差 M-4（必须修，否则示例照抄会被自己的闸门判 3）
 与 6 项 MINOR**；其中 MINOR-2/3/4/5/6/7 各自都是一行到一行半。**修完这 7 处即可交付。**
+
+---
+
+## 9. 最后一轮增量确认（7 处待修 + NIT 的收官核验）
+
+**快照：** `8ef4737`（工作树干净；其上还有 `716dc02`、`d3e3ddc` 两个 shortlist 口径提交）。
+> **行号口径说明：** 本节行号对应 `8ef4737`；§2 / §8 的行号对应它们各自的快照
+> （`aec42b8` / `4fccc32`），修复过程中行号有位移属正常（例如 policy 的 V6 行 `:303`→`:305`、
+> 「一一对应」声明行 `:294`→`:296`）。
+**纪律：** 本次仅向本文件追加本节；未改任何被审文件、未 commit。
+
+### 9.1 七处待修 + NIT 逐条确认
+
+| # | 声明 | 现值（文件:行号） | 判定 |
+|---|---|---|---|
+| 1 | **M-4**：B8 片段补 `claims` + `experiments`（各带 `known_flaws:["F1"]`，`referenced_by` 改 `["C1","X1"]`），`state_check --check` → exit 0 | 片段 `phase-r3-r6-discovery.md:293—305` 顶层键 = `phase / claims / hypotheses / experiments / failures / literature / uncertainties`；`claims[0].known_flaws=["F1"]`、`experiments[0].known_flaws=["F1"]`、`failures[0].referenced_by=["C1","X1"]`。**我自己复跑（不采信自述）：`--check` exit 0、`--json` exit 0**，汇总行「`[ok] 0 处硬违规：V1—V15 全部通过；claims=1…experiments=1…failures=1…`」 | ✅ **达成** |
+| 2 | `phase` 硬规则 5 的 island 枚举 → `P1`—`P6`/`local` | `phase-r3-r6-discovery.md:348`：「每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）与 `generation: 0`（V13/V14 强制）」 | ✅ **达成** |
+| 3 | `B5.4` **自己**加横幅（不落到父节） | `:217` `### B5.4 优先级判定规则` → `:219` 横幅「⚠️ **本节已被 R4.2 取代**：这张排名表**不得**用来筛到 3—5 个候选；筛选动作走 **QD archive**（每个 niche 留一个 elite）。它只作为 **R3 的 concept 级快筛**输入。」→ `:223` 排名表。横幅在 **B5.4 节内**，且在排名表**之前**；父节 B5 的横幅（`:154`）保留 | ✅ **达成** |
+| 4 | `policy` 的 **V6 行** → 「非空**且 ∈ N1—N10**」 | `research-state-policy.md:305` **仍是**「每条 `H` 的 `niche` 非空」；典型反例列也只有 `"niche": ""` | ❌ **未达成 → MINOR-A** |
+| 5 | `policy` **执行契约** → `V1—V15` | `research-state-policy.md:323`「列出 **V1—V10** 与判据（本表与它逐字一致）」、`:324`「内置自检，**V1—V10** 全覆盖」 | ❌ **未达成 → MINOR-B** |
+| 6 | `policy §3.4` 的 `island`/`generation` 补「必填 ✅」列 | `:194` island、`:195` generation 均为 **4 列**（与表头 `字段/取值或类型/必填/说明` 对齐），必填列为 `✅` | ✅ **达成** |
+| 7 | `state_check.py` docstring 统一 `V1—V15`；`_v13` docstring → 7 值 | 范围串已统一：`:2` 标题、`:18` usage、`:46` 判据、`:398` 节注释、`:880` argparse description、`:889—890` `--selftest`/`--list-rules` help、`:933` 自检注释 **全部 V1—V15**；`_v13` docstring `:545` = `island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）` ✅。**但规则清单块 `:23—32` 仍只列 V1—V10**（其 V6 行 `:28` 仍写「非空」） | ⚠️ **达成（范围串）/ 部分（清单块）→ 见 MINOR-A 证据 3、NIT-2** |
+| NIT | `shortlist` 操作句全部改成 population / QD archive；只保留「已作废/被取代/点名」引用；`deprecated-terms.txt` 登记保留 | Lead 指定的过滤 grep `grep -rn 'shortlist' --include='*.md' . \| grep -vE '作废\|被取代\|点名\|本节已被\|deprecated'` → **0 行输出**；全仓只剩 `phase-r3-r6-discovery.md` 2 处，均为「shortlist 这个概念在 Wave 2 起作废」类说明 | ✅ **达成** |
+
+### 9.2 机械面复跑（快照 `8ef4737`）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **410 条，0 断链** ✅ |
+| 2 | deprecated-terms | **exit 1，0 命中** ✅ |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | `python3 -m unittest discover -s scripts -p "test_*.py"` | **116 tests OK** ✅ |
+| 5 | `state_check --selftest` | exit 0 ✅ |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | examples + templates 默认档 linter | 9/9 硬违规 0 ✅ |
+| 8 | `--list-rules` | 15 行 ✅（第 6 行文本见 MINOR-A） |
+| 9 | B8 片段（独立复跑） | `--check` exit 0 / `--json` exit 0 ✅ |
+
+### 9.3 剩余项（0 MAJOR）
+
+| # | 级别 | 现象 | 文件:行号 | 修法（一行级） |
+|---|---|---|---|---|
+| A | **MINOR** | **V6 规则文本三处未同步**（声明已扩展，实际未改）：㈠ `policy §4:305` 仍「非空」；㈡ `state_check.py` 的 `RULES["V6"]` 仍「每条 H 的 niche 非空」——**`--list-rules` 第 6 行就打印这个旧文本**；㈢ docstring 规则清单 `:28` 同旧文本。而 policy §4`:296` 声明「`state_check.py` 与该表一一对应」、`§4` 执行契约声明「本表与它逐字一致」——两处声明因此不成立；Wave 2 spec `§6:116` 明确要求「§4 … 扩展 V6」 | `research-state-policy.md:305`、`scripts/state_check.py:28`（docstring）、`scripts/state_check.py` 的 `RULES["V6"]` | 三处文本统一为「`niche` 非空**且 ∈ `N1`—`N10`**（V6 强制）」，反例列补 `"niche": "assumption-breaking"` |
+| B | **MINOR** | **policy 执行契约两行仍 `V1—V10`**，与脚本实际行为（`--list-rules` 15 条、help 文本已写 V1—V15）矛盾 | `research-state-policy.md:323—324` | 改为 `V1—V15` |
+| C | NIT | policy 另有 **9 处 `V1—V10` 范围标签**：文件标题、导言、`:17` 模板句、`:342—343` 边界 1、`:422` 接口表、`:423` 模板行、`:430` 维护规则 3、`:454` §3.11 更正句 | `research-state-policy.md:1 / :4 / :17 / :342 / :343 / :422 / :423 / :430 / :454` | 批量替换为 `V1—V15`（纯文本，无行为影响） |
+| D | NIT | `state_check.py` docstring 规则清单块仍止于 V10，与同一 docstring 的 V1—V15 标题并存（清单块从未扩写，不是本轮引入） | `scripts/state_check.py:23—32` | 补 V11—V15 五行 |
+| E | NIT | 契约来源只引 Wave 1 spec（V1—V12 在其中），未引 Wave 2 spec §4（V13—V15 的定义处） | `scripts/state_check.py:6—7` | 补一行 `docs/r-architecture-wave2-spec.md` §4 |
+
+### 9.4 收官结论
+
+**0 MAJOR。** 7 处待修中 **5 处完整落地**（M-4 已独立复跑 exit 0、phase 硬规则 5、B5.4 节内横幅、
+§3.4 四列对齐、docstring 范围串统一 + `_v13` 7 值），**2 处未落地**（policy V6 行、policy 执行契约），
+另有 3 项 NIT（policy 范围标签 / docstring 清单块 / 契约来源）。`shortlist` 操作句已清零，
+机械面全绿（410 链接 0 断链、116 测试、deprecated 0、模板 0、linter 0）。
+
+**按你的闸门（「只剩 NIT 才能直接说可交付」）：仍需修 —— 2 项 MINOR（A、B 合计 3 行文本）+ 3 项 NIT。**
+但这 2 项 MINOR 是**纯文档文本同步**：V6 的**实际闸门行为正确**（我复跑 `niche="assumption-breaking"`
+→ exit 3 · V6 · `hypotheses[0].niche`；`niche="N7"` → exit 0），模板/测试/CLI 行为均无缺陷。
+因此：**机制层已可收口**；若你把这 3 行并入 Wave 3 首轮（或现在顺手改掉），
+Wave 2 就可以标记完成并开 Wave 3 —— 我这边没有其它阻断项。
