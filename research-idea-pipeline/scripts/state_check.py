@@ -104,6 +104,9 @@ DISPOSITIONS: Tuple[str, ...] = (
     "REPAIR_CLAIM", "RUN_TEST", "FIX_IMPLEMENTATION", "NARROW_SCOPE", "KILL_BRANCH",
 )
 CLOSURES: Tuple[str, ...] = ("RESOLVED", "ACCEPTED_LIMITATION")
+# Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
+NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
+ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "local")
 
 UNGROUNDED = "ungrounded"
 TBD = "TBD"
@@ -123,6 +126,9 @@ RULES: Dict[str, str] = {
     "V10": "每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure",
     "V11": "stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别",
     "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
+    "V13": "hypotheses[].island ∈ {P1, P2, P3, P4, local}",
+    "V14": "hypotheses[].generation 是非负整数",
+    "V15": "每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性）",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -268,7 +274,7 @@ class Report:
             return f"[env] 环境不满足（退出码 {EXIT_ENV}）：{self.error}"
         counts = "、".join(f"{key}={self.checked.get(key, 0)}" for key in CHECKED_KEYS)
         if not self.violations:
-            return f"[ok] 0 处硬违规：V1—V12 全部通过；{counts}"
+            return f"[ok] 0 处硬违规：V1—V{RULE_ORDER[-1][1:]} 全部通过；{counts}"
         breakdown = "、".join(f"{rule}×{count}" for rule, count in self.rule_counts().items())
         return (f"[hard] 共 {len(self.violations)} 处硬违规（{breakdown}）；state 不合规；{counts}")
 
@@ -514,16 +520,77 @@ def _v5(ctx: _Context) -> List[Violation]:
 
 
 def _v6(ctx: _Context) -> List[Violation]:
-    """V6：每条 H 的 niche 非空（QD archive 的前提）。"""
+    """V6：每条 H 的 niche 非空，且取值必须是 N1—N10 之一（QD archive 的前提）。"""
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("niche")
-        if _text_ok(value):
+        if not _text_ok(value):
+            detail = "为空（QD archive 的前提）" if _is_blank(value) else "必须是非空字符串"
+            out.append(Violation(
+                "V6", f"hypotheses[{index}].niche", detail, value, _subject_of(hypothesis),
+            ))
             continue
-        detail = "为空（QD archive 的前提）" if _is_blank(value) else "必须是非空字符串"
+        if value.strip() not in NICHES:
+            out.append(Violation(
+                "V6",
+                f"hypotheses[{index}].niche",
+                f"不是 N1—N10 之一（QD archive 的 niche 复用 preset 名，不引入第二套枚举）",
+                value,
+                _subject_of(hypothesis),
+            ))
+    return out
+
+
+def _v13(ctx: _Context) -> List[Violation]:
+    """V13：island ∈ {P1, P2, P3, P4, local}。"""
+    out: List[Violation] = []
+    for index, hypothesis in ctx.hypotheses:
+        value = hypothesis.get("island")
+        if _text_ok(value) and value.strip() in ISLANDS:
+            continue
+        detail = ("为空（必须标明由哪条轨产生）" if _is_blank(value)
+                  else f"不是 {'|'.join(ISLANDS)} 之一")
+        out.append(Violation("V13", f"hypotheses[{index}].island", detail, value, _subject_of(hypothesis)))
+    return out
+
+
+def _v14(ctx: _Context) -> List[Violation]:
+    """V14：generation 是非负整数。"""
+    out: List[Violation] = []
+    for index, hypothesis in ctx.hypotheses:
+        value = hypothesis.get("generation")
+        ok = isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        if ok:
+            continue
         out.append(Violation(
-            "V6", f"hypotheses[{index}].niche", detail, value, _subject_of(hypothesis),
+            "V14", f"hypotheses[{index}].generation",
+            "必须是非负整数（0 = 初始候选，每次 R6 进化 +1；不接受 \"1\" 这类字符串）",
+            value, _subject_of(hypothesis),
         ))
+    return out
+
+
+def _v15(ctx: _Context) -> List[Violation]:
+    """V15：每个出现过的 niche 至少有一条 elite（QD archive 不塌成单点）。"""
+    if not ctx.hypotheses:
+        return []
+    niches = {}
+    for index, hypothesis in ctx.hypotheses:
+        niche = hypothesis.get("niche")
+        if not (_text_ok(niche) and niche.strip() in NICHES):
+            continue
+        entry = niches.setdefault(niche.strip(), {"elite": None, "first": index})
+        if _text_ok(hypothesis.get("status")) and hypothesis["status"].strip() == "elite":
+            if entry["elite"] is None:
+                entry["elite"] = index
+    out: List[Violation] = []
+    for niche, entry in sorted(niches.items()):
+        if entry["elite"] is None:
+            out.append(Violation(
+                "V15", f"hypotheses[{entry['first']}].niche",
+                f"niche {niche} 没有任何 status: elite 的候选（QD archive 要求每 niche 留一个 elite）",
+                niche, niche,
+            ))
     return out
 
 
@@ -718,6 +785,7 @@ CHECKS: Dict[str, Callable[[_Context], List[Violation]]] = {
     "V1": _v1, "V2": _v2, "V3": _v3, "V4": _v4, "V5": _v5,
     "V6": _v6, "V7": _v7, "V8": _v8, "V9": _v9, "V10": _v10,
     "V11": _v11, "V12": _v12,
+    "V13": _v13, "V14": _v14, "V15": _v15,
 }
 
 
@@ -887,7 +955,7 @@ def _selftest_state() -> Dict[str, Any]:
             "structural_signature": {"assumption_distance": 2},
             "novelty_source": "assumption-breaking", "theory_lens": "transfer",
             "nearest_prior": "LoRA", "falsifier": "R2 不降级",
-            "expected_information_gain": 0.4, "status": "active", "niche": "assumption-breaking",
+            "expected_information_gain": 0.4, "status": "elite", "niche": "N2", "island": "P2", "generation": 0,
         }],
         "experiments": [{
             "id": "X1", "parent": None, "stage": "X1", "claim_targeted": ["C0"],
@@ -937,7 +1005,7 @@ def selftest() -> int:
         detected.update(report.rules())
         return report
 
-    print("state_check.py 自检（V1—V12）：")
+    print(f"state_check.py 自检（V1—V{RULE_ORDER[-1][1:]}）：")
     clean = check_state(base, source="<selftest>")
     check("合法 state 退出码 0", clean.exit_code == EXIT_OK and clean.ok)
     check("合法 state 无违规", clean.violations == [])
@@ -1025,7 +1093,25 @@ def selftest() -> int:
     check("V12 合法反例：failed 且已被 F 引用 → 0",
           v12ok.exit_code == EXIT_OK and v12ok.violations == [])
 
-    check("自检覆盖 V1—V12", set(RULE_ORDER) - detected == set(),
+    v13 = report_with(lambda d: d["hypotheses"][0].update(island="PX"))
+    check("V13 island 非法 → 3", v13.exit_code == EXIT_HARD and v13.rules() == ["V13"])
+    v13ok = report_with(lambda d: d["hypotheses"][0].update(island="local"))
+    check("V13 合法反例：island=local → 0", v13ok.exit_code == EXIT_OK and v13ok.violations == [])
+
+    v14 = report_with(lambda d: d["hypotheses"][0].update(generation="1"))
+    check("V14 generation 是字符串 → 3", v14.exit_code == EXIT_HARD and v14.rules() == ["V14"])
+    v14b = report_with(lambda d: d["hypotheses"][0].update(generation=-1))
+    check("V14 generation 为负 → 3", v14b.exit_code == EXIT_HARD and v14b.rules() == ["V14"])
+
+    v6b = report_with(lambda d: d["hypotheses"][0].update(niche="assumption-breaking"))
+    check("V6 niche 不在 N1—N10 → 3", v6b.exit_code == EXIT_HARD and v6b.rules() == ["V6"])
+
+    def _no_elite(d):
+        d["hypotheses"].append(dict(d["hypotheses"][0], id="H2", niche="N5", status="active", generation=0))
+    v15 = report_with(_no_elite)
+    check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
+
+    check(f"自检覆盖 V1—V{sorted(rule for rule in RULE_ORDER)[-1][1:]}", set(RULE_ORDER) - detected == set(),
           f"未覆盖 {sorted(set(RULE_ORDER) - detected)}")
 
     check("缺八类数组 → 4", check_state({"foo": 1}).exit_code == EXIT_ENV)

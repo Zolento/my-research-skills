@@ -287,9 +287,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ---
 
-## 4. 引用完整性 V1—V10（`state_check.py` 机械强制）
+## 4. 引用完整性 V1—V15（`state_check.py` 机械强制）
 
-**结论：V1—V10 全部是硬违规；任何一条未清零，state 不得作为下一阶段的输入。**
+**结论：V1—V15 全部是硬违规；任何一条未清零，state 不得作为下一阶段的输入。**
 
 **规则表（规则文本逐字取自 spec §2.3；`state_check.py` 与该表一一对应）：**
 
@@ -305,6 +305,11 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V8 | `X.parent` 必须是存在的 `X` 或 `null`；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
 | V9 | `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 `X` 或 `TBD` | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
 | V10 | 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure` | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
+| V11 | 硬 | `stage == "X2"` ⇒ `claim_targeted` 必须为空数组 —— **`X2` 只做基线校准，不得承担 claim 判别** | `{"stage":"X2","claim_targeted":["C0"]}` |
+| V12 | 硬 | `status == "failed"` 的 `X` 必须被某条 `failures[].referenced_by` 引用 —— **失败不得消失** | failed 实验没有对应 `F` |
+| V13 | 硬 | `hypotheses[].island` ∈ `{P1, P2, P3, P4, local}` | `"island": "PX"` |
+| V14 | 硬 | `hypotheses[].generation` 是非负整数 | `"generation": "1"` / `-1` |
+| V15 | 硬 | 每个出现过的 `niche` 至少有一条 `status: elite`（QD archive 不塌成单点） | `N5` 下全是 `active` |
 
 **执行契约（spec §2.3）：**
 
@@ -356,9 +361,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | **R0** Research Contract | — | `contract` | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R3** Dual Discovery | `literature` / `assumptions` / `failures` | `hypotheses` | `phase-r3-r6-discovery.md` |
-| **R4** Isolated Populations | `hypotheses` | `hypotheses[].niche` | `phase-r3-r6-discovery.md` |
+| **R4** Isolated Populations | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R6** Evolution | `hypotheses` / `uncertainties` / `failures` | `hypotheses` / `failures` | `phase-r3-r6-discovery.md` |
+| **R6** Evolution | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` | `phase-r3-r6-discovery.md` |
 | **R7** Adversarial Assurance | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` | `phase-r7-r10-r13-assurance-repair-review.md` |
 | **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` | `phase-r8-evidence-contract.md` |
 | **R9** Experiment Tree | `uncertainties`(critical, high 且 high) / `claims` | `experiments` | `phase-r9-r11-experiment-loop.md` |

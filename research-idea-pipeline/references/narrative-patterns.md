@@ -24,6 +24,11 @@
 
 ---
 
+
+> **双重身份（Wave 2）：** `N1`—`N10` 既是**叙事 preset**，也是 **R4 的 QD archive niche 取值**。
+> 两者共用同一套名字是**有意为之** —— 另设一套 niche 枚举就是第二个漂移源。
+> 因此 `state_check.py` V6 强制 `hypotheses[].niche ∈ N1—N10`，V15 强制每个 niche 留一个 elite。
+
 ## 1. 十套叙事 preset 表
 
 ### 1.1 N1—N10 的读法

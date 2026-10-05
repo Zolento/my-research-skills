@@ -66,9 +66,9 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
 | **R3** | `dual-discovery` | 双轨发现：local search ‖ paradigm escape（**上下文隔离**） | `literature` / `assumptions` / `failures` | `hypotheses` |
-| **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].niche` |
+| **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
-| **R6** | `evolution` | mutation / crossover / simplification / 新 niche | `hypotheses` / `uncertainties` / `failures` | `hypotheses` / `failures` |
+| **R6** | `evolution` | mutation / crossover / simplification / 新 niche | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` |
 | **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` |
 | **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments` |

@@ -211,50 +211,27 @@
 ---
 
 
-## Wave 2 深化骨架（本轮只落骨架，不假装完成）
+## R5. 共演化检索（**常驻服务**，不是一次性步骤）
 
-### field grammar `{P, A, R, D, O, M, T, E}`
-
-目的：抽取「**这个领域通常怎么想问题**」，而不是列 gap。
-
-| 代号 | 含义 | 本项目要填什么 |
-|---|---|---|
-| `P` | Problem | 领域公认的问题表述 |
-| `A` | Assumptions | 显式 + **默会**假设（默会项直接进 `assumptions[]`） |
-| `R` | Representation | 用什么数学对象表示 |
-| `D` | Data / Supervision | 数据与监督形式 |
-| `O` | Objective | 优化目标 |
-| `M` | Mechanism | 机制解释 |
-| `T` | Theory | 理论工具 |
-| `E` | Evaluation | 评测协议 |
-
-### occupancy map（占用图）
-
-不问「哪些工作做过」，而问「**设计空间的哪些区域已经拥挤**」：
-
-```text
-parameter adaptation        ███████████   拥挤
-feature alignment           █████████
-solver adaptation           ███
-measurement adaptation      █
-identifiability framing     █
-causal framing              0             ← negative space
-quotient representation     0             ← negative space
-```
-
-**negative space（计数为 0 或极低的区域）是 R3 paradigm escape 的输入**，不是直接结论。
-
-### R5 共演化检索
+**检索轨迹必须由当前候选反向驱动，而不是沿着初始关键词越搜越窄。**
 
 ```text
 I_t → Q_{t+1} → L_{t+1} → I_{t+1}
 ```
 
-**当前候选 idea 反过来决定下一轮查什么**。例：候选把问题重述为「partial identifiability」，
-下一轮就该搜 `partial identification under indirect observations`，
-而不是继续搜 `prior adaptation`。**检索纪律（禁止只停留在本地、T1—T7、L1/L2/L3 等级、
-429 退避、代理环境识别、饱和判据、负检索记录）一字不动，见本文档正文与
-[literature-policy.md](literature-policy.md)。**
+**硬规则：**
+
+1. **每轮 R5 必须至少有一条 query 由最新候选的表述生成**，并写明它来自哪条候选。
+   例：候选把问题重述为「partial identifiability」，下一轮就该搜
+   `partial identification under indirect observations`，**不是**继续搜 `prior adaptation`。
+2. **`literature[].relation` 五类关系必填**（`supports` / `contradicts` / `shares-assumption` /
+   `shares-structure` / `solves-analogous-problem` / `uses-same-theory`）——
+   这是把「按关键词最近邻找」升级为「按结构关系找」的落点。
+3. **检索纪律一字不动**：禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查等级、
+   429 退避 `10→20→40→80→160s`、代理环境识别、饱和判据、负检索记录 —— 全部见本文档正文与
+   [literature-policy.md](literature-policy.md)。
+4. **R5 可以随时被 R3/R6 调用**（它是常驻服务）；它的产物只写 `literature[]` / `evidence[]`
+   （`kind: literature`），**不得**直接写 `hypotheses[]`。
 
 ---
 

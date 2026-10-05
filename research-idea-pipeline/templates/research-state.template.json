@@ -161,8 +161,10 @@
       "nearest_prior": "LIT2（示例占位）",
       "falsifier": "解耦后跨中心落差不变或扩大（由 X8 判别）",
       "expected_information_gain": 0.35,
-      "status": "active",
-      "niche": "assumption-breaking"
+      "status": "elite",
+      "niche": "N2",
+      "island": "P2",
+      "generation": 0
     }
   ],
   "experiments": [

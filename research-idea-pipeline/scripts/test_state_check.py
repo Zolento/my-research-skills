@@ -108,7 +108,7 @@ def valid_state() -> Dict[str, Any]:
                 "novelty_source": "assumption-breaking", "theory_lens": "transfer-learning",
                 "nearest_prior": "LoRA", "falsifier": "R2 不降级",
                 "expected_information_gain": 0.4, "status": "active",
-                "niche": "assumption-breaking",
+                "niche": "N2", "island": "P2", "generation": 0, "status": "elite",
             },
         ],
         "experiments": [
@@ -213,7 +213,7 @@ class TestValidState(unittest.TestCase):
         path = self.tmp.write(valid_state())
         code, out, err = _run(str(path))
         self.assertEqual(code, sc.EXIT_OK, msg=out + err)
-        self.assertIn("V1—V12 全部通过", out)
+        self.assertIn(f"V1—V{sc.RULE_ORDER[-1][1:]} 全部通过", out)
 
     def test_valid_state_report_is_clean(self) -> None:
         report = sc.check_state(valid_state())
@@ -446,6 +446,40 @@ class TestV11V12(unittest.TestCase):
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
 
+class TestV13V15(unittest.TestCase):
+    """V13（island 枚举）/ V14（generation 非负整数）/ V15（每 niche 留 elite）—— Wave 2 发现层。"""
+
+    def test_v13_illegal_island_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["island"] = "PX"
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V13"])
+
+    def test_v13_local_track_is_legal(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["island"] = "local"
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
+    def test_v14_string_generation_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["generation"] = "1"
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V14"])
+
+    def test_v14_negative_generation_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["generation"] = -1
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V14"])
+
+    def test_v15_niche_without_elite_is_hard(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="active"))
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V15"])
+
+    def test_v6_niche_must_be_preset_name(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["niche"] = "assumption-breaking"
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V6"])
+
+
 class TestEnvironment(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = _TmpState()
@@ -556,12 +590,12 @@ class TestJsonOutput(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestCli(unittest.TestCase):
-    def test_list_rules_covers_v1_to_v12(self) -> None:
+    def test_list_rules_covers_all_rules(self) -> None:
         code, out, _err = _run("--list-rules")
         self.assertEqual(code, sc.EXIT_OK)
         for rule in sc.RULE_ORDER:
             self.assertIn(rule, out)
-        self.assertEqual(sc.RULE_ORDER, [f"V{n}" for n in range(1, 13)])
+        self.assertEqual(sc.RULE_ORDER, list(sc.RULES))
 
     def test_selftest_passes(self) -> None:
         code, out, _err = _run("--selftest")
@@ -575,7 +609,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(caught.exception.code, sc.EXIT_ERROR)
 
     def test_every_rule_has_judgement_text(self) -> None:
-        self.assertEqual(len(sc.RULES), 12)
+        self.assertTrue(len(sc.RULES) >= 12)
         for rule, text in sc.RULES.items():
             self.assertTrue(text.strip(), msg=rule)
 

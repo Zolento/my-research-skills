@@ -11,6 +11,12 @@
 > ⚠️ **内部小节号 `§B0—§B8` 保留自旧命名**（本文档由旧 `mode-b` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
 > **迁移不得丢节** —— 本注被删掉时，`§B0—§B8` 会失去唯一解释，读者会误当退役字母残留。
 
+
+> ⚠️ **作用域裁决（Wave 2）：** 本文件同时含两代内容 ——
+> **`B0`—`B8`** 是旧的 idea-discovery 流程，**`R3`—`R6`** 是 Wave 2 起生效的发现层正式规则。
+> **冲突时一律以 `R3`—`R6` 为准**；`B2`（局限分析）、`B4`（发散策略）、`B5`（审核）
+> 作为 **R3 的输入约束**保留，不再单独驱动「一轮 brainstorm → shortlist」那条路径。
+
 ## B0. 与 R7 / R10 / R13 的分工（必须先明确，避免重复劳动）
 
 | 维度 | R3—R6（idea 级） | R7 / R10 / R13（方案级） |
@@ -311,52 +317,125 @@
 ---
 
 
-## Wave 2 深化骨架（本轮只落骨架）
-
-### R3 双轨发现，上下文隔离（强制）
+## R3. 双轨发现（**上下文隔离是硬规则**）
 
 ```text
-                 ┌── Local Search ──────── 已有 gap / 机制改进
-problem ─────────┤
-                 └── Paradigm Escape ───── P1 Reframe
-                                           P2 Assumption destruction
-                                           P3 Remote structural analogy（先做 domain erasure）
-                                           P4 Theory lens
-                                           P5 Measurement inversion
-                                           P6 Counterexample / impossibility
+                 ┌── Local Search ─────── 已有 gap / 机制改进
+problem ─────────┤                        （基线：把现状做到更好）
+                 └── Paradigm Escape ──── P1 Reframe            改问题 ontology
+                                          P2 Assumption         摧毁 tacit assumption
+                                          P3 Remote Analogy     先做 domain erasure，再找结构同构
+                                          P4 Theory Lens        换一套数学语言重述
+                                          P5 Measurement        怀疑 metric / observable
+                                          P6 Counterexample     从反例与不可能性生成方向
 ```
 
-**硬规则：两轨在产生候选之前不得互相看到内容。**
-理由：`early communication → idea convergence`，四个 island 若第一轮就共享答案，
-发散度会塌成一条。**隔离是机制，不是建议。**
+**硬规则：**
 
-### R4 隔离种群 → structural signature → QD archive
+1. **两轨在产生候选之前不得互相看到内容。** 理由：`early communication → idea convergence` ——
+   四轨若第一轮就共享答案，发散度会塌成一条。**隔离是机制，不是建议。**
+2. **P3 必须先做 domain erasure**：删掉 `MRI / CT / flow / reconstruction` 这类领域词，
+   只留数学骨架，再找 `high semantic distance + high structural similarity` 的对象。
+   直接说「领域 A 和 B 都在做类似的事」**不算**结构同构。
+3. **P4 每个 theory lens 必须产出 `explanation + prediction + algorithmic consequence`
+   三者中至少两个**，否则是理论包装，退 `failures[]`（`kind: unsupported`）。
+4. **P6 产出的方向必须写成可证伪命题**（否则它是抱怨，不是研究问题）。
+5. 每轨的候选都写 `island`（`P1`—`P4` / `local`）与 `generation: 0`（V13/V14 强制）。
 
-**不要** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为 **Quality-Diversity archive**：
-每个 niche 留一个 elite，避免「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。
+### R3.1 生成预算（默认值，可缩放）
+
+| 项 | 默认 |
+|---|---|
+| islands 数 | **4**（`P1`—`P4`）+ Local Search |
+| 每 island 候选数 | **下限 3，上限 6**（超上限须显式说明为什么值得） |
+| 进化轮数上限 | **2**（见 R6） |
+
+**可缩放：** 领域过窄或资源受限时，可在 R0 `contract.constraints` 写明并降到 **2 islands × ≥2 候选**；
+**上调上限需要用户同意**。
+
+### R3.2 与 Local Search 的分工
+
+Local Search 不是「对照组」——它负责**把现状做到更好**，其候选同样进 population 与 QD archive。
+**但两阶段 fitness 对它在 Search 期一视同仁**（见 R6.3）：不许因为它"更可行"就优先。
+
+---
+
+## R4. 隔离种群 → structural signature → QD archive
+
+### R4.1 聚类必须用结构性距离，**不得用文本 embedding**
+
+两个文字完全不同、本质都是「feature consistency loss」的候选，必须被识别为同一 cluster。
+因此用 `structural_signature` 的五维距离（V13/V14 之外，五键本身由 `state_check.py` 校验形状）：
+
+| 维 | 问的是 |
+|---|---|
+| `assumption_distance` | 依赖的假设差多远 |
+| `formulation_distance` | 问题表述差多远 |
+| `representation_distance` | 数学表示差多远 |
+| `theory_lens_distance` | 理论坐标系差多远 |
+| `mechanism_distance` | 机制解释差多远 |
+
+**同一 cluster 内保留 1 条**（避免同质候选占满 archive）；跨 cluster 一律保留。
+
+### R4.2 Quality-Diversity archive（**不是 Top-K**）
+
+**禁止** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为每个 niche 留一个 elite：
 
 ```text
-Niche A: assumption-breaking      elite: H12
-Niche B: new-formulation          elite: H31
-Niche C: remote-theory-transfer   elite: H44
-Niche D: impossibility            elite: H59
-Niche E: benchmark-inversion      elite: H62
+Niche N2（瓶颈突破/移除假设）        elite: H12
+Niche N5（统一框架）                 elite: H31
+Niche N3（跨域理论迁移）             elite: H44
+Niche N10（不可能性/负结果）         elite: H59
+Niche N8（Benchmark/评测）           elite: H62
 ```
 
-`H.niche` 因此是**必填字段**（`state_check.py` V6 机械强制）。
+- **niche 取值就是 `N1—N10` preset 名** —— 复用已冻结的 10 套，**不引入第二套枚举**（V6 强制）。
+- **`state_check.py` V15 强制**：每个出现过的 niche 至少有一条 `status: elite`。
+  没有 elite 的 niche 要嘛补一条 elite，要嘛就不要开这个 niche。
+- **为什么**：只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」
+  提前杀掉 —— 那正是 increment attractor 的入口。
 
-**structural signature 用五维距离聚类，不用文本 embedding**：两个文字完全不同、
-本质都是「feature consistency loss」的候选必须被识别为同一 cluster。
+### R4.3 archive 的更新规则
 
-### R6 进化算子
+| 事件 | 动作 |
+|---|---|
+| 新候选进 archive | 与该 niche 的 elite 比较；胜者 `elite`，败者 `active`（**两者都留在 population**，不删） |
+| 某 niche 的 elite 被 R7 判 `已被覆盖` | elite 转 `archived`，按 R4.2 补新 elite，或关闭该 niche |
+| 候选被 R6 判 `killed` | `status: killed` 并写 `failures[]`（`kind: deprioritized`） |
 
-`mutation` / `cross-domain crossover` / `simplification` / `theory-induced deduction` /
-`new niche creation`。**fitness 分两段（Wave 2 落地）：**
+---
+
+## R6. 进化与两阶段 fitness
+
+### R6.1 进化算子（五种，按序优先使用前三种）
+
+| 算子 | 做什么 |
+|---|---|
+| `mutation` | 改一个 structural signature 维度 |
+| `cross-domain crossover` | **跨 island** 组合两个候选的表示与机制（P3 的产物最适合） |
+| `simplification` | 删掉不必要假设 —— **删比加优先** |
+| `theory-induced deduction` | 从某个 theory lens 推出新命题 |
+| `new niche creation` | 现有 niche 都不合适时开新 niche（须同时给出 elite，否则 V15 失败） |
+
+**每次进化 `generation + 1`**；到 **2 轮**仍未收敛 → 落 `uncertainties[]` 并交 R7，**不得无限进化**。
+
+### R6.2 保多样性：`island` 与 `niche` 都不许塌
+
+- 进化不得让某个 island 的候选全被 `killed`（全灭说明该轨的提问方式有问题，应作为
+  `uncertainties[]` 记下来，而不是静默消失）。
+- 进化不得让某个 niche 失去 elite（V15 会在下一轮校验时报出来）。
+
+### R6.3 两阶段 fitness（**Wave 2 最重要的纪律**）
 
 | 阶段 | 只看 | **不看** |
 |---|---|---|
-| Search | `representation distance` + `structural novelty` + `cross-domain surprise` + `deductive yield` | **venue fit**（在搜索期优化 venue fit 正是杀死范式 idea 的原因） |
-| Selection | novelty / validity / importance / testability / EIG÷cost | — |
+| **Search（R3—R6）** | `representation_distance` + `structural_novelty` + `cross_domain_surprise` + `deductive_yield` | **venue fit** |
+| **Selection（进 R7 之后）** | novelty / validity / importance / testability / `EIG ÷ cost` | — |
+
+> **在搜索期优化 venue fit，正是杀死范式 idea 的机制。** R3—R6 的任何排序、
+> 任何「优先做哪个」的表述里**都不许出现会议适配**（`venue-standards` 只在 R12/R13 生效）。
+
+**`expected_information_gain` 在 Search 期只作为记录**，不作为排序依据 —— 它属于 Selection 阶段。
 
 ---
 
@@ -365,8 +444,8 @@ Niche E: benchmark-inversion      elite: H62
 | 阶段 | 读 | 写 |
 |---|---|---|
 | **R3** | `literature` / `assumptions` / `failures` | `hypotheses` |
-| **R4** | `hypotheses` | `hypotheses[].niche` |
-| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses` / `failures` |
+| **R4** | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` |
+| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
