@@ -366,11 +366,11 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **输入：** 检索关键词或研究问题；检索范围（时间范围、会议范围、数量上限）；
   尽职调查等级（L1/L2/L3，默认按触发条件自动判定）。
-- **流程：** A1 本地检索 → A2 **arxiv 强制补充检索**（不得因本地命中而跳过）→
+- **流程：** A1 本地检索 → A2 **在线源强制补充检索**（不得因本地命中而跳过）→
   A3 范围扩大策略 → A4 饱和判定与输出。
 - **交付物：** 文献列表（含来源标注）+ 检索过程记录（含 429 等待日志）+ 本地缓存
   更新记录 + 尽职调查等级达成情况。
-- **落盘：** `docs/<R>NNN-literature-survey.md`（含负检索记录），
+- **落盘：** `<routeX>/docs/<R>NNN-literature-survey.md`（含负检索记录），
   并更新该路线 `INDEX.md`；**检索未达饱和必须记入 Warnings**。
 
 ### Mode B — idea-discovery
@@ -387,7 +387,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   INDEX 的 Warnings。**不派遣 S-Repro。**
 - **交付物：** idea 候选清单（**不少于 10 个，每个都带审核结论**）+ 技术路线归纳表
   + 创新性边界界定 + **推荐 shortlist（3—5 个）+ 淘汰清单**。
-- **落盘：** `docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
+- **落盘：** `<routeX>/docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
   （文档索引；被放弃的 idea 记入**已证伪**；未核实的无人区声称记 Warnings）。
 
 ### Mode C — proposal-generation
@@ -398,7 +398,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
 - **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
   + 风险清单。
-- **落盘：** `docs/<R>NNN-proposal.md` + `docs/<R>NNN-experiment-plan.md`（各占独立序号），
+- **落盘：** `<routeX>/docs/<R>NNN-proposal.md` + `<routeX>/docs/<R>NNN-experiment-plan.md`（各占独立序号），
   并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
 
 ### Mode D — narrative-generation
@@ -425,7 +425,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   → E3 交叉质询与共识形成 → E4 复核结论 → E5 接续复核规则。
 - **交付物：** 八子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
   + 横向对比表 +（接续复核时）变更追踪表。
-- **落盘：** `docs/<被审ID>-review.md`（接续复核用 `-review-2.md`），
+- **落盘：** `<routeX>/docs/<被审ID>-review-r01.md`（接续复核用 `-r02.md`），
   并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
   待补 → TODO；未缓解的致命风险 / 复现风险高 → Warnings。
 
