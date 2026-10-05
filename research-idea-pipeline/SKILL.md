@@ -223,6 +223,14 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ### 1.3 输出规范
 
+**形式（受控中文）：** 本节的每一条输出 —— 无论落到文档还是直接返回对话 —— 都遵守
+[writing-policy.md](references/writing-policy.md)：**一句一动作、句长上限（指令 ≤25 字 /
+说明 ≤40 字）、不用分号连接动作、一段一主题、≥3 项用列表**，并扫掉虚动词（「进行分析」→
+「分析」）、套话（「需要注意的是」）、营销形容词（「无缝」「显著提升」）与同义轮换。
+**落盘前跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，硬违规须为 0。**
+**⚠️ 情态是内容：** 改写句子时**不得**把「可能 / 初步 / 倾向于」升成事实
+（与 §1.1 的「禁止推断」同一条纪律）。
+
 - 结构化报告，使用标题和表格。
 - 所有引用给出具体出处，格式 `[作者, 会议/年份]`。
 - 无法确认的信息标注 **"待核实"**，**不得臆造**。
@@ -231,6 +239,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 - 所有分析结论必须有文献依据或明确逻辑链。
 - 每条"没做到 / 缺乏"必须关联**具体未建立的结构性质或未满足的理论条件**，
   禁止模糊表述。
+- **返回对话时先给结论**，依据与推导放后面。
 
 ### 1.4 项目组织与文档落盘（所有 Mode 强制）
 
@@ -286,6 +295,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    里有一条记录（字段见 [literature-policy.md](references/literature-policy.md) §7.1）。
    **索引进版本库，PDF 不进**。新增/替换/删除 PDF 后**必须重建索引**
    （`python3 scripts/refs_index.py`，校验 `--check`）；**未入索引的 PDF 视为不存在**。
+7. **正文形式遵守受控中文：** 落盘**之前**跑
+   `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，**硬违规为 0**。
+   档位按 [writing-policy.md](references/writing-policy.md) §1 判定
+   （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**）。
+   **⚠️ 不得为了过 linter 而删情态**（「可能 / 初步」是内容）。
 
 > **slug 只能取：** `literature-survey` / `ideas` / `proposal` / `experiment-plan` /
 > `narrative`。**Mode D 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
@@ -357,6 +371,8 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **Mode D / E 共用**：1—5 标尺、**极性归一化**（S-Devil 反向）、门禁、逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五 Mode 共用**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述（各 Mode 不再各自定义） |
+| 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：Strict 与 中文-顺 两档、结构规则（硬）、词汇规则（方向）、中文六种机器味、**情态是内容** |
+| 受控中文 linter | [scripts/ste_lint_zh.py](scripts/ste_lint_zh.py) | 机械首查：分号 / 超长句 / 虚动词 / 营销词 / 套话 / 同义轮换 / 被动 / 复合体貌 / 含糊词 / 半角标点；`--baseline`、`--disable`、`--selftest`（MIT，vendored） |
 | 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
 | 多源适配器 | [scripts/literature_sources.py](scripts/literature_sources.py) | arxiv（新）/ openalex（关系）/ crossref（出处）+ 跨源合并层 |
 | 环境自检脚本 | [scripts/env_probe.py](scripts/env_probe.py) | 发现工作解释器（已激活环境 → 项目 `.venv` → conda → PATH）；依赖缺失时退出码 4 |
@@ -611,6 +627,12 @@ E 方案复核。
       **全部措辞符合 [evidence-policy.md](references/evidence-policy.md) 的证据等级表**。
 - [ ] **INDEX 的 Warnings 已统计「待核实」条数**；若超过 5，已在本轮内收敛
       （补检索 / 补实验 / 明确降级措辞）。
+- [ ] **正文形式已达受控中文**：落盘文件已跑
+      `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>` 且**硬违规为 0**
+      （无分号串联动作、无超长句、无虚动词「进行分析」、无营销形容词、无套话）；
+      对话返回**第一段就是结论**；一份文档内同一概念只用一种写法。
+      **⚠️ 情态未被删改**（「可能 / 初步」原样保留，见
+      [writing-policy.md](references/writing-policy.md) §5）。
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
 - [ ] **方案/审阅记录已落盘到所在路线的 `<routeX>/docs/`**，命名符合
@@ -663,6 +685,18 @@ E 方案复核。
 10. **为什么 Mode E 也必须做极性归一化？** E 与 D 同样使用 S-Devil 的**反向**「新颖性
    反驳」分（`5 = 完全无新颖性`）。不归一化就直接取中位数，会把**最没新颖性的方案
    算成高分**——与 D 的极性错误同类。归一化（`稳健度 = 6 − 反驳分`）是聚合的前置条件。
+11. **为什么要给"形式"单独立一条政策（受控中文）？** 本流水线一次产出几千字：一份提案、
+   多套叙事、六到八份评审意见。**没有人会逐句重读**，读不清就等于没写。
+   而中文技术文本有一套和英文不同的机器味：**虚动词**（「进行分析」）、**套话**
+   （「需要注意的是」）、**同义轮换**（同一件事换三个名字）、**分号串联**。
+   这些不是审美问题，是**消歧成本**：读者要把一句话读两遍，就等于这条产出打了个对折。
+   所以按 [writing-policy.md](references/writing-policy.md) 立硬规则，并配一个**能读中文的**
+   linter。**为什么不用英文的 ASD-STE100 原版规则？** 它是英文标准；实测把它套在中文段落上
+   会返回「0 违规」的**假绿灯**，等于装了一道不存在的闸。中文没有官方受控词表，
+   因此词汇规则**只作方向**，不声称合规。
+   **为什么情态单列一条？** 受控写作最常见的翻车方式是：为了压句长，把「实验**可能**受批次
+   效应影响」改成「实验受批次效应影响」——那不是简化，是**换了个结论**。句长上限最容易
+   引诱人删掉的正是这些词，所以必须在政策里显式禁止。
 
 ---
 
@@ -720,10 +754,24 @@ grep -rnE "$PAT" --include=*.md .          # 期望：0 命中（exit 1）
 #    所以「反引号紧跟 docs/」就是缺前缀
 grep -rnE '`docs/<' --include=*.md . | grep -vE 'templates/INDEX\.md|grep -rnE'
 #    ↑ 排除 templates/INDEX.md：该模板本身就在 routeX/ 内，其 `docs/` 是相对路径，正确
+
+# 6) 受控中文 linter —— 自检 + 受管文件必须全绿
+python3 scripts/ste_lint_zh.py --selftest
+for f in examples/*.md templates/*.md; do
+  python3 scripts/ste_lint_zh.py --disable synonym-rotation "$f" || exit 1
+done
+#    注意：**不要**拿它扫本 Skill 自己的规范文本（SKILL.md / references/*.md）——
+#    范围只包含「落盘文档 / 对话返回 / 子代理意见」+ examples/ + templates/，
+#    见 writing-policy.md §0
 ```
 
 > **D4 的"已废弃措辞"清单要持续维护**：每次改规则时，把**被替换掉的旧表述**
 > 追加进来。这份 grep 清单是防漂移最省力的一道闸。
+>
+> **新规则若带机械闸门，也要挂进本节。** 例：受控中文政策（
+> [writing-policy.md](references/writing-policy.md)）带来的 `ste_lint_zh.py`
+> 已挂为第 6 项；它的默认口径（`--disable synonym-rotation`）与其理由写在政策 §7，
+> 不要在这里重复。
 
 ### D5. **内容丢失检查（本次真实教训）**
 

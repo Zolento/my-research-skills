@@ -7,7 +7,7 @@
 
 # <routeX> — <一句话路线名>
 
-> **本路线说明。** 进度与文档索引见 `INDEX.md`；跨路线信息见根目录 `../INDEX.md`。
+> **本路线说明。** 进度与文档索引见 `INDEX.md`。跨路线信息见根目录 `../INDEX.md`。
 
 ## 1. 本路线做什么
 
@@ -51,14 +51,14 @@ python3 <skill>/scripts/refs_index.py --refs-dir docs/refs --check
 ## 4. 关键约定
 
 - 文档命名与 ID 分配见本 Skill 的 `references/project-layout.md` §2。
-- **本路线文档一律放 `docs/`，扁平；编号 `^<R>\d{3}-` 独立递增、永不复用。**
+- **本路线文档一律放 `docs/`，扁平。编号 `^<R>\d{3}-` 独立递增、永不复用。**
 - 审阅命名 `<被审ID>-review-r01.md` / `-r02.md`（轮次零填充两位）。
-- 路线之间**不得互相 import**；需要复用的下沉到根目录 `shared/`。
+- 路线之间**不得互相 import**。需要复用的下沉到根目录 `shared/`。
 - 若项目根目录有 `AGENTS.md`，**以它为准**。
 
 ## 5. 当前状态
 
-> 一句话即可；详细进度在 [INDEX.md](INDEX.md)。
+> 一句话即可。详细进度在 [INDEX.md](INDEX.md)。
 
 - 当前阶段：
 - 阻塞项：

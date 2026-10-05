@@ -284,9 +284,18 @@ reviewers: []               # 可选：参与的子代理角色
 - ✅ 用标题分层、用表格承载对比、用列表承载结论。
 - ✅ 每个结论标注证据来源（文献 `[作者, 会议/年份]` 或实验编号 `E3`）。
 - ✅ 关键数字给单位和口径。
+- ✅ **句子形式遵守受控中文**（[writing-policy.md](writing-policy.md)）：一句一动作、
+  句长上限（指令 ≤25 字 / 说明 ≤40 字）、不用分号连接动作、一段一主题、≥3 项用列表。
+  去掉虚动词（「进行分析」→「分析」）、套话（「需要注意的是」）、营销形容词
+  （「无缝」「显著提升」）、同义轮换。
+- ✅ **落盘前跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，
+  硬违规须为 0。** 档位见 [writing-policy.md](writing-policy.md) §1
+  （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**）。
 - ❌ **禁止**把 `state.json`、原始 JSON、日志、traceback 直接贴进正文——
   机器状态放 `.research-idea-pipeline/`，日志放 `logs/`，正文只放结论与依据。
 - ❌ 禁止只有标题没有内容的空壳文档。
+- ❌ **禁止为了过 linter 而删情态**：「可能 / 初步 / 倾向于」承载置信度，是内容不是修饰
+  （[writing-policy.md](writing-policy.md) §5）。句长超一点没关系，丢置信度不行。
 
 ---
 

@@ -16,13 +16,13 @@
 
 | 项 | 内容 |
 |---|---|
-| **核心目标（锚点）** | theory / performance / phenomenon / benchmark / feasibility / negative（**主锚点必填**；允许"主 + 次"） |
+| **核心目标（锚点）** | theory / performance / phenomenon / benchmark / feasibility / negative（**主锚点必填**。允许"主 + 次"） |
 | 研究问题 | |
 | 核心假设 | |
 | 目标会议 | CVPR / ICML / NeurIPS / MICCAI |
 | 当前阶段 | Mode A / B / C / D / E |
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
-| 负责范围 | 代码：`routeX/code/`；文档：`docs/` |
+| 负责范围 | 代码：`routeX/code/`。文档：`docs/` |
 
 > **锚点变更必须记入 §9 变更日志**，并重新审视老锚点下产出的 idea / 方案 / 叙事 / 审阅
 > 结论（见本 Skill 的 `SKILL.md` §0.1）。
@@ -34,7 +34,7 @@
 > 链接相对本文件（即 `routeX/`）书写，格式为 `docs/<文件名>` ——
 > **本路线的文档都在 `routeX/docs/`（扁平）**。根目录 `docs/` 是跨路线共享区。
 > **slug 只能取下列枚举值**（详见本 Skill 的 `project-layout.md` §2.1）：
-> `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`；
+> `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`。
 > 审阅意见为 `docs/<被审ID>-review-r<NN>.md`，**不占新序号**。
 > 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 
@@ -133,7 +133,7 @@ A001 文献调研
 
 > 风险、待核实项、已知未知、**未达饱和的检索**、未缓解的致命风险。
 > **待核实条数：<N>**（超过 **5** 必须在本轮内收敛：补检索 / 补实验 / 明确降级措辞，
-> 不得继续累积；见 `project-layout.md` §4.2 与 `evidence-policy.md`）
+> 不得继续累积。见 `project-layout.md` §4.2 与 `evidence-policy.md`）
 
 | # | 警告 | 类型 | 影响 | 处置 |
 |---|---|---|---|---|

@@ -29,6 +29,7 @@ research-idea-pipeline/
 │   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
 │   ├── scoring-policy.md             # Mode D/E 共用：1—5 标尺、极性归一化、门禁、中位数、一票否决
 │   ├── evidence-policy.md            # 五 Mode 共用：证据等级 ↔ 允许/禁止表述（唯一定义）
+│   ├── writing-policy.md             # 落盘文档/对话返回/子代理意见共用：受控中文（Strict 与 中文-顺）
 │   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
 │   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
 │   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
@@ -39,6 +40,7 @@ research-idea-pipeline/
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
 │   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
 │   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check 校验）
+│   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）：分号/超长句/虚动词/营销词/套话
 │   └── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
 ├── templates/
 │   ├── INDEX.md                      # 路线级 INDEX.md 骨架（含文档关系图）
@@ -221,6 +223,33 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 
 结构化报告；引用给 `[作者, 会议/年份]`；无法确认标注"待核实"，**不得臆造**；
 "没做到"必须关联具体未建立的结构性质或未满足的理论条件。
+
+**形式：受控中文**（[writing-policy.md](references/writing-policy.md)）。这份政策管三个表面：
+**落到文档**（`<routeX>/docs/*.md`）、**返回对话**（每次 Mode 的报告正文）、**子代理意见**。
+它只管形式，不管内容。
+
+| 抓手 | 做法 |
+|---|---|
+| 一句一动作 | 不用分号连接动作，拆成两句 |
+| 句长 | 指令句 ≤ 25 字，说明句 ≤ 40 字 |
+| 去虚动词 | 「进行分析」→「分析」；「进行了实验验证」→「验证了」 |
+| 去套话 | 删掉「需要注意的是」「在一定程度上」 |
+| 去营销形容词 | 「无缝」「显著提升」删掉，或换成测量值 |
+| 术语一致 | 一份文档内一个概念只用一个写法 |
+| 段与列表 | 一段一主题（≤ 6 句）；≥ 3 项用列表或表格 |
+| 返回对话 | **第一段就是结论** |
+
+**两档：** 实验流程计划书的步骤、命令、路径用 **Strict**；其余正文用**中文-顺**
+（结构规则全执行，词汇规则只作方向）。
+
+**机械闸门：** 落盘**之前**跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，
+**硬违规须为 0**。
+
+> ⚠️ **情态是内容。** 不得为了压句长，把「实验**可能**受批次效应影响」改成「实验受批次效应影响」
+> ——那不是简化，是换了个结论。句长上限最容易引诱人删掉的正是这些词。
+
+> ⚠️ **不要拿 linter 扫本 Skill 自己的规范文本**（`SKILL.md` / `references/*.md`）。
+> 范围只有上面三个表面。
 
 ---
 
