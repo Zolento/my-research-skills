@@ -63,7 +63,7 @@
 ```
 docs/A002-ideas.md            ← idea 候选清单（含 I1..In）
 docs/A003-proposal.md         ← 方案
-docs/A005-narrative-I1.md     ← idea I1 的 ≥4 套叙事
+routeA/docs/A005-narrative.md  ← 一次调用：I1 的 ≥4 套叙事
 docs/A003-review.md           ← 对 A003 的第 1 轮审阅
 docs/A003-review-2.md         ← 对 A003 的第 2 轮审阅（接续复核）
 docs/B002-ideas.md           ← routeB 的 idea 清单（同一目录，靠 B 前缀区分）
@@ -72,7 +72,7 @@ docs/B002-ideas.md           ← routeB 的 idea 清单（同一目录，靠 B �
 | 规则 | 说明 |
 |---|---|
 | 存放 | **所有路线共用根目录 `docs/`（扁平）**；参考文献在 `docs/refs/` |
-| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative-I<n>`；不得自创 |
+| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`；不得自创 |
 | 序号来源 | 扫描 `docs/` 中匹配 `^<路线字母>\d{3}-` 的文件名，取**最大序号 +1** |
 | 递增范围 | **按路线独立**：routeA 是 A001/A002/…，routeB 是 B001/B002/… |
 | 复用 | **永不复用**，也不跳号 |
