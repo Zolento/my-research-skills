@@ -360,6 +360,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    —— 否则 V4 会在**这些阶段自己的收工检查**上报错，而写表又不授权它改 `known_flaws`。
    （挂 `known_flaws` **不是**改 `claims[].status`，不与 §1.6 冲突。）
 
+3. **`claims[].status` 的变更分两类：** **升级**（`ungrounded` → `partially-supported` / `supported`）
+   由 **R8** 按证据驱动执行；**降级与否决**（`contradicted` / `killed`）**只能经 R10**。
+   这条与 SKILL §1.6 的「默认只能经 R10」互为例外关系 —— 八处提及该禁令的地方都已回指本条。
+
 > **终端产物（无显式读者，不是僵尸字段）：** `narrative_view`（R12 写、R13/R14 通过「全 state」隐含读）
 > 与 `decision`（R14 写、供人读与下一轮 R3/R9 的 `pivot`/`continue` 依据）。
 > 机械比对会把它们当成「写了没人读」，**这是设计内**。

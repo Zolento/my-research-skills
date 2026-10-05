@@ -420,7 +420,7 @@ Kill Condition: If alternatives match MIND under equal compute,
 1. **`Kill Condition` 必须可判定** —— 写成「若观察 `O` 则 `X`」的形式；写不出即该 attack 无效
    （`state_check.py` V9 已强制 `kill_condition` 非空、`discriminating_test` 指向存在的 `X` 或 `TBD`）。
 2. **`Discriminating Test` 必须指向存在的 `X`** —— 没有就写 `TBD` 并落一条 `U`。
-3. **assurance 不得直接改 `claims[].status`** —— 只能经 **R10**（见 [../SKILL.md](../SKILL.md) §1.6）。
+3. **assurance 不得直接改 `claims[].status`** —— 只能经 **R10**（例外见 [../SKILL.md](../SKILL.md) §1.6：R8 证据驱动的单向升级）。
 4. **分数只是次要记录。** 可执行对象是 primary；`scoring-policy` 的 `G1—G5` 仍生效，但
    1—5 分**不再**是 assurance 的主要输出。
 5. **人读摘要仍然必填**（仓库既有硬规则）：五元组为 primary，摘要是 secondary，**二者并存**。

@@ -28,6 +28,8 @@ from __future__ import annotations
 import contextlib
 import io
 import copy
+import pathlib
+import re
 import json
 import sys
 import tempfile
@@ -649,3 +651,65 @@ class TestTemplateInterop(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestTableIntegrity(unittest.TestCase):
+    """三张读写表的结构完整性 —— 三方「读/写格」比对看不见列覆盖/错位。
+
+    起因：一次「按单元格索引重写」把 SKILL §0 的「作用」列与 policy §5 的
+    「对应文件」列覆盖掉，而三方读/写格比对仍然全绿。本组用例覆盖该盲区。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _rows(self, rel, start, stop, key_col=1):
+        text = (self.ROOT / rel).read_text(encoding="utf-8")
+        begin = text.index(start)
+        end = text.index(stop, begin) if stop else len(text)
+        rows = []
+        for line in text[begin:end].split("\n"):
+            cells = line.split("|")
+            if len(cells) < 3:
+                continue
+            m = re.match(r"^\s*\*\*(R\d+)\*\*", cells[key_col])
+            if m:
+                rows.append((m.group(1), cells))
+        return rows
+
+    def test_policy_readwrite_table_columns(self) -> None:
+        rows = self._rows("references/research-state-policy.md", "| 阶段 | 读什么", "\n\n>")
+        self.assertTrue(rows, "policy §5 读不到阶段行")
+        for stage, cells in rows:
+            # 4 列表格：| 阶段 | 读 | 写 | 文件 | → split("|") 得 6 段
+            self.assertEqual(len(cells), 6, f"policy {stage} 列数 {len(cells)}")
+
+    def test_skill_stage_table_has_effect_column(self) -> None:
+        rows = self._rows("SKILL.md", "| Phase | 名称 |", "\n\n")
+        self.assertTrue(rows, "SKILL §0 读不到阶段行")
+        for stage, cells in rows:
+            self.assertEqual(len(cells), 7, f"SKILL {stage} 列数 {len(cells)}")
+            effect, read = cells[2].strip(), cells[4].strip()
+            self.assertTrue(effect, f"SKILL {stage} 作用列空")
+            self.assertNotEqual(effect, read, f"SKILL {stage} 作用列被读列覆盖")
+
+    def test_policy_file_column_points_to_real_file(self) -> None:
+        rows = self._rows("references/research-state-policy.md", "| 阶段 | 读什么", "\n\n>")
+        for stage, cells in rows:
+            target = cells[4].strip().strip("`")
+            self.assertTrue(target, f"policy {stage} 对应文件列空")
+            if target.startswith("phase-"):
+                self.assertTrue((self.ROOT / "references" / target).exists(),
+                                f"policy {stage} 指向不存在的 {target}")
+
+    def test_phase_tables_three_columns(self) -> None:
+        for path in sorted((self.ROOT / "references").glob("phase-*.md")):
+            text = path.read_text(encoding="utf-8")
+            if "## 读 / 写 World Model" not in text:
+                continue
+            block = text[text.rindex("## 读 / 写 World Model"):]
+            for line in block.split("\n"):
+                cells = line.split("|")
+                if len(cells) < 3:
+                    continue
+                m = re.match(r"^\s*\*\*(R\d+)\*\*", cells[1])
+                if m:
+                    self.assertEqual(len(cells), 5, f"{path.name} {m.group(1)} 列数 {len(cells)}")

@@ -108,7 +108,7 @@
 
 1. **`Kill Condition` 必须可判定** —— 写成「若观察 `O` 则 `X`」的形式；写不出即该 attack 无效。
 2. **`Discriminating Test` 必须指向存在的 `X`**，或字面量 `TBD`（并落一条 `U`）。
-3. **不得直接改 `claims[].status`** —— 只能经 R10（见 [../SKILL.md](../SKILL.md) §1.6）。
+3. **不得直接改 `claims[].status`** —— 只能经 R10（例外见 SKILL §1.6：R8 证据驱动的单向升级）（见 [../SKILL.md](../SKILL.md) §1.6）。
 4. `1—5` 分**降为次要记录**（只用于门禁与排序），**只有分数、没有可判定 `Kill Condition` 的评审不合格**。
 5. **人读摘要仍然必填**（仓库既有硬规则）—— 五元组 primary、摘要 secondary，**二者并存**。
 

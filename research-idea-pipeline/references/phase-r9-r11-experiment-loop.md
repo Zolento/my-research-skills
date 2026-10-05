@@ -175,7 +175,7 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 
 **硬规则：**
 
-- **`status` 变更只能在这里（经 R10）。** Discovery（R3—R6）与 Assurance（R7）**不得**直接改
+- **`status` 变更只能在这里（经 R10）** —— 例外：R8 的证据驱动**单向升级**（见 [../SKILL.md](../SKILL.md) §1.6）。 Discovery（R3—R6）与 Assurance（R7）**不得**直接改
   `claims[].status` —— 这是防「自己给自己判分」的结构性措施。
 - 第 3 步**不允许只关不增**：一轮实验如果没有任何新不确定性，要么结论已足够强（走 R14），
   要么本次实验没有信息量（应记为 `failures[]` 的 `inconclusive`）。

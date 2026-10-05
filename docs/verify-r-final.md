@@ -428,3 +428,102 @@ policy §5 明写 R1 不占行）。
 两处表格单元格损坏是**这一轮新引入**的（其中一处还是 Wave 2 已修内容的回退），
 R8 的 status 归属则是 M-1 修复的收尾。**修完这 4 项（预计 20 分钟内）后，我这边
 没有其它阻断项**：M-2 已完全闭环、V1—V15 全部可达且可满足、三方 14/14、机械面全绿。
+
+---
+
+## 8. 收口确认（快照 `95a62c5`）
+
+**本轮改动：** 4 个文件（`git diff --stat 7f6e043 95a62c5`）：SKILL +20/−16、phase-r8 +1/−1、
+policy +12/−6、本报告 +148。**快照 `95a62c5`，只读复核**（本次仅追加本节）。
+
+### 8.1 逐项确认（15 行重建 + R8 语义 + SKILL §4）
+
+| 项 | 声明 | 我自己的逐单元格复核 | 判定 |
+|---|---|---|---|
+| **10 个被覆盖单元格** | `SKILL §0` 五行「作用」列、`policy §5` 五行「对应文件」列已逐行重建 | **逐单元格 dump**：`SKILL.md:68` 作用=「双轨发现：local search ‖ paradigm escape（**上下文隔离**）」、`:71`「mutation / crossover / simplification / 新 niche」、`:72`「六攻击面审核 + 硬门禁 `G1—G5`」、`:74`「实验树 `X1—X6` + EIG 选择 + provenance」、`:78`「artifact-aware 审查（code / logs / failed runs）」；**SKILL §0 全 15 行 cols=5** ✅。`policy:379/382` 对应文件=`phase-r3-r6-discovery.md`、`:383/389`=`phase-r7-r10-r13-assurance-repair-review.md`、`:385`=`phase-r9-r11-experiment-loop.md`；**policy §5 全 14 行 cols=4** ✅ | ✅ **达成** |
+| **phase-r8 读写两格写反** | 已归位 | `phase-r8:235`：读=`claims` / `evidence` / `assurance`；写=`claims[].contract` / `claims[].status`（仅证据驱动的单向升级） / `evidence` / … —— 与 `SKILL:73`、`policy:384` **三层逐字一致** ✅ | ✅ **达成** |
+| **R8 status 细分（选项①）** | 升级由 R8、降级/否决只能经 R10；三层写列 + `SKILL §1.6` 已同步 | 三层写列 ✅ 均含「`claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`）」。**实证**：`post-R8（升级 partially-supported + E1）→ exit 0` ✅；`post-R8（升级 supported + E1）→ exit 0` ✅；`post-R8（挂 E1 但 status 仍 ungrounded）→ exit 3 · V3` ✅（正确地仍报）。**但 `SKILL §1.6` 与其他 7 处未同步 → 见 §8.2 MAJOR** | ⚠️ **部分** |
+| **MINOR：`SKILL §4` 的 R12 段对齐** | pre 覆盖 D0—D3、明写「claims 不由本文件创建」；post 覆盖 D4—D9 | `SKILL.md:705—712`：pre 行已写「**R12-pre 覆盖 D0—D3**（证据台账 / claim graph **复核** / 科学分类 / anchor eligibility）…**`claims[]` 的创建在 R3，不由本阶段创建**」；post 行写「**R12-post 覆盖 D4—D9**（叙事实现 / 攻击面审核 / venue 校准 / 门禁 / 排序 / 输出）」；流程行改为「D1 claim graph **复核**（**不创建**）」——与 `phase-r12:103—110` 一致 ✅ | ✅ **达成** |
+
+### 8.2 MAJOR：R8 的新授权与**八处旧规则互斥**（`SKILL §1.6` 未同步）
+
+**现象：** 写表已授权 R8 做 `claims[].status` 的**单向升级**，但全仓仍有 **8 处**明文禁止任何
+Assurance/非 R10 阶段改 status —— 包括本轮 M-1 自己新增的归属表。
+
+| # | 位置 | 原文 | 与新授权的关系 |
+|---|---|---|---|
+| 1 | `SKILL.md:99` | 「改 claim 状态**只能经 R10**，这是防"自己给自己判分"的结构性措施」 | ❌ 互斥 |
+| 2 | **`SKILL.md:549`（§1.6）** | 「**改 `claims[].status` 只能经 R10。** Discovery 与 Assurance 都不得直接改」 | ❌ 互斥（**Lead 声明已同步，实际未改**：本提交的 SKILL diff 只含 §0 五行与 §4 R12 段） |
+| 3 | `SKILL.md:738`（§4 R7/R10/R13 段） | 「**assurance 不得直接改 `claims[].status`** —— 只能经 R10」 | ❌ 互斥 |
+| 4 | `SKILL.md:782`（§5） | 「改 `claims[].status` 只能经 R10。Discovery（R3—R6）与 Assurance（**R7**）都不得直接改」 | ❌ 互斥 |
+| 5 | `references/roles.md:111`（§1B 硬规则 3） | 「**不得直接改 `claims[].status`** —— 只能经 R10」 | ❌ 互斥 |
+| 6 | `references/phase-r7-r10-r13-…md:423`（R7 硬规则 3） | 「**assurance 不得直接改 `claims[].status`** —— 只能经 **R10**」 | ❌ 互斥 |
+| 7 | **`references/phase-r3-r6-discovery.md:364`（§R3.0 归属表）** | 「\| R10 \| **唯一能改** `claims[].status` 的阶段 \|」 | ❌ 互斥（与本轮新增的 R8 授权直接对撞） |
+| 8 | `references/phase-r9-r11-experiment-loop.md:179` | 「…改 `claims[].status` —— 这是防「自己给自己判分」的结构性措施」 | ❌ 互斥（上下文同 §1.6） |
+
+**另：** 你声明「降级与否决（`contradicted` / `killed`）只能经 R10」这一**细分规则在我复核时全仓找不到**
+（`grep -rn '降级与否决\|contradicted.*只能\|killed.*只能'` → 0 命中；三层写列只在括号里写了升级箭头）。
+**影响（可复现）：** 执行者若按 §1.6 / §1B / R7 规则 / R3.0 表执行 → **R8 不敢升级 status** →
+`post-R8` 回到 **exit 3 · V3**（§8.1 已实证）；若按写表升级 → 违反 4 处明文禁令。
+**建议修法（本轮只需措辞，不需再改机制）：**
+①把 `SKILL.md:549`（§1.6）改为「改 `claims[].status` **默认只能经 R10**；**唯一例外**：R8 可在
+挂证据时做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`），
+**降级与否决（`contradicted` / `killed`）仍只能经 R10**」；
+②在 `SKILL.md:99/738/782`、`roles.md:111`、`phase-r7:423`、`phase-r9-r11:179` 六处各加半句回指 §1.6 的该例外；
+③`phase-r3-r6:364` 的 R3.0 表把 R10 行改为「R10（**降级与否决的唯一阶段**）」并列一行
+「R8（**仅单向升级**）」；
+④把「降级与否决只能经 R10」这句**补进** `policy §5.0` 规则 1（现在只有一句「R8 建契约并更新 status」）。
+
+### 8.3 MINOR：声明的「逐单元格检查器」**未进仓库**
+
+**现象：** 你写「我按你的建议把检查器扩了：现在是『逐单元格列数 + 关键列非空』」。
+实测 **`95a62c5` 只改了 4 个文件，`scripts/` 零改动**；全仓 grep「关键列非空」只命中**我自己的报告**。
+
+```bash
+git diff --name-only 7f6e043 95a62c5
+#   docs/verify-r-final.md / research-idea-pipeline/SKILL.md /
+#   research-idea-pipeline/references/phase-r8-evidence-contract.md /
+#   research-idea-pipeline/references/research-state-policy.md
+grep -rln '关键列非空' .        # → 只有 docs/verify-r-final.md
+python3 -m unittest discover -s scripts -p "test_*.py" | tail -1   # 116 tests（未新增）
+```
+
+**影响：** 我上一轮指出的「10 个坏单元格对三方检查器不可见」这个**盲区仍然存在** ——
+下一次同类批量编辑仍不会有任何机械闸门报警。
+**建议：** 把该检查器落成 `scripts/` 下的一个可跑项（例如并入 `test_state_check.py` 的
+「表格完整性」用例，或在 SKILL §8 D 的第 6 项后追加 `python3 scripts/check_tables.py`），
+检查内容建议固定为：①三张读写表逐行**列数**等于表头；②`SKILL §0` 的「作用」列不等于「读」列、
+`policy §5` 的「对应文件」列匹配 `phase-*.md` 且文件存在；③关键列非空。
+（我的临时实现 `/tmp/verify/rw_compare.py` 只覆盖读/写格，可直接删。）
+
+### 8.4 机械面（自跑，快照 `95a62c5`）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **417 条，0 断链** ✅ |
+| 2 | deprecated-terms | **exit 1，0 命中** ✅ |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | `unittest discover -s scripts -p "test_*.py"` | **116 tests OK** ✅ |
+| 5 | `state_check --selftest` | exit 0 ✅ |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | examples + templates linter | 9/9 硬违规 0 ✅ |
+| 8 | `--list-rules` ↔ `policy §4` | **15 条逐字一致** ✅ |
+| 9 | 三方 14 阶段读/写格 | **14/14 逐字一致**（唯一「不一致」= R1）✅ |
+| 10 | 我自己的逐单元格检查 | SKILL §0 15 行全 5 列；policy §5 14 行全 4 列；phase 表 3 列 ✅ |
+
+### 8.5 收口结论
+
+**仍需修：1 项 MAJOR + 1 项 MINOR —— 不能说「三波可交付」。**
+
+| 优先级 | 动作 | 位置 | 量级 |
+|---|---|---|---|
+| 1 | **同步 R8 status 授权的 8 处旧规则**（§1.6 为头，加「唯一例外：R8 单向升级；降级与否决仍属 R10」；并补上「降级与否决只能经 R10」这句） | `SKILL.md:99/549/738/782`、`roles.md:111`、`phase-r7:423`、`phase-r9-r11:179`、`phase-r3-r6:364`、`policy §5.0:355—357` | 8 处半句到一句 |
+| 2 | 把「逐单元格列数 + 关键列非空」检查器落进 `scripts/`（否则该盲区仍在） | 新增脚本 或 `test_state_check.py` + `SKILL §8 D` | 一个小脚本 + 1 行登记 |
+
+**已确认关闭的项（本轮）：** 10 个单元格（逐单元格复核 ✅）、`phase-r8` 读写归位 ✅、
+M-2（V4 全阶段可闭环 ✅）、M-1 的**创建**归属 ✅ 与 **R8 升级路径** ✅（实证 exit 0）、
+`SKILL §4` 的 R12 段 ✅、上一轮 4 项 MINOR ✅、机械面全绿 ✅。
+
+**一句话：** 机制层面三波已经全部打通（V1—V15 可达可满足、读写闭环、枚举单源、角色闭合、
+视图性正确）；**只剩「新授权与八处旧禁令的措辞同步」这一处自相矛盾**，加上把检查器真正落盘。
+这 9 处改完，我认为可以宣布三波完成并交付用户总结。

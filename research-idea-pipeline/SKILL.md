@@ -96,7 +96,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | 深度 | 广：population + 隔离 islands | 深：六攻击面 + 交叉质询 + 硬门禁 |
 
 **Discovery 只管扩大与保多样性，Assurance 只管会不会被推翻。** 两者**都不允许直接改
-`claims[].status`** —— 改 claim 状态只能经 **R10**，这是防"自己给自己判分"的结构性措施。
+`claims[].status`** —— 改 claim 状态**默认只能经 R10**（例外见 §1.6：R8 的证据驱动单向升级），这是防"自己给自己判分"的结构性措施。
 **做得很扎实的复现仍是拒稿理由。**
 
 **解析规则：**
@@ -546,7 +546,8 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 - 只写 `flaw` 而无 `disposition` 或 `state_delta` = **未闭环**；`closure` 为空 = 该轮**不得结束**。
 - **`ACCEPTED_LIMITATION` 必须同时写进 `C.scope` 或 `C.known_flaws`** —— 否则那不是"接受"，只是"忽略"。
-- **改 `claims[].status` 只能经 R10。** Discovery 与 Assurance 都不得直接改（防自己给自己判分）。
+- **改 `claims[].status` 默认只能经 R10。** **唯一例外**：R8 挂证据时可做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`）；**降级与否决**（`contradicted` / `killed`）**仍只能经 R10**。
+  Discovery 与 Assurance 都不得直接改（防自己给自己判分）。
 - **机制型 claim 必须做 regime shift 测试**：构造机制应成立的 `RS1` 与应失效的 `RS2`
   （**注意：`RS<n>` 是 regime-shift 条件，不是阶段号**）；两者结果近似 ⇒ 该机制 claim
   **降级为 `partially-supported`**。
@@ -735,7 +736,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   ③ 投稿被拒 / 改投时。
 - **assurance 输出五元组（Wave 3 硬规则）：** `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`。
   **`Kill Condition` 必须可判定**；只有分数、没有可判定 Kill Condition 的评审**不合格**。
-  1—5 分降为次要记录。**assurance 不得直接改 `claims[].status`** —— 只能经 R10。
+  1—5 分降为次要记录。**assurance 不得直接改 `claims[].status`** —— 只能经 R10（例外见 §1.6）。
 - **Integrity Gate（`S-Integrity`，R13 生效）：** leakage / cherry-picking / metric misuse /
   post-hoc selection bias —— **不通过即不得提交**，不是「记一条 warning」。
 - **流程：** E1 判断复核类型（首次 / 接续）→ E2 八子代理严格审查（含**防复现检查**）
@@ -779,7 +780,8 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 1. **R1 是唯一状态载体**：`.research-idea-pipeline/<route>/research-state.json`，**就地覆盖**，
    不按阶段切分快照（旧的 `state-<mode>-<ts>.json` 口径已作废）。
-2. **改 `claims[].status` 只能经 R10。** Discovery（R3—R6）与 Assurance（R7）都不得直接改 ——
+2. **改 `claims[].status` 默认只能经 R10。** **唯一例外**：R8 挂证据时可做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`）；**降级与否决**（`contradicted` / `killed`）**仍只能经 R10**。
+   Discovery（R3—R6）与 Assurance（R7）都不得直接改 ——
    防「自己给自己判分」。
 3. **每阶段收尾跑** `python3 scripts/state_check.py --check <state.json>`，**硬违规须为 0**；exit 3 = 硬违规，exit 4 = 文件缺失 / JSON 非法。
 
