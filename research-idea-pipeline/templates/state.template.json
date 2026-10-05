@@ -114,6 +114,7 @@
       "R-CVPR": "",
       "R-ICML": "",
       "R-NeurIPS": "",
+      "R-MICCAI": "",
       "S-Lit_overlap": "足够 | 边缘 | 不足",
       "venue_standard_cited": ""
     },
@@ -131,16 +132,17 @@
     "route": "routeA",
     "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A005",
-    "target_venue": "CVPR | ICML | NeurIPS",
+    "target_venue": "CVPR | ICML | NeurIPS | MICCAI",
     "narratives": [
       {
         "idea_id": "I1",
         "pattern": "N2",
         "pattern_name": "瓶颈突破/移除假设",
         "scores": {
-          "R-CVPR": { "method": null, "verifiability": null },
-          "R-ICML": { "originality": null, "rigor": null },
-          "R-NeurIPS": { "insight": null, "importance": null, "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results" },
+          "R-CVPR": { "theory": null, "application": null, "method": null, "verifiability": null, "venue_verdict": "" },
+          "R-ICML": { "theory": null, "application": null, "originality": null, "rigor": null, "venue_verdict": "" },
+          "R-NeurIPS": { "theory": null, "application": null, "insight": null, "importance": null, "type": "General | Theory | Use-Inspired | Concept & Feasibility | Negative Results", "venue_verdict": "" },
+          "R-MICCAI": { "theory": null, "application": null, "clinical_relevance": null, "validation_rigor": null, "applicable": null, "venue_verdict": "" },
           "S-Devil": { "novelty_rebuttal": null, "novelty_robustness": null, "fatal_weaknesses": [] },
           "S-Lit": { "verdict": "确认新颖 | 部分重叠 | 已被覆盖", "closest_prior_work": [] }
         },
@@ -176,9 +178,10 @@
     "review_type": "first | follow-up",
     "proposal_ref": "state-C-<timestamp>.json",
     "review_output": {
-      "R-CVPR": { "score": null, "opinion": "" },
-      "R-ICML": { "score": null, "opinion": "" },
-      "R-NeurIPS": { "score": null, "opinion": "" },
+      "R-CVPR": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "" },
+      "R-ICML": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "" },
+      "R-NeurIPS": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "" },
+      "R-MICCAI": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "", "applicable": null },
       "S-Devil": { "score": null, "opinion": "" },
       "S-Feas": { "score": null, "opinion": "" },
       "S-Lit": { "score": null, "opinion": "" },
@@ -205,7 +208,7 @@
     ],
     "verdict": {
       "priority": "高 | 中 | 低 | 建议放弃",
-      "best_venue": "CVPR | ICML | NeurIPS",
+      "best_venue": "CVPR | ICML | NeurIPS | MICCAI",
       "core_strengths": [],
       "fatal_risks": [{ "risk": "", "mitigable": true, "path": "" }],
       "revision_suggestions": []

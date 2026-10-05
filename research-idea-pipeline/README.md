@@ -1,6 +1,6 @@
 # research-idea-pipeline
 
-面向 **CVPR / ICML / NeurIPS** 投稿的研究创意全流程辅助 Skill。覆盖文献调研、idea
+面向 **CVPR / ICML / NeurIPS / MICCAI** 投稿的研究创意全流程辅助 Skill。覆盖文献调研、idea
 发现（含 idea 级审核）、方案生成、**多套路叙事生成与审稿**、方案复核的完整链路。
 可单独调用任一 Mode，也可串联调用。
 
@@ -22,15 +22,15 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：mode 分发 + 全局不变量 + 状态传递
 ├── README.md                         # 本文件
 ├── references/
-│   ├── roles.md                      # 11 个共享子代理角色 + Mode D 叙事审核量表
-│   ├── venue-standards.md            # CVPR / ICML / NeurIPS 标准 + 防复现标准
+│   ├── roles.md                      # 12 个共享子代理角色（含 R-MICCAI）+ 两角度/会议特性要求 + Mode D 量表
+│   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 标准 + 两角度框架 + 防复现标准
 │   ├── narrative-patterns.md         # 十套叙事套路 + 跨域五步升级 + 叙事包装
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
 │   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
 │   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
 │   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
-│   ├── mode-d-narrative-generation.md# Mode D：多套路叙事 + 五子代理审稿（D0—D8）
+│   ├── mode-d-narrative-generation.md# Mode D：多套路叙事 + 六子代理审稿（D0—D8）
 │   └── mode-e-proposal-review.md     # Mode E：方案级正确性 + 防复现（E0—E8）
 ├── scripts/
 │   ├── literature_search.py          # 可运行检索器（本地+arxiv 并集 / 429 backoff / 缓存 / 代理检测）
@@ -114,7 +114,7 @@ E 定**评审侧重**。
 | 正确性 | 前提是否自洽 | 方法正确性：推导/实现/指标/统计是否成立 |
 | 创新性 | 方向是否已被覆盖、是否非平凡 | 方案是否**实质复现**已有工作 |
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
-| 深度 | 快筛：双评分 + 致命反驳 | 深审：七子代理 + 交叉质询 + 中位数 |
+| 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
 
 Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**。
 
@@ -124,8 +124,8 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 
 1. 从[十套套路](references/narrative-patterns.md)中为每个 idea 选 **≥4 套**生成叙事；
 2. 跨域类 idea 强制走**五步升级**（结构性缺陷 → 结构同构 → 迁移合法性 → 新算法 → 实证）；
-3. 拉起 **5 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / S-Devil / S-Lit）打分；
-4. **综合评分必须覆盖全部维度，不得只看创新性**；**聚合前先做极性归一化**（S-Devil 的反驳分是 5=完全无新颖性、越低越好，须转为**新颖性稳健度 = 6 − 反驳分**），**归一化后任一维度中位数 ≤ 2** 一票否决（见 [mode-d §D4.1](references/mode-d-narrative-generation.md)）；
+3. 拉起 **6 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / S-Devil / S-Lit）打分；**每个会议审稿人都给「理论角度 + 应用角度 + 会议特性判定」**（见 [roles.md §1.0](references/roles.md)）；
+4. **综合评分必须覆盖全部维度，不得只看创新性**；**聚合前先做极性归一化**（S-Devil 的反驳分是 5=完全无新颖性、越低越好，须转为**新颖性稳健度 = 6 − 反驳分**），**归一化后任一维度中位数 ≤ 2** 一票否决（见 [mode-d §D4.1](references/mode-d-narrative-generation.md)）。**两个通用角度（理论角度 / 应用角度）先跨审稿人取中位数**，各算 1 个值进向量，否则会被放大 4 倍；
 5. 完成**叙事包装 = 重新定位，不是夸大**：只改参照系，不改事实，每句声称都要能在
    方案里找到证据。
 
@@ -165,8 +165,15 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 
 ### 2. 顶会标准锚定
 
-创新性判定必须引用 CVPR / ICML / NeurIPS 的具体标准；贡献必须标注类型；
+创新性判定必须引用 CVPR / ICML / NeurIPS / MICCAI 的具体标准；贡献必须标注类型；
 "首次提出"必须经 S-Lit 核实。Mode E 另有**防复现六项检查**与复现风险等级。
+
+**审稿人评价的两角度 + 会议特性：** 四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS /
+R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假设 / 推导是否成立、形式化
+是否完整）+ **② 应用角度**（能否落地、可验证性、影响面）+ **③ 会议特性判定**
+（按本会议首要标准，引用具体条目）。**只写一个角度 = 评审不合格。** R-MICCAI 对无临床
+属性的工作标 **"不适用"**，其两个条件性维度**不进中位数向量**。见
+[roles.md §1.0](references/roles.md) 与 [venue-standards.md §0](references/venue-standards.md)。
 
 ### 3. 输出规范
 

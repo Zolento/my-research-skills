@@ -19,7 +19,7 @@
 | **核心目标（锚点）** | theory / performance / phenomenon / benchmark / feasibility / negative（**主锚点必填**；允许"主 + 次"） |
 | 研究问题 | |
 | 核心假设 | |
-| 目标会议 | CVPR / ICML / NeurIPS |
+| 目标会议 | CVPR / ICML / NeurIPS / MICCAI |
 | 当前阶段 | Mode A / B / C / D / E |
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
 | 负责范围 | 代码：`routeX/code/`；文档：`docs/` |

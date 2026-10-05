@@ -101,7 +101,7 @@ docs/
 ├── A002-ideas.md                  # Mode B —— 含 I1..In 与 B5 审核结论
 ├── A003-proposal.md               # Mode C
 ├── A004-experiment-plan.md        # Mode C
-├── A005-narrative-I1.md           # Mode D —— idea I1 的 ≥4 套叙事 + 五子代理审核
+├── A005-narrative-I1.md           # Mode D —— idea I1 的 ≥4 套叙事 + 六子代理审核
 ├── A006-narrative-I2.md           # Mode D —— idea I2
 └── A003-review.md                 # Mode E —— 对 A003 的审阅
 ```
@@ -244,9 +244,10 @@ reviewers: []               # 可选：参与的子代理角色
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
+- 核心目标（锚点）：theory / performance / phenomenon / benchmark / feasibility / negative
 - 研究问题：
 - 核心假设：
-- 目标会议：CVPR / ICML / NeurIPS
+- 目标会议：CVPR / ICML / NeurIPS / MICCAI
 - 当前阶段：Mode A / B / C / D / E
 - 推荐优先级：高 / 中 / 低 / 建议放弃
 
@@ -259,7 +260,7 @@ reviewers: []               # 可选：参与的子代理角色
 | A004 | [A004-experiment-plan.md](../docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1—E7 |
 | A005 | [A005-narrative-I1.md](../docs/A005-narrative-I1.md) | narrative | D | reviewed | idea I1 的 4 套叙事，最佳 N2 |
 | A006 | [A006-narrative-I3.md](../docs/A006-narrative-I3.md) | narrative | D | reviewed | idea I3 的 4 套叙事，最佳 N3 |
-| A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 七子代理中位数 4，复现风险低 |
+| A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 八子代理中位数 4，复现风险低 |
 
 ### 2.1 Idea 追踪（来自 A002）
 | Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |

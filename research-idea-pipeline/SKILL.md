@@ -1,7 +1,7 @@
 ---
 name: research-idea-pipeline
 description: >-
-  面向 CVPR / ICML / NeurIPS 投稿的研究创意全流程流水线，覆盖文献调研、idea
+  面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程流水线，覆盖文献调研、idea
   发现、方案生成、多套路论文叙事生成与审稿、方案复核五个可独立调用、也可串联调用
   的子流程。文献检索先查本地文献库，并默认再做 arxiv 扩检（本地命中不是终点）；
   遇到 429 限流自动指数退避等待。
@@ -18,7 +18,8 @@ description: >-
   narrative, paper narrative, storytelling, framing, positioning, narrative
   review, proposal review, mock review, reviewer critique, 找 idea, 头脑风暴,
   研究创意, 文献调研, 相关工作, 方案生成, 方案复核, 审阅方案, 投稿方案, 顶会投稿,
-  论文叙事, 叙事套路, 讲故事, 卖点, 定位, 叙事评审.
+  论文叙事, 叙事套路, 讲故事, 卖点, 定位, 叙事评审, 医学影像, 医学图像, 临床验证,
+  MICCAI, medical image analysis, clinical validation.
 argument-hint: "mode=A|B|C|D|E [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
@@ -28,7 +29,7 @@ metadata:
 
 # Research Idea Pipeline（顶会研究创意流水线）
 
-一套面向 CVPR / ICML / NeurIPS 投稿的研究创意全流程辅助流水线。覆盖从文献调研、
+一套面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程辅助流水线。覆盖从文献调研、
 idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完整链路，并支持五个子流程的
 独立调用与串联调用。
 
@@ -62,7 +63,7 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 | 正确性 | 前提是否自洽 | 方法正确性：推导/实现/指标/统计是否成立 |
 | 创新性 | 方向是否已被覆盖、是否非平凡 | 方案是否**实质复现**已有工作（防复现） |
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现检查） |
-| 深度 | 快筛：双评分 + 致命反驳 | 深审：七子代理 + 交叉质询 + 中位数 |
+| 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
 
 **B 偏文献调研与方法研究；E 偏基于方法的正确性审核，但 E 必须显式给出复现风险等级
 ——做得很扎实的复现仍是拒稿理由。**（D 的定位见 [mode-d](references/mode-d-narrative-generation.md) §D0。）
@@ -196,10 +197,22 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ### 1.2 顶会标准锚定
 
-所有创新性判定必须引用 CVPR / ICML / NeurIPS 的具体标准；所有贡献必须标注类型
+所有创新性判定必须引用 CVPR / ICML / NeurIPS / MICCAI 的具体标准；所有贡献必须标注类型
 （General / Theory / Use-Inspired / Concept & Feasibility / Negative Results 或
 方法 / 理论 / 实证 / 问题定义）。
 标准全文见 [references/venue-standards.md](references/venue-standards.md)。
+
+**审稿人评价的两角度 + 会议特性（强化）：** 四个会议审稿人
+（R-CVPR / R-ICML / R-NeurIPS / R-MICCAI）的**每一次评价**都必须同时给出：
+
+1. **理论角度** —— 命题 / 假设 / 推导是否成立、形式化是否完整、理论贡献深度；
+2. **应用角度** —— 能否落地、可验证性、影响面、与真实工作流的兼容性；
+3. **会议特性判定** —— 按**本会议**首要标准给出一条显式判定，并引用
+   [venue-standards.md](references/venue-standards.md) 的对应条目。
+
+**三个都是必填；只写一个角度 = 评审不合格。** 两角度必须落到**具体命题 / 假设 /
+实验 / 工作流环节**，不得用"理论没问题、应用有价值"充数。详见
+[roles.md](references/roles.md) §1.0 与 [venue-standards.md](references/venue-standards.md) §0。
 
 **创新性声明的额外约束（强化）：** 所有"首次提出"声称必须① 先完成 T1 的 **L3 穷尽
 检索**，② 由 **S-Lit 核实**，必要时由 **S-Nov 独立复核**，③ 留存**负检索记录**
@@ -279,8 +292,8 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 
 | 资源 | 位置 | 内容 |
 |---|---|---|
-| 子代理角色库 | [references/roles.md](references/roles.md) | R-CVPR / R-ICML / R-NeurIPS / A-Author / A-Experimenter / S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
-| 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS 三视角锚定标准 + 防复现标准 |
+| 子代理角色库 | [references/roles.md](references/roles.md) | R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / A-Author / A-Experimenter / S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
+| 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
 | 叙事套路库 | [references/narrative-patterns.md](references/narrative-patterns.md) | 十套顶会叙事逻辑、跨域五步升级、禁用表述、叙事自检 |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
@@ -302,10 +315,10 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 | Mode | 派遣子代理 |
 |---|---|
 | A | 无（执行者直接完成检索与归纳） |
-| B | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：三审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
-| C | R-CVPR、R-ICML、R-NeurIPS（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
-| D | **叙事审核五子代理**：R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Lit（每套叙事默认 5 个，至少 3 个；idea 多时可加 S-Feas / S-Repro） |
-| E | R-CVPR、R-ICML、R-NeurIPS、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（**七子代理**严格审查 + 交叉质询）；**S-Nov（按需，S-Lit 判"边缘"或涉及"首次"时）** |
+| B | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：四审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
+| C | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
+| D | **叙事审核六子代理**：R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、S-Devil、S-Lit（每套叙事默认 6 个，至少 4 个；idea 多时可加 S-Feas / S-Repro） |
+| E | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（**八子代理**严格审查 + 交叉质询）；**S-Nov（按需，S-Lit 判"边缘"或涉及"首次"时）** |
 
 **职责边界：** 不派遣 S-Repro 到 Mode B（idea 阶段无代码可复现）；B5 的审核是
 **概念级快筛**，不要与 Mode E 的方案级深审重复。详见
@@ -376,7 +389,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **输入：** 一个或多个 idea（来自 Mode B 或用户直接提供）；关键参考文献（可选）；
   资源约束（可选）。
-- **流程：** C1 创新性研究（三审稿人视角 + S-Lit 核实）→ C2 可行性研究
+- **流程：** C1 创新性研究（四审稿人视角 + S-Lit 核实）→ C2 可行性研究
   （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
 - **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
   + 风险清单。
@@ -390,10 +403,10 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **定位：** **基于 idea + 方案建立多种顶会风格的叙事逻辑，并拉起子代理评审**；
   决定"怎么讲才不被判增量"。字母顺序上位于方案生成与方案复核之间。
 - **流程：** D0.1 信息完整性检查 → D1 叙事套路锚定（每 idea ≥4 套）→
-  D2 每套叙事的生成（含跨域五步升级、五段式、包装前后对照）→ D3 五子代理评审 →
+  D2 每套叙事的生成（含跨域五步升级、五段式、包装前后对照）→ D3 六子代理评审 →
   D4 交叉质询与共识（逐维度中位数）→ D5 最佳叙事推荐。
 - **交付物：** 多套路叙事清单（每 idea **≥4 套**，每套主线 **≥300 字**）+
-  五子代理独立评审意见 + 交叉质询记录 + 最佳叙事推荐 + 横向对比表 + 最终优先级建议。
+  六子代理独立评审意见 + 交叉质询记录 + 最佳叙事推荐 + 横向对比表 + 最终优先级建议。
 - **落盘：** `docs/<R>NNN-narrative-I<n>.md`，并更新该路线 `INDEX.md`
   （被覆盖的叙事套路 → **已证伪**；最佳叙事 → **已证实**；综合评分 <3 → Warnings）。
 
@@ -403,9 +416,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   复核）；关键参考文献（可选）。
 - **定位：** 对象是**已成型方案**；主战场是**方法正确性与工程可行性**；创新性维度
   以**防复现**为核心目的（见 §0 的「各阶段的分工」）。
-- **流程：** E1 判断复核类型（首次 / 接续）→ E2 七子代理严格审查（含**防复现检查**）
+- **流程：** E1 判断复核类型（首次 / 接续）→ E2 八子代理严格审查（含**防复现检查**）
   → E3 交叉质询与共识形成 → E4 复核结论 → E5 接续复核规则。
-- **交付物：** 七子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
+- **交付物：** 八子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
   + 横向对比表 +（接续复核时）变更追踪表。
 - **落盘：** `docs/<被审ID>-review.md`（接续复核用 `-review-2.md`），
   并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
@@ -481,6 +494,9 @@ E 方案复核。
       （写明具体 IP 与判定类型），且**没有**据此判定"arxiv 不可用 / 无人在研究"。
 - [ ] arxiv 结果已写入缓存。
 - [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
+- [ ] **四个会议审稿人的评价都含「理论角度 + 应用角度 + 会议特性判定」三段**
+      （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
+      而非硬凑临床相关性。
 - [ ] **Mode B：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
       没有"只给 idea 不给审核"；且未误派 S-Repro。
 - [ ] **Mode D：每个 idea 至少 4 套叙事，每套 ≥300 字**；已用**五段式**；跨域类已完成
