@@ -32,6 +32,9 @@
 
 ### R0.2 契约字段落盘
 
+**以 `templates/research-state.template.json` 骨架落盘，八类数组保持空 `[]`，只填 `contract`**
+（只写 `contract` 一个键会让 `state_check.py` 判 `exit 4` —— 它要求八类数组存在）：
+
 写进 `research-state.json` 的 `contract`：
 
 ```jsonc

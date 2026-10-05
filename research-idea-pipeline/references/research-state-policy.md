@@ -380,18 +380,18 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|
 | **R0** Research Contract | — | `contract` | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
-| **R4** Isolated Populations | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` | `phase-r3-r6-discovery.md` |
+| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
+| **R4** Isolated Populations | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
 | **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
 | **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` | `phase-r8-evidence-contract.md` |
-| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` | `phase-r9-r11-experiment-loop.md` |
+| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
 | **R11** Update World Model | 全 state | 归并去重 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
 | **R12** Narrative | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） | `phase-r12-narrative.md` |
 | **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 | `phase-r7-r10-r13-assurance-repair-review.md` |
-| **R14** Decision | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `claims[].status` / `uncertainties[].status` / `hypotheses[].status` | `../SKILL.md` §4「R13 / R14」 |
+| **R14** Decision | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） | `../SKILL.md` §4「R13 / R14」 |
 
 > **补充说明（不参与逐字比对）：** 上表读/写列与 `SKILL.md` §0、各 `phase-*.md` 的
 > 「读 / 写 World Model」表**必须逐字相同**；下面保留各阶段的细节语义，供执行时理解，

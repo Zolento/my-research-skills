@@ -426,7 +426,7 @@ Niche N8（Benchmark/评测）           elite: H62
 | 事件 | 动作 |
 |---|---|
 | 新候选进 archive | 与该 niche 的 elite 比较；胜者 `elite`，败者 `active`（**两者都留在 population**，不删） |
-| 某 niche 的 elite 被 R7 判 `已被覆盖` | elite 转 `archived`，按 R4.2 补新 elite，或关闭该 niche |
+| 某 niche 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`，或**关闭该 niche**（否则 V15 会在下一次校验时报出） |
 | 候选被 R6 判 `killed` | `status: killed` 并写 `failures[]`（`kind: deprioritized`） |
 
 ---
@@ -470,8 +470,8 @@ Niche N8（Benchmark/评测）           elite: H62
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） |
-| **R4** | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` |
+| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R4** |`hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
