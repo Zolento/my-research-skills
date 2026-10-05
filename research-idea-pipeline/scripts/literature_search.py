@@ -39,9 +39,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
 import re
+import socket
 import sys
 import time
 from datetime import datetime, timezone
@@ -261,6 +263,73 @@ def search_local(
 # ---------------------------------------------------------------------------
 # Step 2：arxiv 检索（含 429 指数退避）
 # ---------------------------------------------------------------------------
+
+# arxiv 域名解析到本地/私网地址 ⇒ 很可能处于代理或 hosts 劫持环境
+# （Clash / Surge / 镜像站 / /etc/hosts）。详见 literature-policy.md §6.1。
+ARXIV_HOSTS = ("arxiv.org", "export.arxiv.org")
+
+
+def _address_scope(ip: str) -> str:
+    """判定地址是否为非公网。公网可路由地址返回空串。"""
+    try:
+        addr = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return ""
+    if addr.is_loopback:
+        return "回环地址"
+    if addr.is_unspecified:
+        return "未指定地址 (0.0.0.0)"
+    if addr.is_link_local:
+        return "链路本地地址"
+    if addr.is_private:
+        return "私有网段地址"
+    if not addr.is_global:
+        return "非公网地址"
+    return ""
+
+
+def _resolve_host_ips(host: str) -> List[str]:
+    """解析域名到 IP 列表；解析失败返回空列表（不抛异常）。"""
+    try:
+        infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return []
+    return sorted({str(info[4][0]) for info in infos})
+
+
+def detect_proxy_environment() -> Dict[str, Any]:
+    """检查 arxiv 域名是否解析到本地/私网地址。
+
+    ★ 解析到本地 IP 是**代理环境**的强信号：DNS 被 hosts 文件或本地代理接管。
+    此环境下 ① 结果可能来自代理缓存或镜像、与 arxiv 官方不同步；
+    ② 429 与超时行为可能与直连不同，退避重试未必代表真实的 arxiv 限流；
+    ③ 不得据此判定"arxiv 不可用 / 无人在研究"。
+
+    Returns:
+        {"detected": bool, "resolved": {host: [ip]}, "notes": [...], "unresolved": [...]}
+    """
+    resolved: Dict[str, List[str]] = {}
+    notes: List[str] = []
+    for host in ARXIV_HOSTS:
+        ips = _resolve_host_ips(host)
+        resolved[host] = ips
+        flagged = [(ip, _address_scope(ip)) for ip in ips]
+        flagged = [(ip, scope) for ip, scope in flagged if scope]
+        if flagged:
+            detail = "、".join(f"{ip}（{scope}）" for ip, scope in flagged)
+            notes.append(
+                f"{host} 解析到非公网地址：{detail} —— 可能存在代理 / hosts 劫持环境。"
+                f"① 结果可能来自代理缓存或镜像，与 arxiv 官方不同步；"
+                f"② 429 与超时行为可能与直连不同，退避重试未必代表真实限流；"
+                f"③ 不得据此判定「arxiv 不可用」或「无人在研究」。"
+            )
+    return {
+        "detected": bool(notes),
+        "resolved": resolved,
+        "notes": notes,
+        "unresolved": [h for h, ips in resolved.items() if not ips],
+    }
+
 
 def _status_of(exc: BaseException) -> Optional[int]:
     """从异常中尽力提取 HTTP 状态码。
@@ -558,6 +627,14 @@ def search_literature(
             level=level, limit=limit, escalation_attempted=False,
         )
 
+    # --- 代理环境检查：arxiv 解析到本地 IP 是代理 / hosts 劫持的强信号 ---
+    # 仅告警，不改变检索行为：代理环境下的结果仍然可用，但可信度需重新评估。
+    proxy_env = detect_proxy_environment()
+    for note in proxy_env["notes"]:
+        log(f"[proxy?] {note}")
+    for host in proxy_env["unresolved"]:
+        log(f"[warn] {host} 无法解析；若处于受限网络，请检查代理与 DNS 配置")
+
     # --- Step 2: arxiv 检索（每个检索式一次；命中缓存则跳过） ---
     arxiv_available = True
     for q in queries:
@@ -668,6 +745,7 @@ def search_literature(
         per_query=per_query, escalations=escalations,
         saturation={"saturated": saturated, "reason": saturation_reason},
         level=level, limit=limit, escalation_attempted=bool(escalations),
+        proxy_env=proxy_env,
     )
 
 
@@ -685,6 +763,7 @@ def _finish(
     level: Optional[str],
     limit: Optional[int],
     escalation_attempted: bool,
+    proxy_env: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """组装返回值：套用 --limit、生成负检索记录与等级报告。"""
     total_before_limit = len(merged)
@@ -711,6 +790,7 @@ def _finish(
         "escalations": escalations,
         "saturation": saturation,
         "level_report": gaps_level,
+        "proxy_env": proxy_env,
     }
 
 
@@ -898,6 +978,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "saturation": outcome["saturation"],
         "level_report": outcome["level_report"],
         "note": outcome["note"],
+        "proxy_env": outcome.get("proxy_env"),
     }
 
     if args.json:
@@ -918,6 +999,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("\n## 429 等待日志 / arxiv 失败记录")
         for line in payload["rate_limit_log"]:
             print(f"- {line}")
+        proxy = payload.get("proxy_env") or {}
+        if proxy.get("detected"):
+            print("\n## 代理环境提示（arxiv 域名解析到本地 IP）")
+            for line in proxy["notes"]:
+                print(f"- ⚠️ {line}")
         if payload["cache_updates"]:
             print("\n## 本地缓存更新记录")
             for line in payload["cache_updates"]:

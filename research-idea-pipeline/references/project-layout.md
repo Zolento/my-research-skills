@@ -37,10 +37,10 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 │   ├── A003-review.md
 │   ├── B001-literature-survey.md    # routeB 的文档同一目录，靠 B 前缀区分
 │   ├── B002-ideas.md
-│   └── refs/                    # ★ 参考文献（= 本地文献库根目录）
-│       ├── papers/              # {paper_id}.json + 可选 {paper_id}.md
+│   └── refs/                    # ★ 参考文献库（= 本地文献库根目录）
+│       ├── papers/              # {paper_id}.pdf + .json sidecar + 可选 .md
 │       ├── cache/               # {query_hash}.json（arxiv 查询缓存）
-│       └── index.json
+│       └── index.json           # ★ 必需：PDF 索引（每个 PDF 一条记录，进版本库）
 ├── routeA/                      # 路线 A 的代码与实验
 │   ├── INDEX.md                 # ★ 必需：索引到 ../docs/A*
 │   ├── code/                    # 该路线专属代码
@@ -54,7 +54,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 └── .research-idea-pipeline/     # 机器状态
 ```
 
-### 1.1 四条硬性规则
+### 1.1 五条硬性规则
 
 1. **文档集中（扁平）：** 所有路线的文档都放根目录 `docs/` 下，**不再按路线分子目录**；
    路线靠**文件名前缀**（`A*` / `B*`）区分，**序号仍按路线独立递增**。
@@ -65,6 +65,10 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
    链接指向 `../docs/`，且**每次产出后必须更新**。
 4. **参考文献集中：** 论文元数据/笔记/缓存一律放 `docs/refs/`，不要散落在路线目录或
    项目根目录。
+5. **PDF 必须入索引：** `docs/refs/` 下的**每个 PDF** 都要在 **`docs/refs/index.json`**
+   里有一条记录（完整字段见 [literature-policy.md](literature-policy.md) §7.1）。
+   **索引进版本库，PDF 不进**（PDF 是大文件）。新增/替换/删除 PDF 后**必须重建索引**
+   （`python3 scripts/refs_index.py`，校验用 `--check`）；**未入索引的 PDF 视为不存在**。
 
 > **命名说明：** 路线目录用 `routeA` / `routeB`，其文档 ID 前缀用**大写路线字母**
 > `A` / `B`。此处的 A/B 是**路线编号，与 Mode A/B/C/D/E 无关**；文档属于哪个 Mode
@@ -337,6 +341,7 @@ reviewers: []               # 可选：参与的子代理角色
 | `routeX/INDEX.md` | **单写者**：同一时刻只允许一个成员改一条路线的 INDEX |
 | `shared/` | 按 `AGENTS.md` 规定；无规定时默认**只在明确需要时改**，改前先读 |
 | `docs/refs/` | 追加式写入；缓存文件名由 query hash 决定，天然不冲突 |
+| `docs/refs/index.json` | **单写者**：PDF 索引是整文件重写，同一时刻只允许一个成员重建（`refs_index.py`） |
 
 > 序号分配与 INDEX 更新必须**串行进行**：先读取现有最大序号 / 当前 INDEX 内容，
 > 再写入新文件与新行。并发时由 Lead（或指定的单写者）统一执行这两步。
@@ -376,9 +381,19 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 **新项目（无任何结构时）：**
 
 1. 建 `docs/`、`docs/refs/{papers,cache}/`、`shared/{code,docs}/`、`.research-idea-pipeline/`。
-2. 每条路线建 `routeX/{code,experiments}/`（**路线目录下不再建 docs/**）。
-3. 每条路线建 `routeX/INDEX.md`，按 [../templates/INDEX.md](../templates/INDEX.md) 的
+2. 生成空的 PDF 索引：`python3 scripts/refs_index.py --refs-dir docs/refs`（会写出
+   `docs/refs/index.json`）。之后**每次增删 PDF 都要重跑**。
+3. 每条路线建 `routeX/{code,experiments}/`（**路线目录下不再建 docs/**）。
+4. 每条路线建 `routeX/INDEX.md`，按 [../templates/INDEX.md](../templates/INDEX.md) 的
    章节结构填写（**必需**，且之后每次产出都要更新）。
+
+**每次新增 / 替换 / 删除 PDF 时：**
+
+1. 把 PDF 放进 `docs/refs/papers/`，并在同目录写好同名 `.json` sidecar 元数据
+   （字段见 [literature-policy.md](literature-policy.md) §7.2）。
+2. 重建索引：`python3 scripts/refs_index.py`；校验：`python3 scripts/refs_index.py --check`。
+3. 若 `--check` 报"待核实"（`needs_verification = true`），人工补齐 `title/authors/year`
+   后重建；**未核实条目的文献不得用于支撑创新性声明**。
 
 **每次产出新文档时：**
 

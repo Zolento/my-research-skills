@@ -5,6 +5,10 @@ docs/refs/papers/*.json
 docs/refs/papers/*.md
 !docs/refs/papers/.gitkeep
 
+# PDF 原文是大文件，不进版本库；
+# 但 docs/refs/index.json（PDF 索引）**必须**进版本库，故此处不忽略它。
+docs/refs/**/*.pdf
+
 # 机器状态
 .research-idea-pipeline/
 

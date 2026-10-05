@@ -43,6 +43,13 @@
 **执行要求：**
 
 - 使用 **Python `arxiv` 包**，查询构造 = 关键词 + 会议过滤 + 时间范围。
+- **先识别代理环境：** 解析 `arxiv.org` / `export.arxiv.org`。**若解析到本地 IP**
+  （回环 / 私有网段 / 链路本地 / `0.0.0.0`，例如 Clash 的 `198.18.x.x` fake-IP），
+  说明**可能存在代理环境**——DNS 已被 hosts 或本地代理接管，你访问的不是 arxiv 官方。
+  此时必须：① 在报告中**单列「代理环境提示」段**并写明**具体 IP**；② **不得**据此
+  判定"arxiv 不可用"或"无人在研究"；③ 代理链路上的 429 **未必**是 arxiv 官方限流，
+  退避照常但结论须注明该不确定性。见
+  [literature-policy.md](literature-policy.md) §6.1。
 - **严格处理 429**：指数退避 `10s → 20s → 40s → 80s → 160s`，最多 5 次；
   重试期间不发起新请求；5 次失败则回退本地结果并标注
   **"arxiv 暂时不可用，以下结果仅来自本地库"**，同时判定为**检索未达饱和**。
@@ -145,7 +152,17 @@
    - §5 TODO：待核实的会议论文集条目；
    - §7 Warnings：**检索未达饱和必须记入**；
    - §9 变更日志。
-4. **机器状态**写入 `.research-idea-pipeline/state-A-<ts>.json`，不入 docs。
+4. **下载了 PDF 就必须建索引：** 本次调研若把任何 PDF 存进 `docs/refs/papers/`，
+   必须在**同一步**写好 sidecar 元数据并重建索引：
+
+   ```bash
+   python3 scripts/refs_index.py --refs-dir docs/refs          # 重建
+   python3 scripts/refs_index.py --refs-dir docs/refs --check   # 校验（不一致退出码 3）
+   ```
+
+   `docs/refs/index.json` **进版本库**，PDF **不进**。未入索引的 PDF 视为不存在。
+   见 [literature-policy.md](literature-policy.md) §7.1。
+5. **机器状态**写入 `.research-idea-pipeline/state-A-<ts>.json`，不入 docs。
 
 ## A7. 输出后
 

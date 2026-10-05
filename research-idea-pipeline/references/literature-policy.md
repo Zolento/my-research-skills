@@ -243,21 +243,126 @@ def cache_results(query, results): ...
 - 非 429 的 HTTP 错误：不重试，直接报告。
 - 必须输出**等待日志**。
 
+### 6.1 代理环境识别（arxiv 解析到本地 IP）
+
+**发起 arxiv 请求前，先解析 `arxiv.org` / `export.arxiv.org`。若解析结果是回环、
+私有网段、链路本地、`0.0.0.0` 或其他非公网地址，即判定"可能存在代理环境"。**
+
+```
+arxiv.org → 127.0.0.1 / ::1 / 0.0.0.0      ← 直接指向本机
+          → 198.18.0.30 / 192.168.x.x / 10.x.x.x / 172.16-31.x.x
+                                             ← Clash fake-IP、内网镜像、hosts 劫持
+```
+
+> **本地 IP 意味着 DNS 已被 hosts 文件或本地代理（Clash / Surge / 镜像站）接管。**
+> 此时你访问的不是 arxiv 官方，而是代理链路。
+
+命中时必须做到：
+
+| 要求 | 说明 |
+|---|---|
+| **输出代理提示** | 检索报告里单列「代理环境提示」段，写明解析到的**具体 IP 与判定类型**（回环 / 私有网段 / 链路本地 / 未指定） |
+| **不得据此判定"arxiv 不可用"** | 代理只改变链路，不代表 arxiv 宕机；退出码 `2` 的语义仍需真实失败证据 |
+| **不得据此判定"无人在研究"** | 代理缓存/镜像可能不完整，见 §2.1 的禁止推断 |
+| **429 语义降级** | 代理链路上的 429 可能来自代理自身限流，**不必然**代表 arxiv 官方限流。退避照常执行，但结论中必须注明该不确定性 |
+| **记入 Warnings** | 若本次检索要支撑创新性声明，把"经代理环境检索"记入 `INDEX.md` 的 Warnings |
+
+**实现：** [../scripts/literature_search.py](../scripts/literature_search.py) 的
+`detect_proxy_environment()`，结果写入输出的 `proxy_env` 字段
+（`{"detected", "resolved", "notes", "unresolved"}`）。
+
+> ⚠️ **只告警，不阻断。** 代理环境下的结果依然可用，但**可信度需重新评估**：
+> 更应依赖 §3.3 的饱和判据（连续两轮零新增）与 §2.1 的负检索记录来支撑结论。
+
 ---
 
 ## 7. 本地文献库格式约定
 
 ```
 ./docs/refs/
+  ├── index.json               # ★ PDF 索引（强制，见 §7.1）
   ├── papers/
-  │   ├── {paper_id}.json      # 元数据：title/authors/abstract/year/venue/url
-  │   └── {paper_id}.md        # 可选：全文或笔记
-  ├── cache/
-  │   └── {query_hash}.json    # arxiv 查询缓存
-  └── index.json               # 本地索引（可选）
+  │   ├── {paper_id}.pdf       # PDF 原文（大文件，不进版本库）
+  │   ├── {paper_id}.json      # sidecar 元数据（title/authors/abstract/year/venue/url）
+  │   └── {paper_id}.md        # 可选：全文或笔记（参与全文匹配）
+  └── cache/
+      └── {query_hash}.json    # arxiv 查询缓存
 ```
 
-单条元数据 JSON：
+### 7.1 PDF 索引（强制）
+
+**`docs/refs/` 下的每一个 PDF，都必须在 `docs/refs/index.json` 里有一条记录。**
+索引是**可进版本库的元数据**，PDF 本身是大文件、不进版本库——这样别人拿到的是
+你的文献清单，而不必下载几十 GB 的原文。
+
+索引结构：
+
+```json
+{
+  "schema": "research-idea-pipeline/refs-index@1",
+  "generated_at": "2025-01-01T00:00:00+08:00",
+  "count": 1,
+  "pdfs": [
+    {
+      "file": "papers/2401.01234.pdf",
+      "paper_id": "2401.01234",
+      "title": "Discrete Diffusion for Combinatorial Optimization",
+      "authors": ["Ada Smith", "Bob Jones"],
+      "year": 2024,
+      "venue": "NeurIPS",
+      "arxiv_id": "2401.01234",
+      "doi": null,
+      "url": "https://arxiv.org/abs/2401.01234",
+      "abstract": null,
+      "keywords": ["diffusion", "combinatorial optimization"],
+      "pages": 12,
+      "size_bytes": 1234567,
+      "sha256": "…",
+      "added_at": "2025-01-01",
+      "source": "arxiv",
+      "metadata_from": "sidecar",
+      "needs_verification": false,
+      "sidecar_path": "papers/2401.01234.json",
+      "notes_path": "papers/2401.01234.md"
+    }
+  ]
+}
+```
+
+**字段约定：**
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `file` | ✅ | 相对 `docs/refs/` 的路径，POSIX 分隔符；**索引以它作唯一键** |
+| `paper_id` | ✅ | 优先取 sidecar 的 `paper_id`，否则 arXiv ID，否则文件名主干 |
+| `title` | ✅ | 取不到时用文件名兜底，并把 `needs_verification` 置 `true` |
+| `authors` | ✅ | 字符串数组；无法拆分时保留为单元素 |
+| `year` | ✅ | 取不到为 `null`，且 `needs_verification = true` |
+| `arxiv_id` | ❌ | 新式 `YYMM.NNNNN` 或旧式 `category/NNNNNNN` |
+| `url` | ❌ | 缺失但有 `arxiv_id` 时自动补 `https://arxiv.org/abs/<id>` |
+| `sha256` | ✅ | 用于检测文件被替换；`--no-hash` 产出的索引无法通过 `--check` |
+| `added_at` | ✅ | 首次入库日期；文件内容不变时重建会保留原值 |
+| `metadata_from` | ✅ | `sidecar` / `pdf` / `filename`，说明元数据来自哪一层 |
+| `needs_verification` | ✅ | `metadata_from == "filename"` 或 `year is null` 时为 `true` |
+
+**元数据来源优先级：** `papers/{paper_id}.json`（sidecar，最准）→ PDF 内嵌元数据
+（`pypdf`，缺失时回退命令行 `pdfinfo`）→ 文件名解析（兜底，必然标记待核实）。
+
+**更新时机（强制）：** 新增 / 替换 / 删除 PDF 后**必须重建索引**；检索新下载的
+PDF，要在**同一步**写好 sidecar 并重建索引。
+
+```bash
+python3 scripts/refs_index.py            # 扫描 ./docs/refs 并写入 index.json
+python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
+```
+
+**约束：**
+
+- **未入索引的 PDF 视为不存在。** 任何"本地已有该文献"的论断都必须能指向索引条目。
+- `needs_verification = true` 的条目**不得**用于支撑创新性声明，除非已人工补齐。
+- 索引里**不得**写 PDF 绝对路径——换机器、换用户目录后必须仍然有效。
+
+### 7.2 sidecar 单条元数据格式
 
 ```json
 {

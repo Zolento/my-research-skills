@@ -18,8 +18,10 @@
 │   ├── A005-narrative-I1.md
 │   ├── A003-review.md
 │   ├── B001-literature-survey.md    # routeB 的文档同目录，靠 B 前缀区分
-│   └── refs/                    # ★ 参考文献（= 本地文献库根目录）
-│       ├── papers/  cache/  index.json
+│   └── refs/                    # ★ 参考文献库（= 本地文献库根目录）
+│       ├── papers/              # {paper_id}.pdf（不进版本库）+ .json + 可选 .md
+│       ├── cache/               # {query_hash}.json
+│       └── index.json           # ★ 必需：PDF 索引，进版本库
 ├── routeA/
 │   ├── INDEX.md                 # ★ 路线 A 的唯一入口（索引到 ../docs/A*）
 │   ├── code/
@@ -34,7 +36,7 @@
 └── .research-idea-pipeline/     # 机器状态（不入 docs）
 ```
 
-**五条硬性规则：**
+**六条硬性规则：**
 
 1. **所有路线的文档都放根目录 `docs/`（扁平）**，靠**文件名前缀**（`A*`/`B*`）区分
    路线；**不再按路线分子目录**。前缀是唯一的路线隔离手段，不可省。
@@ -42,6 +44,13 @@
 3. **参考文献统一放 `docs/refs/`**（脚本默认 `--local-dir ./docs/refs`）。
 4. 每条路线必须有 `INDEX.md`，每次产出后必须更新。
 5. `state.json` / 日志不进 `docs/`。
+6. **`docs/refs/` 下的每个 PDF 都必须在 `docs/refs/index.json` 里有索引条目**；
+   **索引进版本库、PDF 不进**。新增/替换/删除 PDF 后必须重建索引：
+
+   ```bash
+   python3 scripts/refs_index.py --refs-dir docs/refs
+   python3 scripts/refs_index.py --refs-dir docs/refs --check
+   ```
 
 ---
 
@@ -214,5 +223,6 @@ Mode B5 同理：被判"重叠不足"或致命反驳不可缓解而**放弃**的
 | `routeX/INDEX.md` | **单写者**：同一时刻只允许一个成员改一条路线的 INDEX |
 | `shared/` | 按 `AGENTS.md` 规定；无规定时默认只在明确需要时改，改前先读 |
 | `docs/refs/` | 追加式写入；缓存文件名由 query hash 决定，天然不冲突 |
+| `docs/refs/index.json` | **单写者**：PDF 索引是整文件重写，同一时刻只允许一个成员重建 |
 
 并发下若发生写冲突，**重新读取后再提交**，不要覆盖他人的改动。

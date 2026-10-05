@@ -140,8 +140,21 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 已有结果，标注"arxiv 暂时不可用，以下结果仅来自本地库"，**并在 INDEX.md 的 Warnings
 记录"检索未达饱和"**。
 
-完整规范（含 L1/L2/L3 尽职调查等级与饱和判据）见
-[references/literature-policy.md](references/literature-policy.md)，实现见
+**代理环境识别：** 发起 arxiv 请求前，先解析 `arxiv.org` / `export.arxiv.org`。
+**若解析到本地 IP**（回环 / 私有网段 / 链路本地 / `0.0.0.0`，例如 Clash 的
+`198.18.x.x` fake-IP），说明**可能存在代理环境**——DNS 已被 hosts 文件或本地代理
+（Clash / Surge / 镜像站）接管，你访问的不是 arxiv 官方。此时必须：
+
+1. 在报告中**单列「代理环境提示」段**，写明解析到的**具体 IP 与判定类型**；
+2. **不得**据此判定"arxiv 不可用"或"无人在研究"（代理缓存/镜像可能不完整）；
+3. 代理链路上的 **429 未必是 arxiv 官方限流**，退避照常执行但结论中必须注明该不确定性；
+4. 若本次检索用于支撑创新性声明，把"经代理环境检索"记入 INDEX.md 的 **Warnings**。
+
+> **只告警，不阻断。** 代理环境下的结果仍可用，但**可信度需重新评估**——更应依赖
+> 饱和判据（连续两轮零新增）与负检索记录来支撑结论。
+
+完整规范（含 L1/L2/L3 尽职调查等级、饱和判据与代理环境识别）见
+[references/literature-policy.md](references/literature-policy.md)（§6.1），实现见
 [scripts/literature_search.py](scripts/literature_search.py)。
 
 ### 1.2 顶会标准锚定
@@ -181,7 +194,8 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 │   ├── A005-narrative-I1.md
 │   ├── A003-review.md
 │   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
-│   └── refs/              # ★ 参考文献（= 本地文献库根目录 papers/ cache/ index.json）
+│   └── refs/              # ★ 参考文献库：papers/ cache/ + index.json（PDF 索引，强制）
+│                          #   PDF 原文不进版本库，index.json 必须进
 ├── routeA/
 │   ├── INDEX.md           # ★ 必需：索引到 ../docs/A*
 │   └── code/
@@ -191,7 +205,7 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 └── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
 
-**五条硬性规则：**
+**六条硬性规则：**
 
 1. **先读 `AGENTS.md`。** 项目根目录存在 `AGENTS.md` 时，其约定优先于本 Skill 默认。
 2. **文档集中（扁平）：** 所有路线的文档都放**根目录 `docs/`**，**不再按路线分子
@@ -210,6 +224,14 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 5. **参考文献集中：** 论文元数据/笔记/缓存一律放 **`docs/refs/`**（脚本默认
    `--local-dir ./docs/refs`）；机器状态 `state.json` 放 `.research-idea-pipeline/`，
    日志放 `logs/`——**都不进 docs 正文**。
+6. **`docs/refs/` 下的每个 PDF 都必须有索引条目：** 一律登记到
+   **`docs/refs/index.json`**（强制，见
+   [literature-policy.md](references/literature-policy.md) §7.1），记录
+   `file / paper_id / title / authors / year / arxiv_id / pages / size_bytes / sha256 /
+   added_at / metadata_from / needs_verification` 等基本信息。**索引进版本库，PDF 不进**
+   （PDF 是大文件）。新增/替换/删除 PDF 后**必须重建索引**
+   （`python3 scripts/refs_index.py`，校验用 `--check`）。**未入索引的 PDF 视为不存在**，
+   任何"本地已有该文献"的论断都必须能指向索引条目。
 
 完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
 骨架的检查清单）。
@@ -223,9 +245,10 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 | 子代理角色库 | [references/roles.md](references/roles.md) | R-CVPR / R-ICML / R-NeurIPS / A-Author / A-Experimenter / S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS 三视角锚定标准 + 防复现标准 |
 | 叙事套路库 | [references/narrative-patterns.md](references/narrative-patterns.md) | 十套顶会叙事逻辑、跨域五步升级、禁用表述、叙事自检 |
-| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、缓存 |
+| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
-| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：本地+arxiv 并集、`--level`、`--exhaustive`、`--also-query`、429 backoff |
+| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：本地+arxiv 并集、`--level`、`--exhaustive`、`--also-query`、429 backoff、代理环境检测 |
+| PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3） |
 | 状态传递模板 | [templates/state.template.json](templates/state.template.json) | `state.json` 片段结构 |
 | 路线索引模板 | [templates/INDEX.md](templates/INDEX.md) | 每条路线 `INDEX.md` 的骨架（含已证实/已证伪/TODO/Bugs/Warnings） |
 | 串联示例 | [examples/](examples/) | B→C→D→E 串联、接续复核、单独文献调研、多路线目录管理的示例 |
@@ -387,6 +410,8 @@ E 方案复核。
 - [ ] 已判定触发条件（T1—T7）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
 - [ ] 每条文献结果标注了 `source`；结果集是本地 + arxiv 的并集。
 - [ ] 若发生 429，输出了等待日志，且退避符合 `10→20→40→80→160s`、上限 5 次。
+- [ ] **已解析 `arxiv.org` / `export.arxiv.org`；若解析到本地 IP，输出了「代理环境提示」段**
+      （写明具体 IP 与判定类型），且**没有**据此判定"arxiv 不可用 / 无人在研究"。
 - [ ] arxiv 结果已写入缓存。
 - [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
 - [ ] **Mode B：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
@@ -402,6 +427,9 @@ E 方案复核。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
 - [ ] **方案/审阅记录已落盘到 `docs/`**，命名符合 `<R><NNN>-<slug>.md` /
       `<ID>-review.md`；且**文档前缀 = 路线字母**（不随 Mode 变化）。
+- [ ] **`docs/refs/` 下每个 PDF 都在 `docs/refs/index.json` 里有条目**
+      （`python3 scripts/refs_index.py --check` 通过）；索引中无绝对路径；
+      `needs_verification = true` 的条目**未**用于支撑创新性声明。
 - [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
       变更日志。
 - [ ] 未达饱和的检索、未缓解的风险已记入 `INDEX.md` 的 Warnings。
