@@ -16,7 +16,11 @@
 
 | 项 | 内容 |
 |---|---|
-| **核心目标（锚点）** | theory / performance / phenomenon / benchmark / feasibility / negative（**主锚点必填**。允许"主 + 次"） |
+| **路线锚点 `core_goal`** | theory / performance / phenomenon / benchmark / feasibility / negative（**只记主锚点**） |
+| **次锚点 `core_goal_secondary`** | 可空，如 feasibility（**只写这里，不写进 frontmatter 的 `core_goal`**） |
+| **`anchor_role`** | primary / supporting / orthogonal —— 与《根 INDEX.md》的**项目主锚点**的关系 |
+| **`serves`** | `supporting` **必填**：服务哪条主锚点、通过什么机制 |
+| **`serves_evidence`** | `supporting` **必填**：落到哪条贡献/实验，须可核验（如 `A003/K1`） |
 | 研究问题 | |
 | 核心假设 | |
 | 目标会议 | CVPR / ICML / NeurIPS / MICCAI |
@@ -24,8 +28,19 @@
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
 | 负责范围 | 代码：`routeX/code/`。文档：`docs/` |
 
-> **锚点变更必须记入 §9 变更日志**，并重新审视老锚点下产出的 idea / 方案 / 叙事 / 审阅
-> 结论（见本 Skill 的 `SKILL.md` §0.1）。
+> **`anchor_role: orthogonal` 时**，这里必须写明「**不参与主锚点成功判据**」，
+> 且本路线**不得进入 Mode D、不得作为投稿主线**（见 `SKILL.md` §0.1 规则 3）。
+> **`supporting` 必须可证伪**：要说出一个会因它而改变的下游决策与对主锚点判据的
+> 可测影响。只写"有理论价值"不算 —— 答不出就标 `orthogonal`。
+
+> **锚点变更必须开「锚点变更单」（可放本节下方或 §9 变更日志）：** 记日期、旧方向 → 新方向、
+> 类型（**增补** / **替换**）、依据、以及**受影响产物清单**。
+> - **`类型: 替换` 的依据必须是「用户显式指令原话」** —— 证据只能作为**提请**材料，
+>   **不能**作为变更依据。
+> - **`类型: 替换` 而没有受影响产物清单 = 变更单无效。**
+> - **只有用户能授权换方向。** agent **不得**以"主锚点不可达 / 另一个方向更有意思"为由
+>   自行换方向、换主锚点或开新路线。它只能**提请**（记 Warnings + 问用户）与
+>   **降级**（标 `orthogonal` 并公开标注）。见 `SKILL.md` §0.2 约束 1。
 
 ---
 
@@ -33,19 +48,25 @@
 
 > 链接相对本文件（即 `routeX/`）书写，格式为 `docs/<文件名>` ——
 > **本路线的文档都在 `routeX/docs/`（扁平）**。根目录 `docs/` 是跨路线共享区。
-> **slug 只能取下列枚举值**（详见本 Skill 的 `project-layout.md` §2.1）：
-> `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`。
+> **slug 只能取下列封闭枚举**（详见本 Skill 的 `project-layout.md` §2.1）：
+> `anchor` / `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`。
 > 审阅意见为 `docs/<被审ID>-review-r<NN>.md`，**不占新序号**。
+> **枚举外的派生物不要自创 slug** —— 归到最接近的枚举，原义写 `subtype` 列（见 §3.2）。
 > 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 
-| ID | 文件 | 类型 | Mode | 状态 | 说明 |
-|---|---|---|---|---|---|
-| `<路线字母>001` | `docs/<文件名>` | literature-survey | A | draft | |
-| `<路线字母>002` | `docs/<文件名>` | idea-discovery | B | draft | 含 I1..In |
-| `<路线字母>003` | `docs/<文件名>` | proposal | C | draft | 贡献 K1..Kn |
-| `<路线字母>004` | `docs/<文件名>` | experiment-plan | C | draft | 实验 E1..En |
-| `<路线字母>005` | `docs/<文件名>` | narrative | D | draft | 一次调用：I1..In 的套路 |
-| `<路线字母>003-review-r01` | `docs/<文件名>` | review | E | draft | 对 `003` 的第 1 轮审阅 |
+| ID | 文件 | 类型 | **subtype** | Mode | 状态 | 说明 |
+|---|---|---|---|---|---|---|
+| `<路线字母>000` | `docs/<文件名>` | anchor | — | — | frozen | 冻结契约 · v<版本> · hash <前16位> |
+| `<路线字母>001` | `docs/<文件名>` | literature-survey | — | A | draft | |
+| `<路线字母>002` | `docs/<文件名>` | idea-discovery | — | B | draft | 含 I1..In |
+| `<路线字母>003` | `docs/<文件名>` | proposal | — | C | draft | 贡献 K1..Kn |
+| `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | C | draft | 实验 E1..En |
+| `<路线字母>005` | `docs/<文件名>` | narrative | — | D | draft | 一次调用：I1..In 的套路 |
+| `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | E | draft | 对 `003` 的第 1 轮审阅 |
+
+> **`subtype` 列必填**：枚举内写 `—`，枚举外写原义（如 `paper-outline` /
+> `experiment-cards` / `math-consolidation`）。**文件名只由 `<slug>` 决定**，
+> 派生物的语义**只能靠这一列保住**。
 
 ### 2.0 文档关系图
 

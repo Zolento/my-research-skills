@@ -377,13 +377,31 @@ PDF，要在**同一步**写好 sidecar 并重建索引。
 ```bash
 python3 scripts/refs_index.py            # 扫描 ./docs/refs 并写入 index.json
 python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
+python3 scripts/refs_index.py --migrate  # 旧 schema → 当前 schema（保留旧字段）
 ```
 
 **约束：**
 
 - **未入索引的 PDF 视为不存在。** 任何"本地已有该文献"的论断都必须能指向索引条目。
-- `needs_verification = true` 的条目**不得**用于支撑创新性声明，除非已人工补齐。
+- `needs_verification = true` 的条目**不得**用于支撑创新性声明（含「首次提出 / 未见前作 /
+  复现风险低」），除非已人工补齐；**其数量计入根 `INDEX.md` 的全局 Warnings，超过 5
+  触发补元数据 TODO**（见 [evidence-policy.md](evidence-policy.md) §2 规则 7）。
 - 索引里**不得**写 PDF 绝对路径——换机器、换用户目录后必须仍然有效。
+
+**旧 schema 的迁移路径（别只会"重建"）：**
+
+`--check` 报 **「索引缺少 pdfs 数组（schema 不符）」** 时，说明索引是旧版形状
+（平铺列表，或以文件名为键的字典）。**直接重建会丢掉旧条目里已有的
+title / venue / year 等字段**，因此必须用：
+
+```bash
+python3 scripts/refs_index.py --migrate   # 保留旧字段 + 补齐 schema，顶层写 migrated_from
+python3 scripts/refs_index.py --check     # 迁移后确认一致
+```
+
+迁移会把继承来的元数据标 `metadata_from = "legacy"`。**它同样不算"已核实"**——
+除非旧条目自己声明过 `needs_verification: false`。迁移完请按上面的 Warnings 规则
+清点 `needs_verification` 条数并补 sidecar。
 
 ### 7.2 sidecar 单条元数据格式
 

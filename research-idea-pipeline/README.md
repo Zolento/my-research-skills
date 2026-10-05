@@ -39,9 +39,10 @@ research-idea-pipeline/
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
 │   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
-│   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check 校验）
+│   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check / --migrate）
 │   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）：分号/超长句/虚动词/营销词/套话
-│   └── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
+│   ├── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
+│   └── test_refs_index.py            # 离线测试：索引旧 schema 迁移（保留旧字段）
 ├── templates/
 │   ├── INDEX.md                      # 路线级 INDEX.md 骨架（含文档关系图）
 │   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（跨路线索引）
@@ -63,7 +64,7 @@ research-idea-pipeline/
 ### 锚定点（核心目标）—— **必须先问，不得猜**
 
 开始任何 Mode 之前，先与用户确认本工作的核心目标。用户没说就**反问**，
-**不要默认成"提高性能"**。**未确认前不得开工。**
+**不要默认成"提高性能"**。**项目主锚点未声明前不得开工。**
 
 | 锚点 | 核心目标 | 成功判据 | 贡献类型 |
 |---|---|---|---|
@@ -74,14 +75,40 @@ research-idea-pipeline/
 | **可行性** | 把不可行 / 过贵的方法变可行 | 保持理论保证同时显著降本 | Concept & Feasibility |
 | **负结果** | 证明某目标在一定条件下不可能 | 不可能性成立且给出可达松弛 | Negative Results |
 
-- **允许组合，但必须指定主锚点**（如"主锚点 = 理论，次锚点 = 可行性"）。
-- **锚点必须落盘：** 文档 frontmatter 的 `core_goal`、`INDEX.md` 路线概要、`state.json`。
-- **锚点变更必须显式记录**，并重新审视老锚点下产出的 idea / 方案 / 叙事 / 审阅结论。
-- **锚点与产出不一致时必须当场指出**（如性能锚点却没做同算力公平比较）。
+**三层锚点体系**（层级不分清，规则会互相打架）：
+
+| 层级 | 写在哪 | 字段 |
+|---|---|---|
+| **项目主锚点** | 根 `INDEX.md`，**只声明一次** | （项目级） |
+| **路线锚点** | 路线 frontmatter | `core_goal` + `anchor_role` + `serves` + `serves_evidence` |
+| **次锚点** | 路线 `INDEX.md` 概要与 `state.json` | `core_goal_secondary`（**不进 `core_goal`**） |
+
+- **`core_goal` 只记主锚点**（单值）；写 `"theory+feasibility"` 会被下游脚本判为非法。
+- **`anchor_role`** 取 `primary` / `supporting` / `orthogonal`：
+  `supporting` **必须可证伪**（说出一个会因它改变的下游决策 + 对主锚点判据的可测影响），
+  只写"有理论价值"不算，答不出就标 `orthogonal`；
+  **`orthogonal` 不得进入 Mode D、不得作为投稿主线。**
+- **「必须服务」的强制力是「服务，否则降级 + 公开正交」，不是「服务，否则作废」。**
+  被禁止的是**沉默**：既不服务、又不公开标注、还继续当主线推进。
+- **只有用户能授权换方向。** agent 不得以"我发现主锚点不可达""另一个方向更有意思"
+  为由自行换方向 / 换主锚点 / 开新路线 —— 只能**提请**（记 Warnings + 问用户）与
+  **降级**（标 `orthogonal` 并公开标注）。换方向走[锚点变更单](#锚点变更单anchor-change-order)。
+- **§1.5 的例外只认「项目主锚点」**：只有项目主锚点为 `theory` / `negative` 时，
+  "第 4 步改为给出可检验推论"才对路线生效 —— **自称 `core_goal: theory` 的路线不豁免**。
 
 锚点如何约束各 Mode：A 定**检索边界**、B 定**推导与筛选**、C 定**贡献类型与实验**、
 D 定**叙事套路**（见[锚点 → 套路映射](references/narrative-patterns.md)）、
 E 定**评审侧重**。
+
+### 锚点变更单（Anchor Change Order）
+
+对**项目主锚点**的变更记在根 `INDEX.md`，对**路线锚点**的变更记在该路线 `INDEX.md`。
+append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / **替换**）/ 依据 / 受影响产物。
+
+**两条硬约束：**
+1. **`类型: 替换` 而没有「受影响产物」清单 = 变更单无效。**
+2. **`替换` 的依据必须是「用户显式指令原话」** —— 证据只能作为**提请**材料，
+   **不能**作为变更依据。
 
 ### 派遣方式：Team 优先询问
 
@@ -269,8 +296,9 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 │   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
 ├── routeA/
 │   ├── README.md          # ★ 路线级：本路线说明
-│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
-│   ├── docs/              # ★ 本路线文档（扁平）
+│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度 + 锚点变更单）
+│   ├── docs/              # ★ 本路线文档（扁平；不建子目录）
+│   │   ├── A000-anchor.md # 冻结契约：路线锚点 + anchor_role + serves
 │   │   ├── A001-literature-survey.md
 │   │   ├── A002-ideas.md  # 含 I1..In 与 B5 审核
 │   │   ├── A003-proposal.md
@@ -283,16 +311,21 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 │   ├── INDEX.md
 │   └── docs/
 ├── shared/                # 跨路线公用代码/笔记
-└── .research-idea-pipeline/   # 机器状态（不入 docs）
+└── .research-idea-pipeline/   # 机器状态 + 中间产物（都不入 docs）
+    ├── state-<mode>-<ts>.json # Mode 间传递
+    └── routeA/A003-r01/       # 中间产物：子代理原始评审件（可删）
 ```
 
 | 规则 | 说明 |
 |---|---|
 | 命名 | `<routeX>/docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review-r01.md`，接续 `-r02.md` |
-| 存放 | **路线文档放 `routeX/docs/`（扁平）**；**根 `docs/` 是跨路线共享区，只保证有 `refs/`**，路线文档不得放这里 |
-| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative` |
+| 存放 | **路线文档放 `routeX/docs/`（扁平，不建子目录）**；**根 `docs/` 是跨路线共享区，只保证有 `refs/`**，路线文档不得放这里 |
+| slug 枚举 | **封闭**：`anchor` / `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative` |
+| 派生文档 | **禁止自创 slug**。枚举外的派生物（`paper-outline` / `experiment-cards` / `math-consolidation` …）归到最接近的枚举，原义写 frontmatter 的 **`subtype`**，并在路线 INDEX 文档表加 **`subtype` 列** |
+| 落盘三档 | **交付物** → `routeX/docs/`；**中间产物**（子代理原始评审件、草稿） → `.research-idea-pipeline/<route>/<被审ID>-r<NN>/`；**机器状态** → `.research-idea-pipeline/state-*.json`。**正式 review 必须自带摘要**，原始件不得被当作结论引用 |
 | 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
+| 锚点文档 | `<R>000-anchor.md`（`type: anchor`）是**冻结契约**，frontmatter 带 `anchor_version` + `anchor_hash`；改锚点走锚点变更单并升版本 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A—E 无关；Mode 记在 frontmatter |
 | INDEX.md | 每条路线必需，每次产出后更新 |
 | 进度必须包含 | **已证实 / 已证伪 / TODO / Bugs / Warnings** + 文档索引 + 变更日志 |
@@ -402,18 +435,30 @@ docs/refs/
 ```bash
 python3 scripts/refs_index.py            # 扫描 ./docs/refs，写入 ./docs/refs/index.json
 python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
+python3 scripts/refs_index.py --migrate  # 旧 schema → 当前 schema（保留旧字段）
 ```
 
 | 元数据来源 | 说明 |
 |---|---|
 | `papers/{paper_id}.json`（sidecar） | 最准，检索脚本写入 |
 | PDF 内嵌元数据 | `pypdf`；缺失时回退命令行 `pdfinfo` |
+| **旧索引继承（`--migrate`）** | `metadata_from = "legacy"`；**同样不算已核实** |
 | 文件名解析 | 兜底；此时 `needs_verification = true` |
 
-**未入索引的 PDF 视为不存在**；新增/替换/删除 PDF 后**必须重建索引**；
-`needs_verification = true` 的条目**不得**用于支撑创新性声明。
+**未入索引的 PDF 视为不存在**；新增/替换/删除 PDF 后**必须重建索引**。
 
-完整字段约定见 [references/literature-policy.md](references/literature-policy.md) §7.1。
+**旧 schema 的迁移路径：** `--check` 报「索引缺少 pdfs 数组（schema 不符）」时，
+索引是旧版形状（平铺列表 / 以文件名为键的字典）。**直接重建会丢掉旧条目里已有的
+title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migrated_from`），
+迁移后再 `--check` 确认。
+
+**`needs_verification` 的后果（不只是个标记）：**
+- 该条目**不得**用于支撑「首次提出 / 未见前作 / 复现风险低」类声明；
+- **其数量必须计入根 `INDEX.md` 的全局 Warnings**；
+- **超过 5** 触发补元数据 TODO（写 sidecar 后重建索引），**不得长期累积**。
+
+完整字段约定见 [references/literature-policy.md](references/literature-policy.md) §7.1
+与 [references/evidence-policy.md](references/evidence-policy.md) §2 规则 7。
 
 ---
 
@@ -456,7 +501,13 @@ python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
 [SKILL.md §8 规则变更自检清单](SKILL.md)。
 
 > 本仓库的实际漂移记录显示：改了规则后**漏掉的从来不是规则本身**，而是
-> **设计依据段、速查汇总表、示例与模板**这三类"看起来不像规则"的位置。
+> **设计依据段、速查汇总表、示例与模板、语义字段与规则的一致性**这**四类**
+> "看起来不像规则"的位置。
+
+> **A4（语义字段）的现实教训：** 规则说"锚点必须落盘"，但 frontmatter 没有
+> `anchor_role` / `serves` 的槽位；强制"锚点文档"，但类型枚举里没有 `anchor`；
+> 允许"主+次锚点"，但 `core_goal` 只有一个槽。**规则有、载体无** —— 只查计数与
+> 链接是查不出来的。每条新规则都要问：①字段表里有槽位吗？②枚举里有值吗？
 
 ---
 
