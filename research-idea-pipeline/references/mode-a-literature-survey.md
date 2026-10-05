@@ -59,7 +59,7 @@
 - **严格处理 429**：指数退避 `10s → 20s → 40s → 80s → 160s`，最多 5 次；
   重试期间不发起新请求；5 次失败则回退本地结果并标注
   **"arxiv 暂时不可用，以下结果仅来自本地库"**，同时判定为**检索未达饱和**。
-- 结果**必须缓存**到 `./docs/refs/cache/{query_hash}.json`。
+- 结果**必须缓存**到 `./docs/refs/cache/<source>/{query_hash}.json`。
 - **结果集 = 本地 + 多源 的并集**，每条标注 `source`。
 - 建议直接调用 [../scripts/literature_search.py](../scripts/literature_search.py)；
   创新性声明场景用 `--level L3 --exhaustive --also-query ...`。
@@ -82,6 +82,7 @@
 | 2 | **扩大时间范围** | `--exhaustive` 自动放宽年份 |
 | 3 | **扩大会议范围**（加入 ICLR / ACL / AAAI 等） | 人工构造：把会议名并入检索式，如 `--also-query "ICLR diffusion combinatorial optimization"` |
 | 4 | **增加 max_results** | `--exhaustive` 自动倍增 |
+| 5 | **引文追溯**（前向 `--cited-by` / 后向 `--references`） | 需 OpenAlex；种子可为 DOI / arXiv ID / OpenAlex ID |
 
 > **⚠️ 脚本只自动执行第 ②、④ 级。** 第 ①、③ 级需要**人工构造检索式**：
 > arxiv 元数据不含会议归属，脚本无法自行判断"某个会议是否已覆盖"，
@@ -191,7 +192,7 @@
     {"query": "…", "total_hits": 12, "by_source": {"local": 2, "arxiv": 10}, "why_not_conclusive": "命中均针对连续空间，未覆盖离散置换约束"}
   ],
   "rate_limit_log": ["[429] 限流，等待 10s 后重试（第 1 次）"],
-  "cache_updates": ["docs/refs/cache/ab12cd34ef56.json (12 条)"],
+  "cache_updates": ["docs/refs/cache/arxiv/ab12cd34ef56.json (12 条)"],
   "called_by": "standalone | B | C | D | E",
   "open_questions": ["arxiv 未命中的会议论文需人工补充"],
   "next_mode_suggestion": null

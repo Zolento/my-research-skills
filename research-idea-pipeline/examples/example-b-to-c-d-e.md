@@ -34,7 +34,7 @@
 | I1 | 假设挑战 | 用扩散过程的可逆性约束组合优化搜索空间 | 现有方法把扩散当采样器，未利用可逆性作可行性约束 | Concept & Feasibility | R-ICML | 4 | 3 | 足够 | 高 |
 | I7 | 组合创新 | 把 A 的注意力机制搬到 B 的图搜索 | 仅换模块，无新结构性质 | Use-Inspired | A-Author | 2 | 4 | 不足 | 建议放弃 |
 
-**落盘：** `docs/A002-ideas.md` + 更新 `routeA/INDEX.md`
+**落盘：** `routeA/docs/A002-ideas.md` + 更新 `routeA/INDEX.md`
 
 → `next_mode_suggestion: "C"`
 
@@ -60,7 +60,7 @@
 
 > 贡献编号用 **K1/K2**（不用 C1），避免与 Mode C 的章节号 C1—C7 混淆。
 
-**落盘：** `docs/A003-proposal.md` + `A004-experiment-plan.md` + 更新 INDEX
+**落盘：** `routeA/docs/A003-proposal.md` + `routeA/docs/A004-experiment-plan.md` + 更新 INDEX
 
 → `next_mode_suggestion: "D"`
 
@@ -141,7 +141,7 @@
 4. **E3** 交叉质询：每人至少一条质疑；评分差 ≥2 分记录分歧；汇总取**中位数**。
 5. **E4** 结论卡片（含**复现风险等级**与**方法正确性判定**）。
 
-**落盘：** `docs/A003-review.md` + 更新 INDEX（结论翻译成进度条目）
+**落盘：** `routeA/docs/A003-review-r01.md` + 更新 INDEX（结论翻译成进度条目）
 
 ---
 
@@ -159,7 +159,7 @@ docs/
 ├── A003-proposal.md                      # Mode C
 ├── A004-experiment-plan.md               # Mode C
 ├── A005-narrative.md                     # Mode D（一次调用：I1 的 ≥4 套叙事 + 最佳推荐）
-└── A003-review.md                        # Mode E（含复现风险等级）
+└── A003-review-r01.md                        # Mode E（含复现风险等级）
 ```
 
 `.research-idea-pipeline/` 下另有 `state-B-*.json`、`state-C-*.json`、`state-D-*.json`、

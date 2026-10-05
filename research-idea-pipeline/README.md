@@ -136,7 +136,7 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 
 ---
 
-## 三条全局硬约束
+## 全局硬约束（摘要，完整见 [SKILL.md §1](SKILL.md)）
 
 ### 1. 文献检索：先本地，后多源 —— **禁止只停留在本地**
 
@@ -264,7 +264,9 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | **PDF 索引** | **`docs/refs/` 下每个 PDF 必须在 `docs/refs/index.json` 有记录**；索引进版本库、PDF 不进 |
 
 完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
-骨架的检查清单）。骨架可参考 [templates/INDEX.md](templates/INDEX.md)。
+骨架的检查清单）。骨架可参考 [templates/INDEX.md](templates/INDEX.md)（路线级）、
+[templates/INDEX.root.md](templates/INDEX.root.md)（根级跨路线）与
+[templates/README.route.md](templates/README.route.md)（路线级说明）。
 
 ---
 
@@ -382,7 +384,7 @@ python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
 
 每个 Mode 输出附加 `state.json` 片段（模板见
 [templates/state.template.json](templates/state.template.json)，键名 = Mode 字母 A—E）。
-机器状态写入 `.research-idea-pipeline/`，人类可读产出写入 `docs/`。
+机器状态写入 `.research-idea-pipeline/`，人类可读产出写入**所在路线的 `routeX/docs/`**。
 
 接续规则：
 
@@ -408,6 +410,16 @@ python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
    小结果集"，直接损害 L3 与扩检索质量。缓存键 = `md5(query|max|from_year|to_year)`。
 4. **"本地命中即返回"被取消。** 本地检索改为起点而非终点；默认取本地 + 多源 的
    并集，只有显式 `--local-only` 才跳过 arxiv（并打印规则违反提示）。
+
+---
+
+## 维护本 Skill 时
+
+改动任何**规则 / 命名 / 枚举 / 计数 / 路径**之前，先读
+[SKILL.md §8 规则变更自检清单](SKILL.md)。
+
+> 本仓库的实际漂移记录显示：改了规则后**漏掉的从来不是规则本身**，而是
+> **设计依据段、速查汇总表、示例与模板**这三类"看起来不像规则"的位置。
 
 ---
 
