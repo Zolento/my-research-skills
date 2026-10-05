@@ -23,7 +23,7 @@ description: >-
 argument-hint: "mode=A|B|C|D|E [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
-  version: "1.2.0"
+  version: "1.3.0"
   upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 

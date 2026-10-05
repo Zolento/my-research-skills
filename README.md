@@ -8,9 +8,7 @@
 | 目录 | 是什么 |
 |---|---|
 | [`research-idea-pipeline/`](research-idea-pipeline/) | 面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程流水线：文献调研 → idea 发现 → 方案生成 → 多套路叙事生成与审稿 → 方案复核。含可运行的多源检索脚本与离线测试。 |
-
-> 本分支当前只有这一个 skill。`draft/init` 分支另在开发 `academic-figure-draft-architect/`，
-> 但它尚未进入任何提交，故这里不索引它（避免断链）；待其合并后补上。
+| [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图**字符草稿**架构师：读代码 / 论文 / 配置 / 用户说明，产出若干份结构真正不同的 Markdown 字符示意图 draft，供人审阅并作为 SVG / TikZ / Figma 代理的结构蓝图。强制四级证据（A/B/C/D）、强制区分 train / inference / frozen，禁止补造不存在的模块；含契约校验脚本与离线测试。 |
 
 ## 约定
 
@@ -29,6 +27,7 @@ npx skills add Zolento/my-research-skills -l
 
 # 2) 逐个装（source 相同，便于统一更新）
 npx skills add Zolento/my-research-skills -g -s research-idea-pipeline -y
+npx skills add Zolento/my-research-skills -g -s academic-figure-draft-architect -y
 
 # 或一次装全部
 npx skills add Zolento/my-research-skills -g -s '*' -y
@@ -80,8 +79,11 @@ npx skills remove research-idea-pipeline -g -y  # 卸载
 ```
 my-research-skills/
 ├── README.md                          # 本文件：子目录索引 + 安装与维护
-└── research-idea-pipeline/            # 当前唯一的 skill
-    ├── SKILL.md                       # 入口（frontmatter: name / description / argument-hint）
+├── research-idea-pipeline/            # skill 1
+│   ├── SKILL.md                       # 入口（frontmatter: name / description / argument-hint）
+│   └── references/ scripts/ templates/ examples/
+└── academic-figure-draft-architect/   # skill 2
+    ├── SKILL.md                       # 入口；description 内含触发词，供 skills 发现
     └── references/ scripts/ templates/ examples/
 ```
 
