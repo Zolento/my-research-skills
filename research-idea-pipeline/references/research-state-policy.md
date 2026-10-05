@@ -10,7 +10,7 @@
 [scoring-policy.md](scoring-policy.md)（评分类）> 各 phase 文件。
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
 
-**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4 的 V1—V10。
+**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4 的 V1—V15
 **没有 validator，「一等对象」是宣言，不是机制**（spec §2.3）。
 
 **骨架：** [../templates/research-state.template.json](../templates/research-state.template.json)
@@ -190,7 +190,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `falsifier` | 字符串 | ✅ | |
 | `expected_information_gain` | 数值（如 `0.0`） | ✅ | EIG 排序用（spec §4） |
 | `status` | `active` \| `elite` \| `archived` \| `killed` | ✅ | |
-| `niche` | 字符串，非空 | ✅ | V6；QD archive 的前提 |
+| `niche` | `N1`—`N10` 之一（**V6 强制**；复用 preset 名，不引入第二套枚举） | ✅ | V6；QD archive 的前提 |
+| `island` | `P1`—`P6` / `local` | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制** |
+| `generation` | 整数 ≥ 0 | `0` = 初始候选，每次 R6 进化 +1；**V14 强制** |
 
 ### 3.5 `experiments[]` — Experiment Graph（`X<n>`）
 
@@ -305,11 +307,11 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V8 | `X.parent` 必须是存在的 `X` 或 `null`；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
 | V9 | `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 `X` 或 `TBD` | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
 | V10 | 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure` | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
-| V11 | 硬 | `stage == "X2"` ⇒ `claim_targeted` 必须为空数组 —— **`X2` 只做基线校准，不得承担 claim 判别** | `{"stage":"X2","claim_targeted":["C0"]}` |
-| V12 | 硬 | `status == "failed"` 的 `X` 必须被某条 `failures[].referenced_by` 引用 —— **失败不得消失** | failed 实验没有对应 `F` |
-| V13 | 硬 | `hypotheses[].island` ∈ `{P1, P2, P3, P4, local}` | `"island": "PX"` |
-| V14 | 硬 | `hypotheses[].generation` 是非负整数 | `"generation": "1"` / `-1` |
-| V15 | 硬 | 每个出现过的 `niche` 至少有一条 `status: elite`（QD archive 不塌成单点） | `N5` 下全是 `active` |
+| V11 | `stage == "X2"` ⇒ `claim_targeted` 必须为空数组 —— **`X2` 只做基线校准，不得承担 claim 判别** | 硬 | `{"stage":"X2","claim_targeted":["C0"]}` |
+| V12 | `status == "failed"` 的 `X` 必须被某条 `failures[].referenced_by` 引用 —— **失败不得消失** | 硬 | failed 实验没有对应 `F` |
+| V13 | `hypotheses[].island` ∈ `{P1..P6, local}（默认开启 P1—P4，P5/P6 按需）` | 硬 | `"island": "PX"` |
+| V14 | `hypotheses[].generation` 是非负整数 | 硬 | `"generation": "1"` / `-1` |
+| V15 | 每个出现过的 `niche` 至少有一条 `status: elite`（QD archive 不塌成单点） | 硬 | `N5` 下全是 `active` |
 
 **执行契约（spec §2.3）：**
 

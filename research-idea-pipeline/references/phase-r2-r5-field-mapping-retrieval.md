@@ -211,6 +211,39 @@
 ---
 
 
+## R2.1 field grammar `{P, A, R, D, O, M, T, E}`
+
+目的：抽取「**这个领域通常怎么想问题**」，而不是列 gap。
+
+| 代号 | 含义 | 本项目要填什么 |
+|---|---|---|
+| `P` | Problem | 领域公认的问题表述 |
+| `A` | Assumptions | 显式 + **默会**假设（默会项直接进 `assumptions[]`） |
+| `R` | Representation | 用什么数学对象表示 |
+| `D` | Data / Supervision | 数据与监督形式 |
+| `O` | Objective | 优化目标 |
+| `M` | Mechanism | 机制解释 |
+| `T` | Theory | 理论工具 |
+| `E` | Evaluation | 评测协议 |
+
+## R2.2 occupancy map（Wave 3 深化）（占用图）
+
+不问「哪些工作做过」，而问「**设计空间的哪些区域已经拥挤**」：
+
+```text
+parameter adaptation        ███████████   拥挤
+feature alignment           █████████
+solver adaptation           ███
+measurement adaptation      █
+identifiability framing     █
+causal framing              0             ← negative space
+quotient representation     0             ← negative space
+```
+
+**negative space（计数为 0 或极低的区域）是 R3 paradigm escape 的输入**，不是直接结论。
+
+---
+
 ## R5. 共演化检索（**常驻服务**，不是一次性步骤）
 
 **检索轨迹必须由当前候选反向驱动，而不是沿着初始关键词越搜越窄。**

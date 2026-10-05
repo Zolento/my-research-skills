@@ -474,6 +474,16 @@ class TestV13V15(unittest.TestCase):
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V15"])
 
+    def test_v15_two_niches_each_with_elite_is_clean(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="elite"))
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
+    def test_v15_elite_counts_even_with_active_sibling(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N2", status="active"))
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
     def test_v6_niche_must_be_preset_name(self) -> None:
         doc = valid_state(); doc["hypotheses"][0]["niche"] = "assumption-breaking"
         r = sc.check_state(doc)
@@ -609,7 +619,8 @@ class TestCli(unittest.TestCase):
         self.assertEqual(caught.exception.code, sc.EXIT_ERROR)
 
     def test_every_rule_has_judgement_text(self) -> None:
-        self.assertTrue(len(sc.RULES) >= 12)
+        self.assertTrue(len(sc.RULES) >= len(sc.CHECKS))
+        self.assertEqual(set(sc.RULES), set(sc.CHECKS))
         for rule, text in sc.RULES.items():
             self.assertTrue(text.strip(), msg=rule)
 

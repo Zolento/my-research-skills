@@ -43,7 +43,7 @@
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
-    * V1—V10 之外**不新增**硬规则（spec §2.3 是唯一契约）。
+    * V1—V15 之外**不新增**硬规则（spec §2.3 是唯一契约）。
 
 退出码（与仓库既有脚本一致）：
     0  全部通过
@@ -106,7 +106,7 @@ DISPOSITIONS: Tuple[str, ...] = (
 CLOSURES: Tuple[str, ...] = ("RESOLVED", "ACCEPTED_LIMITATION")
 # Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
 NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
-ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "local")
+ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
 
 UNGROUNDED = "ungrounded"
 TBD = "TBD"
@@ -126,7 +126,7 @@ RULES: Dict[str, str] = {
     "V10": "每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure",
     "V11": "stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别",
     "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
-    "V13": "hypotheses[].island ∈ {P1, P2, P3, P4, local}",
+    "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）",
     "V14": "hypotheses[].generation 是非负整数",
     "V15": "每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性）",
 }
@@ -1111,7 +1111,7 @@ def selftest() -> int:
     v15 = report_with(_no_elite)
     check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
 
-    check(f"自检覆盖 V1—V{sorted(rule for rule in RULE_ORDER)[-1][1:]}", set(RULE_ORDER) - detected == set(),
+    check(f"自检覆盖 V1—V{max(RULE_ORDER, key=lambda r: int(r[1:]))[1:]}", set(RULE_ORDER) - detected == set(),
           f"未覆盖 {sorted(set(RULE_ORDER) - detected)}")
 
     check("缺八类数组 → 4", check_state({"foo": 1}).exit_code == EXIT_ENV)

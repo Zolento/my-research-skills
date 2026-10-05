@@ -16,6 +16,10 @@
 > **`B0`—`B8`** 是旧的 idea-discovery 流程，**`R3`—`R6`** 是 Wave 2 起生效的发现层正式规则。
 > **冲突时一律以 `R3`—`R6` 为准**；`B2`（局限分析）、`B4`（发散策略）、`B5`（审核）
 > 作为 **R3 的输入约束**保留，不再单独驱动「一轮 brainstorm → shortlist」那条路径。
+> **被取代的节（点名）：** `B5.4`（按创新性/可行性/重叠度排名）、`B6`（推荐 shortlist 3—5 个）、
+> `B8`（挑选 1—3 个进入 R8 + `state.json` 片段）—— 三者的**筛选动作已由 `R4.2`（QD archive）
+> 与 `R6.3`（两阶段 fitness）取代**；`B8` 的 state 片段口径已作废，改用
+> [research-state.template.json](../templates/research-state.template.json)。
 
 ## B0. 与 R7 / R10 / R13 的分工（必须先明确，避免重复劳动）
 
@@ -147,6 +151,10 @@
 
 ## B5. Idea 创新性与可行性审核（强制，不可跳过）
 
+> ⚠️ **本节已被 R4.2 / R6.3 取代**（仅在 R3 的 concept 级快筛里作为检查项保留）：
+> **不得**据此把候选筛到 3—5 个 —— 筛选动作走 QD archive（每个 niche 留一个 elite）。
+
+
 **这是 R3—R6 与 R7 / R10 / R13 的分界点：B5 是概念级快筛，不是方案级深审。**
 
 对去重后的**每一个**候选 idea 执行审核。**禁止只给 idea 不给审核。**
@@ -221,6 +229,10 @@
 
 ## B6. 输出
 
+> ⚠️ **本节已被 R4.2 取代**：输出的是 **population + QD archive**，
+> **不是**「shortlist（3—5 个）」。shortlist 这个概念在 Wave 2 起作废。
+
+
 **idea 候选清单（核心交付物：原始候选 ≥ 10，去重后 ≥ 6，每个都带审核结论；领域过窄时可说明原因并减少）：**
 
 | 编号 | 推导策略 | 核心思路 | 与现有工作差异 | 贡献类型 | 来源子代理 | 创新性 | 可行性 | 重叠度 | 优先级 |
@@ -268,51 +280,34 @@
 
 ## B8. 输出后
 
-1. 附 `state.json` 片段，`next_phase_suggestion: "R8"`。
-2. 建议用户从 shortlist 中挑选 1—3 个 idea 进入 R8，并把 B2 的局限分析与
-   B5 的审核结论一并传入。
+> ⚠️ **本节已被 R11 取代**：写回的**必须是 Research World Model**（八类一等对象 + `island` / `generation`）；
+> 旧的 `state.json` 片段（`idea_candidates` / `shortlist` / `rejected`）**已删除**，照抄会被 `state_check.py` 判 exit 4。
+
+
+1. **写回 Research World Model**（不是附 state.json 片段），`next_phase_suggestion: "R8"`。
+2. 进入 R8 的是 **QD archive 的 elite 集合**（每个 niche 一个），**不是**「从 shortlist 挑 1—3 个」；
+   并把 B2 的局限分析与 B5 的快筛结论一并传入。
 
 **state 片段示例：**
 
 ```json
 {
   "phase": "R3—R6",
-  "timestamp": "2025-01-01T00:00:00Z",
-  "route": "routeA",
-  "doc_id": "A002",
-  "domain_keywords": ["diffusion model", "combinatorial optimization"],
-  "idea_candidates": [
-    {
-      "id": "I1",
-      "strategy": "假设挑战",
-      "one_liner": "…",
-      "difference_from_prior_work": "…",
-      "type": "Concept & Feasibility",
-      "source_agent": "R-ICML",
-      "addresses_limitation": "L1 未建立置换等变性",
-      "main_attack_surface": "可逆性约束的松弛误差界未证明",
-      "review": {
-        "innovation": 4,
-        "feasibility": 3,
-        "closest_prior_work": "[作者, 会议/年份]",
-        "overlap": "足够",
-        "search_level": "L2",
-        "first_claim": false,
-        "theory_premise": "有缺口",
-        "devil_objection": "…",
-        "objection_mitigable": true,
-        "priority": "高"
-      }
-    }
+  "hypotheses": [
+    {"id": "H1", "statement": "…", "niche": "N2", "island": "P2", "generation": 0,
+     "status": "elite", "falsifier": "…"}
   ],
-  "shortlist": ["I1", "I3"],
-  "rejected": [{"id": "I7", "reason": "重叠不足：实质已被 [作者, 会议/年份] 覆盖"}],
-  "literature_used": [{"title": "…", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
-  "innovation_boundary": {"red_ocean": [], "blue_ocean": [], "no_mans_land": []},
-  "open_questions": ["无人区判定未经 S-Lit 复核"],
-  "next_phase_suggestion": "R8"
+  "failures": [{"id": "F1", "kind": "deprioritized", "what": "…", "why": "…", "referenced_by": ["H2"]}],
+  "literature": [{"id": "LIT1", "ref": "[作者, 会议/年份]", "relation": "shares-assumption"}],
+  "uncertainties": [{"id": "U1", "question": "…", "importance": "high", "uncertainty": "high",
+                     "cheapest_discriminating_test": "TBD", "status": "open"}]
 }
 ```
+
+> 完整骨架见 [research-state.template.json](../templates/research-state.template.json)；
+> 写回后**必须**跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，
+> **硬违规须为 0**（exit 3 = 硬违规，exit 4 = 结构不符）。
+
 
 ---
 
@@ -346,7 +341,7 @@ problem ─────────┤                        （基线：把现
 
 | 项 | 默认 |
 |---|---|
-| islands 数 | **4**（`P1`—`P4`）+ Local Search |
+| islands 数 | **默认 4**（`P1`—`P4`，各占独立预算）+ Local Search；`P5`（Measurement inversion）与 `P6`（Counterexample & impossibility）**按需启用**（枚举里合法，但不占默认预算；启用即上调，须说明理由） |
 | 每 island 候选数 | **下限 3，上限 6**（超上限须显式说明为什么值得） |
 | 进化轮数上限 | **2**（见 R6） |
 
@@ -433,7 +428,8 @@ Niche N8（Benchmark/评测）           elite: H62
 | **Selection（进 R7 之后）** | novelty / validity / importance / testability / `EIG ÷ cost` | — |
 
 > **在搜索期优化 venue fit，正是杀死范式 idea 的机制。** R3—R6 的任何排序、
-> 任何「优先做哪个」的表述里**都不许出现会议适配**（`venue-standards` 只在 R12/R13 生效）。
+> 任何「优先做哪个」的表述里**都不许出现会议适配**（**消歧：** 会议审稿人角色在 R3—R6 仍可用于 concept 级快筛，但**不得**用「会议适配度」
+排序候选；`venue-standards` 作为**排序依据**只在 R12/R13 生效）。
 
 **`expected_information_gain` 在 Search 期只作为记录**，不作为排序依据 —— 它属于 Selection 阶段。
 

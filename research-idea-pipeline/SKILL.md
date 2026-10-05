@@ -666,22 +666,23 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 ### R3—R6 — 双轨发现与种群进化
 
 - **输入：** 研究领域关键词；已有参考文献（可选）；资源约束（可选）。
-- **流程：** B1 基础文献调研（**必须走 R2 / R5 或等价的脚本调用，禁止内联自行实现检索**）→
-  B2 深度局限性分析 →
-  B3 多子代理头脑风暴 → B4 发散策略约束 →
-  **B5 idea 级创新性与可行性审核（强制）** → B6 输出 → B7 落盘。
-- **发散策略约束：** 每个 idea 必须通过以下**至少一种**策略推导：
+- **流程：** R3 双轨发现（Local Search ‖ Paradigm Escape，**两轨在产生候选前不得互看**）→
+  R4 隔离种群 → `structural_signature` 五维聚类 → **QD archive** →
+  R5 共演化检索（每轮至少一条 query 由最新候选生成）→
+  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction / new niche）。
+- **发散策略约束（`B4` 保留）：** 每个候选至少通过一种策略推导 ——
   *问题重构 / 假设挑战 / 跨域迁移 / 反向思考 / 组合创新*。
-- **B5 审核（不可跳过）：** 对每个候选 idea 给出 **创新性评分 + 可行性评分 +
-  重叠度 + 致命反驳 + 推荐优先级**。**进入 shortlist 的门槛 = 完成 L2 检索**；
-  **只有要写进文档的「首次提出」类声称才要求 L3**（并附负检索记录）。
-  唯一例外是**在线源不可用**等不可控情况，此时必须标注"据本次检索未见 · 待核实"并记入
-  INDEX 的 Warnings。**不派遣 S-Repro。**
-- **交付物：** idea 候选清单（**原始候选 ≥10、去重后 ≥6，每个都带审核结论**；
-  领域过窄时可说明原因并减少）+ 技术路线归纳表
-  + 创新性边界界定 + **推荐 shortlist（3—5 个）+ 淘汰清单**。
+- **快筛（`B5` 保留，降级为 concept 级）：** 给出创新性 / 可行性 / 重叠度 / 致命反驳 / 优先级；
+  **进入 population 的门槛 = 完成 L2 检索**；要写进文档的「首次提出」类声称仍要求 L3 + 负检索记录。
+  **不派遣 S-Repro。**
+- **交付物：** **population + QD archive**（每个出现过的 niche 至少一个 `elite`）+ 技术路线归纳表 +
+  创新性边界界定 + **失败记忆**（被搁置的候选写 `failures[]`，不得删除）。
+  **不再产出「shortlist（3—5 个）」——该概念在 Wave 2 起作废。**
+- **预算：** 默认 4 islands（`P1`—`P4`；`P5`/`P6` 按需启用）× 每岛 3—6 候选；进化 ≤2 轮。
+- **两阶段 fitness：** Search 期只看结构新颖度 / 跨域意外度 / 表示距离 / 演绎产出，
+  **不看 venue fit** —— venue 适配在 R12 / R13 才生效。
 - **落盘：** `<routeX>/docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
-  （文档索引；被放弃的 idea 记入**已证伪**；未核实的无人区声称记 Warnings）。
+  （被放弃的候选记入**已证伪**；未核实的无人区声称记 Warnings）。
 
 ### R8 — 证据契约
 
@@ -951,6 +952,14 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     会让一个很好的 empirical insight 因为没有 theorem 被判"不可投稿"。改为
     **Transfer Legitimacy Argument** 三级（`L1` 结构假设 + 证伪实验 / `L2` 形式化不变性 +
     充分条件 / `L3` 定理 + 证明 + 紧性），硬约束变成**证据强度必须与声称的贡献等级匹配**。
+
+15. **为什么两阶段 fitness？** 在**搜索期**优化 venue fit，正是杀死范式 idea 的机制 ——
+    系统会稳定收敛到「安全、合理、容易做的小改动」。所以 R3—R6 只看
+    `representation_distance` / `structural_novelty` / `cross_domain_surprise` / `deductive_yield`，
+    `EIG` 也只作记录不作排序依据；venue 适配推迟到 **R12 / R13**。
+    配套机制是 **QD archive**（每个 niche 留一个 elite，**V15 机械强制**）——
+    **只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。**
+
 
 ---
 

@@ -70,3 +70,9 @@ arxiv 查询缓存
 mode=[ABCDE]
 Mode [ABCDE]
 templates/state\.template\.json
+
+# ── QD archive 的 niche（2026-10-06：niche 复用 N1—N10 preset 名，不用描述性旧名）──
+assumption-breaking
+new-formulation
+remote-theory-transfer
+benchmark-inversion

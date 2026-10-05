@@ -42,7 +42,7 @@ R6 进化：mutation / cross-domain crossover / simplification / theory-induced 
 | 项 | 默认 | 说明 |
 |---|---|---|
 | **QD archive 的 niche** | **复用 `N1—N10` preset 名** | **不引入第二套枚举** —— 10 套 preset 已冻结且全仓一致，另设一套就是漂移源 |
-| **islands 数** | **4** | 固定四轨：`P1` / `P2` / `P3` / `P4`（见 §1 图） |
+| **islands 数** | **默认 4** | `P1` / `P2` / `P3` / `P4` **默认开启**；`P5`（Measurement inversion）与 `P6`（Counterexample & impossibility）是**按需启用**的第五、第六条轨 —— 枚举里合法，但不占默认预算（用户拍板的是「4 islands × 3—6」，启用 P5/P6 即上调，需说明理由） |
 | **每 island 候选数** | **下限 3，上限 6** | 超出上限必须显式说明为什么值得 |
 | **进化轮数上限** | **2** | 到上限仍未收敛 → 落 `uncertainties[]` 并交 R7，**不得无限进化** |
 | **novelty 计算依据** | `structural_signature` **五维距离** | **不得用文本 embedding** —— 两个文字完全不同、本质同一个机制的候选必须被聚到同一 cluster |
@@ -62,7 +62,7 @@ theory_lens / nearest_prior / falsifier / expected_information_gain / status / n
 
 | 字段 | 取值 | 说明 |
 |---|---|---|
-| `island` | `P1` / `P2` / `P3` / `P4` / `local` | 该候选由哪条轨产生；`local` = Local Search |
+| `island` | `P1`—`P6` / `local` | 该候选由哪条 escape 轨产生；`local` = Local Search。**`P1`—`P4` 默认开启，`P5`/`P6` 按需启用**（见 §2） |
 | `generation` | 整数 ≥ 0 | `0` = 初始候选；每次 R6 进化 +1 |
 
 **`structural_signature` 五维（逐字，Wave 1 已冻结，本波开始真正使用）：**
@@ -75,7 +75,7 @@ theory_lens / nearest_prior / falsifier / expected_information_gain / status / n
 
 | # | 规则 | 硬 |
 |---|---|---|
-| **V13** | `hypotheses[].island` ∈ `{P1, P2, P3, P4, local}` | 硬 |
+| **V13** | `hypotheses[].island` ∈ `{P1..P6, local}` | 硬 |
 | **V14** | `hypotheses[].generation` 是非负整数 | 硬 |
 | **V15** | 若 `hypotheses[]` 非空，则**每个出现过的 `niche` 至少有一个 `status: elite`** | 硬 |
 
@@ -147,3 +147,4 @@ R13 artifact-aware 审计落地。
 | 日期 | 变更 | 人 |
 |---|---|---|
 | 2026-10-06 | 初版；冻结 niche = N1—N10、预算 = 4 islands × 3—6 候选 / 进化 ≤2 轮（用户拍板） | Lead |
+| 2026-10-06 | 依 `docs/verify-r-wave2.md` 修 M-1—M-6 与 MINOR/NIT；`island` 枚举澄清为 `P1`—`P6`/`local`（默认开启 P1—P4，P5/P6 按需） | Lead |
