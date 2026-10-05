@@ -1,0 +1,282 @@
+# R 架构三波总收官：跨波一致性审计报告
+
+**验收对象：** 分支 `research-idea-pipeline-dev`，快照 `61ad5c3`（工作树干净）。
+**审计范围：** Wave 1（状态载体/闸门）+ Wave 2（发现层）+ Wave 3（角色层）**波与波之间**的一致性。
+**契约：** [`docs/r-architecture-wave1-spec.md`](r-architecture-wave1-spec.md)、[`wave2`](r-architecture-wave2-spec.md)、[`wave3`](r-architecture-wave3-spec.md)。
+**验收者：** teammate `verifier`（只读；本文件是本次审计唯一写入的文件）。
+**审计时间：** 2026-10-06 ｜ 行号相对仓库根 `research-idea-pipeline-dev/`。
+
+**立场声明：** 不采信任何自述。每条结论附 文件:行号 与可重跑命令；
+「扫过没问题」的项在 §4 逐条列出，以区分「真的没问题」与「没扫」。
+
+---
+
+## 0. 结论摘要
+
+| 级别 | 条数 | 说明 |
+|---|---|---|
+| **MAJOR** | **2** | ①`claims[]`（claim graph）**无创建归属**，且 R7/R8 在 R12 之前就读它；②**V4 与 R6/R7/R13 的写集冲突**（写 `failures[]` 却无权写 `known_flaws`，收工清零不可能） |
+| MINOR | 3 | `contract` 无读者；R9.4 双写 `failures[]` 但读写行缺该字段；R7 的审计对象由后置的 R8 产出 |
+| NIT | 3 | `decision` 终端写无读者说明；五元组字面量 7 处复述（维护风险）；V11/V7「键缺失即不判」的宽松口径未写明 |
+
+**总收官结论：仍需修（2 项 MAJOR，均为「文档级归属/写集」修复，非新功能缺陷）。**
+三波各自的验收结论保持有效：Wave 1（状态与闸门）、Wave 2（发现机制）、Wave 3（角色层）
+的**单波内部**均已达标 —— 机械面全绿（415 链接 0 断链、116 测试、deprecated 0、模板 0、
+linter 0、`--list-rules` ↔ policy 15 条逐字一致、三方 14/14 逐字相同）；
+**但把三波接起来看，状态机的「谁产出 claim」与「谁写 known_flaws」两个环节没有闭环**，
+导致 V1—V4 这四条闸门在最坏情况下要么永不触发、要么必然触发（无论执行者怎么做都过不了收工检查）。
+
+---
+
+## 1. MAJOR
+
+### M-1 `claims[]`（claim graph）**没有创建归属**，且第一个消费者排在唯一产出者之前
+
+**现象（三段证据）：**
+
+1. **唯一写明「写出 claim graph」的是 R12 的 D1**：
+   `phase-r12-narrative.md:137—141`：「## D1. Claim Graph … **动作：** 按固定节点 ID 写出 claim graph。」
+   但 **R12 的读写行只写 `narrative_view`**：`phase-r12:846`、`research-state-policy.md:374`、
+   `SKILL.md:77`（三层逐字一致，14/14 检查器覆盖）。
+2. **R12 自己的 pre/post 拆分把 claim graph 夹死了**：
+   `phase-r12:824—845` 的 pre/post 表 —— **pre**「只写『若 `H` 被验证，可能成立的 thesis 是…』；
+   产出一份预期叙事草稿」（`:830`）；**post**「**只读已核实**的 `claims[]` / `evidence[]` …」
+   （`:831`）。**两处都没有授权创建 `claims[]`**；而且 `D0—D9` 与 pre/post 之间**没有任何映射说明**
+   （`grep -nE 'pre.*D[0-9]|D[0-9].*pre' phase-r12-narrative.md` → 无）。
+3. **消费者排在产出者之前**：`policy §5` 的 R7 行（`:369`）**读 `claims`**、R8 行（`:370`）
+   **写 `claims[].contract`**（挂契约必须先有 claim），而按 spec §1 的双循环图与 `policy §1` 的
+   顺序，**R7 / R8 都在 R12 之前**（assurance loop 挂在 R2 下 → 汇入 R9 → … → R12）。
+   `phase-r8:227` 更进一步：「写不出可判定 kill rule 的 claim **不得进入 R9**」——
+   即 R8 阶段就要对 claim 做判定。
+
+**证据（命令）：**
+
+```bash
+cd research-idea-pipeline
+grep -rn 'claims\[\]' references/phase-*.md | grep -E '新增|创建|建立|产出|生成'
+#   仅 phase-r0-contract.md:69（禁止 R0 产出 claim）与 phase-r12:831（post 只读）
+sed -n '137,142p' references/phase-r12-narrative.md
+sed -n '824,846p' references/phase-r12-narrative.md
+grep -n 'claims' references/research-state-policy.md | sed -n '1,3p'   # §5 R7/R8 行
+grep -n '写出 claim graph' references/phase-r12-narrative.md
+```
+
+**影响（与 item 2 的联动）：** `V1`（`C.falsifier` 非空）、`V2`（`C` 的 E 引用必须存在）、
+`V3`（无 E 引用必须 `ungrounded`）**在流程上没有产出者**：
+执行者若严格按写表执行（R7 只写 assurance/failures/uncertainties、R8 只写 `claims[].contract`…），
+`claims[]` 永远是空数组 → V1—V3 永不触发；一旦有人按 `phase-r12:141` 手写 claim graph，
+又立刻落到 R7/R8 之前，与三层写表冲突。
+
+**建议修法（二选一，一行到一节）：**
+①**归 R8**：把 `claims[]` 的创建并入 R8（证据契约天然以 claim 为单位），三层读写表 R8 行补
+「`claims[]`（新建条目 + `contract`）」，并在 `phase-r8` §C1 写明「claim graph 在此建立」，
+同时把 `phase-r12:137—141` 的 D1 改为「**复核**（只读 + 校验）claim graph」；
+②**归 R12-pre**：把 `D0—D9` 明确划给 pre（其中 D1 建 claim graph），并在 `phase-r12:830` 的
+「只能做什么」列加入「写 `claims[]` / `evidence[]` 台账」，同时把 R7/R8 的读改为
+「读上一轮 state（首轮 `claims[]` 可为空，则只审计划）」。
+
+---
+
+### M-2 **V4 与 R6 / R7 / R13 的写集冲突**：它们写 `failures[]`，却无权写 `known_flaws`
+
+**现象：** `V4` 要求「每条 `F` 必须被至少一个 `claims[].known_flaws` 或 `experiments[].known_flaws`
+引用」；而写 `failures[]` 的三个阶段，写集里**都没有** `known_flaws`。三层读写表逐字一致，
+所以这不是某一层漏写，而是三波拼起来后的**规则/流程冲突**。
+
+| 阶段 | 写集（policy §5，三层一致） | 会写 `F` 吗 | 能写 `known_flaws` 吗 |
+|---|---|---|---|
+| **R6** | `hypotheses[].generation` / `.status` / **`failures`**（`policy:368`） | ✅ `phase-r3-r6:413`「候选被 R6 判 `killed` → `status: killed` 并写 `failures[]`（`kind: deprioritized`）」 | ❌ 写集里没有 |
+| **R7** | `assurance` / **`failures`** / `uncertainties`（`policy:369`） | ✅ 攻击面暴露的缺口 | ❌ |
+| **R13** | `reviews` / **`failures`** / `experiments[].unexpected`（`policy:375`） | ✅ | ❌ |
+| R9 | `experiments`（`policy:371`） | ✅（R9.4 双写） | ✅（经 `experiments[]` 整体写入，`phase-r9-r11:71`） |
+| R10 | `repairs` + 执行 `state_delta`（`policy:372`） | — | ✅（`state_delta` 可改 `known_flaws`；`policy:284` 的 `ACCEPTED_LIMITATION` 落点） |
+| R14 | `decision` / `repairs[].closure` / 各 `status`（`policy:376`） | — | ✅（同上规则） |
+
+**为什么是硬冲突：** `research-state-policy.md:62`（§1 规则 6）：「**任何写回 state 的阶段，收工前
+**必须**跑 `state_check.py`；硬违规未清零，该阶段**不得**宣告完成」；`:294`（§4 结论）：
+「任何一条未清零，state 不得作为下一阶段的输入」。于是 **R6/R7/R13 各自收工时，
+它们刚写的 `F` 还没被任何 `known_flaws` 引用 → V4 必报 → 这三个阶段永远无法宣告完成**，
+除非执行者越权去写 `claims[].known_flaws`（写表没授权，属自创动作）。
+
+**证据（命令）：**
+
+```bash
+cd research-idea-pipeline
+grep -n 'known_flaws' references/phase-*.md references/research-state-policy.md | grep -E '新增|写入|追加|挂|填|加进'
+#   仅 policy:284（ACCEPTED_LIMITATION 落点）—— 没有阶段把「创建 F 时同步挂 known_flaws」写进写集
+python3 scripts/state_check.py --list-rules | sed -n '4p'    # V4 判据
+sed -n '61,72p' references/phase-r9-r11-experiment-loop.md   # R9.4 双写
+sed -n '62p;294p' references/research-state-policy.md        # 收工清零
+```
+
+**建议修法（二选一，各自一行）：**
+①**扩写集**：在 `policy §5` 的 R6 / R7 / R13 行（连同 `SKILL §0` 与两个 phase 文件的同行）
+写列补「+ 把新 `F` 的 id 挂到对应 `claims[].known_flaws` / `experiments[].known_flaws`」——
+这与「assurance 不得改 `claims[].status`」不冲突（`known_flaws` 不是 `status`）；
+②**改闸门口径**：在 `policy §4` 增一条口径说明「V4 的引用凭证在**同一轮 R10 `state_delta` 执行后**
+复核；R6/R7/R13 的收工检查允许 `failures[]` 新增项暂未被引用，但必须在 R10 落 `repairs[]` 时闭合」
+—— 并同步 `state_check.py` 的 `--check` 语义（否则脚本仍会判 3）。
+
+---
+
+## 2. MINOR
+
+| # | 现象 | 文件:行号 | 证据（命令） | 建议修法 |
+|---|---|---|---|---|
+| m-1 | **`contract` 写了但没人读**：R0 写 `contract`，而**没有任何阶段的「读」列收录它**；全仓唯一的消费点是 `phase-r3-r6:362` 的一句 prose（「可在 R0 `contract.constraints` 里写明并降到 2 islands」）。SKILL §0 的 R1 行「读 全部」是唯一隐含覆盖，而 R1 不是阶段（policy §5 不占行） | `policy:363`（R0 写 `contract`）；读列全表见 `:363—376`；消费点 `phase-r3-r6:362` | `grep -rn 'contract' references/phase-*.md \| grep -vE 'phase-r0\|证据契约\|claim'` → 仅 `phase-r3-r6:362` | 在 R3（或 R4/R6）的读列补 `contract.constraints`（R3.1 的缩放到此读取），或在 policy §5 表下注「`contract` 由 R1 常驻读取，不逐阶段列」 |
+| m-2 | **`R9.4` 强制双写 `failures[]`，但 R9 的读写行只写 `experiments`**（三层同款）：`phase-r9-r11:63`「失败的实验**必须双写**」、`:193` 自检「(status: failed) 与 `failures[]` 双写」，而 `:207` / `policy:371` / `SKILL:75` 的 R9 写列只有 `experiments` | `phase-r9-r11:61—72`、`:207`；`policy:371`；`SKILL:75` | `sed -n '61,72p;207p' references/phase-r9-r11-experiment-loop.md` | R9 写列补 `failures[]`（三处同改），与 R6/R7/R13 的写法对齐 |
+| m-3 | **R7 的审计对象由后置的 R8 产出**：Wave 2/3 冻结的审计时机写「R7 / R8 没有 artifact，**只能审「计划中的证据契约」**」，而「证据契约」是 **R8** 的产物（`policy:370`），R7 在顺序上排在 R8 之前（spec §1 图、`policy §1` 图）→ **首轮的 R7 没有可审对象**，文档未给解释 | `phase-r7:433—437`（审计时机表）、`policy:369—370`；spec §1 图 | `sed -n '433,437p' references/phase-r7-r10-r13-assurance-repair-review.md` | 在 `phase-r7` 的作用域裁决里补一句：「**首轮 R7 审的是 R3—R6 的候选与计划（无契约）**；`claims[].contract` 由 R8 建立后，从第二轮起 R7 审契约」——或把 assurance loop 的顺序明确成 R8 → R7 |
+
+---
+
+## 3. NIT
+
+| # | 现象 | 文件:行号 | 建议 |
+|---|---|---|---|
+| n-1 | `decision`（R14 写）没有任何下游读者（终端产物）；`narrative_view`（R12 写）也没有显式读者（R13/R14 只写「全 state」隐含覆盖）。这**符合设计**（视图 / 终局决策），但表里没有一句说明，机械比对会把它列为「僵尸字段」 | `policy:374`、`:376`、`:467—469`（§3.11 槽位表） | 在 §5 表下加一句：「`narrative_view` / `decision` 是**终端产物**，由 R13/R14 的『全 state』隐含读取，不要求显式读者」 |
+| n-2 | 五元组字面量 `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)` 在全仓**逐字复述 7 处**（spec、phase-r7、scoring-policy、roles、SKILL×2…）。当前**完全一致**，但这正是 SKILL §8 A5 的维护风险面 | `grep -rn 'Attack, Target Claim' --include=*.md .`（7 处） | 不必改；在下一次改枚举时按 A5 的三层扫描执行即可（已在 `claim-first-policy §7` 与 SKILL §8 A5 登记） |
+| n-3 | **V11 / V7 的「键缺失即不判」口径未写进 policy §4**：`V11` 只在 `stage == "X2"` **且 `claim_targeted` 为非空数组**时触发；`V7` 在 `cheapest_discriminating_test` 键缺失时跳过。执行者若省略键，两条闸门都静默通过 | `scripts/state_check.py:747`(`_v11`) / `:620`(`_v7`)；`policy:329—345`（§4 口径补充与边界） | 在 §4「判据补充」里补一行：「`claim_targeted` / `cheapest_discriminating_test` **键缺失**按『未填写』处理，不触发对应规则；如需强制填写，另立字段齐备性规则（§3 层）」 |
+
+---
+
+## 4. 必做七项逐条结果
+
+### 4.1 全链路读写闭环（item 1）
+
+**方法：** 解析 `research-state-policy.md §5`（`:356—376`）的读/写列，建立「字段 → 写者/读者」图，
+再与 6 个 phase 文件的同款表比对（三方 14/14 已逐字一致，故只需一份表）。
+
+| 阶段 | 写 | 下游读者 | 闭环 |
+|---|---|---|---|
+| R0 | `contract` | **无显式读者**（仅 R1「全部」隐含 + `phase-r3-r6:362` prose） | ⚠️ m-1 |
+| R2 | `literature` / `evidence`(lit) / `assumptions` / `uncertainties` | R3（literature、assumptions）、R7（evidence）、R8（evidence） | ✅ |
+| R3 | `hypotheses` | R4 / R5 / R6 / R7（均读 `hypotheses`） | ✅ |
+| R4 | `hypotheses[].niche/.island/.status` | R6（读 hypotheses）、V6/V13/V15 | ✅ |
+| R5 | `literature` / `evidence`(lit) | R3（literature）、R7/R8（evidence） | ✅ |
+| R6 | `hypotheses[].generation/.status` / `failures` | R7（hypotheses）、V4/V12 | ⚠️ M-2（F 无人挂引用） |
+| R7 | `assurance` / `failures` / `uncertainties` | R8（assurance）、R12（failures/uncertainties）、R14（全 state） | ⚠️ M-2 |
+| R8 | `claims[].contract` / `evidence` / `claims[].supporting_evidence`/`refuting_evidence` / `uncertainties` | R9（claims）、R12（claims/evidence） | ⚠️ **M-1**（无 claim 创建者） |
+| R9 | `experiments`（`SKILL:74`、`policy:371`） | R10/R11/R13（全 state） | ⚠️ m-2（R9.4 还写 failures） |
+| R10 | `repairs` + `state_delta` | R14（未闭环 `repairs`） | ✅ |
+| R11 | 归并（无新字段） | — | ✅ |
+| R12 | `narrative_view`（+`uncertainties`） | **无显式读者**（R13/R14 全 state 隐含） | ✅（设计内，n-1） |
+| R13 | `reviews` / `failures` / `experiments[].unexpected` | R14（全 state） | ⚠️ M-2（F 无人挂引用） |
+| R14 | `decision` / `closures` / 各 `status` | **无下游**（终局） | ✅（设计内，n-1） |
+
+**反例（item 1 要求的）：**
+- 「写了但没人读」：`contract`（m-1）、`decision`/`narrative_view`（n-1，设计内）。
+- 「读了但没人写」：**`claims[]` 从未被任何阶段创建**（M-1）；`known_flaws` 在 R6/R7/R13 收工时无人写（M-2）。
+
+### 4.2 门禁与流程的自洽（item 2）
+
+**V1—V15 可达性：**
+
+| 规则 | 依赖对象 | 谁创建 | 可达性 |
+|---|---|---|---|
+| V1 / V2 / V3 | `claims[]` | **无**（M-1） | ❌ **流程上无产出者**（写表执行则永不触发；手写则位置与写表冲突） |
+| V4 | `failures[]` + `known_flaws` | R6/R7/R13 写 F；`known_flaws` 仅 R9/R10/R14 可写 | ❌ **必然触发**（M-2） |
+| V5 / V6 / V7 / V8 / V9 / V10 | evidence / hypotheses / uncertainties / experiments / assurance / repairs | R2·R8·R11 / R3·R4·R6 / R8·R9 / R9 / R7 / R10 | ✅ 可达且可满足 |
+| V11 / V12 | `experiments[]` | R9（同时写 experiments + failures） | ✅ |
+| V13 / V14 / V15 | `hypotheses[].island`/`generation`/`niche`+`status` | R3 建、R4 归档 | ✅ |
+
+**后果表述一致性：** `policy:62`（收工清零）与 `:294`（未清零不得作为下一阶段输入）在 phase 文件中
+均有对应：`phase-r9-r11:182`「跑 `state_check.py`，退出码非 `0` **不得**进入 R12」、
+`phase-r8:227`「不得进入 R9」、其余 5 个 phase 文件末尾「硬违规须为 0」✅ —— **表述本身一致**，
+冲突来自 M-1/M-2（有些阶段无论如何都到不了 0）。
+
+### 4.3 跨波枚举三处一致（item 3）—— ✅ 无第二份定义
+
+| 枚举 | 规范值 | 扫描结果 |
+|---|---|---|
+| `(O,T,R)` | `Problem/Phenomenon/Theory/Method/Evaluation/Resource-System`；`hidden-assumption` 等 7 个 T；`prove/characterize/explain/reformulate/design-algorithm/build-benchmark/build-system` | 全仓**无**下划线/驼峰/空格变体；`claim-first-policy §5` 是唯一权威（spec §2.4 是契约层）✅ |
+| `epistemic_status` 五值 | `Observed/Supported/Hypothesized/Planned/Unknown` | 无第六值、无小写值（小写命中均为 claim/experiment 的 `status` 或 refs_index 内部值）✅ |
+| `N1—N10` | preset 名 = niche | 定义在 `narrative-patterns §1`；`state_check.NICHES` 是唯一镜像 ✅ |
+| `P1`—`P6` / `local` | 7 值（默认开 P1—P4） | `state_check:120` 7 值、spec `:45/:65/:78`、`policy:194/:312`、`phase-r3-r6:344` 四处一致；**无 5 值残留**（命中的两处本身就是 7 值行）✅ |
+| `G1—G5` | `Claim grounding / Prior-work distinction / Identification / Factual integrity / Venue scope` | 全仓只有这 5 个名字（其余命中是 `G1 fail` 等用法）✅ |
+| `S1—S6` | `S1_Context … S6_Consequence_Boundary` | 只有这一套键名 ✅ |
+| 六维 | `Significance / Originality / Soundness margin / Explanatory depth / Generality / Narrative compression` | 无大小写/空格变体 ✅ |
+| 五元组五字段 | `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)` | **逐字出现 7 处、全部一致**；示例里的 `Target:`/`Test:` 简写与 spec 自带示例同款（非规范位）✅ |
+
+**结论：** 每个枚举家族都有**单一权威定义**（claim-first-policy §2/§5、narrative-patterns §1/§3、
+scoring-policy §3/§4、policy §2/§4、spec §2/§3/§4），其余位置是引用或逐字复述；
+**没有出现第二份语义不同的定义**。杂项风险：五元组被复述 7 次（n-2）。
+
+### 4.4 角色与派遣闭环（item 4）—— ✅ 19/19 闭合
+
+```bash
+python3 - <<'PY'   # 定义标题（§1A/§1B/§2/§3 的 `### X — …`）vs §4.2 矩阵行
+PY
+#   定义的角色数: 19   矩阵出现的角色数: 19
+#   矩阵有但未定义: 无
+#   定义但矩阵没有: 无
+```
+
+- 19 个角色 = §1A 四个会议审稿人（矩阵中合并为一行「仅校准表」）+ §1B 六个攻击面审稿人 +
+  §2 两个作者角色 + §3 七个核验/审计角色（含 `S-Integrity`）。
+- **无死角色**（每个定义都在矩阵出现），**无未定义角色**（矩阵每个名字都有定义段）。
+
+### 4.5 R12 的视图性（item 5）—— ✅ 达成
+
+```bash
+grep -rn 'narrative_view' --include=*.md .
+```
+
+只有 7 处：R12 的写入口（`phase-r12:846`、`policy:374`、`SKILL:77`）、R12-post 的落盘
+（`phase-r12:831`）、R12-pre 的**禁写**（`:830`）、policy §3.11 槽位定义（`:462`）、README 概述。
+**没有任何 phase 把它当输入读**（R13/R14 读的是「全 state + artifact / 未闭环 repairs」，
+属隐含覆盖而非依赖）。与「叙事是视图、不是独立 artifact」一致 ✅。
+
+### 4.6 三个已知未做项的当前状态（item 6）—— 三项属实
+
+| 声明 | 核实 | 证据 |
+|---|---|---|
+| `R2.2 occupancy map` 仍是 Wave 3 深化标记 | **属实** | `phase-r2-r5:229`「## R2.2 occupancy map（**Wave 3 深化**）（占用图）」 |
+| `README.md` 仍有 1 处 `R-CVPR` | **属实** | `grep -c 'R-CVPR' README.md` → **1**；位于 `README.md:232`（作用域串仍是「仅 R3—R6 / R8 / R7 / R10 / R13」，属 venue 扫尾） |
+| `example-d-narrative.md` 是否仍与 claim-first 结构一致 | **属实（未被破坏）** | claim-first 关键词命中 **21**；结构完整：`摘要`（`:37`）→ `idea I1`（`:56`）→ `攻击面评审`（`:312`）→ `门禁判定 G1—G5`（`:364`）→ `六维排序`（`:388`）→ `缺失证据清单`（`:430`）→ 落盘（`:459`） |
+
+### 4.7 机械面（item 7）—— 全绿
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **415 条，0 断链** ✅ |
+| 2 | deprecated-terms | **exit 1，0 命中** ✅ |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | `python3 -m unittest discover -s scripts -p "test_*.py"` | **116 tests OK** ✅ |
+| 5 | `state_check --selftest` | exit 0 ✅ |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | examples + templates linter | 9/9 硬违规 0 ✅（含 `61ad5c3` 修掉的两处分号） |
+| 8 | `--list-rules` ↔ `policy §4` | **15 条逐字一致，无缺失** ✅ |
+| 9 | 三方口径 14 阶段 | **14/14 逐字相同**（唯一「不一致」= R1，policy §5 明写 R1 不占行） ✅ |
+| 10 | 波次提交完整性 | `9d63395 → 61ad5c3`：examples 非空（`example-b-to-c-d-e.md` +4/−2、`example-followup-review.md` +1/−1）；旧指示以删除线保留 ✅ |
+
+---
+
+## 5. 总收官结论与修复清单
+
+**三波各自的内部质量已被独立验证**（Wave 1：状态与 V1—V15；Wave 2：发现层与 V6/V13—V15；
+Wave 3：角色层后移与五元组）—— 单波验收的 MAJOR 全部清零，机械面全绿。
+**跨波仍有 2 处状态机闭环缺口**，都是「谁写」的归属问题，不是新功能缺陷：
+
+| 优先级 | 动作 | 文件:行号 | 量级 |
+|---|---|---|---|
+| 1 | **M-1** 给 `claims[]` 指定创建者：把 D0—D9 划给 R12-pre（并授权写 `claims[]`/台账），或把 claim graph 创建并入 R8；同步三层写表 + `phase-r12:137—141` 的 D1 措辞 | `phase-r12:137—141`、`:824—845`、`policy:370`、`policy:374`、`SKILL:75/77`、`phase-r8` §C1 | 一节 + 3 行表 |
+| 2 | **M-2** 让 V4 可闭合：R6/R7/R13 的写列补「把新 `F` 挂到 `known_flaws`」，或在 `policy §4` 写明 V4 的复核时机在 R10 `state_delta` 之后（并同步脚本语义） | `policy:368/369/375`、`SKILL §0` 同行、`phase-r3-r6:413`、`phase-r7` R7 节、`phase-r7` R13 节 | 3 行表 ×3 层 |
+| 3 | m-1 `contract` 补读者；m-2 R9 写列补 `failures[]`；m-3 R7 首轮审计对象说明 | 见 §2 | 各一行 |
+| 4 | n-1/n-2/n-3（终端产物说明、五元组复述风险、闸门宽松口径） | 见 §3 | 可选 |
+
+**总收官结论：仍需修 —— 2 项 MAJOR（跨波状态机闭环）必须处理，3 项 MINOR 建议同批，
+3 项 NIT 可选。** 修完这 2 项 MAJOR 后，三波即可交付：届时 `claims[]` 有明确产出者、
+V1—V4 可达且可满足，R0→R14 的读写在文档层形成闭环。
+**不建议在 M-1/M-2 未修的情况下向用户宣布「三波完成」** —— 这两处会让执行者在
+R6/R7/R13 的收工检查上卡死（V4），或写出一个没有 claim 的 world model（V1—V3 空转）。
+
+---
+
+## 6. 未覆盖项与限制
+
+1. **未重跑单波验收**（Wave 1/2/3 的各自报告仍然有效，本报告只查波间耦合）。
+2. **未做外部事实核验**（spec §1 引用的 Co-Scientist 等系统由用户提供、未经仓库核实；本环境无外网）。
+3. **未评审 `README.md` / `project-layout.md` / `example-d-narrative.md` 的 venue 扫尾内容**
+   （Lead 已登记为已知未做；本报告只确认其当前状态属实）。
+4. **未评审 Wave 2/3 的科学实质**（island 划分、八攻击面的覆盖面、`S-Integrity` 的四类命中是否穷尽）。
+5. 本报告未修改任何被审文件；未 `git commit`。唯一写入：`docs/verify-r-final.md`。

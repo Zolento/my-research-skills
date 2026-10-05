@@ -350,6 +350,20 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ---
 
+### 5.0 两条归属规则（总收官审计 M-1 / M-2）
+
+1. **`claims[]` 的创建归属 = R3。** 每个候选必须产出至少一条 `C`（其 central proposition，
+   `status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
+   —— 否则 R7/R8 在读一个没人写的对象，V1/V2/V3 永不触发。
+2. **每个写 `failures[]` 的阶段（R6 / R7 / R9 / R13）同时负 `known_flaws` 义务**：
+   把新 `F` 的 id 挂到对应 `claims[].known_flaws` 或 `experiments[].known_flaws`。
+   —— 否则 V4 会在**这些阶段自己的收工检查**上报错，而写表又不授权它改 `known_flaws`。
+   （挂 `known_flaws` **不是**改 `claims[].status`，不与 §1.6 冲突。）
+
+> **终端产物（无显式读者，不是僵尸字段）：** `narrative_view`（R12 写、R13/R14 通过「全 state」隐含读）
+> 与 `decision`（R14 写、供人读与下一轮 R3/R9 的 `pivot`/`continue` 依据）。
+> 机械比对会把它们当成「写了没人读」，**这是设计内**。
+
 ## 5. 写入时机：每个 R 阶段读什么、写什么
 
 **结论：每个阶段都必须「先读 state，再写 state」；下面是逐阶段的读写契约，phase 文件不得超出该表。**
@@ -362,17 +376,17 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|
 | **R0** Research Contract | — | `contract` | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R3** Dual Discovery | `literature` / `assumptions` / `failures` | `hypotheses` | `phase-r3-r6-discovery.md` |
+| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） |
 | **R4** Isolated Populations | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R6** Evolution | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` | `phase-r3-r6-discovery.md` |
-| **R7** Adversarial Assurance | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` | `phase-r7-r10-r13-assurance-repair-review.md` |
+| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` | `phase-r8-evidence-contract.md` |
-| **R9** Experiment Tree | `uncertainties`(critical, high 且 high) / `claims` | `experiments` | `phase-r9-r11-experiment-loop.md` |
+| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` | `experiments` / `failures` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
 | **R11** Update World Model | 全 state | 归并去重 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
 | **R12** Narrative | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） | `phase-r12-narrative.md` |
-| **R13** Artifact-aware Review | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected`；缺口**必须**交 R10 | `phase-r7-r10-r13-assurance-repair-review.md` |
+| **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** Decision | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `claims[].status` / `uncertainties[].status` / `hypotheses[].status` | `../SKILL.md` §4「R13 / R14」 |
 
 > **补充说明（不参与逐字比对）：** 上表读/写列与 `SKILL.md` §0、各 `phase-*.md` 的

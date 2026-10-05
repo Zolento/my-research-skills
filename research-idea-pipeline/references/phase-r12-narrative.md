@@ -100,6 +100,16 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 
 ---
 
+### 前置：D0—D9 与 pre / post 的映射（总收官审计 M-1 配套）
+
+| 段 | 属于 | 说明 |
+|---|---|---|
+| D0—D3（证据台账 / claim graph / 科学分类 / anchor eligibility） | **R12-pre** | **但 `claims[]` 的创建在 R3**（见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0）；本段只**复核与展开**，**不创建** |
+| D4—D9（叙事实现 / 攻击面审核 / venue 校准 / 门禁 / 排序 / 输出） | **R12-post** | 只读已核实的 claim / evidence / 边界 / 失败 |
+
+> ⚠️ **`claims[]` 不由本文件创建。** 若执行者在这里新建 `C`，会与 R3 的创建归属冲突，
+> 并让 R7/R8 在第一轮读不到 claim。
+
 ## D0. Evidence Ledger
 
 **输入：** idea 清单 + 方案（proposal）+ 已有实验 / 定理 / 文献。

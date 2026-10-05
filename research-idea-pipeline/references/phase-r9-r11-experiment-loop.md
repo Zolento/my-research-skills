@@ -204,7 +204,7 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` |
+| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` |
 | **R10** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
 | **R11** | 全 state | 归并去重 + 跑 `state_check.py` |
 

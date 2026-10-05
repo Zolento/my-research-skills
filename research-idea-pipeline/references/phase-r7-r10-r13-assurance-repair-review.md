@@ -12,6 +12,9 @@ R7 / R10 / R13 继续复核。**
 > 下方的 **R7 / R13 节**是 Wave 3 起生效的正式规则。
 > **冲突时以 R7 / R13 节为准**；`E2` 的「八子代理」派遣名单已被八个**攻击面算子**取代，
 > 会议审稿人只在 **R12 / R13 的 venue calibration 表**里出现（不派子代理）。
+> **首轮 R7 审什么：** R8 的证据契约在 R7 **之后**才建立，因此**首轮** R7 审的是
+> R3—R6 的候选与其**计划中的**证据契约（写在 `hypotheses[]` / `assurance[]` 里）；
+> 从第二轮起才审 R8 正式建立的 `claims[].contract`。
 
 ## E0. 定位与边界（先读）
 
@@ -451,8 +454,8 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` |
-| **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected`；缺口**必须**交 R10 |
+| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `claims[].status` / `uncertainties[].status` / `hypotheses[].status` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。

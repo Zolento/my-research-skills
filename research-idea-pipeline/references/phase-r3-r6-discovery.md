@@ -351,6 +351,23 @@ problem ─────────┤                        （基线：把现
 4. **P6 产出的方向必须写成可证伪命题**（否则它是抱怨，不是研究问题）。
 5. 每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）与 `generation: 0`（V13/V14 强制）。
 
+### R3.0 `claims[]` 的创建归属（总收官审计 M-1）
+
+**每个候选必须产出至少一条 `C`** —— 它的 central proposition，`status: ungrounded`。
+这是 claim graph 的**唯一起点**：
+
+| 阶段 | 对 `claims[]` 做什么 |
+|---|---|
+| **R3** | **创建**（seed：`status: ungrounded`，`falsifier` 必填） |
+| R7 | **读**（攻击它；输出 `assurance`，不改 `status`） |
+| R8 | 建 `claims[].contract`、更新 `supporting_evidence` / `refuting_evidence` / `scope` |
+| R10 | 唯一能改 `claims[].status` 的阶段 |
+| R12 | **只读**（渲染成 `narrative_view`，**不创建、不修改**） |
+
+**为什么必须写在这里：** 双循环里 R7（对抗保证）与 R8（证据契约）都排在 R12 之前，
+若 claim 由 R12 创建，则 R7/R8 在读一个没人写的对象 —— `state_check.py` 的
+V1 / V2 / V3 会**永不触发**，world model 变成没有 claim 的空壳。
+
 ### R3.1 生成预算（默认值，可缩放）
 
 | 项 | 默认 |
@@ -453,9 +470,9 @@ Niche N8（Benchmark/评测）           elite: H62
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R3** | `literature` / `assumptions` / `failures` | `hypotheses` |
+| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses` / `claims`（**seed**：每个候选至少一条 `C` = central proposition，`status: ungrounded`） |
 | **R4** | `hypotheses` | `hypotheses[].niche` / `hypotheses[].island` / `hypotheses[].status` |
-| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` |
+| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
