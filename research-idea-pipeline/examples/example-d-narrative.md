@@ -1,12 +1,12 @@
 # 示例：A005 — 叙事（claim-first 流程）
 
-> 本例演示 Mode D 的完整产物。顺序固定：D0 证据台账 → D1 claim graph → D2 `(O, T, R)` →
+> 本例演示 R12 的完整产物。顺序固定：D0 证据台账 → D1 claim graph → D2 `(O, T, R)` →
 > D3 anchor eligibility → D4 候选 claim hierarchy 与六槽位 → D5 攻击面审核 →
 > D6 venue calibration → D7 硬门禁 → D8 六维排序 → D9 输出。
 > **证据在 claim 之前，claim 在叙事之前。** 文档骨架见
 > [project-layout.md](../references/project-layout.md) §2.4。
 > 规则出处见 [claim-first-policy.md](../references/claim-first-policy.md)、
-> [mode-d-narrative-generation.md](../references/mode-d-narrative-generation.md)、
+> [phase-r12-narrative.md](../references/phase-r12-narrative.md)、
 > [narrative-patterns.md](../references/narrative-patterns.md)、
 > [scoring-policy.md](../references/scoring-policy.md)。
 
@@ -15,13 +15,13 @@
 ## 0. 示例输入（D0 前置检查）
 
 ```
-mode=D
+phase=R12
 idea 清单：
   I1: 用扩散过程的可逆性约束组合优化搜索空间
       预期贡献：把可逆性从采样技巧升级为硬可行性约束
       与现有工作差异：现有离散扩散只把可逆性当采样器，未用作约束
       关键假设：扩散过程的逆映射在置换空间上可定义且可微
-方案（来自 Mode C）：proposal A003 + experiment-plan A004（含实验 E1—E6）
+方案（来自 R8）：proposal A003 + experiment-plan A004（含实验 E1—E6）
 作者目标 anchor（A003 frontmatter 的 `core_goal`）：theory
 目标会议：ICML
 ```
@@ -452,7 +452,7 @@ N2 的 claim 更强，且已过门禁。按 claim-first 总纲，它是最强可
    N9 可升级为「原评测 protocol 无法识别能力」的层级，此时 anchor 转为基准。
 
 **退回规则：** 若某 idea 的全部候选都 `not_submission_ready`，或六维普遍 ≤ 2，
-就退回 Mode B 重做 idea。
+就退回 R3—R6 重做 idea。
 
 ---
 
@@ -462,7 +462,7 @@ N2 的 claim 更强，且已过门禁。按 claim-first 总纲，它是最强可
 - `routeA/INDEX.md` §2 文档索引：新增 A005 行。
 - §3 已证实：E1 与 E4 支撑的「在 `Y` 下结构性失效」与「结构必要性」。
 - §4 已证伪：N3 的迁移合法性方向（`G1 fail`）。N5 方向被 stress test 排除。
-- §5 TODO：补 E9、E11、E12，并检验 E10 的假设归因。按最佳叙事重写提案（回 Mode C）。
+- §5 TODO：补 E9、E11、E12，并检验 E10 的假设归因。按最佳叙事重写提案（回 R8）。
 - §7 Warnings：作者目标 anchor `理论` 与 `eligible` 集合冲突（需锚点变更单 + 用户授权）。
   `S-Lit` 判「部分重叠」（delta 需在相关工作显式划界）。`N2` 的 `Soundness margin` 偏低。
-- `next_mode_suggestion: "C | E"`：按最佳叙事重写提案，或直接送审。
+- `next_phase_suggestion: "R8 | R7 / R10 / R13"`：按最佳叙事重写提案，或直接送审。

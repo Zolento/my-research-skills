@@ -1,14 +1,18 @@
-# Mode E — proposal-review（方案审阅复核）
+# R7 / R10 / R13 — 对抗保证 · 元认知修复 · artifact 审计
 
-复核**已成型方案**的正确性与可行性，并守住创新性底线。**可接 Mode C，也可接上一次
-Mode E 继续复核。**
+复核**已成型方案**的正确性与可行性，并守住创新性底线。**可接 R8，也可接上一次
+R7 / R10 / R13 继续复核。**
+
+
+> ⚠️ **内部小节号 `§E0—§E8` 保留自旧命名**（本文档由旧 `mode-e` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
+> **迁移不得丢节** —— 本注被删掉时，`§E0—§E8` 会失去唯一解释，读者会误当退役字母残留。
 
 ## E0. 定位与边界（先读）
 
-> **Mode E 的对象是"已成型的方案"，核心问题是"这么做对不对、能不能做成"。
+> **R7 / R10 / R13 的对象是"已成型的方案"，核心问题是"这么做对不对、能不能做成"。
 > 同时必须强调创新性——目的是避免在不知情的情况下**复现别人的方案**。**
 
-| 维度 | Mode B（idea 级，见 [mode-b](mode-b-idea-discovery.md)） | **Mode E（方案级）** |
+| 维度 | R3—R6（idea 级，见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md)） | **R7 / R10 / R13（方案级）** |
 |---|---|---|
 | **对象** | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | **核心问题** | 这个概念值得做吗？ | **这个方案做得对吗、能不能做成？** |
@@ -50,9 +54,9 @@ Mode E 继续复核。**
 
 | 输入 | 必填 | 说明 |
 |---|---|---|
-| 待复核方案 | ✅ | 来自 Mode C 的 `proposal` + `experiment_plan`，或用户提供 |
+| 待复核方案 | ✅ | 来自 R8 的 `proposal` + `experiment_plan`，或用户提供 |
 | 上一次审阅内容 | ❌ | **有 → 接续复核；无 → 首次复核** |
-| 关键参考文献 | ❌ | 缺省时调用 Mode A 定向补充 |
+| 关键参考文献 | ❌ | 缺省时调用 R2 / R5 定向补充 |
 
 ---
 
@@ -62,12 +66,12 @@ Mode E 继续复核。**
 
 | # | 触发点 | 说明 |
 |---|---|---|
-| ① | **Mode C 产出后首次复核** | 方案与实验计划刚成型，做首次完整八子代理审查 |
+| ① | **R8 产出后首次复核** | 方案与实验计划刚成型，做首次完整八子代理审查 |
 | ② | **实验完成、有实测结果后** | 此时"预期"变"实测"，**防复现检查必须重做**（新颖性/复现判定的证据基础已变） |
 | ③ | **投稿被拒 / 改投时** | 按新会议的审稿标准重审，并复核是否**出现了新的最接近工作**（判据是**有无新文献**，**不是**上次检索距今多久） |
 
-> ⚠️ **E 不是链条终点，而是反馈环。** E 的结论可以**回流到 Mode C**（按审阅意见重写
-> 方案 / 补实验）或**回流到 Mode B**（叙事或方案的根本缺陷指向 idea 本身不成立）。
+> ⚠️ **E 不是链条终点，而是反馈环。** E 的结论可以**回流到 R8**（按审阅意见重写
+> 方案 / 补实验）或**回流到 R3—R6**（叙事或方案的根本缺陷指向 idea 本身不成立）。
 > 触发点 ② 之后**不得**直接沿用触发点 ① 的防复现结论。
 
 ### E1.2 复核类型
@@ -148,7 +152,7 @@ Mode E 继续复核。**
 - 每个子代理输出 **1—5 分评分** + **文字评审意见**。
 - **四个会议审稿人的意见必须显式分三段**：`理论角度` / `应用角度` / `会议特性判定`
   （见 [roles.md](roles.md) §1.0）。**缺任一段视为评审不合格。**
-- 字数下限：见 [roles.md](roles.md) §7 的**字数与规模下限总表**（Mode E 子代理意见
+- 字数下限：见 [roles.md](roles.md) §7 的**字数与规模下限总表**（R7 / R10 / R13 子代理意见
   ≥ 200 字，**S-Repro ≥ 150 字**）。
 - 评分必须有理由，且**引用具体证据**（具体实验缺失、具体引用、具体逻辑缺口）。
 - 使用 [roles.md](roles.md) §5 的统一输出骨架。
@@ -169,7 +173,7 @@ Mode E 继续复核。**
 
 ### E3.0 第 0 步：极性归一化（强制，先于汇总）
 
-**与 Mode D 一样，E 的评分也必须先归一化再进中位数**（共用机制见
+**与 R12 一样，E 的评分也必须先归一化再进中位数**（共用机制见
 [scoring-policy.md](scoring-policy.md)）。E 是**单个总分**而非维度向量，因此规则更简单：
 
 - **S-Devil 的「新颖性反驳」是反向维度**：`1—5，5 = 完全无新颖性`，**低 = 好**；
@@ -290,7 +294,7 @@ Mode E 继续复核。**
 1. **写审阅记录：** `<routeX>/docs/<被审ID>-review-r01.md`；
    接续复核写 `-r02.md`、`-r03.md`（轮次零填充两位）（frontmatter 记 `review_round`）。
    **审阅记录不占用新序号**，永远挂在被审文档 ID 上。
-2. **frontmatter：** `mode: E / type: review / review_of: <被审ID> / review_round / also_reviewed / status`。**跨文档复核**（如同时审方案 + 实验计划）挂在主文档 ID 上，其余写进 `also_reviewed`。
+2. **frontmatter：** `phase: R7 / R10 / R13 / type: review / review_of: <被审ID> / review_round / also_reviewed / status`。**跨文档复核**（如同时审方案 + 实验计划）挂在主文档 ID 上，其余写进 `also_reviewed`。
 3. **把审阅结论翻译成 `INDEX.md` 进度**（这是本 Mode 最容易漏的一步）：
 
    | 审阅结论 | 写入 INDEX |
@@ -310,7 +314,7 @@ Mode E 继续复核。**
 
 | 交付物 | 说明 |
 |---|---|
-| **八子代理评审意见** | 每条含评分 + 意见；字数下限见 [roles.md](roles.md) §7（Mode E 子代理 ≥200 字，S-Repro ≥150 字） |
+| **八子代理评审意见** | 每条含评分 + 意见；字数下限见 [roles.md](roles.md) §7（R7 / R10 / R13 子代理 ≥200 字，S-Repro ≥150 字） |
 | **交叉质询记录** | 每人至少一条质询 |
 | **审查结论卡片** | E4 模板 |
 | **横向对比表** | 多方案时必需 |
@@ -318,11 +322,11 @@ Mode E 继续复核。**
 
 ## E8. 输出后
 
-附 `state.json` 片段。接续复核时 `next_mode_suggestion` 仍可为 `"E"`（若仍有未解决项）。
+附 `state.json` 片段。接续复核时 `next_phase_suggestion` 仍可为 `"R7 / R10 / R13"`（若仍有未解决项）。
 
 ```json
 {
-  "mode": "E",
+  "phase": "R7 / R10 / R13",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
   "doc_id": "A003-review",
@@ -365,6 +369,49 @@ Mode E 继续复核。**
     {"agent": "R-CVPR", "previous": 2, "current": 4, "delta": "↑2", "reason": "补全消融矩阵"}
   ],
   "open_questions": ["…"],
-  "next_mode_suggestion": "E"
+  "next_phase_suggestion": "R7 / R10 / R13"
 }
 ```
+
+---
+
+
+## Wave 2/3 骨架
+
+### R7 与硬门禁的衔接
+
+R7 沿用**六个攻击面审稿人**（R-Novelty / R-Causal / R-Experimental / R-Theory /
+R-Generalization / R-Utility）+ **硬门禁 `G1—G5`**，聚合规则见
+[scoring-policy.md](scoring-policy.md) §3 / §4。**R7 不写 `claims[].status`** —— 改状态只能经 R10。
+
+### R10 修复门（权威在别处）
+
+处置五值、关闭两值、`flaw·disposition·state_delta·closure` 三元组、
+「critical flaw ⇒ state 必须改变」的**权威定义在
+[phase-r9-r11-experiment-loop.md](phase-r9-r11-experiment-loop.md)**。本节只登记「R7 发现的问题
+必须交给 R10 处置」，不得在本文件里另立一套。
+
+### R13 artifact-aware 审计（Wave 3 深化）
+
+审计对象不只是论文，而是：`paper` / `claim graph` / `experiment graph` / `code` /
+`logs` / **`failed runs`** / `dataset selection history` / `metric selection history`。
+
+**审计时机（防止空转规则）：** R7 / R8 阶段**没有** code / logs / failed runs，
+**只能审计划中的证据契约**；真正的 artifact 审计绑在 **R9 之后 / R13**。
+**禁止在无 artifact 的阶段要求 artifact 审计。**
+
+**Integrity 检查升级为 Gate**：benchmark cherry-picking / data leakage / metric misuse /
+post-hoc selection bias —— 仅读最终论文比读完整 trace 更难发现，所以必须审 trace。
+
+---
+
+## 读 / 写 World Model（强制）
+
+| 阶段 | 读 | 写 |
+|---|---|---|
+| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` |
+| **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected`；缺口**必须**交 R10 |
+| **R14** | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `claims[].status` / `uncertainties[].status` / `hypotheses[].status` |
+
+> 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

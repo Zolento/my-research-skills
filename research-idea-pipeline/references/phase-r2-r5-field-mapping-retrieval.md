@@ -1,4 +1,4 @@
-# Mode A — literature-survey（文献调研）
+# R2 / R5 — 领域测绘与共演化检索（field-mapping + co-evolving retrieval）
 
 补充文献、扩大检索范围。可被 B/C/D/E 调用，也可单独调用。
 
@@ -6,6 +6,10 @@
 > 1. **禁止只停留在本地。** 本地检索命中不是终点；只要触发 §A2 的任一条件，
 >    就必须查**全部启用源**并扩大范围。
 > 2. **未达饱和不得停止。** 停止时必须能说出依据（§A4）。
+
+
+> ⚠️ **内部小节号 `§A0—§A7` 保留自旧命名**（本文档由旧 `mode-a` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
+> **迁移不得丢节** —— 本注被删掉时，`§A0—§A7` 会失去唯一解释，读者会误当退役字母残留。
 
 ## 输入
 
@@ -41,7 +45,7 @@
 | T1 | 创新性声明（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | 理论不清（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | 可行性不确定（能不能做、资源够不够、有无不可能性结果） | L2 强化 |
-| T4 | 新颖性判定（供 Mode C 的 C1、Mode D 的 S-Lit、Mode E 的 S-Lit/S-Nov 使用） | **L3 穷尽**（**例外：Mode B 的 B5 快筛 = L2**，见 §A5） |
+| T4 | 新颖性判定（供 R8 的 C1、R12 的 S-Lit、R7 / R10 / R13 的 S-Lit/S-Nov 使用） | **L3 穷尽**（**例外：R3—R6 的 B5 快筛 = L2**，见 §A5） |
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 将写进文档的"现有工作尚未……"式论断 | L2 强化 |
@@ -127,7 +131,7 @@
 
 **证据等级 ↔ 允许/禁止表述的权威定义统一见 [evidence-policy.md](evidence-policy.md)**
 （已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明）。
-**本节不再重复定义措辞**；Mode A 达到 **L2 及以上**时，检索结论使用
+**本节不再重复定义措辞**；R2 / R5 达到 **L2 及以上**时，检索结论使用
 「据本次检索未见（检索式见附录）」，且该措辞的唯一依据是上面的**负检索记录**；
 **未达 L2 时只能写「待核实」**。
 
@@ -137,18 +141,18 @@
 
 | 调用方 | 传递内容 | 期望返回 |
 |---|---|---|
-| Mode B | `query` + `scope` | 技术路线归纳所需文献 + 创新性边界线索 |
-| Mode C | idea 涉及的**特定理论工具** | 该工具的代表工作、假设、局限 |
-| Mode D | S-Lit 标记的叙事**"待核实"项** | 该叙事核心思路是否已被提出 / 覆盖 |
-| Mode E | S-Lit 标记的**"待核实"项** | 针对该条目的定向核实证据 |
+| R3—R6 | `query` + `scope` | 技术路线归纳所需文献 + 创新性边界线索 |
+| R8 | idea 涉及的**特定理论工具** | 该工具的代表工作、假设、局限 |
+| R12 | S-Lit 标记的叙事**"待核实"项** | 该叙事核心思路是否已被提出 / 覆盖 |
+| R7 / R10 / R13 | S-Lit 标记的**"待核实"项** | 针对该条目的定向核实证据 |
 
 调用时只做**定向补充**，不重复拉取已有内容（Step 3 原则）。
-若调用方处于**创新性判定场景**（Mode C 的 C1、**Mode D 的 S-Lit**、Mode E 的 E2.2），
-或需要支撑**「首次提出」类声称**，必须按 **L3 穷尽级**执行；**Mode B 的 shortlist
-门槛为 L2**（仅「首次提出」声称要求 L3，见 [mode-b](mode-b-idea-discovery.md) §B5.2）；
+若调用方处于**创新性判定场景**（R8 的 C1、**R12 的 S-Lit**、R7 / R10 / R13 的 E2.2），
+或需要支撑**「首次提出」类声称**，必须按 **L3 穷尽级**执行；**R3—R6 的 shortlist
+门槛为 L2**（仅「首次提出」声称要求 L3，见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §B5.2）；
 **C1 的增量复核例外**（B5 已判「足够」且期间无新文献的项可直接引用 B5 结论，
 **但 B5 只达 L2 时不得把该结论升级为 L3 级证据**，见
-[mode-c](mode-c-proposal-generation.md) §C1）。
+[phase-r8-evidence-contract.md](phase-r8-evidence-contract.md) §C1）。
 
 ---
 
@@ -156,7 +160,7 @@
 
 1. **写文档：** `<routeX>/docs/<R>NNN-literature-survey.md`，内容 = 检索范围 +
    检索式与结果表 + 文献列表 + **负检索记录** + 429 日志 + 饱和判定。
-2. **frontmatter：** `mode: A / type: literature-survey / status / created`。
+2. **frontmatter：** `phase: R2 / R5 / type: literature-survey / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增本文件行；
    - §3 已证实：检索证实的结论（如"某机制已被 [作者] 提出"）；
@@ -182,7 +186,7 @@
 
 ```json
 {
-  "mode": "A",
+  "phase": "R2 / R5",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
   "doc_id": "A001",
@@ -200,6 +204,66 @@
   "cache_updates": ["docs/refs/cache/arxiv/ab12cd34ef56.json (12 条)"],
   "called_by": "standalone | B | C | D | E",
   "open_questions": ["arxiv 未命中的会议论文需人工补充"],
-  "next_mode_suggestion": null
+  "next_phase_suggestion": null
 }
 ```
+
+---
+
+
+## Wave 2 深化骨架（本轮只落骨架，不假装完成）
+
+### field grammar `{P, A, R, D, O, M, T, E}`
+
+目的：抽取「**这个领域通常怎么想问题**」，而不是列 gap。
+
+| 代号 | 含义 | 本项目要填什么 |
+|---|---|---|
+| `P` | Problem | 领域公认的问题表述 |
+| `A` | Assumptions | 显式 + **默会**假设（默会项直接进 `assumptions[]`） |
+| `R` | Representation | 用什么数学对象表示 |
+| `D` | Data / Supervision | 数据与监督形式 |
+| `O` | Objective | 优化目标 |
+| `M` | Mechanism | 机制解释 |
+| `T` | Theory | 理论工具 |
+| `E` | Evaluation | 评测协议 |
+
+### occupancy map（占用图）
+
+不问「哪些工作做过」，而问「**设计空间的哪些区域已经拥挤**」：
+
+```text
+parameter adaptation        ███████████   拥挤
+feature alignment           █████████
+solver adaptation           ███
+measurement adaptation      █
+identifiability framing     █
+causal framing              0             ← negative space
+quotient representation     0             ← negative space
+```
+
+**negative space（计数为 0 或极低的区域）是 R3 paradigm escape 的输入**，不是直接结论。
+
+### R5 共演化检索
+
+```text
+I_t → Q_{t+1} → L_{t+1} → I_{t+1}
+```
+
+**当前候选 idea 反过来决定下一轮查什么**。例：候选把问题重述为「partial identifiability」，
+下一轮就该搜 `partial identification under indirect observations`，
+而不是继续搜 `prior adaptation`。**检索纪律（禁止只停留在本地、T1—T7、L1/L2/L3 等级、
+429 退避、代理环境识别、饱和判据、负检索记录）一字不动，见本文档正文与
+[literature-policy.md](literature-policy.md)。**
+
+---
+
+## 读 / 写 World Model（强制）
+
+| 阶段 | 读 | 写 |
+|---|---|---|
+| **R2** | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
+| **R5** | `hypotheses` | `literature` / `evidence`(kind=literature) |
+
+> 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

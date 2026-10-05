@@ -10,7 +10,7 @@
 - §10 = **contribution type → evidence contract → venue calibration** 的顺序与映射。
 
 **流程顺序**（谁在什么阶段调用本文件）由 [claim-first-policy.md](claim-first-policy.md) 与
-[mode-d-narrative-generation.md](mode-d-narrative-generation.md) 规定；本文件只提供**判定标准**，
+[phase-r12-narrative.md](phase-r12-narrative.md) 规定；本文件只提供**判定标准**，
 不自行定义流程。
 
 ---
@@ -28,7 +28,7 @@
 > 引文保留英文原句，方括号 `[...]` 内为本文件补充的说明；**不得**用"大意是……"替代直引。
 > 无法核实的条目**宁可标【待核实】也不得写成确定口径**——这是本仓库的「禁止推断」纪律。
 
-**核实日期：** 2026-10-06（与 `docs/mode-d-claim-first-spec.md` 同期；该 spec 位于仓库根 `docs/`，
+**核实日期：** 2026-10-06（与 `docs/claim-first-spec.md` 同期；该 spec 位于仓库根 `docs/`，
 不进安装副本，故此处不写相对链接）。
 
 ### 本轮已核实的官方来源清单
@@ -69,16 +69,16 @@
 
 | 使用位置 | 用法 | 是否派遣子代理 |
 |---|---|---|
-| **Mode B / C / E 的会议审稿人**（`R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`） | 每个会议审稿人**必须**输出 `理论角度` + `应用角度` + `会议特性判定` 三段 | 是 |
-| **Mode D `D6` venue calibration** | 会议差异以**校准表**形式出现，沿用同一套判据（`理论角度` / `应用角度` / `会议特性判定`） | **否**（不派子代理，只出校准判定） |
+| **R3—R6 / R8 / R7 / R10 / R13 的会议审稿人**（`R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`） | 每个会议审稿人**必须**输出 `理论角度` + `应用角度` + `会议特性判定` 三段 | 是 |
+| **R12 `D6` venue calibration** | 会议差异以**校准表**形式出现，沿用同一套判据（`理论角度` / `应用角度` / `会议特性判定`） | **否**（不派子代理，只出校准判定） |
 
-> ⚠️ **Mode D `D5` 已改用攻击面审稿人**（`R-Novelty` / `R-Causal` / `R-Experimental` /
+> ⚠️ **R12 `D5` 已改用攻击面审稿人**（`R-Novelty` / `R-Causal` / `R-Experimental` /
 > `R-Theory` / `R-Generalization` / `R-Utility`），**不再**派遣会议审稿人。
-> 因此 **不得**在 Mode D 的 `D5` 阶段要求"四个会议审稿人的两角度意见"——那与
-> [roles.md](roles.md) §1B 冲突。会议维度在 Mode D 中**只出现一次**，即 `D6`，
+> 因此 **不得**在 R12 的 `D5` 阶段要求"四个会议审稿人的两角度意见"——那与
+> [roles.md](roles.md) §1B 冲突。会议维度在 R12 中**只出现一次**，即 `D6`，
 > 其结论落到硬门禁 `G5 Venue scope`（见 [scoring-policy.md](scoring-policy.md)）。
 
-**依据：** `docs/mode-d-claim-first-spec.md` §4（`D5` / `D6` 行）与 §2.9；`SKILL.md` §1.2 与 §3 派遣表。
+**依据：** `docs/claim-first-spec.md` §4（`D5` / `D6` 行）与 §2.9；`SKILL.md` §1.2 与 §3 派遣表。
 
 ### 0.2 两个角度（**都要有实质内容**）
 
@@ -99,8 +99,8 @@
 | R-MICCAI | 方法创新**或**应用创新是否成立；临床影响与方法创新的权衡（§4） |
 
 **输出要求：** 书面意见必须**显式分三段** —— `理论角度` / `应用角度` / `会议特性判定`；
-Mode E 的评分维度也按该结构给出（见 [roles.md](roles.md) §1、§5、§6）。
-Mode D 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审稿意见。
+R7 / R10 / R13 的评分维度也按该结构给出（见 [roles.md](roles.md) §1、§5、§6）。
+R12 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审稿意见。
 
 > ⚠️ **两个角度都要有实质内容。** 用"理论上没问题、应用上很有价值"这类空话充数，
 > 等同于没写。每条判断必须落到**具体的命题、假设、实验或工作流环节**上。
@@ -299,13 +299,13 @@ Mode D 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审
 **硬性要求：**
 
 - **不得留空、不得模糊。** "受 X 启发""结合了 A 与 B"都不是标注。
-- **迁移不得包装成原创。** 这属于夸大（违反 Mode D 包装纪律）。
+- **迁移不得包装成原创。** 这属于夸大（违反 R12 包装纪律）。
 - ICML 视角下，`迁移` 唯一可能的出口是 §2.2 的 "**application to a real-world use case**" 或
   "**removing restrictive assumptions**"（ICML-7）——那需要证明迁移的**合法性**（假设如何修改）
   与新领域中的**新性质**，而不是"拿来就用"。
 - 迁移合法性分级见 [narrative-patterns.md](narrative-patterns.md) §4 的 `Transfer Legitimacy Argument`
   （`L1` / `L2` / `L3`）。
-- Mode E 见 §7：`迁移` 且无新性质 → **复现风险高**。
+- R7 / R10 / R13 见 §7：`迁移` 且无新性质 → **复现风险高**。
 
 ---
 
@@ -340,7 +340,7 @@ Mode D 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审
 
 ---
 
-## 7. 复现风险判定标准（Anti-Reproduction，Mode E 强制）
+## 7. 复现风险判定标准（Anti-Reproduction，R7 / R10 / R13 强制）
 
 > **目的：避免把一个"做得很扎实的复现"当成贡献送审。** 技术正确 ≠ 可发表。
 
@@ -400,8 +400,8 @@ Mode D 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审
 - ❌ 引用 **【待核实】** 条目却把它当作已核实的官方规则使用。
 - ❌ 贡献点不标注类型。
 - ❌ 未经 S-Lit 核实即使用"首次提出 / first to"。
-- ❌ 以"没人做过"作为新颖性的唯一论据（需说明**为什么之前没人做**，见 Mode C §C3 第 4 节）。
-- ❌ Mode E 结论卡片缺少**复现风险等级**。
+- ❌ 以"没人做过"作为新颖性的唯一论据（需说明**为什么之前没人做**，见 R8 §C3 第 4 节）。
+- ❌ R7 / R10 / R13 结论卡片缺少**复现风险等级**。
 - ❌ 用 **venue 直接选 preset**（见 §10.0 的顺序硬规则）。
 - ❌ 用 `clinical significance` 冒充 `methodological innovation`（见 §9.4）。
 
@@ -409,7 +409,7 @@ Mode D 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审
 
 ## 9. 顶刊标准（TMI / JMLR / Nature Machine Intelligence）
 
-> **适用时机：** 当 Mode D `D6` 或 Mode E 的目标 venue 是**期刊**（而非 §1—§4 的四个会议）时，
+> **适用时机：** 当 R12 `D6` 或 R7 / R10 / R13 的目标 venue 是**期刊**（而非 §1—§4 的四个会议）时，
 > 用本节做校准。本轮顶刊**不作为审稿角色**登记（不新增 `R-TMI` / `R-JMLR` / `R-NMI`），
 > 只在 `D6` 校准表中出现（见 §10.2），与 ICLR 的处理一致（§10.3）。
 
@@ -496,7 +496,7 @@ MICCAI 的补偿规则**不得**用于 TMI，TMI 的方法学硬门槛**不得**
 
 ### 10.0 顺序硬规则（禁止倒序）
 
-**逻辑依赖顺序（不是 Mode D 的时间顺序）：**
+**逻辑依赖顺序（不是 R12 的时间顺序）：**
 
 ```
 ① Contribution type        ② Evidence contract            ③ Venue calibration
@@ -504,11 +504,11 @@ MICCAI 的补偿规则**不得**用于 TMI，TMI 的方法学硬门槛**不得**
    取自 claim-first-policy      ← 本文件 §10.1                放到某 venue 的标准下判定
    §5；由 D2 登记                                             ← 本文件 §10.2，落 G5
 
-Mode D 步骤：  D2 登记类型  →  D0 台账 / D1 claim graph / D4 的 S5  →  D6 校准
+R12 步骤：  D2 登记类型  →  D0 台账 / D1 claim graph / D4 的 S5  →  D6 校准
 ```
 
-> **说明：** 上表是**逻辑依赖顺序**，**不是** Mode D 的时间顺序。
-> 在 Mode D 的实际时间轴上，`D0`（证据台账）与 `D1`（claim graph）**先于** `D2`（类型登记），
+> **说明：** 上表是**逻辑依赖顺序**，**不是** R12 的时间顺序。
+> 在 R12 的实际时间轴上，`D0`（证据台账）与 `D1`（claim graph）**先于** `D2`（类型登记），
 > 因为类型要由 claim graph 推出来。**被禁止的是倒序**——先定 venue、再回填 claim 与 preset；
 > **不是**这三者在时间轴上的先后。硬约束只有一条：
 > **`D6` 校准必须等到 ① 与 ② 都已确定之后才能做。**
@@ -609,11 +609,11 @@ preset **不是** venue 的函数。
 > §1—§4 目前只覆盖 **3 + 1** 个会议（CVPR / ICML / NeurIPS / MICCAI）。
 > 若把 ICLR 提升为审稿角色（例如新增 `R-ICLR`），会触发**跨文件大范围漂移**——
 > 至少涉及 `SKILL.md` 的 §0 / §3 / §4、[roles.md](roles.md) §1 的会议审稿人表、
-> 本文件 §0.3 与 §6 模板、以及各 Mode 的派遣矩阵（合计约 **13 处**）。
+> 本文件 §0.3 与 §6 模板、以及各 R 阶段 的派遣矩阵（合计约 **13 处**）。
 > 因此本轮的处理是：**ICLR 只作为 §10.2 的 calibration 参考**（与 TMI / JMLR / Nature MI 同级），
 > **不进入** §0.3 的会议特性判定表，**不进入** §6 模板，**不派**子代理。
 >
-> **已登记为 P1 待办**（见 `docs/mode-d-claim-first-spec.md` §9 第 3 条：
+> **已登记为 P1 待办**（见 `docs/claim-first-spec.md` §9 第 3 条：
 > "会议枚举新增 `ICLR` 与顶刊（TMI / JMLR / Nature MI）——涉及 SKILL §0/§3/§4、venue-standards、
 > roles §1（约 13 处），单独一轮"）。**本轮不得**擅自把 ICLR 写成审稿角色。
 
@@ -629,9 +629,9 @@ preset **不是** venue 的函数。
 
 | 位置 | 引用内容 |
 |---|---|
-| [roles.md](roles.md) §1、§5、§6 | §0 两角度框架（限 Mode B/C/E 会议审稿人 + `D6`） |
-| [mode-b-idea-discovery.md](mode-b-idea-discovery.md) / [mode-c-proposal-generation.md](mode-c-proposal-generation.md) / [mode-e-proposal-review.md](mode-e-proposal-review.md) | §0、§5.1、§6、§7 |
-| [mode-d-narrative-generation.md](mode-d-narrative-generation.md) | `D6` venue calibration → §10；贡献类型 → §5 |
+| [roles.md](roles.md) §1、§5、§6 | §0 两角度框架（限 R3—R6/R8/R7/R10/R13 会议审稿人 + `D6`） |
+| [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) / [phase-r8-evidence-contract.md](phase-r8-evidence-contract.md) / [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) | §0、§5.1、§6、§7 |
+| [phase-r12-narrative.md](phase-r12-narrative.md) | `D6` venue calibration → §10；贡献类型 → §5 |
 | [claim-first-policy.md](claim-first-policy.md) §5、§7.4 | §10（`(O, T, R)` 与证据契约 ← claim-first §5） |
 | [scoring-policy.md](scoring-policy.md) | `G5 Venue scope` → §10.2 |
 | [narrative-patterns.md](narrative-patterns.md) §2 | preset 选择**在** §10.0 顺序之后 |

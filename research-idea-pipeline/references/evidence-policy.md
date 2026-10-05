@@ -40,7 +40,7 @@
 ## 3. 认知状态 ↔ 措辞等级映射
 
 [claim-first-policy.md](claim-first-policy.md) §2 的证据台账给每条证据标 `epistemic_status`
-（五个枚举值，逐字取自仓库级 spec `docs/mode-d-claim-first-spec.md` §2.1，该文件不进安装副本）。
+（五个枚举值，逐字取自仓库级 spec `docs/claim-first-spec.md` §2.1，该文件不进安装副本）。
 **本节只做映射，不新立等级** —— 措辞等级仍只有 §1 的五级，判定权仍在 §1。
 
 | `epistemic_status` | 含义 | 对应 §1 措辞等级 | 附加约束 |
@@ -64,7 +64,7 @@
 （见 §1 与 [../SKILL.md](../SKILL.md) §1.5）。任一条目（含 `Observed` / `Supported`）
 若属定理 / 命题类且证明预算用尽，措辞只能是 **「待补证明 · 待核实」**，不得写「已证明」。
 
-> **模式下调用：** Mode A 的检索结论、Mode B 的 idea 新颖性判定、Mode C 的创新性
-> 判定、Mode D 的叙事新颖性声称与证据台账 `epistemic_status`、Mode E 的防复现结论，
+> **模式下调用：** R2 / R5 的检索结论、R3—R6 的 idea 新颖性判定、R8 的创新性
+> 判定、R12 的叙事新颖性声称与证据台账 `epistemic_status`、R7 / R10 / R13 的防复现结论，
 > **都引用本文件**，不另立措辞表。台账的字段定义见
 > [claim-first-policy.md](claim-first-policy.md) §2，映射见本节。

@@ -1,17 +1,21 @@
-# Mode C — proposal-generation（方案生成）
+# R8 — 证据契约（evidence-contract）
 
 基于 idea 做创新性与可行性研究，产出论文提案 + 实验流程。
+
+
+> ⚠️ **内部小节号 `§C1—§C7` 保留自旧命名**（本文档由旧 `mode-c` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
+> **迁移不得丢节** —— 本注被删掉时，`§C1—§C7` 会失去唯一解释，读者会误当退役字母残留。
 
 ## 输入
 
 | 输入 | 必填 | 说明 |
 |---|---|---|
-| 一个或多个 idea | ✅ | 来自 Mode B 的 `idea_candidates`，或用户直接提供 |
-| 关键参考文献 | ❌ | 种子文献；缺省时调用 Mode A |
+| 一个或多个 idea | ✅ | 来自 R3—R6 的 `idea_candidates`，或用户直接提供 |
+| 关键参考文献 | ❌ | 种子文献；缺省时调用 R2 / R5 |
 | 资源约束 | ❌ | 算力 / 数据 / 人力 / 时间 / 开源要求 |
 
 **信息完整性检查（开工前）：** idea 是否足够具体到可设计实验？若只是方向词
-（如"扩散模型 + 组合优化"），先要求用户收敛，或从 Mode B 的候选清单中选一条。
+（如"扩散模型 + 组合优化"），先要求用户收敛，或从 R3—R6 的候选清单中选一条。
 
 > **锚定点（核心目标）必须先确认**（见 [../SKILL.md](../SKILL.md) §0.1）。
 > 本 Mode 受锚点约束：**贡献类型必须与主锚点一致**；C4 的实验计划按锚点加严要求——
@@ -38,10 +42,10 @@
 
 **C1 是「增量复核」，不是把 B5 重做一遍：**
 
-- 只对 B5（[mode-b](mode-b-idea-discovery.md) §B5）判为 **「边缘 / 不足」** 的项做深化；
+- 只对 B5（[phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §B5）判为 **「边缘 / 不足」** 的项做深化；
 - B5 已判 **「足够」且期间无新文献**的项，**不重做 L3** —— 直接引用 B5 结论并**标注
   来源**（`A002/I3` 的 B5 审核结论 + **当时的检索等级 search_level**）；
-- **继承时不得升级证据等级：** B5 的 shortlist 门槛是 **L2**（[mode-b](mode-b-idea-discovery.md)
+- **继承时不得升级证据等级：** B5 的 shortlist 门槛是 **L2**（[phase-r3-r6-discovery.md](phase-r3-r6-discovery.md)
   §B5.2）。若该 idea 的 B5 `search_level` **只到 L2**，C1 的创新性结论就**只能按 L2
   表述**（用「据本次检索未见」，见 [evidence-policy.md](evidence-policy.md)），
   **不得**升级为「已核实」；**要写「首次提出」类声称，必须该 idea 已达 L3，或由 C1
@@ -53,7 +57,7 @@
 **输出：**
 
 1. **创新性判定** —— 使用 [venue-standards.md](venue-standards.md) §6 的模板。
-2. **创新性边界重界定** —— 相对 Mode B 的边界，本次核实后更新三区划分，
+2. **创新性边界重界定** —— 相对 R3—R6 的边界，本次核实后更新三区划分，
    所有"无人区"声称标注 `已核实` 或 `待核实`。
 
 ---
@@ -158,7 +162,7 @@
    - 方案：`<routeX>/docs/<R>NNN-proposal.md`
    - 实验计划：`<routeX>/docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
    每份文档都按 project-layout.md §2.6 扫描现有最大序号 +1，**序号永不复用**。
-2. **frontmatter：** `mode: C / type: proposal | experiment-plan / status / created`。
+2. **frontmatter：** `phase: R8 / type: proposal | experiment-plan / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增两行；
    - §3 已证实：C1/S-Lit 已核实的结论；
@@ -173,13 +177,13 @@
 
 ## C7. 输出后
 
-1. 附 `state.json` 片段，`next_mode_suggestion: "D"`（先做叙事）或 `"E"`（直接复核）。
-2. 建议进入 Mode E，并提示：若需要接续复核，请保留本次输出作为 `review_output`
+1. 附 `state.json` 片段，`next_phase_suggestion: "R12"`（先做叙事）或 `"R7 / R10 / R13"`（直接复核）。
+2. 建议进入 R7 / R10 / R13，并提示：若需要接续复核，请保留本次输出作为 `review_output`
    的对照基线。
 
 ```json
 {
-  "mode": "C",
+  "phase": "R8",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
   "doc_id": "A003",
@@ -192,6 +196,43 @@
   "risk_list": [{"risk": "…", "type": "工程", "mitigation": "…"}],
   "literature_used": [],
   "open_questions": [],
-  "next_mode_suggestion": "D"
+  "next_phase_suggestion": "R12"
 }
 ```
+
+---
+
+
+## Wave 2 深化骨架：Claim Contract（每个 central claim 一张）
+
+```text
+Claim C17
+─────────
+Statement
+Scope
+Critical assumptions
+Supporting evidence required
+Refuting evidence
+Nearest alternative explanation
+Minimal discriminating experiment
+Expected outcomes:
+  O1 → supports C17
+  O2 → supports alternative ALT-1
+  O3 → inconclusive
+Kill rule
+Expansion rule
+```
+
+**硬规则：** `Kill rule` 与 `Expansion rule` **必须可判定**（写成「若观察 O2 则 X」这种形式）。
+写不出可判定 kill rule 的 claim **不得进入 R9**（`state_check.py` V1 的 `falsifier` 是它的前置条件）。
+
+---
+
+## 读 / 写 World Model（强制）
+
+| 阶段 | 读 | 写 |
+|---|---|---|
+| **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
+
+> 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

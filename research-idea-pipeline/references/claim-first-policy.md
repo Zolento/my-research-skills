@@ -1,15 +1,15 @@
 # Claim-first 政策（claim 层规则的唯一权威定义）
 
 **本文件是 claim 层规则的唯一权威定义。** 证据台账、claim graph、central proposition、
-`(O, T, R)` 三轴与 anchor eligibility 的规则都写在这里。各 Mode 只引用本文件，不重复定义
+`(O, T, R)` 三轴与 anchor eligibility 的规则都写在这里。各 R 阶段 只引用本文件，不重复定义
 ——各自再写一遍枚举就是新的漂移源。
 
-**适用范围：** 本轮（P0）由 **Mode D** 执行本文件全部规则。Mode B / C / E 的接入登记为
+**适用范围：** 本轮（P0）由 **R12** 执行本文件全部规则。R3—R6 / R8 / R7 / R10 / R13 的接入登记为
 **P1**，本轮不执行。
 
-**权威顺序：** 仓库级 spec（`docs/mode-d-claim-first-spec.md`，不进安装副本）
+**权威顺序：** 仓库级 spec（`docs/claim-first-spec.md`，不进安装副本）
 > 本文件（claim 类） > [scoring-policy.md](scoring-policy.md)（评分类） >
-[venue-standards.md](venue-standards.md)（会议类） > 各 Mode 文件。
+[venue-standards.md](venue-standards.md)（会议类） > 各 R 阶段 文件。
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
 
 > **记法警告：** 本文件的 `A` / `B` 是**领域占位符**（A = 目标领域，B = 来源领域），
@@ -68,7 +68,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
    凡要求「必须有 B」的规则一律作废，改为「必须能写出 `G` 与 `K`」。
 3. 写不出 `G` 或 `K` 的叙事**不得**进入投稿叙事（承接 §4 的承重墙）。
 
-**引用本节的 Mode：** Mode D（D4 定位与 §1 因子分解）。Mode B / C / E 为 P1。
+**引用本节的 Mode：** R12（D4 定位与 §1 因子分解）。R3—R6 / R8 / R7 / R10 / R13 为 P1。
 
 ---
 
@@ -127,8 +127,8 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 - 措辞等级的判定与措辞选择**一律**以 [evidence-policy.md](evidence-policy.md) 为准。
   本文件只规定「哪种状态能升到哪一级」。
 
-**引用本节的 Mode：** Mode D（D0、D9）。[evidence-policy.md](evidence-policy.md) §3 做反向映射。
-Mode B / C 为 P1。
+**引用本节的 Mode：** R12（D0、D9）。[evidence-policy.md](evidence-policy.md) §3 做反向映射。
+R3—R6 / R8 为 P1。
 
 ---
 
@@ -163,8 +163,8 @@ Mode B / C 为 P1。
    （见 [narrative-patterns.md](narrative-patterns.md) §3）。claim graph 与槽位的对照
    **必须**一一落地，**不得**只在 claim graph 里写 `Ci ← Ej` 而槽位里没有对应证据句。
 
-**引用本节的 Mode：** Mode D（D1、D4 的 `S5`、D9）。
-[scoring-policy.md](scoring-policy.md) §3 的 `G1` / `G4`。Mode B / C 为 P1。
+**引用本节的 Mode：** R12（D1、D4 的 `S5`、D9）。
+[scoring-policy.md](scoring-policy.md) §3 的 `G1` / `G4`。R3—R6 / R8 为 P1。
 
 ---
 
@@ -217,7 +217,7 @@ Mode B / C 为 P1。
 2. 对应的台账条目**必须**标 `epistemic_status: Hypothesized` 与 `[待验证]`。
 3. 该条**必须**进 D9 的缺失证据清单。**不得**把假设写成已知原因。
 
-**引用本节的 Mode：** Mode D（D1 的 `C0`、D4 的 `S3`）。
+**引用本节的 Mode：** R12（D1 的 `C0`、D4 的 `S3`）。
 [../SKILL.md](../SKILL.md) §1.5。[narrative-patterns.md](narrative-patterns.md) §2 / §4 / §7。
 
 ---
@@ -261,7 +261,7 @@ Mode B / C 为 P1。
 
 该条与 [../SKILL.md](../SKILL.md) §0.1 规则 1 的 `core_goal` 单值纪律一致。
 
-**引用本节的 Mode：** Mode D（D2、D6）。[narrative-patterns.md](narrative-patterns.md) §2。
+**引用本节的 Mode：** R12（D2、D6）。[narrative-patterns.md](narrative-patterns.md) §2。
 [venue-standards.md](venue-standards.md) §10。
 
 ---
@@ -302,9 +302,9 @@ Mode B / C 为 P1。
    只写进对话不算，**不得**提示冲突后继续（[../SKILL.md](../SKILL.md) §0.1 规则 6）。
 6. 冲突的处置权限：agent 只能**提请**或**降级**。要真正更换主锚点，只能走
    [../SKILL.md](../SKILL.md) §0.2 锚点变更单，且**只有用户能授权**。
-7. `anchor_role: orthogonal` 的路线**不得**进入 Mode D（[../SKILL.md](../SKILL.md) §0.1 规则 3）。
+7. `anchor_role: orthogonal` 的路线**不得**进入 R12（[../SKILL.md](../SKILL.md) §0.1 规则 3）。
 
-**引用本节的 Mode：** Mode D（D3）。[../SKILL.md](../SKILL.md) §0.1 的 D 行。
+**引用本节的 Mode：** R12（D3）。[../SKILL.md](../SKILL.md) §0.1 的 D 行。
 
 ---
 
@@ -316,14 +316,14 @@ Mode B / C 为 P1。
 
 | 节 | 引用的内容 | 被引节 |
 |---|---|---|
-| §0.1「锚点如何约束各 Mode」D 行 | Anchor Eligibility Test、与目标锚点冲突时必须显式告知 | §6 |
+| §0.1「锚点如何约束各 R 阶段」D 行 | Anchor Eligibility Test、与目标锚点冲突时必须显式告知 | §6 |
 | §1.5 | 承重墙、`C0—C5`、`Ci ← Ej`、机制规则降级 | §3、§4 |
 | §2 资源索引 | 本文件全部规则 | §1—§6 |
-| §3 派遣矩阵 Mode D 行、§4 Mode D 速查、§6 执行自检清单 | claim-first 流程与自检项 | §1—§6 |
+| §3 派遣矩阵 R12 行、§4 R12 速查、§6 执行自检清单 | claim-first 流程与自检项 | §1—§6 |
 | §7 设计依据 | 「为什么 claim-first」 | §1、§4 |
 | §8 A5 跨层漂移 | claim 层枚举与叙事层 / 评审层的耦合 | §2—§6 |
 
-### 7.2 [mode-d-narrative-generation.md](mode-d-narrative-generation.md)
+### 7.2 [phase-r12-narrative.md](phase-r12-narrative.md)
 
 | 节 | 引用的内容 | 被引节 |
 |---|---|---|
@@ -353,9 +353,9 @@ Mode B / C 为 P1。
 | [scoring-policy.md](scoring-policy.md) | §3 硬门禁 `G1`—`G5` | `G1` 引 `Ci ← Ej`，`G2` 引 delta，`G4` 引证据台账 | §2、§3 |
 | [scoring-policy.md](scoring-policy.md) | §4 排序维度六维 | `Claim strength` 与 `Narrative compression` | §1 |
 | [evidence-policy.md](evidence-policy.md) | §3 认知状态 ↔ 措辞等级映射 | `epistemic_status` 五值 | §2 |
-| [roles.md](roles.md) | §1B 攻击面审稿人（Mode D 主审） | `R-Novelty` / `R-Causal` 攻击 `Ci ← Ej` 的缺口 | §3、§4 |
+| [roles.md](roles.md) | §1B 攻击面审稿人（R12 主审） | `R-Novelty` / `R-Causal` 攻击 `Ci ← Ej` 的缺口 | §3、§4 |
 | [venue-standards.md](venue-standards.md) | §10 contribution type → evidence contract → calibration | `(O, T, R)` 与证据契约 | §5 |
-| [../templates/state.template.json](../templates/state.template.json) | Mode D 段 | `evidence_ledger` / `claim_graph` / `typing` / `anchor_eligibility` 字段 | §2、§3、§5、§6 |
+| [../templates/research-state.template.json](../templates/research-state.template.json) | R12 段 | `evidence_ledger` / `claim_graph` / `typing` / `anchor_eligibility` 字段 | §2、§3、§5、§6 |
 | [../examples/example-d-narrative.md](../examples/example-d-narrative.md) | 全篇示例 | 台账、claim graph、`(O, T, R)`、anchor eligibility、`[待补]` | §2—§6 |
 
 **维护规则：**
@@ -365,5 +365,5 @@ Mode B / C 为 P1。
 2. 引用本文件时**必须**写 `claim-first-policy.md §N`，**不得**只写「见 claim-first 政策」。
 3. 本文件的枚举或门禁一旦改动，**必须**按 [../SKILL.md](../SKILL.md) §8 A5 扫完 claim 层、
    叙事层、评审层三层再收工。
-4. P1 登记（本轮不做）：Mode B / C 接入证据台账与 anchor eligibility，Mode E 迁移到
+4. P1 登记（本轮不做）：R3—R6 / R8 接入证据台账与 anchor eligibility，R7 / R10 / R13 迁移到
    `G1`—`G5` 门禁与六维排序。

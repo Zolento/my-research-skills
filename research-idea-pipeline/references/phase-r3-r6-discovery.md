@@ -1,15 +1,19 @@
-# Mode B — idea-discovery（Idea 发现 + Idea 级审核）
+# R3—R6 — 双轨发现与种群进化（dual-discovery → isolated populations → evolution）
 
 基础文献调研 + 多子代理头脑风暴，产出 idea 候选，**并对每个候选做 idea 级的创新性
 与可行性审核**，最后给出经过筛选的推荐清单。
 
-> **Mode B 的定位是"概念级"。** 它回答 **"这个方向/概念值不值得做"**：
+> **R3—R6 的定位是"概念级"。** 它回答 **"这个方向/概念值不值得做"**：
 > 文献上是否已被覆盖、概念上是否非平凡、方法路线上是否成立。
-> 它**不**回答"这个方案做得对不对"——那是 Mode E 的职责（见 §B0）。
+> 它**不**回答"这个方案做得对不对"——那是 R7 / R10 / R13 的职责（见 §B0）。
 
-## B0. 与 Mode E 的分工（必须先明确，避免重复劳动）
 
-| 维度 | Mode B（idea 级） | Mode E（方案级） |
+> ⚠️ **内部小节号 `§B0—§B8` 保留自旧命名**（本文档由旧 `mode-b` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
+> **迁移不得丢节** —— 本注被删掉时，`§B0—§B8` 会失去唯一解释，读者会误当退役字母残留。
+
+## B0. 与 R7 / R10 / R13 的分工（必须先明确，避免重复劳动）
+
+| 维度 | R3—R6（idea 级） | R7 / R10 / R13（方案级） |
 |---|---|---|
 | **对象** | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | **核心问题** | 这个概念值得做吗？ | 这个方案做得对吗、能不能做成？ |
@@ -45,19 +49,19 @@
 
 ---
 
-## B1. 基础文献调研（必须走 Mode A 或等价的脚本调用）
+## B1. 基础文献调研（必须走 R2 / R5 或等价的脚本调用）
 
-- **检索必须走 Mode A**（或等价的
+- **检索必须走 R2 / R5**（或等价的
   [literature_search.py](../scripts/literature_search.py) 调用），
   按 [literature-policy.md](literature-policy.md) 规范检索**本地 + 多源**
   （先本地、再 arxiv；**本地命中不是终点，仍须扩检**，429 指数退避）。
-- **禁止内联自行实现一套检索。** 各 Mode 自行实现检索会**绕开 Mode A 的全部纪律**
-  （T1—T7 触发、L3 饱和判据、每源状态、负检索记录）。走 Mode A / 等价脚本时，必须
+- **禁止内联自行实现一套检索。** 各 Mode 自行实现检索会**绕开 R2 / R5 的全部纪律**
+  （T1—T7 触发、L3 饱和判据、每源状态、负检索记录）。走 R2 / R5 / 等价脚本时，必须
   保留其**检索式、每源状态与负检索记录**。
 - **注意：本次调研支撑后续的创新性审核，属于 T4/T5 触发场景**（**B5 是概念级快筛，
   按 T4 的例外执行 L2**，见 [literature-policy.md](literature-policy.md) §2 的 T4 行），
   因此本地命中后仍必须执行**在线源**检索；检索等级门槛见 §B5.2。
-- 建议检索量：`max_results ≥ 20`；不足时按 Mode A 的 A3 策略扩大范围。
+- 建议检索量：`max_results ≥ 20`；不足时按 R2 / R5 的 A3 策略扩大范围。
 - **产出：**
   1. **技术路线归纳表** —— 把文献聚类为 3—6 条技术路线。
   2. **创新性边界** —— 分为三区：
@@ -137,7 +141,7 @@
 
 ## B5. Idea 创新性与可行性审核（强制，不可跳过）
 
-**这是 Mode B 与 Mode E 的分界点：B5 是概念级快筛，不是方案级深审。**
+**这是 R3—R6 与 R7 / R10 / R13 的分界点：B5 是概念级快筛，不是方案级深审。**
 
 对去重后的**每一个**候选 idea 执行审核。**禁止只给 idea 不给审核。**
 
@@ -160,7 +164,7 @@
 > 先给**理论角度**与**应用角度**各自的实质判断，再给一条**本会议特性判定**
 > （引用该会议标准条目）。只写一个角度 = 评审不合格。B5 是快筛，但不等于可以只写一句话。
 >
-> **不派遣 S-Repro。** idea 阶段没有代码可复现；可复现性审查只在 Mode E 进行。
+> **不派遣 S-Repro。** idea 阶段没有代码可复现；可复现性审查只在 R7 / R10 / R13 进行。
 
 ### B5.2 检索门禁
 
@@ -246,27 +250,27 @@
    [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 shortlist + 淘汰清单 + 创新性边界界定。
-2. **frontmatter：** `id / route / mode: B / type: idea-discovery / status / created`。
+2. **frontmatter：** `id / route / phase: R3—R6 / type: idea-discovery / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增本文件行；
    - §3 已证实：被 S-Lit 证实"重叠足够"的 idea 方向；
    - §4 已证伪：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea；
-   - §5 TODO：进入 shortlist 的 idea → 转成"进入 Mode C"的任务；"待核实"的无人区
+   - §5 TODO：进入 shortlist 的 idea → 转成"进入 R8"的任务；"待核实"的无人区
      条目 → 检索任务；
    - §7 Warnings：**未完成 L2 的"无人区"声称、未完成 L3 的"首次"声称必须记为 Warning**；
    - §9 变更日志。
 
 ## B8. 输出后
 
-1. 附 `state.json` 片段，`next_mode_suggestion: "C"`。
-2. 建议用户从 shortlist 中挑选 1—3 个 idea 进入 Mode C，并把 B2 的局限分析与
+1. 附 `state.json` 片段，`next_phase_suggestion: "R8"`。
+2. 建议用户从 shortlist 中挑选 1—3 个 idea 进入 R8，并把 B2 的局限分析与
    B5 的审核结论一并传入。
 
 **state 片段示例：**
 
 ```json
 {
-  "mode": "B",
+  "phase": "R3—R6",
   "timestamp": "2025-01-01T00:00:00Z",
   "route": "routeA",
   "doc_id": "A002",
@@ -300,6 +304,69 @@
   "literature_used": [{"title": "…", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
   "innovation_boundary": {"red_ocean": [], "blue_ocean": [], "no_mans_land": []},
   "open_questions": ["无人区判定未经 S-Lit 复核"],
-  "next_mode_suggestion": "C"
+  "next_phase_suggestion": "R8"
 }
 ```
+
+---
+
+
+## Wave 2 深化骨架（本轮只落骨架）
+
+### R3 双轨发现，上下文隔离（强制）
+
+```text
+                 ┌── Local Search ──────── 已有 gap / 机制改进
+problem ─────────┤
+                 └── Paradigm Escape ───── P1 Reframe
+                                           P2 Assumption destruction
+                                           P3 Remote structural analogy（先做 domain erasure）
+                                           P4 Theory lens
+                                           P5 Measurement inversion
+                                           P6 Counterexample / impossibility
+```
+
+**硬规则：两轨在产生候选之前不得互相看到内容。**
+理由：`early communication → idea convergence`，四个 island 若第一轮就共享答案，
+发散度会塌成一条。**隔离是机制，不是建议。**
+
+### R4 隔离种群 → structural signature → QD archive
+
+**不要** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为 **Quality-Diversity archive**：
+每个 niche 留一个 elite，避免「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。
+
+```text
+Niche A: assumption-breaking      elite: H12
+Niche B: new-formulation          elite: H31
+Niche C: remote-theory-transfer   elite: H44
+Niche D: impossibility            elite: H59
+Niche E: benchmark-inversion      elite: H62
+```
+
+`H.niche` 因此是**必填字段**（`state_check.py` V6 机械强制）。
+
+**structural signature 用五维距离聚类，不用文本 embedding**：两个文字完全不同、
+本质都是「feature consistency loss」的候选必须被识别为同一 cluster。
+
+### R6 进化算子
+
+`mutation` / `cross-domain crossover` / `simplification` / `theory-induced deduction` /
+`new niche creation`。**fitness 分两段（Wave 2 落地）：**
+
+| 阶段 | 只看 | **不看** |
+|---|---|---|
+| Search | `representation distance` + `structural novelty` + `cross-domain surprise` + `deductive yield` | **venue fit**（在搜索期优化 venue fit 正是杀死范式 idea 的原因） |
+| Selection | novelty / validity / importance / testability / EIG÷cost | — |
+
+---
+
+## 读 / 写 World Model（强制）
+
+| 阶段 | 读 | 写 |
+|---|---|---|
+| **R3** | `literature` / `assumptions` / `failures` | `hypotheses` |
+| **R4** | `hypotheses` | `hypotheses[].niche` |
+| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses` / `failures` |
+
+> 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

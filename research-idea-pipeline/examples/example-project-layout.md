@@ -27,7 +27,7 @@
 │   │   ├── A002-ideas.md
 │   │   ├── A003-proposal.md
 │   │   ├── A004-experiment-plan.md
-│   │   ├── A005-narrative.md              # Mode D：一次调用一份
+│   │   ├── A005-narrative.md              # R12：一次调用一份
 │   │   └── A003-review-r01.md             # 审阅挂被审 ID，轮次零填充
 │   ├── code/
 │   └── experiments/
@@ -63,7 +63,7 @@
 ```
 routeA/docs/A002-ideas.md                 ← idea 候选清单（含 I1..In）
 routeA/docs/A003-proposal.md              ← 方案
-routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 S1—S6 + 门禁 G1—G5
+routeA/docs/A005-narrative.md             ← R12 一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 S1—S6 + 门禁 G1—G5
 routeA/docs/A003-review-r01.md            ← 对 A003 的第 1 轮审阅
 routeA/docs/A003-review-r02.md            ← 对 A003 的第 2 轮审阅（接续复核）
 routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/ 下
@@ -80,8 +80,8 @@ routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/
 | 审阅记录 | **不占新序号**，挂在被审文档 ID 上：`A003-review-r01.md` / `-r02.md`（轮次零填充） |
 | 接续复核 | 递增 `-r02`、`-r03`（**零填充两位**），frontmatter 的 `review_round` 同步 |
 
-> **注意：** 文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D/E 无关。
-> 产出该文档的 Mode 记在 frontmatter 的 `mode` 字段里。
+> **注意：** 文档 ID 前缀 `A`/`B` 是**路线编号**，与 R 阶段 无关。
+> 产出该文档的 Mode 记在 frontmatter 的 `phase` 字段里。
 
 ### 每份文档的 frontmatter
 
@@ -89,7 +89,7 @@ routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/
 ---
 id: A003
 route: routeA
-mode: C                 # A | B | C | D | E —— 产出该文档的 Mode
+phase: R8                 # R0..R14 —— 产出该文档的阶段
 type: proposal          # idea-discovery | proposal | experiment-plan | narrative | review | literature-survey
 status: draft           # draft | in-review | reviewed | superseded
 created: 2025-01-01
@@ -112,7 +112,7 @@ reviewers: []
 ```markdown
 # routeA — INDEX
 
-> 一句话状态：当前处于 Mode C，方案 A003 已产出待审。
+> 一句话状态：当前处于 R8，方案 A003 已产出待审。
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
@@ -122,17 +122,17 @@ reviewers: []
 | 研究问题 | 离散扩散如何约束组合优化搜索空间 |
 | 核心假设 | 可逆性可作为硬可行性约束 |
 | 目标会议 | ICML |
-| 当前阶段 | Mode D |
+| 当前阶段 | R12 |
 | 推荐优先级 | 中 |
 
 ## 2. 文档索引
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
-| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | B | reviewed | 12 个 idea（含 B5 审核） |
-| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1..Kn |
-| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1..E7 |
-| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1 的 claim graph + 2—4 套六槽位叙事，最佳 N2 |
-| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | E | reviewed | 中位数 4 |
+| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | R3—R6 | reviewed | 12 个 idea（含 B5 审核） |
+| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | R8 | reviewed | 贡献 K1..Kn |
+| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | R9—R11 | reviewed | 实验 E1..E7 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | R12 | reviewed | 一次调用：I1 的 claim graph + 2—4 套六槽位叙事，最佳 N2 |
+| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | R7 / R10 / R13 | reviewed | 中位数 4 |
 
 ### 2.1 Idea 追踪
 | Idea | 状态 | 关联文档 | 最佳 preset | 备注 |
@@ -214,7 +214,7 @@ reviewers: []
 | 致命风险未缓解 / **复现风险 = 高** | **§7 Warnings** |
 | 复现步骤本身有错 | **§6 Bugs** |
 
-Mode B5 同理：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea → **§4 已证伪**。
+R3—R65 同理：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea → **§4 已证伪**。
 
 ---
 

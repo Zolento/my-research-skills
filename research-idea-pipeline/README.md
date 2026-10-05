@@ -2,7 +2,7 @@
 
 面向 **CVPR / ICML / NeurIPS / MICCAI** 投稿的研究创意全流程辅助 Skill。覆盖文献调研、idea
 发现（含 idea 级审核）、方案生成、**多 preset 叙事生成与审稿**、方案复核的完整链路。
-可单独调用任一 Mode，也可串联调用。
+可单独运行任一双循环阶段，也可串联运行。
 
 **字母顺序 = 工作流顺序：**
 
@@ -22,20 +22,20 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：mode 分发 + 全局不变量 + 状态传递
 ├── README.md                         # 本文件
 ├── references/
-│   ├── roles.md                      # 共享角色：会议审稿人（B/C/E）+ 六攻击面审稿人（Mode D）+ 证据核验员
+│   ├── roles.md                      # 共享角色：会议审稿人（B/C/E）+ 六攻击面审稿人（R12）+ 证据核验员
 │   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊（TMI/JMLR/Nature MI）+ contribution type → evidence contract → venue calibration + 防复现标准
 │   ├── narrative-patterns.md         # 十套叙事 preset（非互斥）+ (O,T,R) 选 preset + 六槽位 S1—S6 + Transfer Legitimacy
-│   ├── claim-first-policy.md         # Mode D 现行（P0）：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
+│   ├── claim-first-policy.md         # R12 现行（P0）：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
 │   ├── scoring-policy.md             # 两层：硬门禁 G1—G5 + 排序六维（D）；极性归一化/中位数/一票否决（E）
-│   ├── evidence-policy.md            # 五 Mode 共用：证据等级 ↔ 允许/禁止表述（唯一定义）
+│   ├── evidence-policy.md            # 五类共享政策：证据等级 ↔ 允许/禁止表述（唯一定义）
 │   ├── writing-policy.md             # 落盘文档/对话返回/子代理意见共用：受控中文三档（asd-ste100 / Strict / 中文-顺）
-│   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
-│   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
-│   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
-│   ├── mode-d-narrative-generation.md # Mode D：claim-first 叙事 + 攻击面审核 + 硬门禁（D0—D9）
-│   └── mode-e-proposal-review.md     # Mode E：方案级正确性 + 防复现（E0—E8）
+│   ├── phase-r2-r5-field-mapping-retrieval.md   # R2 / R5：文献调研（A1—A7）
+│   ├── phase-r3-r6-discovery.md      # R3—R6：发现 + idea 级审核（B0—B8）
+│   ├── phase-r8-evidence-contract.md # R8：方案生成（C1—C7）
+│   ├── phase-r12-narrative.md # R12：claim-first 叙事 + 攻击面审核 + 硬门禁（D0—D9）
+│   └── phase-r7-r10-r13-assurance-repair-review.md     # R7 / R10 / R13：方案级正确性 + 防复现（E0—E8）
 ├── scripts/
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
@@ -48,7 +48,7 @@ research-idea-pipeline/
 │   ├── INDEX.md                      # 路线级 INDEX.md 骨架（含文档关系图）
 │   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（跨路线索引）
 │   ├── README.route.md               # 路线级 README.md 骨架
-│   └── state.template.json           # state.json 片段模板（键 = A—E）
+│   └── research-state.template.json           # state.json 片段模板（键 = A—E）
 ├── examples/
 │   ├── example-b-to-c-d-e.md         # 主链路串联
 │   ├── example-d-narrative.md        # claim-first 叙事与选型（D0—D9）
@@ -65,7 +65,7 @@ research-idea-pipeline/
 
 ### 锚定点（核心目标）—— **必须先问，不得猜**
 
-开始任何 Mode 之前，先与用户确认本工作的核心目标。用户没说就**反问**，
+开始任何 R 阶段之前，先与用户确认本工作的核心目标。用户没说就**反问**，
 **不要默认成"提高性能"**。**项目主锚点未声明前不得开工。**
 
 | 锚点 | 核心目标 | 成功判据 | 贡献类型 |
@@ -89,7 +89,7 @@ research-idea-pipeline/
 - **`anchor_role`** 取 `primary` / `supporting` / `orthogonal`：
   `supporting` **必须可证伪**（说出一个会因它改变的下游决策 + 对主锚点判据的可测影响），
   只写"有理论价值"不算，答不出就标 `orthogonal`；
-  **`orthogonal` 不得进入 Mode D、不得作为投稿主线。**
+  **`orthogonal` 不得进入 R12、不得作为投稿主线。**
 - **「必须服务」的强制力是「服务，否则降级 + 公开正交」，不是「服务，否则作废」。**
   被禁止的是**沉默**：既不服务、又不公开标注、还继续当主线推进。
 - **只有用户能授权换方向。** agent 不得以"我发现主锚点不可达""另一个方向更有意思"
@@ -98,7 +98,7 @@ research-idea-pipeline/
 - **§1.5 的例外只认「项目主锚点」**：只有项目主锚点为 `theory` / `negative` 时，
   "第 4 步改为给出可检验推论"才对路线生效 —— **自称 `core_goal: theory` 的路线不豁免**。
 
-锚点如何约束各 Mode：A 定**检索边界**、B 定**推导与筛选**、C 定**贡献类型与实验**、
+锚点如何约束各 R 阶段：A 定**检索边界**、B 定**推导与筛选**、C 定**贡献类型与实验**、
 D 定**叙事资格与 preset**（先做 **Anchor Eligibility Test**，见 claim-first-policy §6；
 再按 `(O,T,R)` + eligible anchor 选 preset）、E 定**评审侧重**。
 
@@ -125,28 +125,29 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 
 - **不得静默降级**；**不得假装使用了 Team**；**不得因"更高级"就默认启用**。
 - **方式不改变标准：** 角色库、派遣矩阵、评分维度、交叉质询与**聚合规则**完全一致
-  （Mode D = 硬门禁 `G1—G5` + 六维排序；Mode E = 归一化后逐维中位数 + 一票否决）
+  （R12 = 硬门禁 `G1—G5` + 六维排序；R7 / R10 / R13 = 归一化后逐维中位数 + 一票否决）
   （见 [roles.md](references/roles.md) §4.1）。
 - 用 Team 时必须守**写作用域**：并行写者写互不重叠的文件；写冲突按
   "重新读取后再提交"处理。
 
 ---
 
-## 五个 Mode
+## R 阶段总览（R0—R14）
 
-| Mode | 名称 | 作用 | 可独立调用 | 可被谁调用 |
+| R 阶段 | 名称 | 作用 | 读 state | 写 state |
 |---|---|---|---|---|
-| **A** | `literature-survey` | 补充文献、扩大检索范围 | 是 | 被 B/C/D/E 调用，也可单独调用 |
-| **B** | `idea-discovery` | 文献调研 + 多子代理头脑风暴产出 idea，**并做 idea 级创新性/可行性审核** | 是 | 接 A 之后 |
-| **C** | `proposal-generation` | 基于 idea 做创新性与可行性研究，产出方案 | 是 | 接 B 之后 |
-| **D** | `narrative-generation` | **基于 idea + 方案**先建证据台账与 claim graph，再生成 2—4 套真正不同的叙事，**经攻击面审核与硬门禁后**筛出最佳叙事 | 是 | 接 B（仅 idea）或接 C（推荐） |
-| **E** | `proposal-review` | 复核**已成型方案**的正确性与可行性，并守创新性底线（防复现） | 是 | 接 C/D，或接上一次 E |
+| **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` |
+| **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
+| **R2—R6** | `discovery` | 领域测绘 → 双轨发现 → 隔离种群 → 共演化检索 → 进化 | `literature` / `assumptions` / `failures` | `hypotheses` / `literature` |
+| **R7—R8** | `assurance & contract` | 六攻击面审核 + 硬门禁 `G1—G5`；每个 central claim 一张证据契约 | `claims` / `evidence` | `assurance` / `claims.contract` |
+| **R9—R11** | `experiment loop` | 实验树 + EIG 选实验 + **修复门** + 状态回写 | `uncertainties` / `experiments` | `experiments` / `repairs` / `uncertainties` |
+| **R12—R14** | `narrative & decision` | 叙事（state 的视图）→ artifact 审计 → `continue` / `pivot` / `archive` / `submit` | `claims` / `evidence` | `narrative_view` / `reviews` / `decision` |
 
-### 各阶段的分工
+### 双循环各管什么
 
-> **B 决定"做不做"，C 决定"做什么"，D 决定"怎么讲"，E 决定"做得对不对"。**
+> **等价旧口号：** R3 决定"做不做"，R8 决定"做什么"，R12 决定"怎么讲"，R7 + R10 决定"做得对不对"。
 
-| 维度 | Mode B（idea 级） | Mode E（方案级） |
+| 维度 | R3—R6（idea 级） | R7 / R10 / R13（方案级） |
 |---|---|---|
 | 对象 | 一句话级 idea / 技术方向 | 成型的 proposal + 实验计划 |
 | 可行性 | 概念可行性：路线是否成立 | 工程可行性：具体做法能否跑通、变量是否可控 |
@@ -155,15 +156,15 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
 | 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
 
-**Mode E：** 结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**；
-**Mode E 下 S-Devil 归一化后的新颖性稳健度 ≤ 2 时同样不得为"高"**（除非走「带条件的推荐」）。
+**R7 / R10 / R13：** 结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**；
+**R7 / R10 / R13 下 S-Devil 归一化后的新颖性稳健度 ≤ 2 时同样不得为"高"**（除非走「带条件的推荐」）。
 **E 不是链条终点，而是反馈环**（可回流 C 或 B）：触发点为 ① C 产出后首次复核；
 ② **实验完成、有实测结果后**（防复现检查必须重做）；③ 投稿被拒 / 改投时。
 
-### Mode D：claim-first 叙事（本 Skill 的差异化能力）
+### R12：claim-first 叙事（本 Skill 的差异化能力）
 
 同一 idea 在不同叙事下，审稿人的接收意愿差异显著。但**叙事层不得凌驾于证据之上**，
-所以 Mode D 的哲学是 **claim-first, evidence-constrained, narrative-last**：
+所以 R12 的哲学是 **claim-first, evidence-constrained, narrative-last**：
 
 > 找到**在现有证据下最强但不过度**的科学主张，再找最短的故事让审稿人正确理解它。
 > `Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensibility`
@@ -200,7 +201,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定** | L2 强化 |
-| T4 | 新颖性判定（C1、D5.3、E2.2） | **L3 穷尽**（**例外：Mode B 的 B5 快筛 = L2**） |
+| T4 | 新颖性判定（C1、D5.3、E2.2） | **L3 穷尽**（**例外：R3—R6 的 B5 快筛 = L2**） |
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
@@ -224,11 +225,11 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 ### 2. 顶会标准锚定
 
 创新性判定必须引用 CVPR / ICML / NeurIPS / MICCAI 的具体标准；贡献必须标注类型；
-"首次提出"必须经 S-Lit 核实。Mode E 另有**防复现六项检查**与复现风险等级。
+"首次提出"必须经 S-Lit 核实。R7 / R10 / R13 另有**防复现六项检查**与复现风险等级。
 **证据等级与措辞统一见 [evidence-policy.md](references/evidence-policy.md)**
-（已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明），各 Mode 不再各自定义。
+（已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明），各 R 阶段 不再各自定义。
 
-**审稿人评价的两角度 + 会议特性（仅 Mode B / C / E）：** 四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS /
+**审稿人评价的两角度 + 会议特性（仅 R3—R6 / R8 / R7 / R10 / R13）：** 四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS /
 R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假设 / 推导是否成立、形式化
 是否完整）+ **② 应用角度**（能否落地、可验证性、影响面）+ **③ 会议特性判定**
 （按本会议首要标准，引用具体条目）。**只写一个角度 = 评审不合格。** R-MICCAI 对无临床
@@ -261,7 +262,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | **迁移** | 把其他领域 / 任务的既有方法搬来，机制不变 | 写明**来源领域 + 迁移合法性依据**；**迁移本身不算增量** |
 
 **不得留空、不得模糊**（"受 X 启发"不算标注）；**把「迁移」写成「原创」属于夸大**；
-标为「迁移」的必须证明**迁移本身带来新性质**，否则 Mode E 按**复现风险高**处理。
+标为「迁移」的必须证明**迁移本身带来新性质**，否则 R7 / R10 / R13 按**复现风险高**处理。
 见 [venue-standards.md §5.1](references/venue-standards.md)。
 
 ### 3. 输出规范
@@ -270,7 +271,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 "没做到"必须关联具体未建立的结构性质或未满足的理论条件。
 
 **形式：受控中文**（[writing-policy.md](references/writing-policy.md)）。这份政策管三个表面：
-**落到文档**（`<routeX>/docs/*.md`）、**返回对话**（每次 Mode 的报告正文）、**子代理意见**。
+**落到文档**（`<routeX>/docs/*.md`）、**返回对话**（每次阶段的报告正文）、**子代理意见**。
 它只管形式，不管内容。
 
 | 抓手 | 做法 |
@@ -327,7 +328,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 │   │   ├── A002-ideas.md  # 含 I1..In 与 B5 审核
 │   │   ├── A003-proposal.md
 │   │   ├── A004-experiment-plan.md
-│   │   ├── A005-narrative.md          # Mode D：一次调用一份
+│   │   ├── A005-narrative.md          # R12：一次调用一份
 │   │   └── A003-review-r01.md         # 审阅挂被审 ID，轮次零填充
 │   └── code/
 ├── routeB/
@@ -336,7 +337,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 │   └── docs/
 ├── shared/                # 跨路线公用代码/笔记
 └── .research-idea-pipeline/   # 机器状态 + 中间产物（都不入 docs）
-    ├── state-<mode>-<ts>.json # Mode 间传递
+    ├── research-state.json    # R1 常驻状态（就地覆盖，不按阶段切分）
     └── routeA/A003-r01/       # 中间产物：子代理原始评审件（可删）
 ```
 
@@ -350,7 +351,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 锚点文档 | `<R>000-anchor.md`（`type: anchor`）是**冻结契约**，frontmatter 带 `anchor_version` + `anchor_hash`；改锚点走锚点变更单并升版本 |
-| 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A—E 无关；Mode 记在 frontmatter |
+| 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 R 阶段无关；阶段记在 frontmatter |
 | INDEX.md | 每条路线必需，每次产出后更新 |
 | 进度必须包含 | **已证实 / 已证伪 / TODO / Bugs / Warnings** + 文档索引 + 变更日志 |
 | 负结果 | 被证伪的假设**不得删除**，保留并注明处置 |
@@ -488,17 +489,17 @@ title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migra
 
 ## 状态传递
 
-每个 Mode 输出附加 `state.json` 片段（模板见
-[templates/state.template.json](templates/state.template.json)，键名 = Mode 字母 A—E）。
+每个 R 阶段 输出附加 `state.json` 片段（模板见
+[templates/research-state.template.json](templates/research-state.template.json)，顶层直接是八类一等对象数组 + `contract`）。
 机器状态写入 `.research-idea-pipeline/`，人类可读产出写入**所在路线的 `routeX/docs/`**。
 
 接续规则：
 
-- Mode C 读取 Mode B 的 `idea_candidates`（含 B5 的 `review` 评分）。
-- Mode D 读取 Mode B 的 idea 与 Mode C 的 `proposal`。
-- Mode E 读取 Mode C 的 `proposal` + `experiment_plan`，以及 Mode D 的最佳叙事推荐。
+- R8 读取 R3—R6 的 `idea_candidates`（含 B5 的 `review` 评分）。
+- R12 读取 R3—R6 的 idea 与 R8 的 `proposal`。
+- R7 / R10 / R13 读取 R8 的 `proposal` + `experiment_plan`，以及 R12 的最佳叙事推荐。
 - 接续 E 读取上一次 E 的 `review_output` + `open_questions`。
-- 任意 Mode 调用 Mode A 时，传递 `query` + `scope` + `level`。
+- 任意阶段调用 R2 / R5 时，传递 `query` + `scope` + `level`。
 
 ---
 
@@ -543,4 +544,4 @@ title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migra
 ln -s "$PWD/research-idea-pipeline" ~/.claude/skills/research-idea-pipeline
 ```
 
-安装后通过 `mode=A|B|C|D|E` 触发调用；需要最强受控档时加 `writing=asd-ste100`。
+安装后通过 `phase=R0..R14` 触发调用；需要最强受控档时加 `writing=asd-ste100`。

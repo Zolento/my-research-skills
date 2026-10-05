@@ -24,12 +24,12 @@
 | 研究问题 | |
 | 核心假设 | |
 | 目标会议 | CVPR / ICML / NeurIPS / MICCAI |
-| 当前阶段 | Mode A / B / C / D / E |
+| 当前阶段 | R2 / R5 / R3—R6 / R8 / R12 / R7 / R10 / R13 |
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
 | 负责范围 | 代码：`routeX/code/`。文档：`docs/` |
 
 > **`anchor_role: orthogonal` 时**，这里必须写明「**不参与主锚点成功判据**」，
-> 且本路线**不得进入 Mode D、不得作为投稿主线**（见 `SKILL.md` §0.1 规则 3）。
+> 且本路线**不得进入 R12、不得作为投稿主线**（见 `SKILL.md` §0.1 规则 3）。
 > **`supporting` 必须可证伪**：要说出一个会因它而改变的下游决策与对主锚点判据的
 > 可测影响。只写"有理论价值"不算 —— 答不出就标 `orthogonal`。
 
@@ -54,15 +54,15 @@
 > **枚举外的派生物不要自创 slug** —— 归到最接近的枚举，原义写 `subtype` 列（见 §3.2）。
 > 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 
-| ID | 文件 | 类型 | **subtype** | Mode | 状态 | 说明 |
+| ID | 文件 | 类型 | **subtype** | 阶段 | 状态 | 说明 |
 |---|---|---|---|---|---|---|
 | `<路线字母>000` | `docs/<文件名>` | anchor | — | — | frozen | 冻结契约 · v<版本> · hash <前16位> |
-| `<路线字母>001` | `docs/<文件名>` | literature-survey | — | A | draft | |
-| `<路线字母>002` | `docs/<文件名>` | idea-discovery | — | B | draft | 含 I1..In |
-| `<路线字母>003` | `docs/<文件名>` | proposal | — | C | draft | 贡献 K1..Kn |
-| `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | C | draft | 实验 E1..En |
-| `<路线字母>005` | `docs/<文件名>` | narrative | — | D | draft | 一次调用：I1..In 的 claim graph + 六槽位叙事 |
-| `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | E | draft | 对 `003` 的第 1 轮审阅 |
+| `<路线字母>001` | `docs/<文件名>` | literature-survey | — | R2 | draft | |
+| `<路线字母>002` | `docs/<文件名>` | idea-discovery | — | R3—R6 | draft | 含 I1..In |
+| `<路线字母>003` | `docs/<文件名>` | proposal | — | R8 | draft | 贡献 K1..Kn |
+| `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | R9—R11 | draft | 实验 E1..En |
+| `<路线字母>005` | `docs/<文件名>` | narrative | — | R12 | draft | 一次调用：I1..In 的 claim graph + 六槽位叙事 |
+| `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | R7 / R10 / R13 | draft | 对 `003` 的第 1 轮审阅 |
 
 > **`subtype` 列必填**：枚举内写 `—`，枚举外写原义（如 `paper-outline` /
 > `experiment-cards` / `math-consolidation`）。**文件名只由 `<slug>` 决定**，
@@ -114,7 +114,7 @@ A001 文献调研
 > 引用写法：`<文档ID>/<子编号>`，如 `A002/I3`、`A003/K1`、`A004/E2`。
 >
 > **行号说明：** 下列各表的 `#` / `ID` 列是**表内行号**（Confirmed 用 C、Falsified 用 F、TODO 用 T、Bugs 用 B、Warnings 用 W），
-> **与 Mode 章节号（如 Mode C 的 §C1）、触发条件 T1—T7 无关**。
+> **与阶段章节号（如 R8 的 §C1）、触发条件 T1—T7 无关**。
 
 | # | 结论 | 证据 | 日期 |
 |---|---|---|---|

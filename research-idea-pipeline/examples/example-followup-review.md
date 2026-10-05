@@ -1,4 +1,4 @@
-# 示例：接续复核（Mode E 接上一次 E）
+# 示例：接续复核（R7 / R10 / R13 接上一次 E）
 
 演示在已有审阅内容的基础上继续复核。
 
@@ -7,7 +7,7 @@
 ## 调用
 
 ```
-调用 research-idea-pipeline，mode=E（接续）
+调用 research-idea-pipeline，phase=R7,R10,R13（接续）
 输入：proposal=上一步输出，review_output=上一次 E 的输出
 ```
 
@@ -57,4 +57,4 @@
 ## 结论要求
 
 即使大部分问题已解决，只要有**未收敛的分歧**或**未缓解的致命风险**，就必须在
-结论卡片中显式保留，并将 `next_mode_suggestion` 设为 `"E"`。
+结论卡片中显式保留，并将 `next_phase_suggestion` 设为 `"R7 / R10 / R13"`。

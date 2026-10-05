@@ -1,4 +1,4 @@
-# 顶会论文叙事 preset 库（Mode D 锚定用）
+# 顶会论文叙事 preset 库（R12 锚定用）
 
 > **名称说明：** 本文件在部分旧引用里被称为「叙事套路库」。现统一称 **narrative preset
 > 库**：`N1—N10` 是 **preset**，不是套路等级，更不是创新等级。
@@ -8,7 +8,7 @@
 >    怎么讲」。它们**不是科学分类**、**互不排斥**、**不是创新等级**。
 >    一个 idea 可以同时满足多个 preset；preset 编号高低不代表工作强弱。
 >    真正的科学分类是 `(O, T, R)` 三轴（见 [claim-first-policy.md](claim-first-policy.md) §5）。
-> 2. 下文与 [mode-d](mode-d-narrative-generation.md) 中的 **「A 领域 / B 领域」是领域
+> 2. 下文与 [phase-r12-narrative.md](phase-r12-narrative.md) 中的 **「A 领域 / B 领域」是领域
 >    占位符**（A = 要解决问题的目标领域，B = 提供理论工具的来源领域），**与 Mode 字母
 >    A/B/C/D/E 无关**。
 
@@ -35,9 +35,9 @@
 - **不是创新等级。** 选 N1 不代表比 N10 更创新；preset 不参与任何评分。
 - **主叙事取决于 claim hierarchy 的强弱**，不取决于 preset 的「热度」。
   哪套 hierarchy 的 central proposition 更强、证据更闭合，哪套就是主叙事
-  （判定见 [mode-d](mode-d-narrative-generation.md) §D8）。
+  （判定见 [phase-r12-narrative.md](phase-r12-narrative.md) §D8）。
 - 「适合会议」列是**候选提示**，不是判据。会议归口在
-  [mode-d](mode-d-narrative-generation.md) §D6 的 venue calibration 里按
+  [phase-r12-narrative.md](phase-r12-narrative.md) §D6 的 venue calibration 里按
   contribution type 校准；**禁止按会议直接选 preset**。
 
 ### 1.2 十套表
@@ -74,7 +74,7 @@
 2. **按 `(O, T, R)` 求候选交集**（§2.1—§2.3）。
 3. **用 eligible anchor 参考表排序**（§2.4，降级为参考，不是判据）。
 4. **跨域类另做 anti-application stress test**（见 §4 与
-   [mode-d](mode-d-narrative-generation.md) §D4）。
+   [phase-r12-narrative.md](phase-r12-narrative.md) §D4）。
 
 ### 2.1 按 `O`（Contribution Object）取候选
 
@@ -210,7 +210,7 @@
 
 **跨域类额外要求：** 必须做一次 **anti-application stress test**
 —— 至少测试 `N2 / N3 / N5 / N9` 四个 preset，目的是**证明「把 B 用到 A」不是最准确的
-描述**，而不是四套都必须成稿（见 [mode-d](mode-d-narrative-generation.md) §D4）。
+描述**，而不是四套都必须成稿（见 [phase-r12-narrative.md](phase-r12-narrative.md) §D4）。
 
 #### （d）负结果类：`(O=Theory, T=infeasibility, R=prove)`
 
@@ -264,7 +264,7 @@
 **未完成五步的后果：** 缺任一步，该套叙事**不得**标为「可用于投稿」；
 应在输出中标注缺口位置，并把它记入 `D9` 的缺失证据清单。
 
-**跨域类还必须做 anti-application stress test**（见 [mode-d](mode-d-narrative-generation.md) §D4）：
+**跨域类还必须做 anti-application stress test**（见 [phase-r12-narrative.md](phase-r12-narrative.md) §D4）：
 至少测试 `N2 / N3 / N5 / N9` 四个 preset，目的是证明「把 B 用到 A」不是最准确的描述。
 
 ---
@@ -328,6 +328,6 @@
 - [ ] 诚实写出该套叙事的**弱点**（1—2 条）。
 - [ ] 无 §5 的禁用表述；所有引用为 `[作者, 会议/年份]`。
 - [ ] 「首次提出」已标「待核实」；要保留则三件事齐备：L3 穷尽检索 + S-Lit 核实 +
-      负检索记录（见 [mode-d](mode-d-narrative-generation.md) §D5.3）。
+      负检索记录（见 [phase-r12-narrative.md](phase-r12-narrative.md) §D5.3）。
 - [ ] 已附「包装前后对照」，且每句声称都能落回 `Ci ← Ej`。
 - [ ] 落盘路径带 `routeX/` 前缀（`<routeX>/docs/<R>NNN-narrative.md`）。

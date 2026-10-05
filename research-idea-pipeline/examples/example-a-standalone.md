@@ -1,4 +1,4 @@
-# 示例：单独调用 Mode A（文献调研）
+# 示例：单独调用 R2 / R5（文献调研）
 
 演示不串接其他 Mode，直接做一次带范围和等级的文献调研。
 
@@ -7,7 +7,7 @@
 ## 调用
 
 ```
-调用 research-idea-pipeline，mode=A
+调用 research-idea-pipeline，phase=R2,R5
 输入：query="diffusion model combinatorial optimization",
       scope="NeurIPS 2022-2025",
       level="L3"        # 因为要支撑"是否有人做过"的判断

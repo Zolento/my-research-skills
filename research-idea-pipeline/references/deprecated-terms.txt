@@ -64,3 +64,9 @@ arxiv 查询缓存
 五段式
 ≥4 套候选
 六子代理
+
+# ── A—E 阶段架构（2026-10-06 R 架构替换掉的全部旧入口）──
+# 以下三条必须保持 0 命中；追溯历史用「旧的阶段名」这类说法，不要写原字面量。
+mode=[ABCDE]
+Mode [ABCDE]
+templates/state\.template\.json

@@ -3,20 +3,20 @@
 演示主链路：从 idea 出发，到方案，到**多 preset 叙事选型**，最后到八子代理方案复核。
 
 > 字母顺序即工作流顺序：**A 文献调研 → B idea 发现 → C 方案生成 → D 叙事生成 →
-> E 方案复核**。本示例走 B→C→D→E，Mode A 按需在任一步被调用。
+> E 方案复核**。本示例走 B→C→D→E，R2 / R5 按需在任一步被调用。
 
 ---
 
-## 1. 调用 Mode B（idea 发现）
+## 1. 调用 R3—R6（idea 发现）
 
 ```
-调用 research-idea-pipeline，mode=B
+调用 research-idea-pipeline，phase=R3-R6
 输入：领域关键词="扩散模型 + 组合优化"，参考文献=[...]
 ```
 
 **执行要点：**
 
-1. **B1** 调用 Mode A（**必须走 Mode A 或等价的脚本调用，禁止内联自行实现检索**）：
+1. **B1** 调用 R2 / R5（**必须走 R2 / R5 或等价的脚本调用，禁止内联自行实现检索**）：
    本地 + 多源并集检索（本地命中不终止），产出技术路线归纳表与创新性边界。
 2. **B2** 逐路线做深度局限性分析 —— 每条"没做到"必须指向**具体未建立的结构性质**。
 3. **B3** **同一轮并发**派遣 7 个头脑风暴子代理（R-CVPR / R-ICML / R-NeurIPS / R-MICCAI /
@@ -37,14 +37,14 @@
 
 **落盘：** `routeA/docs/A002-ideas.md` + 更新 `routeA/INDEX.md`
 
-→ `next_mode_suggestion: "C"`
+→ `next_phase_suggestion: "R8"`
 
 ---
 
-## 2. 调用 Mode C（方案生成）
+## 2. 调用 R8（方案生成）
 
 ```
-调用 research-idea-pipeline，mode=C
+调用 research-idea-pipeline，phase=R8
 输入：idea="I1: 用扩散模型的可逆性约束组合优化搜索空间"
 ```
 
@@ -61,18 +61,18 @@
 **产物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
 + 风险清单。
 
-> 贡献编号用 **K1/K2**（不用 C1），避免与 Mode C 的章节号 C1—C7 混淆。
+> 贡献编号用 **K1/K2**（不用 C1），避免与 R8 的章节号 C1—C7 混淆。
 
 **落盘：** `routeA/docs/A003-proposal.md` + `routeA/docs/A004-experiment-plan.md` + 更新 INDEX
 
-→ `next_mode_suggestion: "D"`
+→ `next_phase_suggestion: "R12"`
 
 ---
 
-## 3. 调用 Mode D（叙事生成与审稿）
+## 3. 调用 R12（叙事生成与审稿）
 
 ```
-调用 research-idea-pipeline，mode=D
+调用 research-idea-pipeline，phase=R12
 输入：idea=I1（含 B5 审核结论），proposal=上一步输出，目标会议=ICML
 ```
 
@@ -105,7 +105,7 @@
    每项写出**依据位置**。任一 `fail` ⇒ `not_submission_ready`，**不参与排序**。
 9. **D8 六维排序**：只排**通过门禁**的候选。六维是 `Significance` / `Originality` /
    `Soundness margin` / `Explanatory depth` / `Generality` / `Narrative compression`，
-   **全部同向（高 = 好）**，因此 Mode D **不做极性归一化**。
+   **全部同向（高 = 好）**，因此 R12 **不做极性归一化**。
    `Soundness margin` 的实验侧与理论侧**两个读数并存，不得平均**。
    排序写出**胜负维**与**代价维**，不给综合总分。
 10. **D9 输出**：最佳叙事 + runner-up + 逐维胜出理由 + 致命风险 + **缺失证据清单**
@@ -137,20 +137,20 @@
 **落盘：** `routeA/docs/A005-narrative.md` + 更新 INDEX（门禁 `fail` 的候选 → §4 已证伪。
 缺失证据与 anchor 冲突 → §5 TODO 与 §7 Warnings）
 
-→ `next_mode_suggestion: "C | E"`
+→ `next_phase_suggestion: "R8 | R7 / R10 / R13"`
 
 ---
 
-## 4. 调用 Mode E（方案复核）
+## 4. 调用 R7 / R10 / R13（方案复核）
 
 ```
-调用 research-idea-pipeline，mode=E
+调用 research-idea-pipeline，phase=R7,R10,R13
 输入：proposal=上一步输出，best_narrative=上一步的最佳叙事
 ```
 
 **执行要点：**
 
-1. **E1** 判定为**首次复核**（触发点 ①：Mode C 刚产出后，无上一次审阅内容）。
+1. **E1** 判定为**首次复核**（触发点 ①：R8 刚产出后，无上一次审阅内容）。
 2. **E2** 派遣八子代理：每人 **1—5 分** + ≥200 字意见（S-Repro ≥150 字）。
    四个会议审稿人的意见必须分 **理论角度 / 应用角度 / 会议特性判定** 三段。
    焦点是**方法正确性与工程可行性**，不重复 B 的概念评估。
@@ -185,12 +185,12 @@ routeA/
 └── experiments/
 
 docs/
-├── A001-literature-survey.md             # Mode A（按需）
-├── A002-ideas.md                         # Mode B（含 I1..In 与 B5 审核）
-├── A003-proposal.md                      # Mode C
-├── A004-experiment-plan.md               # Mode C
-├── A005-narrative.md                     # Mode D（一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 + 门禁 + 最佳推荐）
-└── A003-review-r01.md                        # Mode E（含复现风险等级）
+├── A001-literature-survey.md             # R2 / R5（按需）
+├── A002-ideas.md                         # R3—R6（含 I1..In 与 B5 审核）
+├── A003-proposal.md                      # R8
+├── A004-experiment-plan.md               # R8
+├── A005-narrative.md                     # R12（一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 + 门禁 + 最佳推荐）
+└── A003-review-r01.md                        # R7 / R10 / R13（含复现风险等级）
 ```
 
 `.research-idea-pipeline/` 下另有 `state-B-*.json`、`state-C-*.json`、`state-D-*.json`、

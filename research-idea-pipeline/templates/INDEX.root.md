@@ -34,18 +34,18 @@
 
 | 路线 | 路线锚点 `core_goal` | **`anchor_role`** | **`serves` / `serves_evidence`** | 当前阶段 | 最优方案 | 推荐优先级 | 路线 INDEX |
 |---|---|---|---|---|---|---|---|
-| routeA | theory | primary | — | Mode A—E | A003 | 高 | `routeA/INDEX.md` |
-| routeB | theory | **supporting** | 服务 performance · 选型依据 → `B003/K1` | Mode B—C | B003 | 中 | `routeB/INDEX.md` |
-| routeC | theory | **orthogonal** | —（**不参与主锚点成功判据**） | Mode B | — | 低 | `routeC/INDEX.md` |
+| routeA | theory | primary | — | R 阶段 | A003 | 高 | `routeA/INDEX.md` |
+| routeB | theory | **supporting** | 服务 performance · 选型依据 → `B003/K1` | R3—R6—R8 | B003 | 中 | `routeB/INDEX.md` |
+| routeC | theory | **orthogonal** | —（**不参与主锚点成功判据**） | R3—R6 | — | 低 | `routeC/INDEX.md` |
 
 > - **`supporting`：`serves` 与 `serves_evidence` 必填**，且必须可证伪（说出一个会因它而
 >   改变的下游决策 + 对主锚点判据的可测影响）。
-> - **`orthogonal`：必须写明「不参与主锚点成功判据」**，且该路线**不得进入 Mode D、
+> - **`orthogonal`：必须写明「不参与主锚点成功判据」**，且该路线**不得进入 R12、
 >   不得作为投稿主线**。
 > - 路线锚点与项目主锚点不一致时，**不得只提示冲突就继续**。**当轮**二选一：
 >   **① 重新定位（agent 可自行做）：** 给出可证伪的 `serves` + `serves_evidence`，
 >   并标 `supporting`。答不出就标 `orthogonal` 并公开写明「不参与主锚点成功判据」，
->   该路线**不得进入 Mode D、不得作为投稿主线**。
+>   该路线**不得进入 R12、不得作为投稿主线**。
 >   **② 换方向（只有用户能授权）：** agent 只能**提请**（记 Warnings + 问用户）。
 >   **用户显式同意后**才按 §6 开锚点变更单。**agent 不得自行换方向、换主锚点或开新路线。**
 > - **「必须服务」的强制力是「服务，否则降级 + 公开正交」，不是「服务，否则作废」。**

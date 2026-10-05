@@ -1,4 +1,4 @@
-# Mode D — narrative-generation（claim-first, evidence-constrained, narrative-last）
+# R12 — 叙事（narrative）：Research State 的视图
 
 **本 Mode 的哲学：** **找到「在现有证据下最强但不过度」的科学主张，然后找到最短的故事
 使审稿人正确理解该主张。**
@@ -17,7 +17,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 > 任何以「新颖性印象」为总纲的写法都不得出现。
 
 > ⚠️ **这仍是基于「预期贡献」的叙事预演，不是基于「实测结果」的包装。** 实验完成后
-> 必须**回到 Mode D 复核叙事是否仍成立** —— 结论变了，叙事可能不再成立
+> 必须**回到 R12 复核叙事是否仍成立** —— 结论变了，叙事可能不再成立
 > （此时必须按新结果重写 claim graph 与六槽位，不得沿用旧叙事）。
 
 > **记法（两条）：** ① `N1—N10` = **narrative presets / rhetorical realizations**，
@@ -28,12 +28,16 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 
 ---
 
+
+> ⚠️ **内部小节号 `§D0—§D9` 保留自旧命名**（本文档由旧 `mode-d` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
+> **迁移不得丢节** —— 本注被删掉时，`§D0—§D9` 会失去唯一解释，读者会误当退役字母残留。
+
 ## 定位与边界
 
 **角色：** 你是横跨多领域的**资深论文作者**，熟悉 CVPR / ICML / NeurIPS / MICCAI 的
 评审逻辑。本 Mode 由该角色主导 claim 与叙事生成，再由 §D5 的**攻击面审稿人**独立审查。
 
-| 维度 | Mode B（idea） | Mode C（方案） | **Mode D（叙事）** | Mode E（方案审查） |
+| 维度 | R3—R6（idea） | R8（方案） | **R12（叙事）** | R7 / R10 / R13（方案审查） |
 |---|---|---|---|---|
 | 对象 | 想法 | 想法 → 可执行方案 | **证据 → claim → 叙事** | 成型的方案 |
 | 核心问题 | 值得做吗 | 怎么做、能不能做成 | **最强可辩护的 claim 是什么，最短的故事是什么** | 做得对不对 |
@@ -52,13 +56,13 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 
 **何时调用：**
 
-- 接 **Mode C** 之后（**推荐**）：idea 与方案都已成型，证据台账最完整。
-- 接 **Mode B** 之后：只有 idea、暂无方案；可做 D0—D4，但台账里大量条目会是
+- 接 **R8** 之后（**推荐**）：idea 与方案都已成型，证据台账最完整。
+- 接 **R3—R6** 之后：只有 idea、暂无方案；可做 D0—D4，但台账里大量条目会是
   `Hypothesized` / `Planned`，必须标注 `[待补]`，且 `S5` 会出现缺口。
 - **独立**调用：用户直接给出 idea（+ 方案 + 已有实验 / 定理）。
 
-**输出给谁：** 最佳叙事回流到 **Mode C**（按该叙事重写提案）与/或 **Mode E**
-（完整审查）。**所有候选叙事都被门禁判 `fail`** 时，建议**退回 Mode B**。
+**输出给谁：** 最佳叙事回流到 **R8**（按该叙事重写提案）与/或 **R7 / R10 / R13**
+（完整审查）。**所有候选叙事都被门禁判 `fail`** 时，建议**退回 R3—R6**。
 
 ---
 
@@ -67,7 +71,7 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 | 输入 | 必填 | 说明 |
 |---|---|---|
 | **idea 清单** | ✅ | 每个 idea 的：核心思路、预期贡献、与现有工作的差异、关键假设 |
-| **方案（proposal）** | 推荐 | 来自 Mode C 的 `proposal`（含贡献清单 / 相关工作差异 / 动机 / 实验设计）或用户提供。缺失时叙事只能到「预期」层级并标注**待方案补充** |
+| **方案（proposal）** | 推荐 | 来自 R8 的 `proposal`（含贡献清单 / 相关工作差异 / 动机 / 实验设计）或用户提供。缺失时叙事只能到「预期」层级并标注**待方案补充** |
 | **已有实验 / 定理 / 文献** | 推荐 | 证据台账的原料；**没有原料就没有 claim graph** |
 | 关键参考文献 | ❌ | 3—5 篇最相关论文 |
 | 目标会议 | ❌ | CVPR / ICML / NeurIPS / MICCAI（**只影响 D6 校准，不影响 preset 选择**） |
@@ -295,7 +299,7 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 - **篇幅下限见 [roles.md](roles.md) §7**（D4 每套详写候选 ≥300 字）。本 Mode 不另立数字。
 - **跨域类不强制写满四套**，但**必须做一次 anti-application stress test**
   （§D4.3）。
-- **[../SKILL.md](../SKILL.md) §0.1 规则 3 不变：** `orthogonal` 路线仍不得进 Mode D。
+- **[../SKILL.md](../SKILL.md) §0.1 规则 3 不变：** `orthogonal` 路线仍不得进 R12。
 
 ### D4.1 什么算「真正不同的 claim hierarchy」
 
@@ -381,7 +385,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - ❌ 把「部分重叠」写成「首次提出」；
 - ❌ **把「迁移」写成「原创」**；
 - ❌ 用「显著提升」「有效解决」替代具体数字与口径；
-- ❌ 承诺**方案（Mode C 的 proposal）里没做**的事。
+- ❌ 承诺**方案（R8 的 proposal）里没做**的事。
 
 **判定标准（唯一、可机械执行）：**
 
@@ -510,7 +514,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 2. **攻击面判定相差 ≥2 分**时，记录分歧点并尝试**用证据**协商；无法收敛的标注
    **「存在评审分歧」**。
 3. **分歧与结论并存**：分歧单列，不得被任何聚合掩盖。
-4. **不做中位数、不做平均、不做一票否决** —— Mode D 的否决权在 D7 的门禁，
+4. **不做中位数、不做平均、不做一票否决** —— R12 的否决权在 D7 的门禁，
    排序在 D8 的六维。
 
 ### D5.5 汇总表
@@ -550,12 +554,12 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
   落在该会议范围内」，**不影响** D4 已经确定的 claim hierarchy。
 - **`clinical significance ≠ methodological innovation`**，两者**不得互相冒充**。
 - **本 Mode 不派遣会议审稿人。** `R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`
-  四个角色留给 Mode B / C / E（见 [roles.md](roles.md) §4.2）；
+  四个角色留给 R3—R6 / R8 / R7 / R10 / R13（见 [roles.md](roles.md) §4.2）；
   D6 只在**校准**意义上使用会议标准。**派遣名单仍以 §D5 的六个攻击面审稿人为准。**
 - 校准结论与 `G5 Venue scope` 联动：贡献对象与 venue 明显不匹配 → `G5` 记 `fail`。
 
 **产物：** 每套叙事的会议适配判定 + 理由 + 不匹配时的处置建议
-（换会议 / 收窄 claim scope / 补证据 / 退回 Mode B）。
+（换会议 / 收窄 claim scope / 补证据 / 退回 R3—R6）。
 
 ---
 
@@ -580,7 +584,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - **任一 `fail` ⇒ 该套叙事标 `not_submission_ready`**，**不得推荐为最佳**，
   且**不参与 D8 排序**。
 - 门禁失败**不得**用高分抵消，**不得**走「带条件的推荐」出口
-  （该出口只适用于 Mode E 的维度否决，见 [scoring-policy.md](scoring-policy.md) §5.1）。
+  （该出口只适用于 R7 / R10 / R13 的维度否决，见 [scoring-policy.md](scoring-policy.md) §5.1）。
 
 **产物：** `state.json` 的 `gates`。
 
@@ -610,8 +614,8 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 
 **硬约束：**
 
-- **六维全部同向（高 = 好）。Mode D 没有反向维度，因此不使用极性归一化。**
-  极性归一化仅适用于仍含反向维度的 Mode（当前为 Mode E），
+- **六维全部同向（高 = 好）。R12 没有反向维度，因此不使用极性归一化。**
+  极性归一化仅适用于仍含反向维度的 Mode（当前为 R7 / R10 / R13），
   见 [scoring-policy.md](scoring-policy.md) §2 的适用范围限定。
 - **不做跨审稿人逐维中位数，不折算单一综合评分。** 六个审稿人不是独立样本
   （`corr ≫ 0`），聚合出的中位数或总分是伪精确。
@@ -667,7 +671,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 3. **哪个 idea 如果换一种 claim hierarchy，可能获得更高价值？**
 
 **退回规则：** 某 idea 的所有候选叙事均 `not_submission_ready`，或六维普遍 ≤ 2
-→ 建议**退回 Mode B** 重新生成 idea（并在 `INDEX.md` 的 TODO 里留任务）。
+→ 建议**退回 R3—R6** 重新生成 idea（并在 `INDEX.md` 的 TODO 里留任务）。
 
 **合并规则：** 两个 idea 的**最佳叙事高度相似** → 考虑**合并或差异化定位**。
 
@@ -694,12 +698,12 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
    内容 = 证据台账 + claim graph + typing + anchor eligibility + 2—4 套叙事
    （每套 claim hierarchy + 六槽位）+ 攻击面评审意见 + 交叉质询记录 + 门禁表
    + 六维排序 + 最佳叙事推荐 + 缺失证据清单 + 最小必要实验 / 定理 + 最终建议。
-2. **frontmatter：** `id / route / mode: D / type: narrative / status / created`。
+2. **frontmatter：** `id / route / phase: R12 / type: narrative / status / created`。
 3. **更新该路线 `INDEX.md`**（章节规范见 [project-layout.md](project-layout.md) §4.1）：
    - §2 文档索引：新增本文件行；
    - §3 已证实：`S-Lit` 确认新颖、且通过全部门禁的叙事方向；
    - §4 已证伪：被 `S-Lit` 判「已被覆盖」、或因结构性缺陷无法成立的候选；
-   - §5 TODO：**退回 Mode B / 换 claim hierarchy 重试 / 按最佳叙事重写提案 /
+   - §5 TODO：**退回 R3—R6 / 换 claim hierarchy 重试 / 按最佳叙事重写提案 /
      补齐缺失证据清单**；
    - §7 Warnings：**门禁 `fail` 的候选**、**存在评审分歧**的项、
      **未完成 L3 的「首次提出」声称**、**未核验的新颖性结论**；
@@ -709,7 +713,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 
 ```json
 {
-  "mode": "D",
+  "phase": "R12",
   "timestamp": "2026-10-06T00:00:00Z",
   "route": "routeA",
   "core_goal": "performance",
@@ -788,7 +792,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
   "final_advice": {"most_mature": "I1", "unfixable": "I4", "repattern_candidate": "I3"},
   "literature_used": [{"title": "……", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
   "open_questions": ["I1 的迁移合法性待补 L2 级举证"],
-  "next_mode_suggestion": "C | E"
+  "next_phase_suggestion": "R8 | R7 / R10 / R13"
 }
 ```
 
@@ -802,3 +806,26 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 > **注意 `E3`：** 它是 `Hypothesized`，所以 `claim_graph` 里**没有任何 `C_i` 引用它**，
 > 它只出现在 `missing_evidence` 里。这正是 `G4` 的机械判据 ——
 > 一旦 `C0` 挂上 `E3`，就属于证据夸大（[claim-first-policy.md](claim-first-policy.md) §3）。
+
+---
+
+
+## 定位补充：Narrative 是 Research State 的视图
+
+**叙事不创造事实，只呈现 state。** 硬规则：
+
+- 叙事里的每句声称必须能落回 `Ci ← Ej`；找不到的删除或标 `[待补]`。
+- **`failures[]` 里的失败不得在叙事中消失**（`state_check.py` V4 是它的机械前置）。
+- Wave 3 将拆成 **R12-pre**（只能写「若 H 被验证，可能成立的 thesis 是…」，**不得决定研究方向**）
+  与 **R12-post**（只读已核实的 claim graph / evidence ledger / boundary / negative findings）。
+
+---
+
+## 读 / 写 World Model（强制）
+
+| 阶段 | 读 | 写 |
+|---|---|---|
+| **R12** | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |
+
+> 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
