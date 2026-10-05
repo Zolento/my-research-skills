@@ -40,7 +40,12 @@
 
 - 只对 B5（[mode-b](mode-b-idea-discovery.md) §B5）判为 **「边缘 / 不足」** 的项做深化；
 - B5 已判 **「足够」且期间无新文献**的项，**不重做 L3** —— 直接引用 B5 结论并**标注
-  来源**（`A002/I3` 的 B5 审核结论 + 检索等级）；
+  来源**（`A002/I3` 的 B5 审核结论 + **当时的检索等级 search_level**）；
+- **继承时不得升级证据等级：** B5 的 shortlist 门槛是 **L2**（[mode-b](mode-b-idea-discovery.md)
+  §B5.2）。若该 idea 的 B5 `search_level` **只到 L2**，C1 的创新性结论就**只能按 L2
+  表述**（用「据本次检索未见」，见 [evidence-policy.md](evidence-policy.md)），
+  **不得**升级为「已核实」；**要写「首次提出」类声称，必须该 idea 已达 L3，或由 C1
+  自己补做 L3 + 负检索记录**；
 - 若**期间出现新文献**，则**必须重做**相应检索；
 - 无论是否重做，创新性结论的措辞等级一律见
   [evidence-policy.md](evidence-policy.md)。

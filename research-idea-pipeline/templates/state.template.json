@@ -182,7 +182,7 @@
       "R-ICML": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "" },
       "R-NeurIPS": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "" },
       "R-MICCAI": { "score": null, "opinion": "", "theory_angle": "", "application_angle": "", "venue_verdict": "", "applicable": null },
-      "S-Devil": { "score": null, "opinion": "" },
+      "S-Devil": { "novelty_rebuttal": null, "novelty_robustness": null, "score": null, "opinion": "" },
       "S-Feas": { "score": null, "opinion": "" },
       "S-Lit": { "score": null, "opinion": "" },
       "S-Repro": { "score": null, "opinion": "" }

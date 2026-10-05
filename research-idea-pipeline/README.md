@@ -32,7 +32,7 @@ research-idea-pipeline/
 │   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
 │   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
 │   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
-│   ├── mode-d-narrative-generation.md# Mode D：多套路叙事 + 六子代理审稿（D0—D8）
+│   ├── mode-d-narrative-generation.md # Mode D：多套路叙事 + 六子代理审稿（D0—D8）
 │   └── mode-e-proposal-review.md     # Mode E：方案级正确性 + 防复现（E0—E8）
 ├── scripts/
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
@@ -153,7 +153,7 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定** | L2 强化 |
-| T4 | 新颖性判定（C1、D3.2、E2.2） | **L3 穷尽** |
+| T4 | 新颖性判定（C1、D3.2、E2.2） | **L3 穷尽**（**例外：Mode B 的 B5 快筛 = L2**） |
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
