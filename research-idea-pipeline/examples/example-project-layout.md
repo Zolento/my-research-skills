@@ -9,48 +9,50 @@
 
 ```
 <项目根目录>/
-├── AGENTS.md                    # 共享契约（若项目已有则优先遵循）
-├── docs/                        # ★ 所有路线的文档集中于此（扁平，不分子目录）
-│   ├── A001-literature-survey.md
-│   ├── A002-ideas.md
-│   ├── A003-proposal.md
-│   ├── A004-experiment-plan.md
-│   ├── A005-narrative-I1.md
-│   ├── A003-review.md
-│   ├── B001-literature-survey.md    # routeB 的文档同目录，靠 B 前缀区分
-│   └── refs/                    # ★ 参考文献库（= 本地文献库根目录）
-│       ├── papers/              # {paper_id}.pdf（不进版本库）+ .json + 可选 .md
-│       ├── cache/               # {query_hash}.json
-│       └── index.json           # ★ 必需：PDF 索引，进版本库
+├── AGENTS.md                    # 共享契约；存在则优先遵循
+├── README.md                    # ★ 根级：项目总览
+├── INDEX.md                     # ★ 根级：跨路线索引
+├── docs/                        # ★ 跨路线共享区（不放路线文档）
+│   ├── refs/                    # ★ 必需：参考文献库
+│   │   ├── papers/              # {paper_id}.pdf（不进版本库）+ .json + 可选 .md
+│   │   ├── cache/<source>/      # 查询缓存（按源分目录）
+│   │   └── index.json           # ★ 必需：PDF 索引，进版本库
+│   ├── notes/                   # 可选：跨路线共享笔记
+│   └── latex/                   # 可选：跨路线共享 LaTeX
 ├── routeA/
-│   ├── INDEX.md                 # ★ 路线 A 索引（文档索引 + 关系图 + 进度）
+│   ├── README.md                # ★ 路线级：本路线说明
+│   ├── INDEX.md                 # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
+│   ├── docs/                    # ★ 本路线文档（扁平）
+│   │   ├── A001-literature-survey.md
+│   │   ├── A002-ideas.md
+│   │   ├── A003-proposal.md
+│   │   ├── A004-experiment-plan.md
+│   │   ├── A005-narrative.md              # Mode D：一次调用一份
+│   │   └── A003-review-r01.md             # 审阅挂被审 ID，轮次零填充
 │   ├── code/
 │   └── experiments/
 ├── routeB/
-│   ├── INDEX.md                 # ★ 路线 B 索引
-│   ├── code/
-│   └── experiments/
+│   ├── README.md
+│   ├── INDEX.md
+│   ├── docs/                    # B001-… 同样扁平
+│   └── code/
 ├── shared/                      # 跨路线公用代码/笔记
-│   ├── code/
-│   └── docs/
 └── .research-idea-pipeline/     # 机器状态（不入 docs）
 ```
 
 **六条硬性规则：**
 
-1. **所有路线的文档都放根目录 `docs/`（扁平）**，靠**文件名前缀**（`A*`/`B*`）区分
-   路线；**不再按路线分子目录**。前缀是唯一的路线隔离手段，不可省。
-2. 路线之间**不得互相 import**；要复用的下沉到 `shared/`。
-3. **参考文献统一放 `docs/refs/`**（脚本默认 `--local-dir ./docs/refs`）。
-4. 每条路线必须有 `INDEX.md`，每次产出后必须更新。
-5. `state.json` / 日志不进 `docs/`。
-6. **`docs/refs/` 下的每个 PDF 都必须在 `docs/refs/index.json` 里有索引条目**；
-   **索引进版本库、PDF 不进**。新增/替换/删除 PDF 后必须重建索引：
-
-   ```bash
-   python3 scripts/refs_index.py --refs-dir docs/refs
-   python3 scripts/refs_index.py --refs-dir docs/refs --check
-   ```
+1. **文档按路线分离、各自扁平：** 产出放 `routeX/docs/`，**该目录内不再按类型分子目录**。
+   **根 `docs/` 是跨路线共享区**——只保证有 `refs/`，`notes/`、`latex/` 等由
+   `AGENTS.md` 决定。**唯一硬约束：路线文档不得放根 `docs/`。**
+2. **两层 `README.md` + 两层 `INDEX.md`：** 根级管"项目总览 + 跨路线索引"，
+   路线级管"本路线说明 + 本路线索引（含关系图）"。**每次产出后更新所在路线的 INDEX。**
+3. **文件名前缀 = 文档 ID**（不再是路径隔离）：前缀仍必需（审阅挂靠、跨路线引用唯一）。
+   序号按路线独立递增、永不复用。
+4. **审阅挂被审 ID、轮次零填充：** `<被审ID>-review-r01.md` / `-r02.md`，**不占新序号**。
+5. **参考文献集中：** 一律放根目录 `docs/refs/`，不散落到 `routeX/docs/`。
+6. **PDF 必须入索引：** `docs/refs/` 下每个 PDF 都要在 `docs/refs/index.json` 里有记录；
+   **索引进版本库、PDF 不进**；增删后必须重建（`scripts/refs_index.py`）。
 
 ---
 

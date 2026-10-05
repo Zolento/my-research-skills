@@ -34,7 +34,7 @@
 > 链接相对本文件（即 `routeX/`）书写，格式为 `docs/<文件名>` ——
 > **本路线的文档都在 `routeX/docs/`（扁平）**。根目录 `docs/` 是跨路线共享区。
 > **slug 只能取下列枚举值**（详见本 Skill 的 `project-layout.md` §2.1）：
-> `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative-I<n>`；
+> `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`；
 > 审阅意见为 `docs/<被审ID>-review-r<NN>.md`，**不占新序号**。
 > 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 

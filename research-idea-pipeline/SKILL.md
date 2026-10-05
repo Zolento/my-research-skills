@@ -412,7 +412,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   D4 交叉质询与共识（逐维度中位数）→ D5 最佳叙事推荐。
 - **交付物：** 多套路叙事清单（每 idea **≥4 套**，每套主线 **≥300 字**）+
   六子代理独立评审意见 + 交叉质询记录 + 最佳叙事推荐 + 横向对比表 + 最终优先级建议。
-- **落盘：** `docs/<R>NNN-narrative-I<n>.md`，并更新该路线 `INDEX.md`
+- **落盘：** `<routeX>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
   （被覆盖的叙事套路 → **已证伪**；最佳叙事 → **已证实**；综合评分 <3 → Warnings）。
 
 ### Mode E — proposal-review

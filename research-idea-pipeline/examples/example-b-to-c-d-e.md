@@ -106,7 +106,7 @@
 | 包装后 | 现有离散扩散方法共享**"可逆性仅作采样技巧"**这一假设，导致在置换约束下**结构性失效**；我们移除该假设 | Mode C 提案 §1 的失效分析 + 实验 E2 |
 | 判定 | 只改参照系，未改事实 | 每句都能在提案中找到证据 ✓ |
 
-**落盘：** `docs/A005-narrative-I1.md` + 更新 INDEX（被覆盖套路 → 已证伪）
+**落盘：** `routeA/docs/A005-narrative.md` + 更新 INDEX（被覆盖套路 → 已证伪）
 
 → `next_mode_suggestion: "C | E"`
 
@@ -158,7 +158,7 @@ docs/
 ├── A002-ideas.md                         # Mode B（含 I1..In 与 B5 审核）
 ├── A003-proposal.md                      # Mode C
 ├── A004-experiment-plan.md               # Mode C
-├── A005-narrative-I1.md                  # Mode D（idea I1 的 ≥4 套叙事 + 最佳推荐）
+├── A005-narrative.md                     # Mode D（一次调用：I1 的 ≥4 套叙事 + 最佳推荐）
 └── A003-review.md                        # Mode E（含复现风险等级）
 ```
 
