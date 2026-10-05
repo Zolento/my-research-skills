@@ -221,23 +221,30 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 ```
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
-├── docs/                  # ★ 所有路线的文档集中于此（扁平，不分子目录）
-│   ├── A001-literature-survey.md
-│   ├── A002-ideas.md      # 含 I1..In 与 B5 审核
-│   ├── A003-proposal.md
-│   ├── A004-experiment-plan.md
-│   ├── A005-narrative.md
-│   ├── A003-review-r01.md
-│   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
-│   └── refs/              # ★ 参考文献库（= 本地文献库根目录）
-│       ├── papers/        # {paper_id}.pdf（不进版本库）+ .json sidecar + 可选 .md
-│       ├── cache/         # {query_hash}.json
-│       └── index.json     # ★ 必需：PDF 索引，进版本库
+├── README.md              # ★ 根级：项目总览
+├── INDEX.md               # ★ 根级：跨路线索引（各路线状态 + 全局 TODO/Warnings）
+├── docs/                  # ★ 跨路线共享区（不放路线文档）
+│   ├── refs/              # ★ 必需：参考文献库（= 本地文献库根目录）
+│   │   ├── papers/        # {paper_id}.pdf（不进版本库）+ .json sidecar + 可选 .md
+│   │   ├── cache/<source>/ # 查询缓存（按源分目录）
+│   │   └── index.json     # ★ 必需：PDF 索引，进版本库
+│   ├── notes/             # 可选：跨路线共享笔记（按 AGENTS.md）
+│   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
 ├── routeA/
-│   ├── INDEX.md           # ★ 路线级索引（文档索引 + 关系图 + 进度）
+│   ├── README.md          # ★ 路线级：本路线说明
+│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
+│   ├── docs/              # ★ 本路线文档（扁平）
+│   │   ├── A001-literature-survey.md
+│   │   ├── A002-ideas.md  # 含 I1..In 与 B5 审核
+│   │   ├── A003-proposal.md
+│   │   ├── A004-experiment-plan.md
+│   │   ├── A005-narrative.md          # Mode D：一次调用一份
+│   │   └── A003-review-r01.md         # 审阅挂被审 ID，轮次零填充
 │   └── code/
 ├── routeB/
-│   └── INDEX.md
+│   ├── README.md
+│   ├── INDEX.md
+│   └── docs/
 ├── shared/                # 跨路线公用代码/笔记
 └── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
@@ -245,7 +252,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | 规则 | 说明 |
 |---|---|
 | 命名 | `<routeX>/docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review-r01.md`，接续 `-r02.md` |
-| 存放 | **所有路线共用根目录 `docs/`（扁平）**，靠文件名前缀区分路线；参考文献在 `docs/refs/` |
+| 存放 | **路线文档放 `routeX/docs/`（扁平）**；**根 `docs/` 是跨路线共享区，只保证有 `refs/`**，路线文档不得放这里 |
 | slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative` |
 | 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |

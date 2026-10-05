@@ -61,23 +61,23 @@
 ### 命名格式
 
 ```
-docs/A002-ideas.md            ← idea 候选清单（含 I1..In）
-docs/A003-proposal.md         ← 方案
-routeA/docs/A005-narrative.md  ← 一次调用：I1 的 ≥4 套叙事
-docs/A003-review.md           ← 对 A003 的第 1 轮审阅
-docs/A003-review-2.md         ← 对 A003 的第 2 轮审阅（接续复核）
-docs/B002-ideas.md           ← routeB 的 idea 清单（同一目录，靠 B 前缀区分）
+routeA/docs/A002-ideas.md                 ← idea 候选清单（含 I1..In）
+routeA/docs/A003-proposal.md              ← 方案
+routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 ≥4 套叙事
+routeA/docs/A003-review-r01.md            ← 对 A003 的第 1 轮审阅
+routeA/docs/A003-review-r02.md            ← 对 A003 的第 2 轮审阅（接续复核）
+routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/ 下
 ```
 
 | 规则 | 说明 |
 |---|---|
-| 存放 | **所有路线共用根目录 `docs/`（扁平）**；参考文献在 `docs/refs/` |
+| 存放 | **路线文档放 `routeX/docs/`（扁平）**；根 `docs/` 是跨路线共享区（只保证有 `refs/`） |
 | slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`；不得自创 |
-| 序号来源 | 扫描 `docs/` 中匹配 `^<路线字母>\d{3}-` 的文件名，取**最大序号 +1** |
+| 序号来源 | 扫描 `routeX/docs/` 中匹配 `^<路线字母>\d{3}-` 的文件名，取**最大序号 +1** |
 | 递增范围 | **按路线独立**：routeA 是 A001/A002/…，routeB 是 B001/B002/… |
 | 复用 | **永不复用**，也不跳号 |
 | 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验；引用写作 `<文档ID>/<子编号>` |
-| 审阅记录 | **不占新序号**，永远挂在被审文档 ID 上（`A003-review.md`） |
+| 审阅记录 | **不占新序号**，挂在被审文档 ID 上：`A003-review-r01.md` / `-r02.md`（轮次零填充） |
 | 接续复核 | 递增 `-review-2`、`-review-3`，frontmatter 的 `review_round` 同步 |
 
 > **注意：** 文档 ID 前缀 `A`/`B` 是**路线编号**，与 Mode A/B/C/D/E 无关。

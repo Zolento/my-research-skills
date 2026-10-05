@@ -454,11 +454,12 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
    `docs/refs/index.json`）。之后**每次增删 PDF 都要重跑**。
 3. 每条路线建 `routeX/{docs,code,experiments}/`。
 4. 建两层索引与说明（**都必需**）：
-   - 根 `README.md` / 根 `INDEX.md`：项目总览 + 跨路线索引；
+   - 根 `README.md`（项目总览）与根 `INDEX.md`（跨路线索引），
+     按 [../templates/INDEX.root.md](../templates/INDEX.root.md) 填写；
    - `routeX/README.md`（本路线说明）与 `routeX/INDEX.md`（本路线索引 + 关系图），
-     按 [../templates/INDEX.md](../templates/INDEX.md) 与
-     [../templates/README.route.md](../templates/README.route.md) 填写。
-   之后**每次产出都要更新所在路线的 INDEX**。
+     按 [../templates/README.route.md](../templates/README.route.md) 与
+     [../templates/INDEX.md](../templates/INDEX.md) 填写。
+   之后**每次产出都要更新所在路线的 INDEX**；跨路线层面变化同步根 `INDEX.md`。
 
 **每次新增 / 替换 / 删除 PDF 时：**
 
