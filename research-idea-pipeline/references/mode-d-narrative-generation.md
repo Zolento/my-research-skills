@@ -250,10 +250,10 @@
 S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
 
 - **先本地、后 arxiv；但本地命中不是终点**——新颖性核实属 T1/T4 触发场景，
-  **必须查 arxiv**，且本地命中不得作为终止条件。
+  **必须查全部启用源**，且本地命中不得作为终止条件。
 - 429 指数退避 `10s → 20s → 40s → 80s → 160s`，最多 5 次，退避期间不发新请求；
   失败则回退本地结果并**标注检索未达饱和**。
-- 结果缓存到 `./docs/refs/cache/`；每条标注 `source="local" | "arxiv"`。
+- 结果缓存到 `./docs/refs/cache/<source>/`；每条标注 `sources=["local" | "arxiv" | "openalex" | "crossref"]`。
 - 新颖性核实必须达到 **L3 穷尽检索**并附**负检索记录**；未达标时结论只能写
   **"据本次检索未见 · 待核实"**，且**不得**认定"确认新颖"。
 
@@ -489,7 +489,7 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
     {"idea_id": "I1", "pattern": "N2", "median": 4.0, "best_venue": "ICML", "runner_up": "N3", "fatal_defect": false}
   ],
   "final_advice": {"most_mature": "I1", "unfixable": "I4", "repattern_candidate": "I3"},
-  "literature_used": [{"title": "…", "source": "arxiv", "ref": "[作者, 会议/年份]"}],
+  "literature_used": [{"title": "…", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
   "open_questions": ["I1 的迁移合法性定理待补证明"],
   "next_mode_suggestion": "C | E"
 }

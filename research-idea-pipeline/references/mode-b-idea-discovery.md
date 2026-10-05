@@ -47,11 +47,11 @@
 
 ## B1. 基础文献调研（调用 Mode A 或内联执行）
 
-- 按 [literature-policy.md](literature-policy.md) 规范检索**本地 + arxiv**
+- 按 [literature-policy.md](literature-policy.md) 规范检索**本地 + 多源**
   （先本地、再 arxiv；**本地命中不是终点，仍须扩检**，429 指数退避）。
 - **注意：本次调研支撑后续的创新性审核，属于 T4/T5 触发场景**，因此本地命中后
-  仍必须执行 arxiv 检索；**进入 shortlist 的 idea 必须完成 L3 穷尽检索**
-  （唯一例外是 arxiv 不可用，见 §B5.2）。
+  仍必须执行**在线源**检索；**进入 shortlist 的 idea 必须完成 L3 穷尽检索**
+  （唯一例外是在线源不可用，见 §B5.2）。
 - 建议检索量：`max_results ≥ 20`；不足时按 Mode A 的 A3 策略扩大范围。
 - **产出：**
   1. **技术路线归纳表** —— 把文献聚类为 3—6 条技术路线。
@@ -286,7 +286,7 @@
   ],
   "shortlist": ["I1", "I3"],
   "rejected": [{"id": "I7", "reason": "重叠不足：实质已被 [作者, 会议/年份] 覆盖"}],
-  "literature_used": [{"title": "…", "source": "arxiv", "ref": "[作者, 会议/年份]"}],
+  "literature_used": [{"title": "…", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
   "innovation_boundary": {"red_ocean": [], "blue_ocean": [], "no_mans_land": []},
   "open_questions": ["无人区判定未经 S-Lit 复核"],
   "next_mode_suggestion": "C"

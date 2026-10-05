@@ -54,7 +54,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 
 此模式下**不得**输出任何"没人做过"类结论。
 
-### 场景 C：arxiv 不可用（429 耗尽重试）
+### 场景 C：某个在线源不可用（429 耗尽重试）
 
 ```
 ## 429 等待日志 / arxiv 失败记录
@@ -78,7 +78,7 @@ python3 scripts/literature_search.py --query "..." --local-only
 - cache: 20 条
 ```
 
-缓存中的 arxiv 结果仍标 `source="arxiv"` 并带 `cache_hit: true`。
+缓存中的结果仍标 `sources=["arxiv"]`（或对应的源名）并带 `cache_hit: true`。
 
 ---
 

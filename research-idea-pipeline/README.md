@@ -33,8 +33,11 @@ research-idea-pipeline/
 │   ├── mode-d-narrative-generation.md# Mode D：多套路叙事 + 六子代理审稿（D0—D8）
 │   └── mode-e-proposal-review.md     # Mode E：方案级正确性 + 防复现（E0—E8）
 ├── scripts/
-│   ├── literature_search.py          # 可运行检索器（本地+arxiv 并集 / 429 backoff / 缓存 / 代理检测）
-│   └── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check 校验）
+│   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
+│   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
+│   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
+│   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check 校验）
+│   └── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
 ├── templates/
 │   ├── INDEX.md                      # 路线 INDEX.md 骨架（必需）
 │   └── state.template.json           # state.json 片段模板（键 = A—E）
@@ -133,9 +136,9 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 
 ## 三条全局硬约束
 
-### 1. 文献检索：先本地，后 arxiv —— **禁止只停留在本地**
+### 1. 文献检索：先本地，后多源 —— **禁止只停留在本地**
 
-本地是**起点与排序依据，不是终点**。凡触发下列任一条件，必须查 arxiv 并扩大范围：
+本地是**起点与排序依据，不是终点**。凡触发下列任一条件，必须查**全部启用源**并扩大范围：
 
 | # | 触发条件 | 最低等级 |
 |---|---|---|
@@ -160,7 +163,7 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 **若解析到本地 IP**（回环 / 私有网段 / 链路本地 / `0.0.0.0`，例如 Clash 的
 `198.18.x.x` fake-IP），说明**可能存在代理环境**——DNS 已被 hosts 或本地代理接管。
 此时：① 报告中单列「代理环境提示」并写明**具体 IP**；② **不得**据此判定
-"arxiv 不可用"或"无人在研究"；③ 代理链路上的 429 **未必**是 arxiv 官方限流；
+"在线源不可用"或"无人在研究"；③ 代理链路上的 429 **未必**是官方限流；
 ④ 用于支撑创新性声明时记入 INDEX 的 Warnings。**只告警，不阻断。**
 
 ### 2. 顶会标准锚定
@@ -259,43 +262,69 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 ## 命令行检索器
 
 ```bash
-# 默认：本地 + arxiv 并集（不会因本地命中而跳过 arxiv）
-python3 scripts/literature_search.py --query "diffusion model combinatorial optimization" --max 20
+# 默认：本地 + 全部已实现源（arxiv / openalex / crossref）合并
+python3 scripts/literature_search.py -q "diffusion model combinatorial optimization" --max 20
+
+# 环境自检（建议先跑一次）—— 确认工作解释器与依赖
+python3 scripts/literature_search.py --check-env
 
 # 创新性声明：L3 穷尽 + 自动扩检 + 追加同义词/否定式检索式
-python3 scripts/literature_search.py --query "discrete diffusion combinatorial optimization" \
+python3 scripts/literature_search.py -q "discrete diffusion combinatorial optimization" \
     --level L3 --exhaustive \
     --also-query "score-based generative model discrete optimization" \
     --also-query "limits of diffusion model combinatorial optimization" \
-    --json
+    --mailto you@example.com --json
 
-# 离线：显式只用本地（会打印规则违反提示；不得支撑创新性声明）
-python3 scripts/literature_search.py --query "..." --local-only
+# 会议过滤（A3 第 ③ 级自动化；★ 只在 OpenAlex 上服务端生效）
+python3 scripts/literature_search.py -q "..." --venue "Neural Information Processing Systems"
+
+# 引文追溯（A3 第 ⑤ 级）
+python3 scripts/literature_search.py -q "..." --cited-by "10.1109/TPAMI.2023.3261988"
+python3 scripts/literature_search.py -q "..." --references "2209.04747"
+
+# 离线：不查任何在线源（会打印规则违反提示；不得支撑创新性声明）
+python3 scripts/literature_search.py -q "..." --local-only    # 或 --offline
 ```
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `--query` / `-q` | 必填 | 检索关键词或研究问题（支持中文） |
-| `--max` / `-n` | `20` | **每次 arxiv 查询**的条数上限；本地命中不受此限制 |
+| `--query` / `-q` | 必填 | 检索关键词或研究问题（支持中文；`--check-env` 时可省） |
+| `--max` / `-n` | `20` | **每个在线源每次查询**的条数上限；本地命中不受此限制 |
 | `--limit` | 不截断 | 最终返回条数上限（截断时保留本地优先顺序，并报告截断量） |
+| `--sources` | 全部 | 启用的源：`arxiv,openalex,crossref` 或 `all`。**少指定会打印覆盖警告** |
+| `--venue` | 无 | 会议/期刊名 → OpenAlex 解析后过滤（**只在 OpenAlex 生效**） |
+| `--cited-by` | 无 | 前向引文追溯（谁引用了它）。ID 可为 DOI / arXiv ID / OpenAlex ID |
+| `--references` | 无 | 后向引文追溯（它引用了谁）。ID 同上 |
+| `--mailto` | `$RESEARCH_MAILTO` | OpenAlex / CrossRef 的 polite pool 联系方式 |
+| `--check-env` | 关 | 只做解释器/依赖自检并退出；不满足时退出码 `4` |
+| `--no-reexec` | 关 | 禁止自动切换到合格解释器（默认会切换并打印 `[env]` 行） |
 | `--from-year` / `--to-year` | 无 | 年份过滤（含端点；启用过滤时**年份未知的条目被排除**） |
 | `--level {L1,L2,L3}` | 无 | 尽职调查等级，输出达成情况（饱和只对 L2/L3 是硬要求） |
 | `--exhaustive` | 关 | 自动执行 A3 第 ②④ 级扩大检索直到饱和 |
-| `--also-query` | 无 | 追加检索式（可重复）；A3 第 ①③ 级需人工构造 |
-| `--local-only` | 关 | **显式**只用本地（违反默认规则；**不得用于支撑创新性声明**） |
+| `--also-query` | 无 | 追加检索式（可重复）；A3 第 ① 级 |
+| `--local-only` / `--offline` | 关 | **显式**不查任何在线源（违反默认规则；**不得用于支撑创新性声明**） |
 | `--local-dir` | `./docs/refs` | 本地库；亦可用 `RESEARCH_LOCAL_LITERATURE` |
 | `--cache-dir` | `<local-dir>/cache` | 缓存目录；亦可用 `RESEARCH_LIT_CACHE` |
-| `--refresh` | 关 | 跳过缓存（仍查本地与 arxiv，可与 `--exhaustive` 同用） |
+| `--refresh` | 关 | 跳过缓存（仍查本地与在线源，可与 `--exhaustive` 同用） |
 | `--no-cache` | 关 | 不读缓存（结果仍会写入缓存） |
 | `--json` / `--quiet` | 关 | JSON 输出 / 静默 |
 
-**退出码：** `0` 正常；`1` 硬错误（含参数错误、渲染失败）；`2` arxiv
-不可用、已回退本地结果（**检索未达饱和**）。
+**退出码：**
 
-**依赖：** `arxiv`（`pip install arxiv`）。未安装时自动回退本地结果，不会崩溃。
+| 码 | 含义 |
+|---|---|
+| `0` | 全部启用源成功 |
+| `1` | 硬错误（参数、本地库不可读、渲染失败） |
+| **`2`** | **存在降级** —— **任一**启用源 `unavailable` / `partial`；结果不完整，检索视为未饱和 |
+| **`4`** | **环境不满足** —— 依赖缺失或找不到可用解释器（**依赖缺失 ≠ 源不可用 ≠ 没人做过**） |
 
-**输出：** 文献列表（含 `source`）+ 检索过程记录 + 429 等待日志 + 缓存更新记录 +
-范围扩大记录 + **逐检索式的负检索记录** + **饱和判定与等级达成情况**。
+**依赖：** `arxiv`（检索）与 `pypdf`（PDF 索引），**必须在同一个解释器里**。
+脚本会自动发现工作解释器（已激活环境 → 项目 `.venv` → conda 各环境 → PATH）；
+唯一命中则切换并打印 `[env]` 行，多个候选不猜，找不到则退出码 `4`。
+
+**输出：** 文献列表（含 `sources`）+ **每源状态** + 检索过程记录 + 源日志（429 / 失败 /
+代理）+ 缓存更新记录 + 范围扩大记录 + **逐检索式的负检索记录** +
+**饱和判定与等级达成情况**。
 
 ---
 
@@ -310,7 +339,7 @@ docs/refs/
 ├── papers/{paper_id}.pdf      # PDF 原文（大文件，不进版本库）
 ├── papers/{paper_id}.json     # sidecar 元数据：title/authors/abstract/year/venue/url
 ├── papers/{paper_id}.md       # 可选：全文或笔记（参与全文匹配）
-└── cache/{query_hash}.json    # arxiv 查询缓存（键含 max_results 与年份）
+└── cache/{query_hash}.json    # 查询缓存（**按源分目录**：<source>/<hash>.json）
 ```
 
 ### ★ PDF 必须入索引
@@ -368,7 +397,7 @@ python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
    改用 `hashlib.md5(...)[:16]`。
 3. **缓存键必须含检索参数。** 只按 query 建键会导致"用更大的 `--max` 复跑却命中旧的
    小结果集"，直接损害 L3 与扩检索质量。缓存键 = `md5(query|max|from_year|to_year)`。
-4. **"本地命中即返回"被取消。** 本地检索改为起点而非终点；默认取本地 + arxiv 的
+4. **"本地命中即返回"被取消。** 本地检索改为起点而非终点；默认取本地 + 多源 的
    并集，只有显式 `--local-only` 才跳过 arxiv（并打印规则违反提示）。
 
 ---

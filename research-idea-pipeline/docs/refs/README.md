@@ -14,7 +14,7 @@ docs/refs/
 │   ├── {paper_id}.json      # sidecar 元数据：title/authors/abstract/year/venue/url
 │   └── {paper_id}.md        # 可选：全文或笔记（参与全文匹配）
 └── cache/
-    └── {query_hash}.json    # arxiv 查询缓存（键含 max_results 与年份）
+    └── {query_hash}.json    # 查询缓存（**按源分目录**：<source>/<hash>.json）
 ```
 
 ---
@@ -101,7 +101,7 @@ python3 scripts/refs_index.py --check    # 只校验；不一致时退出码 3
 2. **每个 PDF 必须有索引条目**；未入索引的 PDF 视为不存在。
 3. 新增 / 替换 / 删除 PDF 后**必须重建索引**（`refs_index.py`）；检索新下载 PDF 时，
    要在同一步写好 sidecar 并重建索引。
-4. 检索结果的来源必须标注 `source="local"` 或 `source="arxiv"`。
+4. **检索结果**的来源必须标注 `sources=["local" | "arxiv" | "openalex" | "crossref"]`（`source` 是派生别名 = `sources[0]`）。注意 `index.json` 里的 `source` 是**PDF 来源**，含义不同。
 5. 缓存与大文件（PDF）按需 `.gitignore`；**`index.json` 必须进版本库**。
 6. 索引里**不得**写绝对路径——换机器、换用户目录后必须仍然有效。
 7. 路径可用 `--local-dir` 或 `RESEARCH_LOCAL_LITERATURE` 覆盖，缓存目录用

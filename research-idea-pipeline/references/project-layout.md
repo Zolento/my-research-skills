@@ -39,7 +39,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 │   ├── B002-ideas.md
 │   └── refs/                    # ★ 参考文献库（= 本地文献库根目录）
 │       ├── papers/              # {paper_id}.pdf + .json sidecar + 可选 .md
-│       ├── cache/               # {query_hash}.json（arxiv 查询缓存）
+│       ├── cache/               # {source}/{query_hash}.json（查询缓存，按源分目录）
 │       └── index.json           # ★ 必需：PDF 索引（每个 PDF 一条记录，进版本库）
 ├── routeA/                      # 路线 A 的代码与实验
 │   ├── INDEX.md                 # ★ 必需：索引到 ../docs/A*

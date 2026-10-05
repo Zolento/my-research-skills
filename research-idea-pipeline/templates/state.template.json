@@ -18,7 +18,7 @@
     "level_achieved": null,
     "saturation": { "saturated": null, "reason": "" },
     "literature_used": [
-      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "", "relevance": "高 | 中 | 低" }
+      { "ref": "[作者, 会议/年份]", "title": "", "sources": ["local | arxiv | openalex | crossref"], "url": "", "relevance": "高 | 中 | 低" }
     ],
     "retrieval_log": [
       { "round": 1, "query": "", "hits": 0, "escalation": null }
@@ -67,7 +67,7 @@
       { "id": "I7", "reason": "重叠不足 / 可行性过低 / 致命反驳不可缓解" }
     ],
     "literature_used": [
-      { "ref": "[作者, 会议/年份]", "title": "", "source": "local | arxiv", "url": "" }
+      { "ref": "[作者, 会议/年份]", "title": "", "sources": ["local | arxiv | openalex | crossref"], "url": "" }
     ],
     "innovation_boundary": {
       "red_ocean": [],

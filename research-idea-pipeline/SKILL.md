@@ -3,7 +3,7 @@ name: research-idea-pipeline
 description: >-
   面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程流水线，覆盖文献调研、idea
   发现、方案生成、多套路论文叙事生成与审稿、方案复核五个可独立调用、也可串联调用
-  的子流程。文献检索先查本地文献库，并默认再做 arxiv 扩检（本地命中不是终点）；
+  的子流程。文献检索先查本地文献库，并默认再做多源扩检（本地命中不是终点）；
   遇到 429 限流自动指数退避等待。
   End-to-end research-idea pipeline for top-conference submissions: literature
   survey, idea discovery, proposal generation, multi-pattern paper narrative
@@ -141,19 +141,20 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 
 以下五条是硬约束，任何 Mode 都不得违反。执行前先确认，输出时自检。
 
-### 1.1 文献检索：先本地，后 arxiv —— **但禁止只停留在本地**
+### 1.1 文献检索：先本地，后多源 —— **但禁止只停留在本地**
 
 ```
 Step 1: 搜索本地文献库 ./docs/refs/
-        命中 → 纳入结果，标注 source="local" —— 但流程继续，不得在此返回
-Step 2: 调用 Python arxiv 包
+        命中 → 纳入结果，标注 sources=["local"] —— 但流程继续，不得在此返回
+Step 2: 调用全部启用源（arxiv / openalex / crossref）
         ★ 即使 Step 1 已命中，只要触发下述任一条件，本步必须执行
-        命中 → 拉取元数据与摘要，缓存到本地库，标注 source="arxiv"
+        ★ 单源失败【不终止】检索：该源标记 unavailable，其余源照常
+        命中 → 拉取元数据与摘要，缓存到 docs/refs/cache/<source>/，标注 sources=[<source>]
 Step 3: 信息不足 → 仅补充缺失字段，不重复拉取已有内容
 Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 ```
 
-**⚠️ 强制扩检触发条件（命中任一即必须查 arxiv 并扩大范围）：**
+**⚠️ 强制扩检触发条件（命中任一即必须查**全部启用源**并扩大范围）：**
 
 | # | 触发条件 | 最低等级 |
 |---|---|---|
@@ -184,7 +185,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 （Clash / Surge / 镜像站）接管，你访问的不是 arxiv 官方。此时必须：
 
 1. 在报告中**单列「代理环境提示」段**，写明解析到的**具体 IP 与判定类型**；
-2. **不得**据此判定"arxiv 不可用"或"无人在研究"（代理缓存/镜像可能不完整）；
+2. **不得**据此判定"在线源不可用"或"无人在研究"（代理缓存/镜像可能不完整）；
 3. 代理链路上的 **429 未必是 arxiv 官方限流**，退避照常执行但结论中必须注明该不确定性；
 4. 若本次检索用于支撑创新性声明，把"经代理环境检索"记入 INDEX.md 的 **Warnings**。
 
@@ -348,7 +349,10 @@ Markdown 存储；参考文献放 `docs/refs/`。**
 | 叙事套路库 | [references/narrative-patterns.md](references/narrative-patterns.md) | 十套顶会叙事逻辑、跨域五步升级、禁用表述、叙事自检 |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
-| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：本地+arxiv 并集、`--level`、`--exhaustive`、`--also-query`、429 backoff、代理环境检测 |
+| 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
+| 多源适配器 | [scripts/literature_sources.py](scripts/literature_sources.py) | arxiv（新）/ openalex（关系）/ crossref（出处）+ 跨源合并层 |
+| 环境自检脚本 | [scripts/env_probe.py](scripts/env_probe.py) | 发现工作解释器（已激活环境 → 项目 `.venv` → conda → PATH）；依赖缺失时退出码 4 |
+| 离线测试 | [scripts/test_literature_search.py](scripts/test_literature_search.py) | stdlib unittest，全离线（环境发现 / 跨源合并 / 等级判定） |
 | PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3） |
 | 状态传递模板 | [templates/state.template.json](templates/state.template.json) | `state.json` 片段结构 |
 | 路线索引模板 | [templates/INDEX.md](templates/INDEX.md) | 每条路线 `INDEX.md` 的骨架（含已证实/已证伪/TODO/Bugs/Warnings） |
@@ -429,7 +433,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   *问题重构 / 假设挑战 / 跨域迁移 / 反向思考 / 组合创新*。
 - **B5 审核（不可跳过）：** 对每个候选 idea 给出 **创新性评分 + 可行性评分 +
   重叠度 + 致命反驳 + 推荐优先级**。**进入 shortlist 的 idea 必须完成 L3 穷尽检索**；
-  唯一例外是 arxiv 不可用等不可控情况，此时必须标注"据本次检索未见 · 待核实"并记入
+  唯一例外是**在线源不可用**等不可控情况，此时必须标注"据本次检索未见 · 待核实"并记入
   INDEX 的 Warnings。**不派遣 S-Repro。**
 - **交付物：** idea 候选清单（**不少于 10 个，每个都带审核结论**）+ 技术路线归纳表
   + 创新性边界界定 + **推荐 shortlist（3—5 个）+ 淘汰清单**。
@@ -539,10 +543,13 @@ E 方案复核。
 - [ ] 文献检索：**先本地后 arxiv，且没有只停留在本地**——本地命中后仍执行了 arxiv
       检索（除非用户显式 `--local-only`）。
 - [ ] 已判定触发条件（T1—T7）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
-- [ ] 每条文献结果标注了 `source`；结果集是本地 + arxiv 的并集。
+- [ ] 每条文献结果标注了 `source`；结果集是本地 + 多源 的并集。
 - [ ] 若发生 429，输出了等待日志，且退避符合 `10→20→40→80→160s`、上限 5 次。
+- [ ] **每个启用源都有状态**（`ok` / `partial` / `unavailable` / `skipped`）；任一源降级已在输出中显式说明，且**退出码为 2**。
+- [ ] **饱和计数只在「当期可用源集合未变」时累加**；集合一变已重置计数。
+- [ ] 若少用了源（`--sources`），报告中已写明理由；源覆盖不完整时结论措辞已降级。
 - [ ] **已解析 `arxiv.org` / `export.arxiv.org`；若解析到本地 IP，输出了「代理环境提示」段**
-      （写明具体 IP 与判定类型），且**没有**据此判定"arxiv 不可用 / 无人在研究"。
+      （写明具体 IP 与判定类型），且**没有**据此判定"在线源不可用 / 无人在研究"。
 - [ ] arxiv 结果已写入缓存。
 - [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
 - [ ] **每个方法都标了「方法来源」**（`原创` / `部分原创` / `迁移`）且**可核验**；
