@@ -5,6 +5,7 @@
     "mode": "A",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
+    "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A001",
     "query": "",
     "scope": {
@@ -35,6 +36,7 @@
     "mode": "B",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
+    "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A002",
     "domain_keywords": [],
     "idea_candidates": [
@@ -79,6 +81,7 @@
     "mode": "C",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
+    "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A003",
     "idea_id": "I1",
     "idea": "",
@@ -126,6 +129,7 @@
     "mode": "D",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
+    "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A005",
     "target_venue": "CVPR | ICML | NeurIPS",
     "narratives": [
@@ -167,6 +171,7 @@
     "mode": "E",
     "timestamp": "1970-01-01T00:00:00Z",
     "route": "routeA",
+    "core_goal": "theory | performance | phenomenon | benchmark | feasibility | negative",
     "doc_id": "A003-review",
     "review_type": "first | follow-up",
     "proposal_ref": "state-C-<timestamp>.json",

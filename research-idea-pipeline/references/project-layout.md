@@ -200,6 +200,8 @@ docs/<被审ID>-review-3.md     # 第 3 轮
 ---
 id: A002
 route: routeA
+core_goal: theory           # ★ 锚定点：theory | performance | phenomenon | benchmark | feasibility | negative
+                            #   未与用户确认锚定点就开工属于违规（见 SKILL.md §0.1）
 mode: C                     # A | B | C | D | E —— 产出该文档的 Mode
 type: proposal              # idea-discovery | proposal | experiment-plan | narrative | review | literature-survey
 status: draft               # draft | in-review | reviewed | superseded | archived

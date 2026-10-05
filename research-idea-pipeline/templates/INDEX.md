@@ -16,12 +16,16 @@
 
 | 项 | 内容 |
 |---|---|
+| **核心目标（锚点）** | theory / performance / phenomenon / benchmark / feasibility / negative（**主锚点必填**；允许"主 + 次"） |
 | 研究问题 | |
 | 核心假设 | |
 | 目标会议 | CVPR / ICML / NeurIPS |
 | 当前阶段 | Mode A / B / C / D / E |
 | 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
 | 负责范围 | 代码：`routeX/code/`；文档：`docs/` |
+
+> **锚点变更必须记入 §9 变更日志**，并重新审视老锚点下产出的 idea / 方案 / 叙事 / 审阅
+> 结论（见本 Skill 的 `SKILL.md` §0.1）。
 
 ---
 
