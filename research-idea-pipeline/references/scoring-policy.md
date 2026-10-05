@@ -31,6 +31,20 @@ R12 的六个攻击面审稿人与 R7 / R10 / R13 的八子代理，都是**同�
 
 ---
 
+## 0. 与 assurance 五元组的关系（Wave 3）
+
+**从 Wave 3 起，assurance 的主要输出是五元组**，不是 1—5 分：
+
+```
+(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)
+```
+
+1—5 分**降为次要记录**，用于 `G1—G5` 门禁与六维排序（R12 的 venue calibration 也读它）。
+**五元组仍是 primary** —— 只有分数、没有可判定的 `Kill Condition` 的评审**不合格**。
+权威定义见 [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) 的 R7 节。
+
+---
+
 ## 1. 评分标尺与锚点（1—5）
 
 **所有进入聚合的维度都使用同一把 1—5 的尺子：**

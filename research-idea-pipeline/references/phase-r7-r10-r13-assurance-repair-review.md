@@ -376,34 +376,70 @@ R7 / R10 / R13 继续复核。**
 ---
 
 
-## Wave 2/3 骨架
+## R7 assurance：输出**可执行对象**，不是分数
 
-### R7 与硬门禁的衔接
+**八个攻击面**（Wave 3 起正式，取代「按 venue 组织」）：
 
-R7 沿用**六个攻击面审稿人**（R-Novelty / R-Causal / R-Experimental / R-Theory /
-R-Generalization / R-Utility）+ **硬门禁 `G1—G5`**，聚合规则见
-[scoring-policy.md](scoring-policy.md) §3 / §4。**R7 不写 `claims[].status`** —— 改状态只能经 R10。
+| 攻击面 | 承担角色 | 专攻 |
+|---|---|---|
+| 最近工作碰撞 | **`S-Lit`** + `R-Novelty` | 是否已有人做过、delta 是否非平凡 |
+| 更简单解释够不够 | **`R-Causal`** | 是否只是相关性 / 事后解释 |
+| 实验是否识别 claim | **`R-Experimental`**（读数 ①） | baseline、confounder、统计功效 |
+| 统计与不确定性 | **`R-Experimental`**（读数 ②） | p 值、置信区间、多重比较 |
+| assumption / theorem / boundary | **`R-Theory`** | 假设是否必要、证明是否有缺口 |
+| claim scope | **`R-Generalization`** | 声称范围是否超出证据 |
+| 实现与可复现 | **`S-Repro`** | 复现风险、实现与声称是否一致 |
+| **完整性** | **`S-Integrity`**（Wave 3 新增） | leakage / cherry-pick / metric misuse / post-hoc |
 
-### R10 修复门（权威在别处）
+**每个攻击面必须输出五元组（硬规则）：**
 
-处置五值、关闭两值、`flaw·disposition·state_delta·closure` 三元组、
-「critical flaw ⇒ state 必须改变」的**权威定义在
-[phase-r9-r11-experiment-loop.md](phase-r9-r11-experiment-loop.md)**。本节只登记「R7 发现的问题
-必须交给 R10 处置」，不得在本文件里另立一套。
+```
+(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)
+```
 
-### R13 artifact-aware 审计（Wave 3 深化）
+示例：
 
-审计对象不只是论文，而是：`paper` / `claim graph` / `experiment graph` / `code` /
+```
+Attack:         MIND-specific mechanism may be unnecessary.
+Target:         C17
+Alternative:    Any edge-preserving relational loss gives same gain.
+Test:           MIND vs gradient relation vs random matched-scale loss.
+Kill Condition: If alternatives match MIND under equal compute,
+                remove the MIND-specific mechanism claim.
+```
+
+1. **`Kill Condition` 必须可判定** —— 写成「若观察 `O` 则 `X`」的形式；写不出即该 attack 无效
+   （`state_check.py` V9 已强制 `kill_condition` 非空、`discriminating_test` 指向存在的 `X` 或 `TBD`）。
+2. **`Discriminating Test` 必须指向存在的 `X`** —— 没有就写 `TBD` 并落一条 `U`。
+3. **assurance 不得直接改 `claims[].status`** —— 只能经 **R10**（见 [../SKILL.md](../SKILL.md) §1.6）。
+4. **分数只是次要记录。** 可执行对象是 primary；`scoring-policy` 的 `G1—G5` 仍生效，但
+   1—5 分**不再**是 assurance 的主要输出。
+5. **人读摘要仍然必填**（仓库既有硬规则）：五元组为 primary，摘要是 secondary，**二者并存**。
+
+**venue 校准（不进 R7）**：`R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`
+**不参与科学发现**，只在 **R12/R13 的 venue calibration 表**里出现（不派子代理）。
+`contribution type → evidence contract → venue calibration` 是唯一入口
+（见 [venue-standards.md](venue-standards.md) §10）；**禁止**「venue 直接选 preset」。
+
+## R13 artifact-aware 审计（Wave 3 落地）
+
+**审计对象不是论文**，而是：`paper` / `claim graph` / `experiment graph` / `code` /
 `logs` / **`failed runs`** / `dataset selection history` / `metric selection history`。
 
-**审计时机（防止空转规则）：** R7 / R8 阶段**没有** code / logs / failed runs，
-**只能审计划中的证据契约**；真正的 artifact 审计绑在 **R9 之后 / R13**。
-**禁止在无 artifact 的阶段要求 artifact 审计。**
+**Integrity Gate（承担者 `S-Integrity`）：** benchmark cherry-picking / data leakage /
+metric misuse / post-hoc selection bias —— **不通过即不得提交**，
+**不是**「记一条 warning」（对比 R10 的 `RESOLVED` / `ACCEPTED_LIMITATION` 闭合规则）。
 
-**Integrity 检查升级为 Gate**：benchmark cherry-picking / data leakage / metric misuse /
-post-hoc selection bias —— 仅读最终论文比读完整 trace 更难发现，所以必须审 trace。
+**审计时机（Wave 1 已冻结）：**
 
----
+| 阶段 | 有什么 artifact | 允许要求什么审计 |
+|---|---|---|
+| R7 / R8 | **没有** code / logs / failed runs | **只能审「计划中的证据契约」** |
+| R9 之后 / R13 | 完整 trace | artifact-aware 审计（含 Integrity Gate） |
+
+**禁止在无 artifact 的阶段要求 artifact 审计** —— 那会产出一条永远无法执行、只能填「待补」的规则。
+
+**失败的实验不得在审计里消失**：`state_check.py` V4 + V12 是机械前置。
 
 ## 读 / 写 World Model（强制）
 

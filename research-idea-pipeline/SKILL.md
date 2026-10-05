@@ -562,7 +562,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 | 资源 | 位置 | 内容 |
 |---|---|---|
-| 子代理角色库 | [references/roles.md](references/roles.md) | 会议审稿人 R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI**（**B/C/E 用**）；**攻击面审稿人 R-Novelty / R-Causal / R-Experimental / R-Theory / R-Generalization / R-Utility（R12 主审）**；A-Author / A-Experimenter；S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
+| 子代理角色库 | [references/roles.md](references/roles.md) | 会议审稿人 R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI**（**仅 venue calibration 用，不参与科学发现**）；**攻击面审稿人 R-Novelty / R-Causal / R-Experimental / R-Theory / R-Generalization / R-Utility**；A-Author / A-Experimenter；S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro / **S-Integrity** |
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
 | 叙事 preset 库 | [references/narrative-patterns.md](references/narrative-patterns.md) | **十套叙事 preset（N1—N10，非互斥、非创新等级）**、**(O,T,R) + anchor 选 preset**、**六槽位 S1—S6**、跨域 **Transfer Legitimacy Argument（L1/L2/L3）**、禁用表述、叙事自检 |
 | **Claim-first 政策** | [references/claim-first-policy.md](references/claim-first-policy.md) | **R12 现行（P0）**：总纲公式（`Claim strength × Evidence alignment × Reviewer comprehensibility`）、**证据台账 `epistemic_status`**、**Claim Graph `C0—C5` + `Ci ← Ej`**、**可证伪 central proposition**、**`(O,T,R)` 三轴**、**Anchor Eligibility Test**。**R3—R6 / R8 / R7 / R10 / R13 的接入登记为 P1**（见 `docs/claim-first-spec.md` §9） |
@@ -599,10 +599,10 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | R 阶段 | 派遣子代理 |
 |---|---|
 | **R2 / R5** | 无（执行者直接完成检索与归纳） |
-| **R3—R6** | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：四审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
-| **R8** | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
+| **R3—R6** | **按 island 分轨生成**（`P1`—`P6` 各自独立、**上下文隔离**；**不派 venue 角色**）；concept 级快筛由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 承担，`S-Devil` 出致命反驳。**不派 S-Repro** |
+| **R8** | 由 `A-Author` / `A-Experimenter` 展开提案与实验计划；核实由 `S-Lit`、**`S-Nov`（按需）**、`S-Theory`、`S-Feas`；**venue 角色不派** |
 | **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **D6 venue calibration** 中以校准表出现 |
-| **R7 / R10 / R13** | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（**八子代理**严格审查 + 交叉质询）；**S-Nov（按需，S-Lit 判"边缘"或涉及"首次"时）** |
+| **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
 
 **职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；B5 的审核是
 **概念级快筛**，不要与 R7 / R10 / R13 的方案级深审重复。详见
@@ -701,6 +701,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **输入：** **idea 清单**（来自 R3—R6 或用户提供）+ **方案**（来自 R8，推荐）；
   关键参考文献（可选）；目标会议（可选）；资源约束（可选）。
+- **拆 pre / post（Wave 3）：** **R12-pre**（R8 后、R9 前）只写「若 `H` 被验证，可能成立的 thesis 是…」，
+  **不得决定研究方向**；**R12-post**（R11 后）只读**已核实**的 claim / evidence / 边界 / **失败**，
+  此时才选 preset 并落 `narrative_view`，且**不得新增 `evidence`、不得提高 `epistemic_status`**。
 - **定位：** **Claim-first, evidence-constrained, narrative-last** —— 先确定**在现有证据下
   最强但不过度**的科学主张，再找最短的故事让审稿人正确理解该主张。
   **这是基于「预期贡献」的叙事预演，不是基于「实测结果」的包装** —— 实验完成后应
@@ -727,6 +730,11 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   **R3—R6**（缺陷指向 idea 本身）。**三个触发点：** ① R8 产出后首次复核；
   ② **实验完成、有实测结果后**（"预期"变"实测"，**防复现检查必须重做**）；
   ③ 投稿被拒 / 改投时。
+- **assurance 输出五元组（Wave 3 硬规则）：** `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`。
+  **`Kill Condition` 必须可判定**；只有分数、没有可判定 Kill Condition 的评审**不合格**。
+  1—5 分降为次要记录。**assurance 不得直接改 `claims[].status`** —— 只能经 R10。
+- **Integrity Gate（`S-Integrity`，R13 生效）：** leakage / cherry-picking / metric misuse /
+  post-hoc selection bias —— **不通过即不得提交**，不是「记一条 warning」。
 - **流程：** E1 判断复核类型（首次 / 接续）→ E2 八子代理严格审查（含**防复现检查**）
   → E3 交叉质询与共识形成（**先做极性归一化**，见
   [scoring-policy.md](references/scoring-policy.md)）→ E4 复核结论 → E5 接续复核规则。
@@ -959,6 +967,17 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     `EIG` 也只作记录不作排序依据；venue 适配推迟到 **R12 / R13**。
     配套机制是 **QD archive**（每个 niche 留一个 elite，**V15 机械强制**）——
     **只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。**
+
+
+16. **为什么角色按「攻击面」而非「venue」组织？** 真实的 paper failure mode 是
+    *novelty / causality / experimental design / theory / scope / integrity* 这几类，
+    而 `R-CVPR`、`R-ICML`、`R-NeurIPS` 的意见**高度重合** —— 真实的 CVPR 审稿人可能是理论审稿人，
+    真实的 ICML 审稿人也可能主攻实验设计。所以 venue 差异**后移为一层校准**
+    （`contribution type → evidence contract → venue calibration`，见 venue-standards §10），
+    不参与科学发现。
+    **为什么 assurance 输出五元组而不是分数？** 分数只能排序，**不能指导下一步**。
+    `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)` 里每一格
+    都直接对应一个可执行动作或一次实验 —— 这正是从「评审意见」走向「科研搜索」的一步。
 
 
 ---

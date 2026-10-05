@@ -9,13 +9,21 @@
 
 ---
 
-## 1. 审稿人视角
+## 1. 会议审稿人（**仅 venue calibration**，Wave 3 起不参与科学发现）
+
+> ⚠️ **Wave 3 后移：** `R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI` **不再出现在任何 R 阶段的派遣表里**。
+> 它们只作为 **R12 / R13 的 venue calibration 表**的判断视角出现（不派子代理）。
+> 科学发现与对抗保证改由 **§1B 的六个攻击面审稿人** + **§3 的证据核验员 / `S-Integrity`** 承担。
+> 入口顺序是 `contribution type → evidence contract → venue calibration`
+> （见 [venue-standards.md](venue-standards.md) §10）—— **禁止「venue 直接选 preset」**。
+
+## 1A. 审稿人视角（会议校准）
 
 > **作用域（本轮收窄）：** 本节的四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS / R-MICCAI）
-> 仍用于 **R3—R6 / R8 / R7 / R10 / R13**，并在 **R12 的 D6 venue calibration** 中以会议校准视角出现。
+> **Wave 3 起只用于 venue calibration**（R12 / R13 的校准表），**不再出现在任何 R 阶段的派遣表**。
 > **R12 的 D5 主审已改为 §1B 的攻击面审稿人**（六人全部派遣）。
-> 会议审稿人**不作为 D5 主审派遣**；因此 §1.0 的「两角度 + 会议特性」三段要求
-> **不适用于** §1B 的攻击面审稿人（他们按 §5 骨架 B 输出）。
+> §1.0 的「两角度 + 会议特性」三段要求**只适用于校准表**，
+> **不适用于** §1B 的攻击面审稿人（他们按 §5 骨架 B 输出五元组）。
 
 ### 1.0 通用要求：两角度 + 会议特性（强制）
 
@@ -251,6 +259,21 @@
 - **字数：** 见 §7 **字数与规模下限总表**（R7 / R10 / R13 中 S-Repro ≥ 150 字）。
 
 ---
+
+### S-Integrity — 完整性审计员（Wave 3 新增）
+
+**唯一职责面：** leakage（数据泄漏 / 训练-测试污染）、benchmark cherry-picking、
+metric misuse（指标口径与声称不符）、post-hoc selection bias（先看结果再挑设定）。
+
+**输出（五元组，与其余攻击面同构）：**
+`(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`。
+
+**与别处的边界：**
+- 与 `S-Repro` 的分工：`S-Repro` 管**能不能复现**，`S-Integrity` 管**这个结果是不是被不正当手段做出来的**。
+- 与 `R-Experimental` 的分工：后者审**实验设计与统计**，前者审**实验材料与选择过程**的完整性。
+- **只在 R13 生效**（R7/R8 无 artifact 可查，禁止在那时要求完整性审计）。
+
+**Integrity Gate：** 命中即**不得提交**，不是「记一条 warning」。
 
 ## 4. Mode × 角色 派遣矩阵
 
