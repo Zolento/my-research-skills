@@ -1,0 +1,49 @@
+# Configuration for the flow-matching prior + unrolled solver demo.
+# Every key used by train.py / infer.py / solver.py lives here, except where
+# noted in the worked example's Uncertainties section.
+
+data:
+  dataset: fastMRI_knee_source      # source domain, fully sampled
+  target_dataset: inhouse_target    # target domain, undersampled only
+  image_size: 320
+  rho: 0.4                          # SSDU hold-out fraction of acquired lines
+  mask:
+    type: equispaced
+    acceleration: 4
+    center_fraction: 0.08
+
+model:
+  flow:
+    in_ch: 2                        # real / imaginary channels
+    base_ch: 32
+    time_dim: 64
+
+solver:
+  num_steps: 8                      # K, number of alternating unrolled steps
+  dc_step_size: 0.5                 # initial alpha
+  prior_step_size: 0.2              # initial beta
+  prior_inner_steps: 4              # inner ODE depth for a multi-step prior sampler
+  init: zero_filled                 # x0 = A^H (M y)
+
+source:                             # stage 1: source pre-training
+  epochs: 60
+  batch_size: 8
+  lr: 0.0001
+  optim: adam
+  freeze: []
+  losses:
+    dc: 1.0
+    holdout: 1.0
+    flow: 1.0
+
+adapt:                              # stage 2: target adaptation (source-free)
+  steps: 200
+  batch_size: 1
+  lr: 0.001
+  optim: adam
+  unroll: 8                         # unroll depth used while adapting (train.py::target_adapt)
+  freeze: [flow]                    # the flow prior is frozen here
+  trainable: [log_alpha, log_beta, prior_scale]
+  losses:
+    dc: 1.0
+    holdout: 1.0
