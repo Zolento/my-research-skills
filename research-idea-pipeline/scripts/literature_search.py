@@ -33,6 +33,8 @@
     0  正常（本地 + arxiv 成功）
     1  硬错误（参数错误、本地库不可读、渲染失败等）
     2  arxiv 不可用，已回退到本地结果（检索未达饱和）
+    4  环境不满足：当前解释器缺依赖，且找不到（或有多个）可用解释器
+       —— 见 SKILL.md §0.2。**「依赖缺失」不等于「源不可用」。**
 """
 
 from __future__ import annotations
@@ -50,12 +52,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import env_probe  # noqa: E402  （同目录模块，用于确认工作解释器）
+
 # ---------------------------------------------------------------------------
 # 常量（与 literature-policy.md 保持一致）
 # ---------------------------------------------------------------------------
 
 MAX_RETRIES = 5
 BASE_WAIT = 10  # 秒；退避序列 10 → 20 → 40 → 80 → 160
+
+# 退出码（见模块 docstring）
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_SOURCE_DOWN = 2   # 在线源不可用，已回退本地结果（检索未达饱和）
+EXIT_ENV = 4           # 环境不满足：依赖缺失 / 找不到可用解释器
+
+# 防 re-exec 死循环：切换解释器后置位
+ENV_REEXEC_FLAG = "RESEARCH_IDEA_PIPELINE_REEXEC"
 DEFAULT_LOCAL_DIR = os.environ.get("RESEARCH_LOCAL_LITERATURE", "./docs/refs")
 DEFAULT_CACHE_DIR = os.environ.get("RESEARCH_LIT_CACHE")  # 为空则由 <local-dir>/cache 决定
 RATE_LIMIT_NOTE = "arxiv 暂时不可用，以下结果仅来自本地库"
@@ -891,7 +905,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         description="Research Idea Pipeline 文献检索（先本地，后 arxiv；本地命中不是终点）",
     )
-    parser.add_argument("--query", "-q", required=True, help="检索关键词或研究问题")
+    parser.add_argument("--query", "-q", default=None,
+                        help="检索关键词或研究问题（--check-env 时可省略）")
     parser.add_argument(
         "--max", "-n", type=int, default=20,
         help="每次 arxiv 查询的条数上限（默认 20）。本地命中不受此限制；"
@@ -931,14 +946,81 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", action="store_true", help="以 JSON 输出完整结果")
     parser.add_argument("--quiet", action="store_true", help="不输出过程日志")
+    parser.add_argument(
+        "--check-env", action="store_true",
+        help="只做工作解释器 / 依赖自检并退出（无需 --query）；"
+             "不满足时退出码 4。依赖缺失不等于源不可用，见 SKILL.md §0.2",
+    )
+    parser.add_argument(
+        "--no-reexec", action="store_true",
+        help="禁止自动切换到合格解释器（默认会切换并打印 [env] 行）",
+    )
     return parser
 
 
+def _env_gate(args: Any, log: Log, argv: List[str]) -> Optional[int]:
+    """确认工作解释器（SKILL.md §0.2）。
+
+    返回 None 表示"继续执行"；返回 int 表示"直接以该退出码结束"。
+
+    当**当前解释器缺依赖**而**恰好有一个**合格候选时，切换到该解释器并重新执行本脚本
+    （会打印 `[env]` 行，非静默）。多个候选取"不猜"，直接交回用户。
+
+    ⚠️ **依赖缺失 ≠ 源不可用 ≠ 没人做过。** 这里失败绝不能写成"检索未达饱和"。
+    """
+    required = ("arxiv",)
+
+    # --local-only 不调用任何在线源，因此不要求 arxiv
+    if args.local_only and not args.check_env:
+        return None
+
+    report = env_probe.discover(required)
+
+    if args.check_env:
+        print(env_probe.render(report))
+        return EXIT_OK if report["chosen"] else EXIT_ENV
+
+    current = report["current"]
+    if any(env_probe._same(c["path"], current) and c["ok"] for c in report["candidates"]):
+        return None
+
+    chosen = report["chosen"]
+    if chosen and not args.no_reexec and os.environ.get(ENV_REEXEC_FLAG) != "1":
+        log(f"[env] 当前解释器缺少 {', '.join(required)}：{current}")
+        log(f"[env] 已切换到 {chosen} 并重新执行（加 --no-reexec 可禁止该行为）")
+        env = dict(os.environ)
+        env[ENV_REEXEC_FLAG] = "1"
+        try:
+            os.execve(chosen, [chosen, str(Path(__file__).resolve()), *argv], env)
+        except OSError as exc:  # 切换失败则按环境不满足处理
+            log(f"[env] 切换解释器失败：{exc}")
+        return EXIT_ENV
+
+    log(env_probe.render(report))
+    log(f"[env] 退出码 {EXIT_ENV}：环境不满足，**未发起任何检索**")
+    if report["ambiguous"]:
+        log("[env] 合格解释器不止一个，不自动选择 —— 请指定其一后重跑")
+    else:
+        log(f"[env] 请先安装依赖或指定解释器，例如："
+            f"conda run -n <env> python {Path(__file__).name} ...")
+    return EXIT_ENV
+
+
 def main(argv: Optional[List[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    effective_argv = list(argv) if argv is not None else sys.argv[1:]
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not args.check_env and not args.query:
+        parser.error("--query 是必填项（仅 --check-env 可省略）")
+    log: Log = _noop_log if args.quiet else _log_stderr
+
+    # --- 环境闸门：先确认工作解释器，再谈检索 ---
+    gate = _env_gate(args, log, effective_argv)
+    if gate is not None:
+        return gate
+
     local_dir = Path(args.local_dir).expanduser().resolve()
     cache_dir = Path(args.cache_dir).expanduser().resolve() if args.cache_dir else None
-    log: Log = _noop_log if args.quiet else _log_stderr
 
     if not local_dir.is_dir():
         log(f"[warn] 本地文献库不存在：{local_dir}")
