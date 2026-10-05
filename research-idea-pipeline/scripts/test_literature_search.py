@@ -34,6 +34,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import env_probe  # noqa: E402
 import literature_search as ls  # noqa: E402
+import literature_sources as src  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +218,163 @@ class EnvGateTests(unittest.TestCase):
             env_probe.discover = original  # type: ignore[assignment]
         self.assertIsNone(gate)
         self.assertEqual(called["n"], 0, "--local-only 不应触发环境探测")
+
+
+# ---------------------------------------------------------------------------
+# 3. 多源：身份键与合并
+# ---------------------------------------------------------------------------
+
+#: 同一篇论文，三个源各出一条（arXiv 无 venue / CrossRef 权威 / OpenAlex 带引文）
+_SAME_PAPER = [
+    {"title": "Diffusion Models in Vision: A Survey", "year": 2023,
+     "arxiv_id": "2209.04747v2", "doi": None, "venue": None, "sources": ["arxiv"],
+     "url": "http://arxiv.org/abs/2209.04747"},
+    {"title": "Diffusion models in vision: a survey", "year": 2023,
+     "doi": "10.1109/TPAMI.2023.3261988", "arxiv_id": "2209.04747",
+     "venue": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+     "openalex_id": "W4360884927", "cited_by_count": 1862,
+     "references": ["W1", "W2"], "sources": ["openalex"]},
+    {"title": "Diffusion Models in Vision: A Survey", "year": 2023,
+     "doi": "https://doi.org/10.1109/tpami.2023.3261988",
+     "venue": "IEEE Trans. Pattern Anal. Mach. Intell.", "sources": ["crossref"],
+     "authors": ["F. Croitoru", "D. Oneata"]},
+]
+
+
+class IdentityTests(unittest.TestCase):
+
+    def test_doi_normalization_strips_url_and_case(self):
+        self.assertEqual(
+            src.normalize_doi("https://doi.org/10.1109/TPAMI.2023.3261988"),
+            "10.1109/tpami.2023.3261988",
+        )
+        self.assertEqual(src.normalize_doi("doi:10.1/ABC"), "10.1/abc")
+
+    def test_arxiv_id_normalization_strips_version_and_url(self):
+        self.assertEqual(src.normalize_arxiv_id("2209.04747v2"), "2209.04747")
+        self.assertEqual(src.normalize_arxiv_id("https://arxiv.org/abs/2209.04747"),
+                         "2209.04747")
+        self.assertEqual(src.normalize_arxiv_id("http://arxiv.org/pdf/2209.04747.pdf"),
+                         "2209.04747")
+
+    def test_openalex_id_extraction(self):
+        self.assertEqual(src.normalize_openalex_id("https://openalex.org/W4360884927"),
+                         "W4360884927")
+
+    def test_identity_keys_cover_all_axes(self):
+        keys = src.identity_keys(_SAME_PAPER[1])
+        self.assertTrue(any(k.startswith("doi:") for k in keys))
+        self.assertTrue(any(k.startswith("arxiv:") for k in keys))
+        self.assertTrue(any(k.startswith("oa:") for k in keys))
+        self.assertTrue(any(k.startswith("t:") for k in keys))
+
+
+class MergeTests(unittest.TestCase):
+
+    def test_same_paper_from_three_sources_merges_to_one(self):
+        merged = src.merge_records(_SAME_PAPER)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["sources"], ["crossref", "openalex", "arxiv"])
+
+    def test_venue_uses_authority_order(self):
+        merged = src.merge_records(_SAME_PAPER)[0]
+        self.assertEqual(merged["venue_from"], "crossref")
+        self.assertIn("IEEE Trans", merged["venue"])
+
+    def test_authors_pick_longest_list(self):
+        merged = src.merge_records(_SAME_PAPER)[0]
+        self.assertEqual(merged["authors"], ["F. Croitoru", "D. Oneata"])
+
+    def test_derived_source_alias_is_first_of_sources(self):
+        merged = src.merge_records(_SAME_PAPER)[0]
+        self.assertEqual(merged["source"], merged["sources"][0])
+
+    def test_merge_keeps_citation_data(self):
+        merged = src.merge_records(_SAME_PAPER)[0]
+        self.assertEqual(merged["cited_by_count"], 1862)
+        self.assertEqual(merged["references"], ["W1", "W2"])
+
+    def test_unrelated_paper_is_not_merged(self):
+        records = _SAME_PAPER + [{"title": "A Completely Different Paper",
+                                  "year": 2020, "sources": ["crossref"]}]
+        self.assertEqual(len(src.merge_records(records)), 2)
+
+    def test_records_without_title_are_dropped(self):
+        self.assertEqual(src.merge_records([{"year": 2020}, {"title": None}]), [])
+
+    def test_title_only_match_still_merges(self):
+        """两个源都没有 DOI/arXiv ID 时，靠"标题+年份"合并。"""
+        records = [
+            {"title": "Some Unusual Paper Title", "year": 2021, "sources": ["arxiv"]},
+            {"title": "Some   Unusual  Paper Title!", "year": 2021, "sources": ["crossref"]},
+        ]
+        merged = src.merge_records(records)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["sources"], ["crossref", "arxiv"])
+
+
+class SourceRegistryTests(unittest.TestCase):
+
+    def test_default_is_all_implemented_sources(self):
+        names, unknown = src.resolve_source_names(None)
+        self.assertEqual(names, list(src.DEFAULT_SOURCES))
+        self.assertEqual(unknown, [])
+        self.assertIn("all", ["all"])   # "all" 与 "*" 等价
+        self.assertEqual(src.resolve_source_names("all")[0], list(src.DEFAULT_SOURCES))
+        self.assertEqual(src.resolve_source_names("*")[0], list(src.DEFAULT_SOURCES))
+
+    def test_subset_and_unknown(self):
+        names, unknown = src.resolve_source_names("arxiv,crossref,bogus")
+        self.assertEqual(names, ["arxiv", "crossref"])
+        self.assertEqual(unknown, ["bogus"])
+
+    def test_dedup_and_case(self):
+        names, _ = src.resolve_source_names("Arxiv,arxiv")
+        self.assertEqual(names, ["arxiv"])
+
+    def test_all_hosts_unions(self):
+        hosts = src.all_hosts(["arxiv", "openalex", "crossref"])
+        self.assertIn("export.arxiv.org", hosts)
+        self.assertIn("api.openalex.org", hosts)
+        self.assertIn("api.crossref.org", hosts)
+        self.assertEqual(len(hosts), len(set(hosts)))
+
+
+class OpenAlexNormalizeTests(unittest.TestCase):
+
+    def test_arxiv_repository_is_not_treated_as_venue(self):
+        work = {
+            "id": "https://openalex.org/W1",
+            "display_name": "T", "publication_year": 2024,
+            "primary_location": {"source": {"display_name": "arXiv (Cornell University)"},
+                                 "landing_page_url": "http://arxiv.org/abs/2502.08696"},
+        }
+        record = src.REGISTRY["openalex"]._normalize(work)
+        self.assertIsNone(record["venue"])
+        self.assertEqual(record["arxiv_id"], "2502.08696")
+
+    def test_real_venue_is_kept(self):
+        work = {
+            "id": "https://openalex.org/W2", "display_name": "T",
+            "publication_year": 2023,
+            "primary_location": {"source": {"display_name": "Neural Information Processing Systems"}},
+        }
+        self.assertEqual(src.REGISTRY["openalex"]._normalize(work)["venue"],
+                         "Neural Information Processing Systems")
+
+
+class YearRangeTests(unittest.TestCase):
+
+    def test_year_range_inclusive(self):
+        self.assertTrue(src._in_range(2024, 2020, 2025))
+        self.assertTrue(src._in_range(2020, 2020, 2025))
+        self.assertTrue(src._in_range(2025, 2020, 2025))
+        self.assertFalse(src._in_range(2019, 2020, 2025))
+        self.assertFalse(src._in_range(2026, 2020, 2025))
+
+    def test_unknown_year_only_passes_without_filter(self):
+        self.assertTrue(src._in_range(None, None, None))
+        self.assertFalse(src._in_range(None, 2020, None))
 
 
 if __name__ == "__main__":
