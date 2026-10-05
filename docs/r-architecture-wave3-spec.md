@@ -82,7 +82,7 @@ Kill Condition: If alternatives match MIND under equal compute,
 
 | 子阶段 | 何时 | 只能做什么 |
 |---|---|---|
-| **R12-pre** | R8 之后、R9 之前 | 只写「**若 `H` 被验证，可能成立的 thesis 是…**」；**不得决定研究方向**，不得写进 `narrative_view` 以外的地方 |
+| **R12-pre** | R8 之后、R9 之前 | 只写「**若 `H` 被验证，可能成立的 thesis 是…**」；**不得决定研究方向**；产出的预期叙事草稿**不落 `narrative_view`** |
 | **R12-post** | R11 之后 | 只读**已核实**的 `claims[]` / `evidence[]` / `boundary` / **`failures[]`**；此时才用 `N1—N10` 选 preset |
 
 **硬规则：** R12-post 的每句声称必须能落回 `Ci ← Ej`；**`failures[]` 不得在叙事中消失**（V4/V12 是前置）。
@@ -131,7 +131,7 @@ post-hoc selection bias —— **不通过即不得提交**（不是「记一条
 ## 8. 验收标准
 
 - [ ] `roles.md` 里 **venue 角色不再出现在任何 R 阶段的派遣表**（只在校准表）
-- [ ] 每个 assurance 算子给出五元组；`Kill Condition` 可判定（给正反例）
+- [ ] 每个 assurance 算子给出五元组；`Kill Condition` 可判定 —— **正例**：「若替代解释在等算力下追平，则移除机制专属 claim」；**反例**：「若结果不好看则重新考虑」（不可判定 → 该 attack 无效）
 - [ ] **assurance 不得改 `claims[].status`** 写成硬规则，并与 §1.6 一致
 - [ ] `S-Integrity` 是 Integrity Gate 的承担者，且**只在 R13 生效**
 - [ ] R12-pre / R12-post 的**输入输出边界**写清（pre 不得决定方向；post 不得新增 `evidence`）

@@ -318,9 +318,10 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 标准全文见 [references/venue-standards.md](references/venue-standards.md)。
 
 **审稿人评价的两角度 + 会议特性（强化）：** 四个会议审稿人
-（R-CVPR / R-ICML / R-NeurIPS / R-MICCAI）的**每一次评价**都必须同时给出：
+（R-CVPR / R-ICML / R-NeurIPS / R-MICCAI）**只用于 venue calibration 表**；
+该校准表的**每一行**都必须同时给出：
 
-> **作用域：** 本条适用于**仍使用会议审稿人的 阶段（R3—R6 / R8 / R7 / R10 / R13）**。**R12 已改用
+> **作用域：** 本条**仅适用于 venue calibration 表**（R12 / R13）。**R12 已改用
 > 攻击面审稿人**（见 §3 派遣表），会议审稿人只在 **D6 venue calibration** 中以校准表的
 > 形式出现 —— 那里沿用「两角度 + 会议特性」的判据，但**不派子代理**。
 
@@ -819,12 +820,14 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       工作上停留或反复**；未完成的证明已标 **"待补证明 · 待核实"** 并转入后续步骤，
       而不是阻塞链路；**也没有声称"已证明"却未完成证明**。
 - [ ] **四个会议审稿人的评价都含「理论角度 + 应用角度 + 会议特性判定」三段**
-      （**仅 R3—R6 / R8 / R7 / R10 / R13**；**R12 的 D6 只出汇总校准表，不派会议审稿人**）
+      （**仅 venue calibration 表**）
       （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
       而非硬凑临床相关性。
 - [ ] **R3—R6：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
       没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 QD archive 的 elite 集合 的 idea 已达 L2**，
       含「首次提出」声称的已达 L3 并附负检索记录。
+- [ ] **assurance 五元组齐备**：每个攻击面都给了 `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`；**`Kill Condition` 可判定**；只有分数没有 Kill Condition 的评审**不合格**。
+- [ ] **Integrity Gate（R13）**：leakage / cherry-picking / metric misuse / post-hoc bias 已逐项过闸；**R7/R8 未要求 artifact 审计**。
 - [ ] **R12：先有证据台账与 claim graph，再有叙事**：`C0—C5` 完整，每个 `Ci` 都有
       `Ci ← Ej` 或标 `[待补]`；每套候选都能写出一句话的**可证伪 central proposition**；
       候选是 **2—4 套真正不同的 claim hierarchy**（**不是**同一主张的四种措辞）；

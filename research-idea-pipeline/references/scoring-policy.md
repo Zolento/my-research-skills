@@ -43,6 +43,14 @@ R12 的六个攻击面审稿人与 R7 / R10 / R13 的八子代理，都是**同�
 **五元组仍是 primary** —— 只有分数、没有可判定的 `Kill Condition` 的评审**不合格**。
 权威定义见 [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) 的 R7 节。
 
+### 0.1 Integrity Gate 的位置
+
+**`S-Integrity` 的 Integrity Gate 不是评分，是门禁**（与 §3 的 `G1—G5` 同级但独立）：
+leakage / benchmark cherry-picking / metric misuse / post-hoc selection bias ——
+**不通过即不得提交**。它**不进**中位数向量，也不参与排序。
+生效时机：**R13**（R7/R8 无 artifact，禁止在那时要求完整性审计）。
+权威定义见 [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) 的 R13 节。
+
 ---
 
 ## 1. 评分标尺与锚点（1—5）
