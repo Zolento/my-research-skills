@@ -76,7 +76,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R11** | `state-update` | result → claim / uncertainty → next experiment | 全 state | 归并去重 + 跑 `state_check.py` |
 | **R12** | `narrative` | **state 的视图**：六槽位 + presets + 六维 | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |
 | **R13** | `artifact-review` | artifact-aware 审查（code / logs / failed runs） | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
-| **R14** | `decision` | continue / pivot / archive / submit | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`**） |
+| **R14** | `decision` | continue / pivot / archive / submit | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） |
 
 > **R1 是常驻对象，不是一次调用。** 任何 R 阶段开工前先读 World Model，收工前写回。
 > **R10 是闭环，不是报告：** 检测到 critical flaw ⇒ **state 必须改变**（见 §1.6）。
