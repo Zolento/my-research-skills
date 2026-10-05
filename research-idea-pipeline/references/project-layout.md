@@ -42,6 +42,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 │   ├── README.md                # ★ 路线级：本路线说明（做什么、怎么跑、目录说明）
 │   ├── INDEX.md                 # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
 │   ├── docs/                    # ★ 本路线文档（扁平；不再按类型分子目录）
+│   │   ├── A000-anchor.md       # 冻结契约：路线锚点 + anchor_role + serves
 │   │   ├── A001-literature-survey.md
 │   │   ├── A002-ideas.md
 │   │   ├── A003-proposal.md
@@ -56,7 +57,9 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 │   ├── docs/                    # B001-… 同样扁平
 │   └── code/
 ├── shared/                      # 跨路线公用代码/笔记（按 AGENTS.md 规范）
-└── .research-idea-pipeline/     # 机器状态
+└── .research-idea-pipeline/     # 机器状态 + 中间产物（都不入 docs）
+    ├── state-<mode>-<ts>.json   # Mode 间传递
+    └── routeA/A003-r01/         # 中间产物：子代理原始评审件（可删）
 ```
 
 ### 1.1 六条硬性规则
@@ -103,9 +106,11 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 ### 2.1 文档类型与文件名（唯一权威表）
 
 **`<slug>` 只能取下表枚举值**，不得自创。文件位于 **`<routeX>/docs/`**。
+**枚举外的派生物不靠新 slug 表达，而靠 frontmatter 的自由字段 `subtype:`（见 §3.2）。**
 
 | type（frontmatter） | slug | 文件名 | 产出 Mode |
 |---|---|---|---|
+| `anchor` | `anchor` | `<R>000-anchor.md` | **—**（开工前由用户确认锚点后建立，**冻结契约**） |
 | `literature-survey` | `literature-survey` | `<R><NNN>-literature-survey.md` | A |
 | `idea-discovery` | `ideas` | `<R><NNN>-ideas.md` | B |
 | `proposal` | `proposal` | `<R><NNN>-proposal.md` | C |
@@ -113,8 +118,14 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 | `narrative` | `narrative` | `<R><NNN>-narrative.md` | D（**一次调用一份**，内含各 idea 的小节） |
 | `review` | —（特殊，见 §2.3） | `<被审ID>-review-r<NN>.md` | E（或 D 的叙事审核） |
 
+> **`anchor` 是「冻结契约」，必须可溯源：** frontmatter 除常规字段外**必须**带
+> `anchor_version`（如 `1.7`）与 `anchor_hash`（对正文算的内容哈希，用
+> `sha256sum <文件> | cut -c1-16` 即可）。**改锚点 = 开新的 §0.2 锚点变更单 +
+> 升 `anchor_version`**，不得原地静默改写。
+
 ```
 routeA/docs/
+├── A000-anchor.md                 # 冻结契约：路线锚点 + anchor_role + serves
 ├── A001-literature-survey.md      # Mode A
 ├── A002-ideas.md                  # Mode B —— 含 I1..In 与 B5 审核结论
 ├── A003-proposal.md               # Mode C
@@ -127,6 +138,10 @@ routeA/docs/
 > **为什么叙事不再每个 idea 一份？** Mode D 的产出本来就是**一份**报告：它含全部 idea 的
 > 叙事、**跨 idea 的交叉质询**、**跨 idea 的最佳推荐与最终优先级建议**。硬拆成 N 份文件后，
 > 这些跨 idea 的内容只能重复或随意归属，而且每个 idea 都要吃掉一个新序号。
+
+> **为什么加 `anchor`？** §0.1 强制「锚点必须落盘」，但类型表原先不承认锚点文档。
+> 结果是执行者只能自创 `type: mainline-anchor` / `type: anchor` 之类，**文件名越界**，
+> 序列表也对不上。强制项必须与枚举表同步 —— 这正是 §8 的 A4 类漂移。
 
 ### 2.2 子编号规范（路线内唯一，不复用）
 
@@ -261,10 +276,18 @@ routeA/docs/
 ---
 id: A002
 route: routeA
-core_goal: theory           # ★ 锚定点：theory | performance | phenomenon | benchmark | feasibility | negative
+core_goal: theory           # ★ 锚定点【只记主锚点】：theory | performance | phenomenon | benchmark | feasibility | negative
+                            #   允许"主+次"组合，但次锚点**不进本字段**（写 INDEX 概要与 state.json 的
+                            #   core_goal_secondary）；写成 "theory+feasibility" 之类会被下游脚本判为非法值。
                             #   未与用户确认锚定点就开工属于违规（见 SKILL.md §0.1）
+anchor_role: supporting     # ★ primary | supporting | orthogonal —— 本路线与「项目主锚点」的关系
+                            #   项目主锚点在根 INDEX.md 声明（见 SKILL.md §0.1 三层锚点体系）
+serves: performance         # ★ supporting 必填：服务哪条主锚点、通过什么机制
+serves_evidence: A003/K1    # ★ supporting 必填：该机制落到哪条贡献/实验，须可核验
+subtype: null               # 可选：自由文本，保留枚举外的原始语义（如 paper-outline /
+                            #   experiment-cards / math-consolidation）。**不参与文件名**，见 §3.2
 mode: C                     # A | B | C | D | E —— 产出该文档的 Mode
-type: proposal              # idea-discovery | proposal | experiment-plan | narrative | review | literature-survey
+type: proposal              # anchor | literature-survey | idea-discovery | proposal | experiment-plan | narrative | review
 status: draft               # draft | in-review | reviewed | superseded | archived
 created: 2025-01-01
 updated: 2025-01-02
@@ -274,6 +297,8 @@ review_of: null             # 仅审阅文档：被审文档 ID，如 A002
 review_round: null          # 仅审阅文档：第几轮（1,2,3…）
 also_reviewed: []           # 仅审阅文档：同一轮还覆盖了哪些文档 ID
 reviewers: []               # 可选：参与的子代理角色
+anchor_version: null        # 仅 type: anchor：锚点版本号，如 1.7
+anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum | cut -c1-16）
 ---
 ```
 
@@ -287,6 +312,34 @@ reviewers: []               # 可选：参与的子代理角色
 - ❌ **禁止**把 `state.json`、原始 JSON、日志、traceback 直接贴进正文——
   机器状态放 `.research-idea-pipeline/`，日志放 `logs/`，正文只放结论与依据。
 - ❌ 禁止只有标题没有内容的空壳文档。
+
+### 3.2 `subtype`：枚举外的派生物怎么落
+
+**`slug` 保持封闭**（§2.1 的 5 类 + `review` + `anchor`），**派生物用 `subtype` 表达**：
+
+- **文件名只由 `<R><NNN>-<slug>.md` 决定**，`subtype` **不参与文件名**；
+- 派生物**归到最接近的枚举 `slug`**（如「论文大纲」→ `proposal`、「实验卡」→
+  `experiment-plan`、「数学合并」→ `proposal`、「执行方案」→ `experiment-plan`），
+  原始语义写进 `subtype`；
+- 路线 `INDEX.md` 的文档表**必须加一列 `subtype`**，否则语义在索引层丢失；
+- **禁止**为了保留语义去自创 slug（`paper-outline` 之类）。那会让"文件名可预测"
+  这条保证失效，序号也会被派生物持续吃掉。
+
+### 3.3 `anchor_role` / `serves` / `serves_evidence`：把"服务主锚点"做成可证伪的
+
+`core_goal` 只说"这条路线想做什么"，**不表达"它在项目里扮演什么角色"**。缺了从属字段，
+「服务主锚点」与「偏离主锚点」写出来一模一样。
+
+| 值 | 含义 | 附加要求 |
+|---|---|---|
+| `primary` | 本路线就是**项目主锚点**的主战场 | — |
+| `supporting` | 服务主锚点，但主攻方向不同 | **`serves` + `serves_evidence` 必填**，且必须可证伪（见下） |
+| `orthogonal` | 与主锚点成功判据无关 | 在根 `INDEX.md` 写明「不参与主锚点成功判据」；**不得进入 Mode D、不得作为投稿主线** |
+
+**`supporting` 的可证伪要求（否则只是把"自称理论"换成"自称服务"）：**
+必须说明**一个会因它而改变的下游决策**，以及该决策对主锚点成功判据的**可测影响**
+（自己实测，或写明**由谁实测、用什么指标、什么判据**）。
+**只写"有理论价值 / 能提供洞见"不算。** 答不出 ⇒ 只能标 `orthogonal` 并接受其后果。
 
 ---
 
@@ -305,12 +358,19 @@ reviewers: []               # 可选：参与的子代理角色
 > 最后更新：2025-01-02
 
 ## 1. 路线概要
-- 核心目标（锚点）：theory / performance / phenomenon / benchmark / feasibility / negative
+- 核心目标（路线锚点 `core_goal`）：theory / performance / phenomenon / benchmark / feasibility / negative
+- **次锚点（`core_goal_secondary`，可空）：** 如 feasibility —— **只写这里，不进 frontmatter 的 `core_goal`**
+- **与项目主锚点的关系（`anchor_role`）：** primary / supporting / orthogonal
+- **`serves`（`supporting` 必填）：** 服务《根 INDEX.md》声明的哪条主锚点、通过什么机制
+- **`serves_evidence`（`supporting` 必填）：** 落到哪条贡献/实验（如 `A003/K1`）
 - 研究问题：
 - 核心假设：
 - 目标会议：CVPR / ICML / NeurIPS / MICCAI
 - 当前阶段：Mode A / B / C / D / E
 - 推荐优先级：高 / 中 / 低 / 建议放弃
+
+> **`anchor_role: orthogonal` 时**，必须在这里写明「**不参与主锚点成功判据**」，
+> 且该路线**不得进入 Mode D、不得作为投稿主线**（见 SKILL.md §0.1 规则 3）。
 
 ### 2.0 文档关系图
 
@@ -324,14 +384,19 @@ A001 文献调研
 ```
 
 ## 2. 文档索引
-| ID | 文件 | 类型 | Mode | 状态 | 说明 |
-|---|---|---|---|---|---|
-| A001 | [A001-literature-survey.md](docs/A001-literature-survey.md) | literature-survey | A | reviewed | L3 达饱和 |
-| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | B | reviewed | 10 个 idea（含 B5 审核） |
-| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1—K3 |
-| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1—E7 |
-| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1/I3 各 4 套叙事，最佳 N2 / N3 |
-| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | E | reviewed | 八子代理中位数 4，复现风险低 |
+| ID | 文件 | 类型 | **subtype** | Mode | 状态 | 说明 |
+|---|---|---|---|---|---|---|
+| A000 | [A000-anchor.md](docs/A000-anchor.md) | anchor | — | — | frozen | v1.2 · hash 8f3a1c02…（冻结契约） |
+| A001 | [A001-literature-survey.md](docs/A001-literature-survey.md) | literature-survey | — | A | reviewed | L3 达饱和 |
+| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | — | B | reviewed | 10 个 idea（含 B5 审核） |
+| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | — | C | reviewed | 贡献 K1—K3 |
+| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | experiment-cards | C | reviewed | 实验 E1—E7 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | — | D | reviewed | 一次调用：I1/I3 各 4 套叙事，最佳 N2 / N3 |
+| A006 | [A006-proposal.md](docs/A006-proposal.md) | proposal | paper-outline | C | draft | 枚举外语义写 subtype |
+| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | — | E | reviewed | 八子代理中位数 4，复现风险低 |
+
+> **`subtype` 列必填**（枚举外写原义，枚举内写 `—`）。文件名只由 `<R><NNN>-<slug>.md` 决定，
+> 派生物的语义**只能靠这一列保住**（见 §3.2）。
 
 ### 2.1 Idea 追踪（来自 A002）
 | Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
@@ -431,7 +496,15 @@ A001 文献调研
 
 ## 6. 各 Mode 的落盘职责
 
-| Mode | 产出文档 | 落盘路径 | 同时必须更新 |
+**落盘分三档**（缺了中间产物这一档，子代理原始件就只能违规塞进 `docs/`）：
+
+| 档 | 落盘位置 | 例 | 可否删除 |
+|---|---|---|---|
+| **交付物** | `<routeX>/docs/`（扁平，**不分子目录**） | anchor / literature-survey / ideas / proposal / experiment-plan / narrative / review | 否（是路线资产） |
+| **中间产物** | `.research-idea-pipeline/<route>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 | 可（review 自带摘要） |
+| **机器状态** | `.research-idea-pipeline/state-<mode>-<ts>.json` | Mode 间传递 | 可 |
+
+| Mode | 产出文档（交付物） | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
 | **A** | 文献调研报告（含负检索记录） | `<routeX>/docs/<R>NNN-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
 | **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `<routeX>/docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
@@ -439,7 +512,13 @@ A001 文献调研
 | **C** | 实验流程计划书 | `<routeX>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
 | **D** | 多套路叙事清单（≥4 套候选/idea，**详写最佳 2 套、各 ≥300 字**）+ 六子代理评审（**全部派遣，S-Lit 恒派**） + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `<routeX>/docs/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
 | **E** | 审阅记录（**含复现风险等级**） | `<routeX>/docs/<被审ID>-review-r01.md`（接续则 `-r02.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
-| 任意 | 机器状态 | `.research-idea-pipeline/state-<mode>-<ts>.json` | 不入 docs |
+
+> **中间产物的两条硬约束：**
+> 1. **正式 review 必须自带摘要**（结论 + 评分 + 关键证据 + 交叉质询记录）——
+>    否则删掉原始件就等于丢结论。
+> 2. **原始件不得被当作结论引用**：引用一律指向 review 正文
+>    （`<被审ID>-review-rNN.md`），不得指向 `.research-idea-pipeline/` 里的原件。
+>    **`routeX/docs/` 内不得建子目录** —— 原始件不属于交付物，不要硬塞。
 
 **审阅结论对进度的映射：** Mode E 的结论要**翻译成进度条目**——
 
@@ -460,17 +539,30 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 
 **新项目（无任何结构时）：**
 
-1. 建 `docs/`、`docs/refs/{papers,cache/<source>}/`、`shared/{code,docs}/`、`.research-idea-pipeline/`。
+1. 建 `docs/`、`docs/refs/{papers,cache/<source>}/`、`shared/{code,docs}/`、
+   `.research-idea-pipeline/`（后者还要放**中间产物**：`.research-idea-pipeline/<route>/<被审ID>-r<NN>/`）。
 2. 生成空的 PDF 索引：`python3 scripts/refs_index.py --refs-dir docs/refs`（会写出
    `docs/refs/index.json`）。之后**每次增删 PDF 都要重跑**。
+   若已有旧索引而 `--check` 报「缺少 pdfs 数组」→ 用 `--migrate`，**不要直接重建**（会丢旧字段）。
 3. 每条路线建 `routeX/{docs,code,experiments}/`。
 4. 建两层索引与说明（**都必需**）：
    - 根 `README.md`（项目总览）与根 `INDEX.md`（跨路线索引），
-     按 [../templates/INDEX.root.md](../templates/INDEX.root.md) 填写；
+     按 [../templates/INDEX.root.md](../templates/INDEX.root.md) 填写。
+     **必须在根 `INDEX.md` 声明「项目主锚点」** —— 未声明不得开工（`SKILL.md` §0.1 规则 0）。
    - `routeX/README.md`（本路线说明）与 `routeX/INDEX.md`（本路线索引 + 关系图），
      按 [../templates/README.route.md](../templates/README.route.md) 与
      [../templates/INDEX.md](../templates/INDEX.md) 填写。
+     每条路线还要建 **`<R>000-anchor.md`**（`type: anchor`，冻结契约，带
+     `anchor_version` + `anchor_hash`）。
    之后**每次产出都要更新所在路线的 INDEX**；跨路线层面变化同步根 `INDEX.md`。
+
+**每次开工前的契约检查（`AGENTS.md`）：**
+
+1. 读根 `AGENTS.md`（若存在）—— 布局 / 命名 / 公用约定优先于本 Skill 默认约定。
+2. **校验它引用的文件是否都存在**：逐个确认 `AGENTS.md` 里提到的路径。
+   **缺失项记入根 `INDEX.md` 的 Warnings**（悬空引用会让"按 AGENTS.md 办"直接失效）。
+3. 若 `AGENTS.md` 的**纪律性条款**与本路线锚定契约冲突，按 `SKILL.md` §0 的裁决规则处理：
+   **纪律性条款优先**，冲突走锚点变更单或重新定位，**不得用路线自述的 `core_goal` 抵消它**。
 
 **每次新增 / 替换 / 删除 PDF 时：**
 
@@ -482,9 +574,12 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 
 **每次产出新文档时：**
 
+0. **判断它属于哪一档**（§6）：交付物 → `routeX/docs/`；**中间产物 → `.research-idea-pipeline/`**；
+   机器状态 → `.research-idea-pipeline/state-*.json`。**不要为了塞中间产物而在 `docs/` 下建子目录。**
 1. 扫描 `<routeX>/docs/` 里匹配 `^<路线字母>\d{3}-` 的文件名，取最大序号 +1。
-2. 按 `<ID>-<slug>.md` 命名创建，文件开头写完整 frontmatter（§3）。
-3. 把该行登记进 `routeX/INDEX.md` 的**文档索引**，并在**变更日志**加一行。
+2. 按 `<ID>-<slug>.md` 命名创建（**`slug` 只取 §2.1 封闭枚举**；枚举外的派生物写
+   frontmatter 的 `subtype`，**不改文件名**），文件开头写完整 frontmatter（§3）。
+3. 把该行登记进 `routeX/INDEX.md` 的**文档索引**（**含 `subtype` 列**），并在**变更日志**加一行。
 
 **每次审阅时：**
 
@@ -501,3 +596,13 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 - 每条路线都有 `README.md` + `INDEX.md`，且 `routeX/docs/` 扁平；
 - 每条路线都含全部必需章节（文档索引、已证实、已证伪、TODO、Bugs、Warnings、变更日志）；
 - 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新。
+- **锚点体系完整**：根 `INDEX.md` 声明了**项目主锚点**；每条路线有 `<R>000-anchor.md`，
+  frontmatter 含 `core_goal` / `anchor_role` / `serves` / `serves_evidence`
+  （`supporting` 时后两者必填且可证伪）；路线锚点与本路线 INDEX 一致。
+- **文档名没越界**：所有 `<R><NNN>-<slug>.md` 的 `slug` 都在 §2.1 封闭枚举内；
+  枚举外的派生物写的是 `subtype`，且路线 INDEX 文档表**有 `subtype` 列**。
+- **中间产物没混进 `docs/`**：`routeX/docs/` 内**没有子目录**；`routeX/docs/` 里
+  **没有**子代理原始评审件；正式 review **自带摘要**，且没有引用指向原始件。
+- **`AGENTS.md` 引用可达**：它提到的路径都存在；缺失项已记入根 `INDEX.md` 的 Warnings。
+- **refs 索引一致且已清点待核实**：`python3 scripts/refs_index.py --check` 通过；
+  `needs_verification` 条数已计入根 `INDEX.md` 的全局 Warnings。

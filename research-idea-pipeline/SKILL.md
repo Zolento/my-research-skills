@@ -80,14 +80,20 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 
 **启动前置动作（每次调用都做）：**
 
-0. **先确认锚定点（核心目标）** —— 见 §0.1。**未确认前不得开工。**
+0. **先确认锚定点（核心目标）** —— 见 §0.1。**项目主锚点未声明前不得开工。**
 1. **读项目根目录的 `AGENTS.md`**（若存在）—— 其布局、命名、公用部分约定优先于本
-   Skill 默认约定。
+   Skill 默认约定。**并校验它引用的文件是否都存在**：缺失项记入根 `INDEX.md` 的
+   Warnings。**悬空引用会让后续所有"按 AGENTS.md 办"的动作失效**，所以发现即记。
 2. **确定路线**（`routeA` / `routeB` / …）。用户未指定时反问；若只有一条路线则用它。
 3. **读该路线的 `INDEX.md`**，了解进度、已证实/已证伪结论、TODO 与 Warnings。
 4. 若路线或 `INDEX.md` 不存在，按
    [references/project-layout.md](references/project-layout.md) §7 的检查清单手工建立
    （目录 + `INDEX.md`）后再开工。
+
+> **与 `AGENTS.md` 冲突时的裁决：** `AGENTS.md` 的**纪律性条款**（如"必须改进最终任务
+> 性能""禁止在证明性工作上停留"）**优先于任何既有路线的锚定契约**。冲突时按 **§0.2
+> 锚点变更单**处理：为该路线申请新方向，**或**按项目主锚点重定位（`anchor_role` +
+> 可证伪的 `serves`）。**不得用路线自述的 `core_goal` 去抵消 `AGENTS.md` 的纪律。**
 
 > 详细约定见 [references/project-layout.md](references/project-layout.md)。
 
@@ -107,15 +113,50 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 | **可行性** | 把不可行 / 过贵的方法变可行 | 保持理论保证同时显著降本 | CVPR / ICML | Concept & Feasibility |
 | **负结果** | 证明某目标在一定条件下不可能 | 不可能性成立且给出可达松弛 | NeurIPS | Negative Results |
 
+**三层锚点体系（先把层级分清，否则规则会互相打架）：**
+
+| 层级 | 是什么 | 写在哪 | 谁定 |
+|---|---|---|---|
+| **项目主锚点** | 整个项目要成功，必须拿下什么 | **根 `INDEX.md` 的「项目主锚点」声明** | 用户（开工前确认一次） |
+| **路线锚点** | 本条路线自己主攻什么（`core_goal`） | 路线 frontmatter + 路线 `INDEX.md` 概要 + `state.json` | 用户 / 执行者，须与项目主锚点对齐 |
+| **次锚点** | 辅助方向 | **只写路线 `INDEX.md` 概要与 `state.json`** | 执行者 |
+
 **规则：**
 
+0. **项目主锚点必须先声明。** 只声明一次，写在根 `INDEX.md`。未声明前不得开工。
 1. **允许组合，但必须指定主锚点。** 例如"主锚点 = 理论，次锚点 = 可行性"。
-2. **锚点必须落盘：** 写进文档 frontmatter 的 `core_goal`、`INDEX.md` 的路线概要、
-   以及 `state.json` 的 `core_goal` 字段。
-3. **锚点变更必须显式记录。** 中途换锚点是重大变更——老锚点下的产物（idea / 方案 /
-   叙事 / 审阅结论）**必须重新审视**，并在 `INDEX.md` 变更日志留痕。
-4. **锚点与产出不一致时必须当场指出。** 例如主锚点是"性能"，但 idea 是纯理论类、
-   或实验设计里没有同算力公平比较——直接提示冲突，不要默默继续。
+   **`core_goal` 字段只记主锚点**（单值，便于脚本解析）。**次锚点写进路线 `INDEX.md`
+   概要与 `state.json` 的 `core_goal_secondary`**，**不得**塞进 `core_goal`
+   （写成 `"theory+feasibility"` 之类会被下游脚本判为非法值）。
+2. **锚点必须落盘，且路线必须声明它与项目主锚点的关系：**
+   - **`core_goal`** —— 路线锚点（枚举见上表；英文枚举值见 §3 frontmatter）；
+   - **`anchor_role`** —— `primary`（本路线就是主锚点的主战场）/ `supporting`（服务
+     主锚点，但主攻方向不同）/ `orthogonal`（与主锚点成功判据无关）；
+   - **`serves`** —— `supporting` **必填**：服务哪条主锚点、通过什么机制；
+   - **`serves_evidence`** —— 该机制落到哪条贡献 / 实验，**须可核验**（如 `T003/K1`）。
+   四者同时写进 frontmatter、路线 `INDEX.md` 概要与 `state.json`。
+3. **`supporting` 必须可证伪，否则只能标 `orthogonal`。** 要说明**一个会因它而改变的
+   下游决策**，以及该决策对主锚点成功判据的**可测影响**（自己实测，或写明由谁实测、
+   指标与判据）。**只写"有理论价值 / 能提供洞见"不算。**
+   - 答不出 ⇒ 只能标 `orthogonal`，并在根 `INDEX.md` 写明「不参与主锚点成功判据」；
+   - **`orthogonal` 的路线不得进入 Mode D、不得作为投稿主线。**
+4. **路线锚点不得覆盖项目主锚点。** 项目主锚点是**项目级**约束，任何路线都不能靠
+   自称 `core_goal: theory` 来豁免它。**要改项目主锚点，只能走 §0.2 锚点变更单，
+   且只有用户能授权** —— agent 只能提请，不能自行换方向（见 §0.2 约束 1）。
+5. **锚点变更必须显式记录** —— 填 **§0.2 锚点变更单**。只有义务、没有载体的规则会空转。
+6. **锚点与产出不一致时必须当场指出，并给出处置。** 例如项目主锚点是"性能"，但某条
+   路线的 idea 是纯理论类、或实验设计里没有同算力公平比较 —— **指出冲突只是第一步**，
+   必须**当轮落盘**下列之一：
+   - ① **重新定位（agent 可自行执行）：** 给出**可证伪的** `serves` + `serves_evidence`，
+     标 `anchor_role: supporting`。**答不出 ⇒ 只能标 `orthogonal`**，按规则 3 公开标注
+     并接受后果（不得进 Mode D、不得作投稿主线）。
+   - ② **换方向（只有用户能授权）：** 向用户**提请**并给出证据；**用户显式同意后**，
+     才按 §0.2 开锚点变更单。**agent 不得自行换方向、换项目主锚点或开新路线。**
+   **不得只提示冲突就继续。**
+
+> **强制力的边界（避免误读）：** 本节的"必须服务主锚点"**不是**"不服务就作废"。
+> 严格选法下，它的强制力是**「服务，或降级 + 公开正交」**。真正被禁止的是**沉默**：
+> 既不服务、又不公开标注、还继续当作主线推进。
 
 **锚点如何约束各 Mode：**
 
@@ -134,6 +175,37 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 - Mode C → [references/mode-c-proposal-generation.md](references/mode-c-proposal-generation.md)
 - Mode D → [references/mode-d-narrative-generation.md](references/mode-d-narrative-generation.md)
 - Mode E → [references/mode-e-proposal-review.md](references/mode-e-proposal-review.md)
+
+### 0.2 锚点变更单（Anchor Change Order）
+
+**适用：** 任何对**项目主锚点**或**任一路线锚点**的变更。项目主锚点的变更单落盘到
+**根 `INDEX.md`**，路线锚点的变更单落盘到**该路线 `INDEX.md`**，各自有「锚点变更单」小节。
+
+| 字段 | 内容 |
+|---|---|
+| **日期** | |
+| **旧方向 → 新方向** | 例：`performance → theory` |
+| **类型** | **增补**（主锚点不变，只调整路线侧重）/ **替换**（主锚点或路线主攻方向改变） |
+| **依据** | **`增补`**：证据或用户指令均可。**`替换`：必须是「用户显式指令原话」** —— 证据只能作为**提请**的支撑材料，**不能**作为变更依据 |
+| **受影响产物** | **替换时必填**：列出需重审、或标 `superseded` 的文档 ID（idea / 方案 / 叙事 / 审阅结论） |
+
+**约束：**
+
+1. **谁有权改锚点：只有用户。** 锚点变更单的**执行**必须由**用户显式指令**触发。
+   agent **不得**以"我发现主锚点不可达""觉得另一个方向更有意思"为由**自行换方向、
+   换项目主锚点、或新开路线**。在用户答复前，agent 能做且只能做两件事：
+   - **提请：** 把"不可达"的证据写进根 `INDEX.md` 的 Warnings，并向用户明确提问；
+   - **降级：** 按 §0.1 规则 3 把自己标成 `orthogonal` 并**公开**标注。
+   **提请与降级是 agent 可做的；换方向不是。**
+2. **`类型: 替换` 而没有「受影响产物」清单 = 变更单无效。**
+   **`替换` 的依据不是用户原话 = 变更单同样无效。** 两者缺一，都不得据此改变产出方向。
+3. **「必须服务」的强制力是「服务，否则降级 + 公开正交」，不是「服务，否则作废」。**
+   即：答不出可证伪的 `serves` ⇒ 标 `orthogonal`，并在根 `INDEX.md` **公开写明**
+   「不参与主锚点成功判据」，且不得进入 Mode D、不得作为投稿主线。
+   **路线本身不被销毁** —— 它仍可继续产出，只是不参与主锚点的成功判据。
+4. **append-only：** 不修改历史条目，后续变更追加新行。
+5. **受影响产物必须在同一轮内被重审**，结论写回各自路线 `INDEX.md` 的
+   已证实 / 已证伪 / Warnings。
 
 ---
 
@@ -261,7 +333,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 └── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
 
-**六条硬性规则：**
+**七条硬性规则：**
 
 1. **文档按路线分离、各自扁平：** 产出放 `routeX/docs/`，**该目录内不再按类型分子目录**。
    **根 `docs/` 是跨路线共享区**——本 Skill **只保证 `refs/` 存在**，`notes/`、`latex/`
@@ -276,6 +348,12 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    **每次产出后更新所在路线的 `INDEX.md`**；跨路线层面的变化同步更新根 `INDEX.md`。
 3. **文件名前缀 = 文档 ID**（不再是路径隔离）：前缀仍**必需** —— 审阅要挂靠、跨路线
    引用要唯一。序号按路线独立递增、**永不复用**。
+   **文件名只能由 `<R><NNN>-<slug>.md` 决定，`slug` 只取
+   [project-layout.md](references/project-layout.md) §2.1 表的封闭枚举。**
+   实际路线必然产生枚举外的派生物（大纲、实验卡、数学合并、执行方案…）。它们
+   **一律归到最接近的枚举 `slug`**，原始语义写 frontmatter 的**自由字段 `subtype:`**
+   （**不参与文件名**），并在路线 `INDEX.md` 文档表加一列 `subtype`。
+   **禁止自创 slug** —— 那会让"文件名可预测"这条保证失效，序号也会被派生物吃光。
 4. **审阅挂被审 ID、轮次零填充：** `<被审ID>-review-r01.md`、`-r02.md`（**不占新序号**）。
    用 `-r<NN>` 是因为 `-review.md`/`-review-2.md` 在 `ls`/`sort` 下**轮次顺序是反的**。
    一轮覆盖多份文档时挂主文档 ID，其余写 frontmatter 的 `also_reviewed`。
@@ -286,6 +364,19 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    里有一条记录（字段见 [literature-policy.md](references/literature-policy.md) §7.1）。
    **索引进版本库，PDF 不进**。新增/替换/删除 PDF 后**必须重建索引**
    （`python3 scripts/refs_index.py`，校验 `--check`）；**未入索引的 PDF 视为不存在**。
+7. **落盘分三档，别把中间产物塞进 `docs/`：**
+
+   | 档 | 落盘位置 | 例 |
+   |---|---|---|
+   | **交付物** | `routeX/docs/`（扁平，不分子目录） | `anchor` / proposal / experiment-plan / narrative / review |
+   | **中间产物** | `.research-idea-pipeline/<route>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 |
+   | **机器状态** | `.research-idea-pipeline/state-*.json` | Mode 间传递 |
+
+   - 子代理的**原始评审件**属于**中间产物**：**不进 `docs/`**，也**不得**为了塞进去而在
+     `routeX/docs/` 下建子目录（该目录内不分子目录）。
+   - **正式 review 必须自带摘要**（结论 + 评分 + 关键证据 + 交叉质询记录），放进 `docs/`。
+   - **原始件不得被当作结论引用**——引用一律指向 review 正文（`<被审ID>-review-rNN.md`）。
+   - 中间产物可随时删除；删掉不影响交付物的完整性（因为 review 自带摘要）。
 
 > **slug 只能取：** `literature-survey` / `ideas` / `proposal` / `experiment-plan` /
 > `narrative`。**Mode D 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
@@ -337,9 +428,17 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 预算用尽仍未完成 → **标注"待补证明 · 待核实"，转入第 2—4 步**，并在 `INDEX.md`
 的 TODO 里留下补证任务。**不得**因此阻塞整条链路。
 
-**唯一例外（主锚点为「理论」或「负结果」时）：** 第 4 步改为
-「给出**可被实验检验的推论**或**可达到的松弛**」—— 此时"性能"指推论的可检验性，
-不是 SOTA 指标。**但第 2、3 步仍然必须走通**：纯证明、无证据、无方法，依然不成立。
+**唯一例外（当且仅当《根 `INDEX.md`》声明的「项目主锚点」为「理论」或「负结果」时）：**
+第 4 步改为「给出**可被实验检验的推论**或**可达到的松弛**」—— 此时"性能"指推论的
+可检验性，不是 SOTA 指标。**但第 2、3 步仍然必须走通**：纯证明、无证据、无方法，
+依然不成立。
+
+> ⚠️ **例外的 key 是「项目主锚点」，不是路线自己的 `core_goal`。**
+> **项目主锚点为「性能 / 基准 / 现象 / 可行性」时，本例外对任何路线都不生效**——
+> **包括自称 `core_goal: theory` 的路线。** 这类路线可以不做实验，但必须给出
+> **可检验的性能推论**，并指明**由谁执行、用什么指标、什么判据**。
+> 路线想豁免，只能先走 §0.2 锚点变更单把**项目主锚点**改掉（只改路线 `core_goal`
+> 不构成豁免）。
 
 > ⚠️ **底线不变：** 本条约束的是**精力分配与停止条件**，不是诚实性。
 > **不得**声称"已证明"却未完成证明；未完成的必须标 **"待补证明 · 待核实"**。
@@ -354,14 +453,15 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
 | 叙事套路库 | [references/narrative-patterns.md](references/narrative-patterns.md) | 十套顶会叙事逻辑、跨域五步升级、禁用表述、叙事自检 |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
-| 项目组织规范 | [references/project-layout.md](references/project-layout.md) | `docs/` 命名与 ID 分配、`INDEX.md` 章节、`AGENTS.md` 优先、`shared/` 公用、并发写入 |
+| 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、**锚点变更单**、`INDEX.md` 章节、`AGENTS.md` 优先与可达性校验、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **Mode D / E 共用**：1—5 标尺、**极性归一化**（S-Devil 反向）、门禁、逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五 Mode 共用**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述（各 Mode 不再各自定义） |
 | 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
 | 多源适配器 | [scripts/literature_sources.py](scripts/literature_sources.py) | arxiv（新）/ openalex（关系）/ crossref（出处）+ 跨源合并层 |
 | 环境自检脚本 | [scripts/env_probe.py](scripts/env_probe.py) | 发现工作解释器（已激活环境 → 项目 `.venv` → conda → PATH）；依赖缺失时退出码 4 |
 | 离线测试 | [scripts/test_literature_search.py](scripts/test_literature_search.py) | stdlib unittest，全离线（环境发现 / 跨源合并 / 等级判定） |
-| PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3） |
+| PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3）、**`--migrate` 旧 schema 迁移（保留旧字段）** |
+| 索引迁移测试 | [scripts/test_refs_index.py](scripts/test_refs_index.py) | 离线测试：三种旧索引形状的迁移、「保留旧字段」、`--check` 退出码与提示 |
 | 状态传递模板 | [templates/state.template.json](templates/state.template.json) | `state.json` 片段结构 |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routeX/INDEX.md` 骨架（文档索引 + **关系图** + 已证实/已证伪/TODO/Bugs/Warnings） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（跨路线索引 + 全局 TODO/Warnings） |
@@ -568,9 +668,19 @@ E 方案复核。
 - [ ] mode 已明确，且与该 Mode 的输入约定一致。
 - [ ] **锚定点（核心目标）已与用户确认**，并已写入 frontmatter 的 `core_goal`、
       路线 `INDEX.md` 的路线概要、以及 `state.json`；**未确认就开工属于违规**。
+- [ ] **锚点体系完整（新增）**：根 `INDEX.md` 已声明**项目主锚点**；
+      本路线的 `anchor_role` 已给出；`supporting` 时 `serves` / `serves_evidence`
+      已填**且可证伪**；答不出已降级为 `orthogonal` 并在根 `INDEX.md` 公开写明
+      "不参与主锚点成功判据"（`orthogonal` 不得进 Mode D、不得作投稿主线）。
+      **`core_goal` 只记主锚点**；次锚点写的是 `core_goal_secondary`，不是
+      `"theory+feasibility"` 这种拼接值。
+- [ ] **锚点与产出不一致时已落盘处置，而不是只提示（新增）**：要么重新定位
+      （可证伪的 `serves` 或 `orthogonal`），要么向用户提请换方向。
+      **没有自行换方向、换项目主锚点或开新路线**（只有用户能授权，走 §0.2 变更单）。
 - [ ] **派遣方式已定**：环境有 Team 能力时**已询问用户**；用户显式要求 Team 而环境
       不具备时，已**显式告知回退**（未静默降级、未假装使用 Team）。
-- [ ] **已读项目 `AGENTS.md` 与目标路线的 `INDEX.md`**，并遵循其约定。
+- [ ] **已读项目 `AGENTS.md` 与目标路线的 `INDEX.md`**，并遵循其约定；
+      **`AGENTS.md` 引用的文件已逐个校验存在性**，缺失项已记入根 `INDEX.md` 的 Warnings。
 - [ ] 文献检索：**先本地后 arxiv，且没有只停留在本地**——本地命中后仍执行了 arxiv
       检索（除非用户显式 `--local-only`）。
 - [ ] 已判定触发条件（T1—T7）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
@@ -610,14 +720,21 @@ E 方案复核。
       否则已降级为"据本次检索未见"或标注"待核实"；
       **全部措辞符合 [evidence-policy.md](references/evidence-policy.md) 的证据等级表**。
 - [ ] **INDEX 的 Warnings 已统计「待核实」条数**；若超过 5，已在本轮内收敛
-      （补检索 / 补实验 / 明确降级措辞）。
+      （补检索 / 补实验 / 明确降级措辞）；**`needs_verification` 的条数也已计入根
+      `INDEX.md` 的全局 Warnings**，超过 5 已开补元数据 TODO。
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
 - [ ] **方案/审阅记录已落盘到所在路线的 `<routeX>/docs/`**，命名符合
       `<R><NNN>-<slug>.md` / `<ID>-review-r01.md`；且**文档前缀 = 路线字母**（不随 Mode 变化）。
+      **`slug` 未越界**（只用 §2.1 封闭枚举）；枚举外的派生物写的是 frontmatter 的
+      `subtype`，且路线 `INDEX.md` 文档表**有 `subtype` 列**。
+- [ ] **落盘分档正确**：交付物在 `routeX/docs/`（**扁平，无子目录**）；
+      子代理**原始评审件**在 `.research-idea-pipeline/<route>/<被审ID>-r<NN>/`，
+      **没有**塞进 `docs/`；**正式 review 自带摘要**，且没有引用指向原始件。
 - [ ] **`docs/refs/` 下每个 PDF 都在 `docs/refs/index.json` 里有条目**
       （`python3 scripts/refs_index.py --check` 通过）；索引中无绝对路径；
-      `needs_verification = true` 的条目**未**用于支撑创新性声明。
+      `needs_verification = true` 的条目**未**用于支撑创新性声明；
+      遇到旧 schema 已用 `--migrate`（**不是**直接重建，避免丢旧字段）。
 - [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
       变更日志。
 - [ ] 未达饱和的检索、未缓解的风险已记入 `INDEX.md` 的 Warnings。
@@ -672,15 +789,21 @@ E 方案复核。
 > 触发条件：改动任何**规则、命名、枚举、计数、路径**。
 
 **为什么需要它：** 本仓库的实际漂移记录显示，改了规则后**漏掉的从来不是规则本身**，
-而是下面 A 组这三类"看起来不像规则"的位置。
+而是下面 A 组这四类"看起来不像规则"的位置。
 
-### A. 三类高危位置（历史上反复漏）
+### A. 四类高危位置（历史上反复漏）
 
 | # | 位置 | 为什么危险 | 必做动作 |
 |---|---|---|---|
 | A1 | **设计依据 / 理由段**（§7、各文件开头的"为什么"） | 它在**论证旧设计**，读起来像权威依据。改规则后最容易整条漏掉，且在有人质疑设计时被当成正确论点引用 | **逐条读一遍 §7 与各"为什么"，问："这条还在支持当前规则吗？"** |
 | A2 | **速查 / 汇总表**（§4 各 Mode 速查、`project-layout` §6 落盘职责表、`roles` §4.2 派遣矩阵、`mode-d` D3.3 汇总表） | 汇总表是规则的**复制品**。改规则不改它 = 仓库里有两份互相矛盾的规则 | **所有"表格式汇总"逐个核对** |
 | A3 | **示例与模板**（`examples/*`、`templates/*`） | 示例会**示范旧写法**，且比正文更容易被照抄 | **示例里的文件名、路径、计数、命令逐个核对** |
+| A4 | **语义字段与规则的一致性**（§0.1/§0.2 锚点体系、`project-layout` §2.1 类型枚举、§3 frontmatter schema、`state.template.json`、§4 INDEX 章节） | 规则写"**必须**有 X"，但 schema / 枚举里**没有 X 的槽位**，或强制项与枚举表脱节。这种漂移**不在计数上、在语义上**，比 A2 更难发现：执行者只能自创值或让 frontmatter 失真 | **规则 → 字段 → 枚举 → 模板 → 示例，五处同步。** 每条新规则都问两句：①「它要求落盘的东西，**字段表里有槽位吗**？」②「它要求存在的文档类型，**枚举里有值吗**？」 |
+
+> **A4 的现实教训（B1—B5 那一批）：** 规则要求"锚点必须落盘"，但 frontmatter 没有
+> `anchor_role` / `serves` 的槽位；强制"锚点文档"，但类型枚举里没有 `anchor`；
+> 允许"主+次锚点"，但 `core_goal` 只有一个槽；实际路线必然产出枚举外的派生物，
+> 但除自创 slug 外无处安放。**全都是"规则有、载体无"** —— 只查计数与链接是查不出来的。
 
 ### B. 计数与枚举（每轮都漏）
 

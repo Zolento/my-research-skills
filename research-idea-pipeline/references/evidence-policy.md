@@ -28,6 +28,13 @@
    本地未命中 ≠ 不存在；arxiv 未见 ≠ 无人研究过；429 中断 ≠ 检索完整。
 6. **未核实条目不支撑创新性声明**：`needs_verification = true` 的文献条目、
    「待核实」的无人区声称，都不得用于支撑"首次提出"或任何确定性结论。
+7. **`needs_verification` 有明确后果，不只是个标记**（与 `docs/refs/index.json` 闭环）：
+   - `needs_verification = true` 的条目**不得**用于支撑「首次提出 / 未见前作 / 复现风险低」
+     类声明 —— 它的元数据来自文件名兜底，标题、作者、年份本身就可能错；
+   - **其数量必须计入根 `INDEX.md` 的全局 Warnings**（见
+     [project-layout.md](project-layout.md) §4.2）；
+   - 数量**超过 5** 时触发**补元数据的 TODO**（为对应 PDF 写 sidecar
+     `docs/refs/papers/<paper_id>.json`，再重建索引），**不得**让它长期累积。
 7. **禁止臆造引用**；无法确认处一律标「待核实」。
 
 > **模式下调用：** Mode A 的检索结论、Mode B 的 idea 新颖性判定、Mode C 的创新性

@@ -7,8 +7,16 @@
 用法：
     python3 refs_index.py                        # 扫描 ./docs/refs，写入 ./docs/refs/index.json
     python3 refs_index.py --check                # 只校验不写入；不一致时退出码 3
+    python3 refs_index.py --migrate              # 旧 schema → 当前 schema（保留旧字段，标 migrated_from）
     python3 refs_index.py --refs-dir ./refs --json
     python3 refs_index.py --no-hash              # 跳过 sha256（大库提速）
+
+迁移（--migrate）：
+    旧版索引可能不是 `{"schema":…, "pdfs":[…]}` 形状（例如平铺列表，或按文件名做键的字典），
+    此时 `--check` 会报「索引缺少 pdfs 数组」而**无法直接重建**（重建会丢掉旧字段）。
+    `--migrate` 的语义：**保留旧条目里已有的字段**，补齐当前 schema 所需字段，
+    并在索引顶层写入 `migrated_from`（旧 schema 字符串）与 `migrated_at`。
+    迁移后请仍用 `--check` 确认一致；元数据缺口由 `needs_verification` 标出。
 
 元数据来源优先级：
     1. sidecar 元数据 `<refs-dir>/papers/{paper_id}.json`（由检索脚本写入，最准）
@@ -271,6 +279,9 @@ def build_entry(
             return sidecar[key]
         if embedded and embedded.get(key) not in (None, "", []):
             return embedded[key]
+        # ★ 最低优先级：继承旧索引里的字段（--migrate 的"保留旧字段"就靠这一条）
+        if previous and previous.get(key) not in (None, "", [], {}):
+            return previous[key]
         return default
 
     arxiv_id = _arxiv_id_from(pick("arxiv_id")) or _arxiv_id_from(pdf.stem) \
@@ -281,6 +292,9 @@ def build_entry(
     if not title:
         title = _title_from_filename(pdf)
         metadata_from = "filename"
+    elif metadata_from is None:
+        # 标题只可能来自旧索引（sidecar/embedded 都没有）
+        metadata_from = "legacy"
 
     authors = pick("authors")
     if not isinstance(authors, list):
@@ -331,7 +345,12 @@ def build_entry(
         "added_at": added_at,
         "source": _clean_str(pick("source")) or "local",
         "metadata_from": metadata_from,
-        "needs_verification": metadata_from == "filename" or year is None,
+        # 继承来的旧元数据同样不算"已核实"——除非旧条目自己已明确核实过
+        "needs_verification": (
+            (previous.get("needs_verification") is True)
+            if metadata_from == "legacy" and isinstance(previous.get("needs_verification"), bool)
+            else (metadata_from in {"filename", "legacy"} or year is None)
+        ),
         "sidecar_path": sidecar_rel,
         "notes_path": notes_path.relative_to(refs_dir).as_posix() if notes_path.is_file() else None,
     }
@@ -358,6 +377,67 @@ def load_previous(output: Path) -> Dict[str, Dict[str, Any]]:
     }
 
 
+# 旧索引可能用过的"文件路径"字段名（按优先级）
+_LEGACY_PATH_KEYS = ("file", "path", "rel", "relative_path", "filename", "pdf", "name")
+
+
+def harvest_legacy(data: Any) -> Dict[str, Dict[str, Any]]:
+    """从**任意形状**的旧索引里抽出 {相对路径: 记录}。抽不出就返回 {}。
+
+    支持三类旧形状：
+      1. 平铺列表：`[{"file": "a.pdf", ...}, ...]`
+      2. 具名列表：`{"records"|"entries"|"papers"|"items": [...]}`
+      3. 以文件名为键的字典：`{"a.pdf": {...}, ...}`
+    """
+    def _pick(record: Dict[str, Any], fallback_key: Optional[str] = None) -> Optional[str]:
+        for key in _LEGACY_PATH_KEYS:
+            value = record.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return fallback_key if fallback_key else None
+
+    harvested: Dict[str, Dict[str, Any]] = {}
+
+    def _consume(records: Dict[str, Dict[str, Any]], keyed: bool) -> None:
+        for key, record in records.items():
+            if not isinstance(record, dict):
+                continue
+            rel = _pick(record, key if keyed else None)
+            if rel:
+                harvested[rel.lstrip("./")] = record
+
+    if isinstance(data, list):
+        _consume({str(i): r for i, r in enumerate(data)}, keyed=False)
+        return harvested
+
+    if not isinstance(data, dict):
+        return harvested
+
+    for list_key in ("records", "entries", "papers", "items", "pdfs"):
+        value = data.get(list_key)
+        if isinstance(value, list):
+            _consume({str(i): r for i, r in enumerate(value)}, keyed=False)
+            return harvested
+
+    # 以文件名为键的字典（排除元信息键）
+    meta_keys = {"schema", "version", "generated_at", "count", "migrated_from", "migrated_at"}
+    _consume(
+        {k: v for k, v in data.items() if k not in meta_keys},
+        keyed=True,
+    )
+    return harvested
+
+
+def legacy_schema_of(data: Any) -> Optional[str]:
+    """取旧索引自称的 schema 字符串；没有就返回 `unknown`。"""
+    if isinstance(data, dict):
+        for key in ("schema", "_schema", "version"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return "unknown" if data else None
+
+
 def scan_pdfs(refs_dir: Path) -> List[Path]:
     return sorted(
         (p for p in refs_dir.rglob("*.pdf") if p.is_file()),
@@ -365,19 +445,36 @@ def scan_pdfs(refs_dir: Path) -> List[Path]:
     )
 
 
-def build_index(refs_dir: Path, with_hash: bool) -> Dict[str, Any]:
-    previous = load_previous(refs_dir / INDEX_NAME)
+def build_index(
+    refs_dir: Path,
+    with_hash: bool,
+    previous_override: Optional[Dict[str, Dict[str, Any]]] = None,
+    migrated_from: Optional[str] = None,
+) -> Dict[str, Any]:
+    previous = (
+        previous_override
+        if previous_override is not None
+        else load_previous(refs_dir / INDEX_NAME)
+    )
     entries = [
         build_entry(pdf, refs_dir, with_hash, previous.get(pdf.relative_to(refs_dir).as_posix(), {}))
         for pdf in scan_pdfs(refs_dir)
     ]
-    return {
+    index: Dict[str, Any] = {
         "schema": SCHEMA,
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "count": len(entries),
         # ★ 不写 refs_dir：索引本身就在 refs 目录内，写绝对路径会导致换机器后失效
         "pdfs": entries,
     }
+    if migrated_from:
+        index["migrated_from"] = migrated_from
+        index["migrated_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        index["_migrate_note"] = (
+            "本索引由 refs_index.py --migrate 从旧 schema 迁移而来；"
+            "旧字段已尽量保留，缺失字段由 needs_verification 标出，请人工补齐后重建。"
+        )
+    return index
 
 
 def check_index(refs_dir: Path, index: Dict[str, Any]) -> List[str]:
@@ -385,7 +482,10 @@ def check_index(refs_dir: Path, index: Dict[str, Any]) -> List[str]:
     problems: List[str] = []
     raw_entries = index.get("pdfs") if isinstance(index, dict) else None
     if not isinstance(raw_entries, list):
-        return ["索引缺少 pdfs 数组（schema 不符）"]
+        return [
+            "索引缺少 pdfs 数组（schema 不符）—— 旧版索引请先迁移："
+            "`python3 refs_index.py --migrate`（保留旧字段），再跑 --check"
+        ]
 
     indexed: Dict[str, Dict[str, Any]] = {}
     for entry in raw_entries:
@@ -435,6 +535,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help=f"索引输出路径（默认 <refs-dir>/{INDEX_NAME}）")
     parser.add_argument("--check", action="store_true",
                         help="只校验索引与 PDF 集合是否一致，不写入；不一致退出码 3")
+    parser.add_argument("--migrate", action="store_true",
+                        help="旧 schema → 当前 schema：保留旧条目字段，补 migrated_from/migrated_at")
     parser.add_argument("--no-hash", action="store_true",
                         help="跳过 sha256 计算（大库提速；--check 下会报缺少 sha256）")
     parser.add_argument("--json", action="store_true", help="把索引打印到 stdout")
@@ -471,14 +573,43 @@ def main(argv: Optional[List[str]] = None) -> int:
         if problems:
             for line in problems:
                 log(f"[stale] {line}")
-            log(f"[stale] 共 {len(problems)} 处不一致；请运行："
-                f"python3 {Path(__file__).name} --refs-dir {refs_dir}")
+            schema_mismatch = any("pdfs 数组" in line for line in problems)
+            hint = ("python3 %s --refs-dir %s --migrate" % (Path(__file__).name, refs_dir)
+                    if schema_mismatch
+                    else "python3 %s --refs-dir %s" % (Path(__file__).name, refs_dir))
+            log(f"[stale] 共 {len(problems)} 处不一致；请运行：{hint}")
             return EXIT_STALE
         log(f"[ok] 索引与 {len(on_disk_index.get('pdfs', []))} 个 PDF 一致")
         return EXIT_OK
 
     try:
-        index = build_index(refs_dir, with_hash=with_hash)
+        if args.migrate:
+            raw: Any = None
+            if output.is_file():
+                try:
+                    raw = json.loads(output.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError) as exc:
+                    log(f"[error] 旧索引无法解析，无法迁移：{exc}")
+                    return EXIT_ERROR
+            harvested = harvest_legacy(raw)
+            old_schema = legacy_schema_of(raw)
+            if raw is not None and old_schema == SCHEMA:
+                log(f"[ok] 已是当前 schema（{SCHEMA}），无需迁移；如需重建请直接运行不加 --migrate")
+                return EXIT_OK
+            index = build_index(
+                refs_dir,
+                with_hash=with_hash,
+                previous_override=harvested,
+                # 索引本来就不存在时，这是「首次建立」而不是「迁移」，不得标 migrated_from
+                migrated_from=(old_schema or "unknown") if raw is not None else None,
+            )
+            if raw is None:
+                log(f"[migrate] 无既有索引，按当前 schema 直接建立（{index['count']} 条）")
+            else:
+                log(f"[migrate] 旧 schema = {old_schema or 'unknown'}；"
+                    f"保留 {len(harvested)} 条旧记录，扫描到 {index['count']} 个 PDF")
+        else:
+            index = build_index(refs_dir, with_hash=with_hash)
     except OSError as exc:
         log(f"[error] 扫描失败：{exc}")
         return EXIT_ERROR
