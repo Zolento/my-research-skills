@@ -22,7 +22,7 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：mode 分发 + 全局不变量 + 状态传递
 ├── README.md                         # 本文件
 ├── references/
-│   ├── roles.md                      # 共享角色：会议审稿人（B/C/E）+ 六攻击面审稿人（R12）+ 证据核验员
+│   ├── roles.md                      # 共享角色：venue calibration 的会议视角（仅 R12/R13）+ 六攻击面审稿人（R7 / R12）+ 证据核验员 + S-Integrity
 │   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊（TMI/JMLR/Nature MI）+ contribution type → evidence contract → venue calibration + 防复现标准
 │   ├── narrative-patterns.md         # 十套叙事 preset（非互斥）+ (O,T,R) 选 preset + 六槽位 S1—S6 + Transfer Legitimacy
 │   ├── claim-first-policy.md         # R12 现行（P0）：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
