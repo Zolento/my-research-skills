@@ -20,7 +20,7 @@ description: >-
   研究创意, 文献调研, 相关工作, 方案生成, 方案复核, 审阅方案, 投稿方案, 顶会投稿,
   论文叙事, 叙事套路, 讲故事, 卖点, 定位, 叙事评审, 医学影像, 医学图像, 临床验证,
   MICCAI, medical image analysis, clinical validation.
-argument-hint: "mode=A|B|C|D|E [领域关键词 | idea | proposal | query]"
+argument-hint: "mode=A|B|C|D|E [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
   version: "1.2.0"
@@ -77,6 +77,10 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 3. mode 之外的参数按该 Mode 的输入约定解析（见下）。
 4. 若用户显式给了多个 Mode（如 `mode=B,C,D`），按 B → C → D 顺序串联执行，
    中间状态通过 `state.json` 片段传递（见 §5）。
+5. **档位参数（可选）**：若 `$ARGUMENTS` 含 `writing=asd-ste100`，或用户在自然语言里
+   显式要求「用 asd-ste100 档」，本次调用按 **asd-ste100** 执行（见 §1.3 与
+   [writing-policy.md](references/writing-policy.md) §1）。未声明即走默认档；
+   **Agent 不得自行升档**，声明也**不跨轮继承**。
 
 **启动前置动作（每次调用都做）：**
 
@@ -296,10 +300,14 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 ### 1.3 输出规范
 
 **形式（受控中文）：** 本节的每一条输出 —— 无论落到文档还是直接返回对话 —— 都遵守
-[writing-policy.md](references/writing-policy.md)：**一句一动作、句长上限（指令 ≤25 字 /
+[writing-policy.md](references/writing-policy.md)：**一句一动作、句长上限（默认档：指令 ≤25 字 /
 说明 ≤40 字）、不用分号连接动作、一段一主题、≥3 项用列表**，并扫掉虚动词（「进行分析」→
 「分析」）、套话（「需要注意的是」）、营销形容词（「无缝」「显著提升」）与同义轮换。
-**落盘前跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，硬违规须为 0。**
+**默认档落盘前跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，
+硬违规须为 0。**
+**可选最强档 asd-ste100：** 用户显式声明时启用 —— 句长一律 ≤25 字、打开同义轮换、
+建议类报告升为硬；命令改 `python scripts/ste_lint_zh.py --max-chars 25 <文件>`。
+**Agent 不得自行升档**（见该政策 §1）。
 **⚠️ 情态是内容：** 改写句子时**不得**把「可能 / 初步 / 倾向于」升成事实
 （与 §1.1 的「禁止推断」同一条纪律）。
 
@@ -389,7 +397,9 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 8. **正文形式遵守受控中文：** 落盘**之前**跑
    `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，**硬违规为 0**。
    档位按 [writing-policy.md](references/writing-policy.md) §1 判定
-   （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**）。
+   （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**；
+   **用户显式声明 asd-ste100 时改按该档执行** —— 命令换成
+   `python scripts/ste_lint_zh.py --max-chars 25 <文件>`，且**不得自行升档**）。
    **⚠️ 不得为了过 linter 而删情态**（「可能 / 初步」是内容）。
 
 > **slug 只能取：** `literature-survey` / `ideas` / `proposal` / `experiment-plan` /
@@ -470,7 +480,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、**锚点变更单**、`INDEX.md` 章节、`AGENTS.md` 优先与可达性校验、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **Mode D / E 共用**：1—5 标尺、**极性归一化**（S-Devil 反向）、门禁、逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五 Mode 共用**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述（各 Mode 不再各自定义） |
-| 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：Strict 与 中文-顺 两档、结构规则（硬）、词汇规则（方向）、中文六种机器味、**情态是内容** |
+| 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：三档 **asd-ste100（可选最强档，须用户显式声明）/ Strict / 中文-顺**、结构规则（硬）、词汇规则（方向；asd-ste100 档下升为执行）、中文六种机器味、**情态是内容** |
 | 受控中文 linter | [scripts/ste_lint_zh.py](scripts/ste_lint_zh.py) | 机械首查：分号 / 超长句 / 虚动词 / 营销词 / 套话 / 同义轮换 / 被动 / 复合体貌 / 含糊词 / 半角标点；`--baseline`、`--disable`、`--selftest`（MIT，vendored） |
 | 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
 | 多源适配器 | [scripts/literature_sources.py](scripts/literature_sources.py) | arxiv（新）/ openalex（关系）/ crossref（出处）+ 跨源合并层 |
@@ -742,6 +752,9 @@ E 方案复核。
       `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>` 且**硬违规为 0**
       （无分号串联动作、无超长句、无虚动词「进行分析」、无营销形容词、无套话）；
       对话返回**第一段就是结论**；一份文档内同一概念只用一种写法。
+      **若用户显式声明了 asd-ste100 档**，命令改为
+      `python scripts/ste_lint_zh.py --max-chars 25 <文件>`，且**建议类报告已逐条人工处置**
+      （脚本不会因此失败，见 [writing-policy.md](references/writing-policy.md) §7）。
       **⚠️ 情态未被删改**（「可能 / 初步」原样保留，见
       [writing-policy.md](references/writing-policy.md) §5）。
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
@@ -811,6 +824,11 @@ E 方案复核。
    linter。**为什么不用英文的 ASD-STE100 原版规则？** 它是英文标准；实测把它套在中文段落上
    会返回「0 违规」的**假绿灯**，等于装了一道不存在的闸。中文没有官方受控词表，
    因此词汇规则**只作方向**，不声称合规。
+   **为什么 asd-ste100 只作可选最强档、不做默认？** 实测：8 个受管文件在默认档下硬违规
+   全为 0；换成 asd-ste100 口径（25 字上限 + 同义轮换）会新增 2—20 处，其中多为
+   **说明性长句**。默认档服务常规产出（一次几千字），asd-ste100 服务**必须逐字精确**的产出
+   （对外交付、冻结契约、给外部 agent 的指令）。按期放开是**产能与严格度的取舍**，
+   所以开关交给用户；**Agent 不得自行升档**，否则严格档会被当默认档用，产出速度静默变慢。
    **为什么情态单列一条？** 受控写作最常见的翻车方式是：为了压句长，把「实验**可能**受批次
    效应影响」改成「实验受批次效应影响」——那不是简化，是**换了个结论**。句长上限最容易
    引诱人删掉的正是这些词，所以必须在政策里显式禁止。
@@ -886,6 +904,8 @@ done
 #    注意：**不要**拿它扫本 Skill 自己的规范文本（SKILL.md / references/*.md）——
 #    范围只包含「落盘文档 / 对话返回 / 子代理意见」+ examples/ + templates/，
 #    见 writing-policy.md §0
+#    这里固定跑**默认档**：examples/ 与 templates/ 是存量样例，不按 asd-ste100 追溯改写。
+#    asd-ste100 是**当次调用**的可选档（--max-chars 25），不是仓库级闸门。
 ```
 
 > **D4 的"已废弃措辞"清单要持续维护**：每次改规则时，把**被替换掉的旧表述**

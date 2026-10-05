@@ -315,7 +315,9 @@ anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum 
   （「无缝」「显著提升」）、同义轮换。
 - ✅ **落盘前跑 `python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，
   硬违规须为 0。** 档位见 [writing-policy.md](writing-policy.md) §1
-  （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**）。
+  （实验流程计划书的步骤与命令用 **Strict**，其余正文用**中文-顺**；
+  用户显式声明 **asd-ste100** 时改按该档，命令换 `--max-chars 25`，
+  **Agent 不得自行升档**）。
 - ❌ **禁止**把 `state.json`、原始 JSON、日志、traceback 直接贴进正文——
   机器状态放 `.research-idea-pipeline/`，日志放 `logs/`，正文只放结论与依据。
 - ❌ 禁止只有标题没有内容的空壳文档。
