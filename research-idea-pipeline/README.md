@@ -181,7 +181,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 3. **D5 攻击面审核**：六个**攻击面审稿人**（R-Novelty / R-Causal / R-Experimental /
    R-Theory / R-Generalization / R-Utility）**全部派遣、不得裁减**；**S-Lit 恒派**
    （L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例）。
-4. **D6 venue calibration**（按 contribution type 校准会议适配，**不是** venue 直接选 preset）
+4. **R12 / R13 的 venue calibration**（按 contribution type 校准会议适配，**不是** venue 直接选 preset）
    → **D7 硬门禁 `G1—G5`**（任一 `fail` ⇒ `not_submission_ready`，且**不参与排序**）
    → **D8 六维排序**（Significance / Originality / Soundness margin / Explanatory depth /
    Generality / Narrative compression）→ **D9 输出**（含**缺失证据清单与最小必要实验 / 定理**）。

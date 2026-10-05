@@ -395,7 +395,7 @@ R7 / R10 / R13 继续复核。**
 | assumption / theorem / boundary | **`R-Theory`** | 假设是否必要、证明是否有缺口 |
 | claim scope | **`R-Generalization`** | 声称范围是否超出证据 |
 | 实现与可复现 | **`S-Repro`** | 复现风险、实现与声称是否一致 |
-| **完整性** | **`S-Integrity`**（Wave 3 新增） | leakage / cherry-pick / metric misuse / post-hoc |
+| **完整性** | **`S-Integrity`**（Wave 3 新增；**R13 起生效**，R7/R8 不得要求） | leakage / cherry-pick / metric misuse / post-hoc |
 
 **每个攻击面必须输出五元组（硬规则）：**
 

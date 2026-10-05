@@ -322,7 +322,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 该校准表的**每一行**都必须同时给出：
 
 > **作用域：** 本条**仅适用于 venue calibration 表**（R12 / R13）。**R12 已改用
-> 攻击面审稿人**（见 §3 派遣表），会议审稿人只在 **D6 venue calibration** 中以校准表的
+> 攻击面审稿人**（见 §3 派遣表），会议审稿人只在 **R12 / R13 的 venue calibration** 中以校准表的
 > 形式出现 —— 那里沿用「两角度 + 会议特性」的判据，但**不派子代理**。
 
 1. **理论角度** —— 命题 / 假设 / 推导是否成立、形式化是否完整、理论贡献深度；
@@ -602,7 +602,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | **R2 / R5** | 无（执行者直接完成检索与归纳） |
 | **R3—R6** | **按 island 分轨生成**（`P1`—`P6` 各自独立、**上下文隔离**；**不派 venue 角色**）；concept 级快筛由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 承担，`S-Devil` 出致命反驳。**不派 S-Repro** |
 | **R8** | 由 `A-Author` / `A-Experimenter` 展开提案与实验计划；核实由 `S-Lit`、**`S-Nov`（按需）**、`S-Theory`、`S-Feas`；**venue 角色不派** |
-| **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **D6 venue calibration** 中以校准表出现 |
+| **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **R12 / R13 的 venue calibration** 中以校准表出现 |
 | **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
 
 **职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；B5 的审核是
@@ -713,7 +713,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   D3 Anchor Eligibility → D4 叙事实现（**2—4 套真正不同的 claim hierarchy**；六槽位
   `S1—S6`；含包装前后对照）→ D5 攻击面审核（**R-Novelty / R-Causal / R-Experimental /
   R-Theory / R-Generalization / R-Utility 六人全部派遣 + S-Lit 恒派 + S-Devil 不打分**）→
-  D6 venue calibration → D7 硬门禁 `G1—G5` → D8 六维排序 → D9 最佳叙事推荐。
+  R12 / R13 的 venue calibration → D7 硬门禁 `G1—G5` → D8 六维排序 → D9 最佳叙事推荐。
 - **交付物：** 证据台账 + claim graph + 每套候选的六槽位叙事 + 六攻击面审稿人意见 +
   S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
   **缺失证据清单与最小必要实验 / 定理**。
@@ -957,7 +957,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     *novelty / causality / experimental design / theory / scope / utility* 六类，而
     `R-CVPR`、`R-ICML`、`R-NeurIPS` 的意见**高度重合** —— 真实的 CVPR 审稿人可能是理论
     审稿人，真实的 ICML 审稿人也可能主攻实验设计。所以 R12 改派六个攻击面审稿人，
-    会议差异改由 **D6 venue calibration** 单独一层承担：**按 contribution type 校准，
+    会议差异改由 **R12 / R13 的 venue calibration** 单独一层承担：**按 contribution type 校准，
     不是 venue 直接选 preset**。
     **为什么同时删掉「必须有迁移合法性定理」？** 那是一条过拟合 ICML theory 的规则，
     会让一个很好的 empirical insight 因为没有 theorem 被判"不可投稿"。改为

@@ -107,7 +107,7 @@ R12 的 D7 对**每一套候选叙事**逐项判定下列五项。
 | `G2 Prior-work distinction` | 与最近工作没有明确的 delta | R-Novelty | S-Lit 的最接近工作（≥5 篇）+ L3 负检索记录 |
 | `G3 Identification` | 实验 / 证明不能识别所声称的机制 | R-Causal + R-Experimental | confounder / 替代解释清单 + S-Devil 的最简解释反例 |
 | `G4 Factual integrity` | 定理 / 实验 / 结果被叙事夸大 | R-Theory（+ R-Experimental） | 定理与实验的原始范围 vs 叙事句；[evidence-policy.md](evidence-policy.md) §1、§3 |
-| `G5 Venue scope` | 贡献对象与 venue 明显不匹配 | R-Utility + D6 venue calibration | [venue-standards.md](venue-standards.md) 的贡献对象 ↔ venue 校准 |
+| `G5 Venue scope` | 贡献对象与 venue 明显不匹配 | R-Utility + R12 / R13 的 venue calibration | [venue-standards.md](venue-standards.md) 的贡献对象 ↔ venue 校准 |
 
 **判定规则（强制）：**
 
