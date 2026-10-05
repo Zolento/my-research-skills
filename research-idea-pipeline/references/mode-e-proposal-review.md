@@ -235,8 +235,8 @@ Mode E 继续复核。**
 
 ## E6. 文档落盘与 INDEX 更新（强制）
 
-1. **写审阅记录：** `docs/<被审ID>-review.md`；
-   接续复核写 `-review-2.md`、`-review-3.md`（frontmatter 记 `review_round`）。
+1. **写审阅记录：** `<routeX>/docs/<被审ID>-review-r01.md`；
+   接续复核写 `-r02.md`、`-r03.md`（轮次零填充两位）（frontmatter 记 `review_round`）。
    **审阅记录不占用新序号**，永远挂在被审文档 ID 上。
 2. **frontmatter：** `mode: E / type: review / review_of: <被审ID> / review_round / also_reviewed / status`。**跨文档复核**（如同时审方案 + 实验计划）挂在主文档 ID 上，其余写进 `also_reviewed`。
 3. **把审阅结论翻译成 `INDEX.md` 进度**（这是本 Mode 最容易漏的一步）：

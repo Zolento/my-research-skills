@@ -141,8 +141,8 @@
 ## C6. 文档落盘与 INDEX 更新（强制）
 
 1. **写文档（两份，各占独立序号）：**
-   - 方案：`docs/<R>NNN-proposal.md`
-   - 实验计划：`docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
+   - 方案：`<routeX>/docs/<R>NNN-proposal.md`
+   - 实验计划：`<routeX>/docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
    每份文档都按 project-layout.md §2.6 扫描现有最大序号 +1，**序号永不复用**。
 2. **frontmatter：** `mode: C / type: proposal | experiment-plan / status / created`。
 3. **更新该路线 `INDEX.md`：**

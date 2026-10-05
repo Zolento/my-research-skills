@@ -148,7 +148,7 @@
 
 ## A6. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `docs/<R>NNN-literature-survey.md`，内容 = 检索范围 +
+1. **写文档：** `<routeX>/docs/<R>NNN-literature-survey.md`，内容 = 检索范围 +
    检索式与结果表 + 文献列表 + **负检索记录** + 429 日志 + 饱和判定。
 2. **frontmatter：** `mode: A / type: literature-survey / status / created`。
 3. **更新该路线 `INDEX.md`：**

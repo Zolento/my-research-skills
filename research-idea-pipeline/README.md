@@ -39,7 +39,9 @@ research-idea-pipeline/
 │   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check 校验）
 │   └── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
 ├── templates/
-│   ├── INDEX.md                      # 路线 INDEX.md 骨架（必需）
+│   ├── INDEX.md                      # 路线级 INDEX.md 骨架（含文档关系图）
+│   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（跨路线索引）
+│   ├── README.route.md               # 路线级 README.md 骨架
 │   └── state.template.json           # state.json 片段模板（键 = A—E）
 ├── examples/
 │   ├── example-b-to-c-d-e.md         # 主链路串联
@@ -224,15 +226,15 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 │   ├── A002-ideas.md      # 含 I1..In 与 B5 审核
 │   ├── A003-proposal.md
 │   ├── A004-experiment-plan.md
-│   ├── A005-narrative-I1.md
-│   ├── A003-review.md
+│   ├── A005-narrative.md
+│   ├── A003-review-r01.md
 │   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
 │   └── refs/              # ★ 参考文献库（= 本地文献库根目录）
 │       ├── papers/        # {paper_id}.pdf（不进版本库）+ .json sidecar + 可选 .md
 │       ├── cache/         # {query_hash}.json
 │       └── index.json     # ★ 必需：PDF 索引，进版本库
 ├── routeA/
-│   ├── INDEX.md           # ★ 必需：索引到 ../docs/A*
+│   ├── INDEX.md           # ★ 路线级索引（文档索引 + 关系图 + 进度）
 │   └── code/
 ├── routeB/
 │   └── INDEX.md
@@ -242,9 +244,9 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 
 | 规则 | 说明 |
 |---|---|
-| 命名 | `docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review.md`，接续为 `-review-2.md` |
+| 命名 | `<routeX>/docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review-r01.md`，接续 `-r02.md` |
 | 存放 | **所有路线共用根目录 `docs/`（扁平）**，靠文件名前缀区分路线；参考文献在 `docs/refs/` |
-| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative-I<n>` |
+| slug 枚举 | `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative` |
 | 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 Mode A—E 无关；Mode 记在 frontmatter |

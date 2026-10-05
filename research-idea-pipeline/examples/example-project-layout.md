@@ -23,11 +23,11 @@
 │       ├── cache/               # {query_hash}.json
 │       └── index.json           # ★ 必需：PDF 索引，进版本库
 ├── routeA/
-│   ├── INDEX.md                 # ★ 路线 A 的唯一入口（索引到 ../docs/A*）
+│   ├── INDEX.md                 # ★ 路线 A 索引（文档索引 + 关系图 + 进度）
 │   ├── code/
 │   └── experiments/
 ├── routeB/
-│   ├── INDEX.md                 # ★ 索引到 ../docs/B*
+│   ├── INDEX.md                 # ★ 路线 B 索引
 │   ├── code/
 │   └── experiments/
 ├── shared/                      # 跨路线公用代码/笔记
@@ -126,11 +126,11 @@ reviewers: []
 ## 2. 文档索引
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
-| A002 | [A002-ideas.md](../docs/A002-ideas.md) | idea-discovery | B | reviewed | 12 个 idea（含 B5 审核） |
-| A003 | [A003-proposal.md](../docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1..Kn |
-| A004 | [A004-experiment-plan.md](../docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1..E7 |
-| A005 | [A005-narrative-I1.md](../docs/A005-narrative-I1.md) | narrative | D | reviewed | idea I1 的 4 套叙事，最佳 N2 |
-| A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 中位数 4 |
+| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | B | reviewed | 12 个 idea（含 B5 审核） |
+| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1..Kn |
+| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1..E7 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1 的 4 套叙事，最佳 N2 |
+| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | E | reviewed | 中位数 4 |
 
 ### 2.1 Idea 追踪
 | Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |

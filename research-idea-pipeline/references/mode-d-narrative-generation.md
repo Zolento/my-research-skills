@@ -430,7 +430,7 @@ S-Lit 遵守 [literature-policy.md](literature-policy.md) 的**全部**规则：
 
 ## D7. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `docs/<R>NNN-narrative-I<n>.md`
+1. **写文档：** `<routeX>/docs/<R>NNN-narrative.md`
    （ID 按 [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = 多套路叙事清单（每 idea ≥4 套）+ 六子代理评审意见 + 交叉质询记录
    + 最佳叙事推荐 + 横向对比表 + 最终建议。

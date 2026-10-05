@@ -231,112 +231,62 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ### 1.4 项目组织与文档落盘（所有 Mode 强制）
 
-**所有路线的方案与审阅记录必须落盘到项目根目录的 `docs/`（扁平、集中），以人类可读的
-Markdown 存储；参考文献放 `docs/refs/`。**
+**各路线产出的文档放该路线自己的 `routeX/docs/`（扁平）；根目录 `docs/` 是跨路线共享区，
+至少保证有 `refs/`。根目录与每条路线各自有 `README.md` 与 `INDEX.md`。**
 
 ```
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
-├── docs/                  # ★ 所有路线的文档集中于此（扁平，不分子目录）
-│   ├── A001-literature-survey.md
-│   ├── A002-ideas.md
-│   ├── A003-proposal.md
-│   ├── A004-experiment-plan.md
-│   ├── A005-narrative-I1.md
-│   ├── A003-review.md
-│   ├── B001-literature-survey.md   # routeB 的文档同目录，靠 B 前缀区分
-│   └── refs/              # ★ 参考文献库：papers/ cache/ + index.json（PDF 索引，强制）
-│                          #   PDF 原文不进版本库，index.json 必须进
+├── README.md              # ★ 根级：项目总览（研究问题、路线列表、怎么跑）
+├── INDEX.md               # ★ 根级：跨路线索引（各路线状态 + 全局 TODO/Warnings）
+├── docs/                  # ★ 跨路线共享区（不放路线文档）
+│   ├── refs/              # ★ 必需：参考文献库 papers/ cache/<source>/ index.json
+│   ├── notes/             # 可选：跨路线共享笔记（按 AGENTS.md）
+│   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
 ├── routeA/
-│   ├── INDEX.md           # ★ 必需：索引到 ../docs/A*
+│   ├── README.md          # ★ 路线级：本路线说明
+│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
+│   ├── docs/              # ★ 本路线文档（扁平）
+│   │   ├── A001-literature-survey.md
+│   │   ├── A002-ideas.md
+│   │   ├── A003-proposal.md
+│   │   ├── A004-experiment-plan.md
+│   │   ├── A005-narrative.md          # Mode D：一次调用一份，内含各 idea 小节
+│   │   └── A003-review-r01.md         # 审阅挂被审 ID；零填充轮次
 │   └── code/
-├── routeB/
-│   └── INDEX.md
-├── shared/                # 跨路线公用代码/笔记，按 AGENTS.md 规范
+├── shared/                # 跨路线公用代码/笔记
 └── .research-idea-pipeline/   # 机器状态（不入 docs）
 ```
 
 **六条硬性规则：**
 
-1. **先读 `AGENTS.md`。** 项目根目录存在 `AGENTS.md` 时，其约定优先于本 Skill 默认。
-2. **文档集中（扁平）：** 所有路线的文档都放**根目录 `docs/`**，**不再按路线分子
-   目录**；路线靠**文件名前缀**（`A*` / `B*`）区分，**序号仍按路线独立递增、永不复用**。
-   `slug` 只能取：`literature-survey` / `ideas` / `proposal` / `experiment-plan` /
-   `narrative-I<n>`。
-3. **审阅意见挂在被审 ID 上：** `<被审ID>-review.md`；接续复核 `-review-2.md`。
-   **审阅记录不占新序号。**
-   > 注意：文档 ID 前缀是**路线编号**，与 Mode A/B/C/D/E 无关。Mode C 在 `routeA`
-   > 产出的方案是 `A003` 而**不是** `C003`；产出该文档的 Mode 记在 frontmatter 的
-   > `mode` 字段。
-4. **每条路线必须有 `INDEX.md`**（如 `routeA/INDEX.md`），且每次产出后必须更新。
-   进度必须包含：**已证实 / 已证伪 / TODO / Bugs / Warnings**，以及文档索引
-   （含 **Idea 追踪 / 叙事追踪 / 审阅追踪**）与变更日志。
-   被证伪的假设**不得删除**；"检索未达饱和"必须记入 Warnings。
+1. **文档按路线分离、各自扁平：** 产出放 `routeX/docs/`，**该目录内不再按类型分子目录**。
+   **根 `docs/` 是跨路线共享区**——本 Skill **只保证 `refs/` 存在**，`notes/`、`latex/`
+   等由项目与 `AGENTS.md` 决定。**唯一硬约束：路线文档不得放根 `docs/`。**
+2. **两层 `README.md` + 两层 `INDEX.md`，分层管理：**
+
+   | 层级 | `README.md` | `INDEX.md` |
+   |---|---|---|
+   | 根 | 项目总览 | **跨路线索引**（各路线状态、全局 TODO/Warnings） |
+   | `routeX/` | 本路线说明 | **本路线索引**（文档索引 + **关系图** + 进度） |
+
+   **每次产出后更新所在路线的 `INDEX.md`**；跨路线层面的变化同步更新根 `INDEX.md`。
+3. **文件名前缀 = 文档 ID**（不再是路径隔离）：前缀仍**必需** —— 审阅要挂靠、跨路线
+   引用要唯一。序号按路线独立递增、**永不复用**。
+4. **审阅挂被审 ID、轮次零填充：** `<被审ID>-review-r01.md`、`-r02.md`（**不占新序号**）。
+   用 `-r<NN>` 是因为 `-review.md`/`-review-2.md` 在 `ls`/`sort` 下**轮次顺序是反的**。
+   一轮覆盖多份文档时挂主文档 ID，其余写 frontmatter 的 `also_reviewed`。
 5. **参考文献集中：** 论文元数据/笔记/缓存一律放 **`docs/refs/`**（脚本默认
-   `--local-dir ./docs/refs`）；机器状态 `state.json` 放 `.research-idea-pipeline/`，
-   日志放 `logs/`——**都不进 docs 正文**。
-6. **`docs/refs/` 下的每个 PDF 都必须有索引条目：** 一律登记到
-   **`docs/refs/index.json`**（强制，见
-   [literature-policy.md](references/literature-policy.md) §7.1），记录
-   `file / paper_id / title / authors / year / arxiv_id / pages / size_bytes / sha256 /
-   added_at / metadata_from / needs_verification` 等基本信息。**索引进版本库，PDF 不进**
-   （PDF 是大文件）。新增/替换/删除 PDF 后**必须重建索引**
-   （`python3 scripts/refs_index.py`，校验用 `--check`）。**未入索引的 PDF 视为不存在**，
-   任何"本地已有该文献"的论断都必须能指向索引条目。
+   `--local-dir ./docs/refs`）；机器状态放 `.research-idea-pipeline/`，日志放 `logs/`
+   ——**都不进 docs 正文**。
+6. **PDF 必须入索引：** `docs/refs/` 下的每个 PDF 都要在 **`docs/refs/index.json`**
+   里有一条记录（字段见 [literature-policy.md](references/literature-policy.md) §7.1）。
+   **索引进版本库，PDF 不进**。新增/替换/删除 PDF 后**必须重建索引**
+   （`python3 scripts/refs_index.py`，校验 `--check`）；**未入索引的 PDF 视为不存在**。
 
-完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
-骨架的检查清单）。
-
-### 1.5 推进纪律：理论建模是手段，不是终点（限制子代理行为）
-
-> **禁止在「证明性工作」上停留与反复。** 数学理论的作用是**把问题建模清楚**，
-> 据此找证据、提出方法、改进最终任务性能 —— **它不是交付物本身**。
-> 这条规则同时约束**执行者**与**所有子代理**（尤其 S-Theory、R-ICML）。
-
-**四步链（每个 idea / 方案都必须走得通）：**
-
-| 步 | 内容 | 产出 |
-|---|---|---|
-| 1 | **数学理论建模** | 形式化问题：变量、假设、目标、结构性质 |
-| 2 | **寻找证据** | 文献证据 + 实验证据（不是"我觉得"） |
-| 3 | **结合机器学习领域的方法提出方法**，并**明确标注方法来源** | 可执行的方法 / 算法 + `方法来源 = 原创 / 部分原创 / 迁移` |
-| 4 | **改进最终任务性能** | 有可测指标与公平比较 |
-
-**方法来源必须显式标注（原创 / 部分原创 / 迁移）：**
-
-| 标注 | 含义 | 判据 |
-|---|---|---|
-| **原创** | 方法的核心机制由本工作提出，不来自既有工作 | 必须指出最接近先前工作，并说明**机制层面**的不同 |
-| **部分原创** | 核心机制部分来自既有工作，但有关键改造 / 新组合 / 新性质 | 必须写明**改了哪一条**，以及改造带来的新性质 |
-| **迁移** | 把其他领域 / 任务的既有方法搬过来，机制本身不变 | 必须写明**来源领域 + 迁移合法性依据**；**迁移本身不算增量** |
-
-**标注的硬性要求：**
-
-- 每个方法都必须标 —— Mode B 的每个 idea、Mode C 的每条贡献、Mode D 的每套叙事。
-  **不得留空，也不得模糊**（"受 X 启发"不是标注）。
-- **迁移必须诚实标成迁移。** 把迁移包装成原创属于**夸大**，违反 §D2.4 的包装纪律
-  （包装只允许改参照系，不允许改事实）。
-- **迁移要成为贡献，必须证明迁移本身带来了新性质**（新的结构性质、理论条件或性能
-  来源）。否则就只是"把 X 用到 Y 上" —— Mode B 的反模式、Mode E 的**复现风险高**。
-- 标注必须**可核验**：能指向具体的先前工作与具体的机制差异。
-
-**明令禁止：**
-
-- ❌ 反复打磨证明（"再证一遍"不是进度）
-- ❌ 把"证不出来"当成阻塞 —— 应标注 **"待补证明"** 后**继续走第 2—4 步**
-- ❌ 把贡献定位成"我们证明了 X"，却没有方法、没有可验证性能
-- ❌ 在证明性工作上无限迭代而不产出可执行方法与实验
-
-**证明预算（防止无限证明）：** 证明类工作必须设**显式预算**（时间或轮次上限）。
-预算用尽仍未完成 → **标注"待补证明 · 待核实"，转入第 2—4 步**，并在 `INDEX.md`
-的 TODO 里留下补证任务。**不得**因此阻塞整条链路。
-
-**唯一例外（主锚点为「理论」或「负结果」时）：** 第 4 步改为
-「给出**可被实验检验的推论**或**可达到的松弛**」—— 此时"性能"指推论的可检验性，
-不是 SOTA 指标。**但第 2、3 步仍然必须走通**：纯证明、无证据、无方法，依然不成立。
-
-> ⚠️ **底线不变：** 本条约束的是**精力分配与停止条件**，不是诚实性。
-> **不得**声称"已证明"却未完成证明；未完成的必须标 **"待补证明 · 待核实"**。
+> **slug 只能取：** `literature-survey` / `ideas` / `proposal` / `experiment-plan` /
+> `narrative`。**Mode D 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
+> 完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建骨架清单）。
 
 ---
 

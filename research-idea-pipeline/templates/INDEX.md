@@ -31,21 +31,34 @@
 
 ## 2. 文档索引
 
-> 链接相对本文件（即 `routeX/`）书写，格式为 `../docs/<文件名>`——
-> **所有路线的文档都放在根目录 `docs/`（扁平）**，靠文件名前缀区分路线。
+> 链接相对本文件（即 `routeX/`）书写，格式为 `docs/<文件名>` ——
+> **本路线的文档都在 `routeX/docs/`（扁平）**。根目录 `docs/` 是跨路线共享区。
 > **slug 只能取下列枚举值**（详见本 Skill 的 `project-layout.md` §2.1）：
 > `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative-I<n>`；
-> 审阅意见为 `../docs/<被审ID>-review[-<轮次>].md`，**不占新序号**。
+> 审阅意见为 `docs/<被审ID>-review-r<NN>.md`，**不占新序号**。
 > 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
-| `<路线字母>001` | `../docs/<文件名>` | literature-survey | A | draft | |
-| `<路线字母>002` | `../docs/<文件名>` | idea-discovery | B | draft | 含 I1..In |
-| `<路线字母>003` | `../docs/<文件名>` | proposal | C | draft | 贡献 K1..Kn |
-| `<路线字母>004` | `../docs/<文件名>` | experiment-plan | C | draft | 实验 E1..En |
-| `<路线字母>005` | `../docs/<文件名>` | narrative | D | draft | idea I1 的套路 |
-| `<路线字母>003-review` | `../docs/<文件名>` | review | E | draft | 对 `003` 的审阅 |
+| `<路线字母>001` | `docs/<文件名>` | literature-survey | A | draft | |
+| `<路线字母>002` | `docs/<文件名>` | idea-discovery | B | draft | 含 I1..In |
+| `<路线字母>003` | `docs/<文件名>` | proposal | C | draft | 贡献 K1..Kn |
+| `<路线字母>004` | `docs/<文件名>` | experiment-plan | C | draft | 实验 E1..En |
+| `<路线字母>005` | `docs/<文件名>` | narrative | D | draft | 一次调用：I1..In 的套路 |
+| `<路线字母>003-review-r01` | `docs/<文件名>` | review | E | draft | 对 `003` 的第 1 轮审阅 |
+
+### 2.0 文档关系图
+
+> **编号是"时间序"，关系图是"关系序"。** 每次产出后手工更新本节。
+
+```text
+A001 文献调研
+ └─▶ A002 ideas ─┬─▶ A003 方案 ─┬─▶ A004 实验计划
+                 │              ├─▶ A003-review-r01
+                 │              └─▶ A003-review-r02（接续复核）
+                 └─▶ A005 narrative（含 I1 / I3 / I5）
+                       └─▶ A005-review-r01
+```
 
 ### 2.1 Idea 追踪
 
@@ -69,7 +82,8 @@
 
 | 被审文档 | 轮次 | 文件 | 中位数 | 复现风险 | 结论 |
 |---|---|---|---|---|---|
-| `<ID>` | 1 | `<ID>-review.md` | | 低 / 中 / 高 | |
+| `<ID>` | 1 | `<ID>-review-r01.md` | | 低 / 中 / 高 | |
+| `<ID>` | 2 | `<ID>-review-r02.md` | | 低 / 中 / 高 | 接续复核 |
 
 ---
 

@@ -22,52 +22,70 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 
 ## 1. 标准项目布局
 
-**所有路线的文档集中放在根目录的 `docs/`（扁平），靠文件名前缀区分路线；参考文献放
-根目录 `docs/refs/`。**
+**各路线产出的文档放该路线自己的 `routeX/docs/`（扁平，不按类型再分子目录）；
+根目录 `docs/` 是跨路线共享区，至少保证有 `refs/`（参考文献库）。根目录与每条路线
+各自有 `README.md` 与 `INDEX.md`，分层管理各自层级的文件。**
 
 ```
 <项目根目录>/
-├── AGENTS.md                    # 共享契约：布局、命名、公用部分规范
-├── docs/                        # ★ 所有路线的文档集中于此（扁平，不分子目录）
-│   ├── A001-literature-survey.md
-│   ├── A002-ideas.md
-│   ├── A003-proposal.md
-│   ├── A004-experiment-plan.md
-│   ├── A005-narrative-I1.md
-│   ├── A003-review.md
-│   ├── B001-literature-survey.md    # routeB 的文档同一目录，靠 B 前缀区分
-│   ├── B002-ideas.md
-│   └── refs/                    # ★ 参考文献库（= 本地文献库根目录）
-│       ├── papers/              # {paper_id}.pdf + .json sidecar + 可选 .md
-│       ├── cache/               # {source}/{query_hash}.json（查询缓存，按源分目录）
-│       └── index.json           # ★ 必需：PDF 索引（每个 PDF 一条记录，进版本库）
-├── routeA/                      # 路线 A 的代码与实验
-│   ├── INDEX.md                 # ★ 必需：索引到 ../docs/A*
+├── AGENTS.md                    # 共享契约：布局、命名、公用部分规范（最高优先级）
+├── README.md                    # ★ 根级：项目总览（研究问题、路线列表、怎么跑）
+├── INDEX.md                     # ★ 根级：跨路线索引（各路线状态 + 全局 TODO / Warnings）
+├── docs/                        # ★ 跨路线共享区（不放路线文档）
+│   ├── refs/                    # ★ 必需：参考文献库（= 本地文献库根目录）
+│   │   ├── papers/              # {paper_id}.pdf + .json sidecar + 可选 .md
+│   │   ├── cache/<source>/      # 查询缓存（按源分目录）
+│   │   └── index.json           # ★ 必需：PDF 索引（每个 PDF 一条记录，进版本库）
+│   ├── notes/                   # 可选：跨路线共享笔记（按 AGENTS.md）
+│   └── latex/                   # 可选：跨路线共享 LaTeX 模板/样式（按 AGENTS.md）
+├── routeA/
+│   ├── README.md                # ★ 路线级：本路线说明（做什么、怎么跑、目录说明）
+│   ├── INDEX.md                 # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
+│   ├── docs/                    # ★ 本路线文档（扁平；不再按类型分子目录）
+│   │   ├── A001-literature-survey.md
+│   │   ├── A002-ideas.md
+│   │   ├── A003-proposal.md
+│   │   ├── A004-experiment-plan.md
+│   │   ├── A005-narrative.md
+│   │   └── A003-review-r01.md
 │   ├── code/                    # 该路线专属代码
 │   └── experiments/
 ├── routeB/
-│   ├── INDEX.md                 # ★ 必需：索引到 ../docs/B*
+│   ├── README.md
+│   ├── INDEX.md
+│   ├── docs/                    # B001-… 同样扁平
 │   └── code/
 ├── shared/                      # 跨路线公用代码/笔记（按 AGENTS.md 规范）
-│   ├── code/                    # 公用工具、数据加载、评测脚本
-│   └── docs/
 └── .research-idea-pipeline/     # 机器状态
 ```
 
-### 1.1 五条硬性规则
+### 1.1 六条硬性规则
 
-1. **文档集中（扁平）：** 所有路线的文档都放根目录 `docs/` 下，**不再按路线分子目录**；
-   路线靠**文件名前缀**（`A*` / `B*`）区分，**序号仍按路线独立递增**。
-   集中管理的代价是前缀不可省——它是唯一的路线隔离手段。
-2. **路线隔离：** 每条路线 `routeX/` 自带代码与实验；**路线之间不得互相 import**，
+1. **文档按路线分离、各自扁平：** 每条路线的产出放 `routeX/docs/`，**该目录内不再按
+   类型分子目录**（方案、叙事、审阅平铺在一起，靠文件名排序与识别）。
+   **根目录 `docs/` 是跨路线共享区**：Skill **只保证 `refs/` 存在**，
+   其他共享子目录（`notes/`、`latex/` 等）由项目与 `AGENTS.md` 决定，本 Skill
+   不规定也不禁止。**唯一的硬约束是：路线文档不得放根 `docs/`。**
+2. **两层 `README.md` + 两层 `INDEX.md`：** 根目录与每条路线**都必须**各有
+   `README.md` 与 `INDEX.md`，**分层管理各自层级的文件**：
+
+   | 层级 | `README.md` | `INDEX.md` |
+   |---|---|---|
+   | 根 | 项目总览：研究问题、路线列表、统一怎么跑 | **跨路线索引**：各路线状态、全局 TODO / Warnings |
+   | `routeX/` | 本路线说明：目标、怎么跑、目录说明 | **本路线索引**：文档索引 + 关系图 + 进度 |
+
+   **每次产出后必须更新所在路线的 `INDEX.md`**；涉及跨路线层面的变化（新增路线、
+   全局风险）同步更新根 `INDEX.md`。
+3. **文件名前缀 = 文档 ID，不再是路径隔离：** 文档已按路线分目录，前缀（`A` / `B`）
+   不再承担"唯一的路线隔离手段"，但它**仍然是文档 ID** —— 审阅要挂靠、跨路线引用要
+   唯一、`state.json` 与正文按 ID 引用。**前缀保留；序号按路线独立递增、永不复用。**
+4. **路线隔离：** 每条路线 `routeX/` 自带代码与实验；**路线之间不得互相 import**，
    需要复用的一律下沉到 `shared/`。
-3. **INDEX.md 必需：** 每条路线根目录必须有 `INDEX.md`（如 `routeA/INDEX.md`），
-   链接指向 `../docs/`，且**每次产出后必须更新**。
-4. **参考文献集中：** 论文元数据/笔记/缓存一律放 `docs/refs/`，不要散落在路线目录或
-   项目根目录。
-5. **PDF 必须入索引：** `docs/refs/` 下的**每个 PDF** 都要在 **`docs/refs/index.json`**
+5. **参考文献集中：** 论文元数据/笔记/缓存一律放**根目录 `docs/refs/`**，
+   不要散落到 `routeX/docs/`；跨路线共享的笔记 / LaTeX 放根 `docs/` 的其他子目录。
+6. **PDF 必须入索引：** `docs/refs/` 下的**每个 PDF** 都要在 **`docs/refs/index.json`**
    里有一条记录（完整字段见 [literature-policy.md](literature-policy.md) §7.1）。
-   **索引进版本库，PDF 不进**（PDF 是大文件）。新增/替换/删除 PDF 后**必须重建索引**
+   **索引进版本库，PDF 不进**（PDF 是大文件）。新增 / 替换 / 删除 PDF 后**必须重建索引**
    （`python3 scripts/refs_index.py`，校验用 `--check`）；**未入索引的 PDF 视为不存在**。
 
 > **命名说明：** 路线目录用 `routeA` / `routeB`，其文档 ID 前缀用**大写路线字母**
@@ -84,7 +102,7 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 
 ### 2.1 文档类型与文件名（唯一权威表）
 
-**`<slug>` 只能取下表枚举值**，不得自创：
+**`<slug>` 只能取下表枚举值**，不得自创。文件位于 **`<routeX>/docs/`**。
 
 | type（frontmatter） | slug | 文件名 | 产出 Mode |
 |---|---|---|---|
@@ -92,19 +110,23 @@ ID 分配、`INDEX.md` 与 `AGENTS.md` 的规范。
 | `idea-discovery` | `ideas` | `<R><NNN>-ideas.md` | B |
 | `proposal` | `proposal` | `<R><NNN>-proposal.md` | C |
 | `experiment-plan` | `experiment-plan` | `<R><NNN>-experiment-plan.md` | C（独立序号） |
-| `narrative` | `narrative-I<n>` | `<R><NNN>-narrative-I<n>.md` | D（**每个 idea 一份**） |
-| `review` | —（特殊，见 §2.3） | `<被审ID>-review.md` | E（或 D 的叙事审核） |
+| `narrative` | `narrative` | `<R><NNN>-narrative.md` | D（**一次调用一份**，内含各 idea 的小节） |
+| `review` | —（特殊，见 §2.3） | `<被审ID>-review-r<NN>.md` | E（或 D 的叙事审核） |
 
 ```
-docs/
+routeA/docs/
 ├── A001-literature-survey.md      # Mode A
 ├── A002-ideas.md                  # Mode B —— 含 I1..In 与 B5 审核结论
 ├── A003-proposal.md               # Mode C
 ├── A004-experiment-plan.md        # Mode C
-├── A005-narrative-I1.md           # Mode D —— idea I1 的 ≥4 套叙事 + 六子代理审核
-├── A006-narrative-I2.md           # Mode D —— idea I2
-└── A003-review.md                 # Mode E —— 对 A003 的审阅
+├── A005-narrative.md              # Mode D —— 一次调用：I1..In 的全部叙事 + 审核 + 推荐
+├── A003-review-r01.md             # Mode E —— 对 A003 的第 1 轮审阅
+└── A003-review-r02.md             # Mode E —— 接续复核（第 2 轮）
 ```
+
+> **为什么叙事不再每个 idea 一份？** Mode D 的产出本来就是**一份**报告：它含全部 idea 的
+> 叙事、**跨 idea 的交叉质询**、**跨 idea 的最佳推荐与最终优先级建议**。硬拆成 N 份文件后，
+> 这些跨 idea 的内容只能重复或随意归属，而且每个 idea 都要吃掉一个新序号。
 
 ### 2.2 子编号规范（路线内唯一，不复用）
 
@@ -126,51 +148,84 @@ docs/
 **统一规则：审阅意见永远挂在「被审文档的 ID」上，不占用新序号。**
 
 ```
-docs/<被审ID>-review.md       # 第 1 轮
-docs/<被审ID>-review-2.md     # 第 2 轮（接续复核）
-docs/<被审ID>-review-3.md     # 第 3 轮
+<routeX>/docs/<被审ID>-review-r01.md    # 第 1 轮
+<routeX>/docs/<被审ID>-review-r02.md    # 第 2 轮（接续复核）
+<routeX>/docs/<被审ID>-review-r10.md    # 第 10 轮
 ```
 
-- `<被审ID>` 是被审**文档的 ID**（不是文件名），可以是任意类型的文档：
-  方案（`A003`）、实验计划（`A004`）、叙事（`A005`）等。
+**为什么用 `-r<NN>` 而不是 `-review.md` / `-review-2.md`：**
+
+| 问题 | 旧写法 `-review.md` / `-review-2.md` | 新写法 `-review-r01.md` |
+|---|---|---|
+| `ls` / `sort` 顺序 | **第 1 轮排在最后**（`-` 排在 `.` 前），第 10 轮排最前 | 就是轮次顺序 |
+| 轮次可读性 | 第 1 轮无编号，靠"没有后缀"推断 | `r01` / `r02` 一眼可读 |
+| 歧义 | `A003-review-2` 到底是"第 2 轮"还是"被审 ID 为 A003-review-2" | 无歧义 |
+
+**规则：**
+
+- `<被审ID>` 是被审**文档的 ID**（不是文件名），可以是任意类型：方案 `A003`、
+  实验计划 `A004`、叙事 `A005` 等。
+- `r<NN>` **零填充两位**（`r01`…`r99`），保证字典序 = 轮次序。
 - 文件名里**不出现** Mode 字母，避免与路线字母混淆。
-- **一轮复核覆盖多个文档时**（如同时审 proposal + experiment-plan）：
-  挂在**主文档**（proposal 或 narrative）的 ID 上，其余文档写进 frontmatter 的
-  `also_reviewed` 列表。
-- 接续复核递增 `-review-2`、`-review-3`，并在 frontmatter 写 `review_round`。
+- **一轮覆盖多个文档时**（如同时审 proposal + experiment-plan）：挂在**主文档**
+  （proposal 或 narrative）的 ID 上，其余写进 frontmatter 的 `also_reviewed`。
+- frontmatter 必须写 `review_of` 与 `review_round`。
 
 **示例：**
 
 | 被审对象 | 第 1 轮 | 第 2 轮 |
 |---|---|---|
-| 方案 `A003` | `A003-review.md` | `A003-review-2.md` |
-| 实验计划 `A004` | `A004-review.md` | `A004-review-2.md` |
-| 叙事 `A005`（idea I1） | `A005-review.md` | `A005-review-2.md` |
-| 跨文档复核（A003 + A004） | `A003-review.md`（frontmatter `also_reviewed: [A004]`） | `A003-review-2.md` |
+| 方案 `A003` | `A003-review-r01.md` | `A003-review-r02.md` |
+| 实验计划 `A004` | `A004-review-r01.md` | `A004-review-r02.md` |
+| 叙事 `A005` | `A005-review-r01.md` | `A005-review-r02.md` |
+| 跨文档复核（A003 + A004） | `A003-review-r01.md`（frontmatter `also_reviewed: [A004]`） | `A003-review-r02.md` |
 
 ### 2.4 叙事文档的内部结构
 
-一个 `<R><NNN>-narrative-I<n>.md` 内含该 idea 的**全部套路**，每套一节：
+**一次 Mode D 调用产出一份 `<R><NNN>-narrative.md`**，内含**全部 idea**的叙事，
+按 idea 分节：
 
 ```markdown
-## N2 瓶颈突破/移除假设     ← 套路编号与名称必须取自套路库 §1
-### N2.1 套路名称与适配理由
-### N2.2 五段式叙事主线（≥300 字）
-### N2.3 贡献清单
-### N2.4 为什么之前没人做
-### N2.5 该套路的弱点
-### N2.6 包装前后对照
+# A005 — 多套路叙事（I1 / I3 / I5）
 
-## N3 跨域理论迁移
+## 摘要
+
+| idea | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
+|---|---|---|---|---|
+| I1 | N2/N3/N5/N9 | **N2** | 4.0 | 否 |
+| I3 | N2/N3/N5/N9 | N3 | 3.0 | 否 |
+
+## idea I1
+
+### I1 / N2 瓶颈突破/移除假设     ← 套路编号与名称必须取自套路库 §1
+#### N2.1 套路名称与适配理由
+#### N2.2 五段式叙事主线（≥300 字）
+#### N2.3 贡献清单（标注贡献类型 + 方法来源）
+#### N2.4 为什么之前没人做
+#### N2.5 该套路的弱点
+#### N2.6 包装前后对照
+
+### I1 / N3 跨域理论迁移
 ...
+
+## idea I3
+...
+
+## 交叉质询（跨 idea）
+
+## 最佳叙事推荐（跨 idea）
+
+## 最终优先级建议（跨 idea）
 ```
 
 **硬规则：**
 
-1. **每个 idea 一份叙事文档**；同一 idea 重做叙事取**新序号**，并在 frontmatter
+1. **一次调用一份文档**；同一批 idea 重做叙事取**新序号**，并在 frontmatter
    `supersedes` 指向旧 ID。
-2. 每份叙事文档**至少 4 套**套路，每套主线 **≥300 字**。
-3. 套路编号 `N<k>` **必须**取自套路库；引用外部内容时写 `A005/N2`。
+2. **每个 idea 至少 4 套**套路，每套主线 **≥300 字**。
+3. **跨 idea 的内容（交叉质询、最佳推荐、最终建议）集中在本文件末尾**，
+   不要分散到 per-idea 小节里。
+4. 套路编号 `N<k>` **必须**取自套路库；跨文档引用写 `A005/I1/N2`。
 
 ### 2.5 硬规则（不随 Mode 变化）
 
@@ -251,16 +306,26 @@ reviewers: []               # 可选：参与的子代理角色
 - 当前阶段：Mode A / B / C / D / E
 - 推荐优先级：高 / 中 / 低 / 建议放弃
 
+### 2.0 文档关系图
+
+```text
+A001 文献调研
+ └─▶ A002 ideas ─┬─▶ A003 方案 ─┬─▶ A004 实验计划
+                 │              ├─▶ A003-review-r01
+                 │              └─▶ A003-review-r02
+                 └─▶ A005 narrative（含 I1 / I3）
+                       └─▶ A005-review-r01
+```
+
 ## 2. 文档索引
 | ID | 文件 | 类型 | Mode | 状态 | 说明 |
 |---|---|---|---|---|---|
-| A001 | [A001-literature-survey.md](../docs/A001-literature-survey.md) | literature-survey | A | reviewed | L3 达饱和 |
-| A002 | [A002-ideas.md](../docs/A002-ideas.md) | idea-discovery | B | reviewed | 10 个 idea（含 B5 审核） |
-| A003 | [A003-proposal.md](../docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1—K3 |
-| A004 | [A004-experiment-plan.md](../docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1—E7 |
-| A005 | [A005-narrative-I1.md](../docs/A005-narrative-I1.md) | narrative | D | reviewed | idea I1 的 4 套叙事，最佳 N2 |
-| A006 | [A006-narrative-I3.md](../docs/A006-narrative-I3.md) | narrative | D | reviewed | idea I3 的 4 套叙事，最佳 N3 |
-| A003-review | [A003-review.md](../docs/A003-review.md) | review | E | reviewed | 八子代理中位数 4，复现风险低 |
+| A001 | [A001-literature-survey.md](docs/A001-literature-survey.md) | literature-survey | A | reviewed | L3 达饱和 |
+| A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | B | reviewed | 10 个 idea（含 B5 审核） |
+| A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1—K3 |
+| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1—E7 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1/I3 各 4 套叙事，最佳 N2 / N3 |
+| A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | E | reviewed | 八子代理中位数 4，复现风险低 |
 
 ### 2.1 Idea 追踪（来自 A002）
 | Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
@@ -278,8 +343,8 @@ reviewers: []               # 可选：参与的子代理角色
 ### 2.3 审阅追踪
 | 被审文档 | 轮次 | 文件 | 中位数 | 复现风险 | 结论 |
 |---|---|---|---|---|---|
-| A003 | 1 | A003-review.md | 4 | 低 | 推荐优先级高 |
-| A003 | 2 | A003-review-2.md | 4 | 低 | 致命风险已缓解 |
+| A003 | 1 | A003-review-r01.md | 4 | 低 | 推荐优先级高 |
+| A003 | 2 | A003-review-r02.md | 4 | 低 | 致命风险已缓解 |
 
 ## 3. 已证实（Confirmed）
 > 有明确证据支持的结论。每条必须带证据链接，引用写作 `<文档ID>/<子编号>`。
@@ -287,7 +352,7 @@ reviewers: []               # 可选：参与的子代理角色
 > TODO 用 T、Bugs 用 B、Warnings 用 W），**与 Mode 章节号、触发条件 T1—T7 无关**。
 | # | 结论 | 证据 | 日期 |
 |---|---|---|---|
-| C1 | 离散扩散可表示组合约束 | [A002/I1](../docs/A002-ideas.md) §2；实验 A004/E1 | 2025-01-01 |
+| C1 | 离散扩散可表示组合约束 | [A002/I1](docs/A002-ideas.md) §2；实验 A004/E1 | 2025-01-01 |
 
 ## 4. 已证伪（Falsified）
 > 被实验或文献否定的假设。**负结果同样是要保管的资产**，不要删。
@@ -340,8 +405,9 @@ reviewers: []               # 可选：参与的子代理角色
 
 | 资源 | 规则 |
 |---|---|
-| `docs/` | **所有路线共用同一目录**；同一路线内序号分配**串行化**，不同路线互不阻塞 |
+| `routeX/docs/` | **路线内**序号分配串行化；**不同路线各自独立目录，互不阻塞** |
 | `routeX/INDEX.md` | **单写者**：同一时刻只允许一个成员改一条路线的 INDEX |
+| 根 `INDEX.md` | **单写者**：跨路线状态汇总，改动前先读 |
 | `shared/` | 按 `AGENTS.md` 规定；无规定时默认**只在明确需要时改**，改前先读 |
 | `docs/refs/` | 追加式写入；缓存文件名由 query hash 决定，天然不冲突 |
 | `docs/refs/index.json` | **单写者**：PDF 索引是整文件重写，同一时刻只允许一个成员重建（`refs_index.py`） |
@@ -356,12 +422,12 @@ reviewers: []               # 可选：参与的子代理角色
 
 | Mode | 产出文档 | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
-| **A** | 文献调研报告（含负检索记录） | `docs/<R>NNN-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
-| **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
-| **C** | 论文提案 | `docs/<R>NNN-proposal.md` | 对应 `INDEX.md` |
-| **C** | 实验流程计划书 | `docs/<R>NNN-experiment-plan.md`（**取其独立序号，通常紧随 proposal 之后**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
-| **D** | 多套路叙事清单（≥4 套/idea）+ ≥3 子代理评审（默认 5） + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `docs/<R>NNN-narrative-I<n>.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
-| **E** | 审阅记录（**含复现风险等级**） | `docs/<被审ID>-review.md`（接续则 `-review-2.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
+| **A** | 文献调研报告（含负检索记录） | `<routeX>/docs/<R>NNN-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
+| **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `<routeX>/docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
+| **C** | 论文提案 | `<routeX>/docs/<R>NNN-proposal.md` | 对应 `INDEX.md` |
+| **C** | 实验流程计划书 | `<routeX>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
+| **D** | 多套路叙事清单（≥4 套/idea）+ ≥3 子代理评审（默认 5） + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `<routeX>/docs/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
+| **E** | 审阅记录（**含复现风险等级**） | `<routeX>/docs/<被审ID>-review-r01.md`（接续则 `-r02.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
 | 任意 | 机器状态 | `.research-idea-pipeline/state-<mode>-<ts>.json` | 不入 docs |
 
 **审阅结论对进度的映射：** Mode E 的结论要**翻译成进度条目**——
@@ -386,9 +452,13 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 1. 建 `docs/`、`docs/refs/{papers,cache}/`、`shared/{code,docs}/`、`.research-idea-pipeline/`。
 2. 生成空的 PDF 索引：`python3 scripts/refs_index.py --refs-dir docs/refs`（会写出
    `docs/refs/index.json`）。之后**每次增删 PDF 都要重跑**。
-3. 每条路线建 `routeX/{code,experiments}/`（**路线目录下不再建 docs/**）。
-4. 每条路线建 `routeX/INDEX.md`，按 [../templates/INDEX.md](../templates/INDEX.md) 的
-   章节结构填写（**必需**，且之后每次产出都要更新）。
+3. 每条路线建 `routeX/{docs,code,experiments}/`。
+4. 建两层索引与说明（**都必需**）：
+   - 根 `README.md` / 根 `INDEX.md`：项目总览 + 跨路线索引；
+   - `routeX/README.md`（本路线说明）与 `routeX/INDEX.md`（本路线索引 + 关系图），
+     按 [../templates/INDEX.md](../templates/INDEX.md) 与
+     [../templates/README.route.md](../templates/README.route.md) 填写。
+   之后**每次产出都要更新所在路线的 INDEX**。
 
 **每次新增 / 替换 / 删除 PDF 时：**
 
@@ -400,20 +470,22 @@ idea，同样写入 **§4 已证伪**——负结果是资产，不要丢。
 
 **每次产出新文档时：**
 
-1. 扫描 `docs/` 里匹配 `^<路线字母>\d{3}-` 的文件名，取最大序号 +1。
+1. 扫描 `<routeX>/docs/` 里匹配 `^<路线字母>\d{3}-` 的文件名，取最大序号 +1。
 2. 按 `<ID>-<slug>.md` 命名创建，文件开头写完整 frontmatter（§3）。
 3. 把该行登记进 `routeX/INDEX.md` 的**文档索引**，并在**变更日志**加一行。
 
 **每次审阅时：**
 
-1. 审阅记录命名为 `<被审ID>-review.md`；已是审阅则递增 `-review-2.md`、`-review-3.md`。
-   **审阅记录不占新序号。**
+1. 审阅记录命名为 `<被审ID>-review-r01.md`；接续复核递增 `-r02.md`、`-r03.md`
+   （**零填充两位**）。**审阅记录不占新序号。**
 2. frontmatter 填 `review_of` 与 `review_round`。
 3. 把审阅结论翻译成 INDEX 的 已证实 / 已证伪 / TODO / Warnings / Bugs（§6）。
 
 **自检：**
 
 - INDEX 里的每个链接都指向真实存在的文件；
-- **每条路线下的文档 ID 前缀与该路线字母一致**（`routeB/` 下不得出现 `A0xx`）；
+- **每条路线下的文档 ID 前缀与该路线字母一致**（`routeB/docs/` 下不得出现 `A0xx`）；
+- **根 `docs/` 下没有路线文档**（至少含 `refs/`；其他共享子目录按 `AGENTS.md`）；
+- 每条路线都有 `README.md` + `INDEX.md`，且 `routeX/docs/` 扁平；
 - 每条路线都含全部必需章节（文档索引、已证实、已证伪、TODO、Bugs、Warnings、变更日志）；
 - 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新。

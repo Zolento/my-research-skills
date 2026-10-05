@@ -232,7 +232,7 @@
 
 ## B7. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `docs/<R>NNN-ideas.md`（ID 按
+1. **写文档：** `<routeX>/docs/<R>NNN-ideas.md`（ID 按
    [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 shortlist + 淘汰清单 + 创新性边界界定。
