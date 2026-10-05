@@ -146,8 +146,8 @@ idea 清单：
 
 ## 6. 输出与落盘
 
-- 文档：`routeA/docs/A005-narrative.md`（4 套叙事 + 六子代理意见 + 交叉质询 +
-  推荐 + 包装对照）
+- 文档：`routeA/docs/A005-narrative.md`（4 套候选叙事，**详写最佳 2 套** + 六子代理意见 +
+  交叉质询 + 推荐 + 包装对照）
 - INDEX 更新：最佳叙事 → **§3 已证实**；N5 被否决 → **§4 已证伪**；
   N9 的评审分歧与 T1 待补 → **§7 Warnings / §5 TODO**
 - `next_mode_suggestion: "C | E"` —— 按最佳叙事重写提案（回 Mode C），或直接送审

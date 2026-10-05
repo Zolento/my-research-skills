@@ -27,6 +27,8 @@ research-idea-pipeline/
 │   ├── narrative-patterns.md         # 十套叙事套路 + 跨域五步升级 + 叙事包装
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
+│   ├── scoring-policy.md             # Mode D/E 共用：1—5 标尺、极性归一化、门禁、中位数、一票否决
+│   ├── evidence-policy.md            # 五 Mode 共用：证据等级 ↔ 允许/禁止表述（唯一定义）
 │   ├── mode-a-literature-survey.md   # Mode A：文献调研（A1—A7）
 │   ├── mode-b-idea-discovery.md      # Mode B：发现 + idea 级审核（B0—B8）
 │   ├── mode-c-proposal-generation.md # Mode C：方案生成（C1—C7）
@@ -121,16 +123,20 @@ E 定**评审侧重**。
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
 | 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
 
-Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**。
+Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**；
+**S-Devil 归一化后的新颖性稳健度 ≤ 2 时同样不得为"高"**（除非走「带条件的推荐」）。
+**E 不是链条终点，而是反馈环**（可回流 C 或 B）：触发点为 ① C 产出后首次复核；
+② **实验完成、有实测结果后**（防复现检查必须重做）；③ 投稿被拒 / 改投时。
 
 ### Mode D：多套路叙事（本 Skill 的差异化能力）
 
 同一 idea 在不同叙事下，审稿人的接收意愿差异显著。Mode D 因此：
 
-1. 从[十套套路](references/narrative-patterns.md)中为每个 idea 选 **≥4 套**生成叙事；
+1. 从[十套套路](references/narrative-patterns.md)中为每个 idea 选 **≥4 套候选**叙事，
+   其中**详写最佳 2 套（各 ≥300 字）**，其余给摘要；
 2. 跨域类 idea 强制走**五步升级**（结构性缺陷 → 结构同构 → 迁移合法性 → 新算法 → 实证）；
-3. 拉起 **6 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / S-Devil / S-Lit）打分；**每个会议审稿人都给「理论角度 + 应用角度 + 会议特性判定」**（见 [roles.md §1.0](references/roles.md)）；
-4. **综合评分必须覆盖全部维度，不得只看创新性**；**聚合前先做极性归一化**（S-Devil 的反驳分是 5=完全无新颖性、越低越好，须转为**新颖性稳健度 = 6 − 反驳分**），**归一化后任一维度中位数 ≤ 2** 一票否决（见 [mode-d §D4.1](references/mode-d-narrative-generation.md)）。**两个通用角度（理论角度 / 应用角度）先跨审稿人取中位数**，各算 1 个值进向量，否则会被放大 4 倍；
+3. 拉起 **6 个维度化子代理**（R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / S-Devil / S-Lit）打分，**六子代理全部派遣、不得裁减，S-Lit 恒派**；**每个会议审稿人都给「理论角度 + 应用角度 + 会议特性判定」**（见 [roles.md §1.0](references/roles.md)）；
+4. **综合评分必须覆盖全部维度，不得只看创新性**；**聚合前先做极性归一化**（S-Devil 的反驳分是 5=完全无新颖性、越低越好，须转为**新颖性稳健度 = 6 − 反驳分**），**归一化后任一维度中位数 ≤ 2** 一票否决（见 [scoring-policy.md](references/scoring-policy.md) 与 [mode-d §D4.1](references/mode-d-narrative-generation.md)）。**两个通用角度（理论角度 / 应用角度）先跨审稿人取中位数**，各算 1 个值进向量，否则会被放大 4 倍；
 5. 完成**叙事包装 = 重新定位，不是夸大**：只改参照系，不改事实，每句声称都要能在
    方案里找到证据。
 
@@ -172,6 +178,8 @@ Mode E 的结论卡片**必须**给出复现风险等级；**复现风险 = 高�
 
 创新性判定必须引用 CVPR / ICML / NeurIPS / MICCAI 的具体标准；贡献必须标注类型；
 "首次提出"必须经 S-Lit 核实。Mode E 另有**防复现六项检查**与复现风险等级。
+**证据等级与措辞统一见 [evidence-policy.md](references/evidence-policy.md)**
+（已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明），各 Mode 不再各自定义。
 
 **审稿人评价的两角度 + 会议特性：** 四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS /
 R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假设 / 推导是否成立、形式化

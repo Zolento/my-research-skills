@@ -63,7 +63,7 @@
 ```
 routeA/docs/A002-ideas.md                 ← idea 候选清单（含 I1..In）
 routeA/docs/A003-proposal.md              ← 方案
-routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 ≥4 套叙事
+routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 ≥4 套候选叙事（详写最佳 2 套）
 routeA/docs/A003-review-r01.md            ← 对 A003 的第 1 轮审阅
 routeA/docs/A003-review-r02.md            ← 对 A003 的第 2 轮审阅（接续复核）
 routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/ 下
