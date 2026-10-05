@@ -18,7 +18,7 @@ description: >-
 argument-hint: "FIGURE_TYPE=auto [SKETCH_STYLE=auto] [SKETCH_VARIANTS=single] [DETAIL_LEVEL=medium] [NUM_DRAFTS=3] [FOCUS=...] [代码根目录 | 论文路径]"
 metadata:
   author: academic-figure-draft-architect
-  version: "1.0.0"
+  version: "1.1.0"
   upstream-spec: "Academic Figure Draft Architect（学术示意图字符草稿架构师）"
 ---
 
