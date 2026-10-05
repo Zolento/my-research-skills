@@ -87,7 +87,7 @@
     "idea": "",
     "proposal": {
       "background": "",
-      "contributions": [{ "id": "K1", "text": "", "type": "方法 | 理论 | 实证 | 问题定义" }],
+      "contributions": [{ "id": "K1", "text": "", "type": "方法 | 理论 | 实证 | 问题定义", "method_origin": "原创 | 部分原创 | 迁移" }],
       "related_work": [{ "ref": "", "difference": "" }],
       "motivation_why_not_before": "",
       "experiments": [],
