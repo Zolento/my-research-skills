@@ -360,8 +360,7 @@ problem ─────────┤                        （基线：把现
 |---|---|
 | **R3** | **创建**（seed：`status: ungrounded`，`falsifier` 必填） |
 | R7 | **读**（攻击它；输出 `assurance`，不改 `status`） |
-| R8 | 建 `claims[].contract`、更新 `supporting_evidence` / `refuting_evidence` / `scope` |
-| **R8** | 挂证据时做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`） |
+| **R8** | 建 `claims[].contract`、更新 `supporting_evidence` / `refuting_evidence` / `scope`；挂证据时做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`） |
 | R10 | **降级与否决的唯一阶段**（`contradicted` / `killed`） |
 | R12 | **只读**（渲染成 `narrative_view`，**不创建、不修改**） |
 

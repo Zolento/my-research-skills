@@ -229,7 +229,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 **证据等级与措辞统一见 [evidence-policy.md](references/evidence-policy.md)**
 （已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明），各 R 阶段 不再各自定义。
 
-**审稿人评价的两角度 + 会议特性（仅 R3—R6 / R8 / R7 / R10 / R13）：** 四个会议审稿人（R-CVPR / R-ICML / R-NeurIPS /
+**venue calibration 表的两角度 + 会议特性（仅 R12 / R13）：** venue calibration 的四个会议视角（原 R-CVPR / R-ICML / R-NeurIPS /
 R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假设 / 推导是否成立、形式化
 是否完整）+ **② 应用角度**（能否落地、可验证性、影响面）+ **③ 会议特性判定**
 （按本会议首要标准，引用具体条目）。**只写一个角度 = 评审不合格。** R-MICCAI 对无临床

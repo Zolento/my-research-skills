@@ -630,3 +630,78 @@ M-2（V4 全阶段可闭环 ✅）、M-1 的**创建**归属 ✅ 与 **R8 升级
 **已确认关闭：** 8/8 status 例外同步 ✅（含 §1.6，这次 `git diff` 自证成立）、`policy §5.0` 第 3 条 ✅、
 `TestTableIntegrity` 已落盘且 120 用例全绿 ✅（但见 §9.2 的有效性缺陷）、
 机械面 9 项全绿 ✅。**除上述 1 MAJOR + 1 MINOR，机制层三波没有其它阻断项。**
+
+---
+
+## 10. 最后一次收口确认（快照 `5f65df4`）—— **结论：三波可交付**
+
+**本轮改动：** 3 个文件（`git diff --stat 9fc4c66 5f65df4`）：`scripts/test_state_check.py` **+3/−2**、
+`research-state-policy.md` **+4/−2**、本报告。**只读复核**；被审文件 120 秒窗口内稳定。
+
+### 10.1 MAJOR（检查器有效性）—— ✅ **已修，且我独立复现了损坏注入**
+
+```bash
+cp -r research-idea-pipeline /tmp/verify/tc && cd /tmp/verify/tc
+# A. 干净副本
+python3 -m unittest discover -s scripts -p test_state_check.py -k TestTableIntegrity
+#   → Ran 4 tests … OK
+# B. 注入原始损坏：SKILL R6「作用列 ← 读列」；policy R6「对应文件列 ← 写值」
+#   → FAILED (failures=2)
+#      AssertionError: '`hypotheses` / `uncertainties` / `failures`' == '…' : SKILL R6 作用列被读列覆盖
+#      AssertionError: … policy R6 对应文件列不是 phase-*.md：hypotheses[].generation / …
+# C. 另一方向：policy R7「文件列 ← 读值」
+#   → 同样被正则拦下（Regex didn't match: ^(phase-[\w-]+\.md|\.\./SKILL\.md.*)$）
+```
+
+**修法核对（`scripts/test_state_check.py`）：**
+- `:690` 已改为 `name, effect, read = cells[2]…, cells[3]…, cells[4]…` —— **作用列索引正确** ✅；
+- `:699` 已改为先 `assertRegex(target, r"^(phase-[\w-]+\.md|\.\./SKILL\.md.*)$")` **再**查存在性 ✅
+  （`../SKILL.md` 是 R14 行的合法值，正则已放行，无假阳性）；
+- 干净副本 4/4 通过、仓库本体 **120 tests OK** —— 既抓得住损坏，也不误报 ✅。
+
+### 10.2 MINOR（`policy §5` 补充说明）—— ✅ 已对齐
+
+| 行 | 现值 | 判定 |
+|---|---|---|
+| `policy:401` | 「**R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（**只读，用于定位缺口**）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（**缺口类主张先落 `U`，由 R3 转成 `C`**）」 | ✅ **不再写 `claims[]`**，与 §5.0 规则 1「创建归属 = R3」一致 |
+| `policy:402` | 「**R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）」 | ✅ 读列表与上表 R3 行**逐字相同**（已程序化比对） |
+
+### 10.3 NIT —— ⚠️ 一项**声明已改但未落地**（不影响交付）
+
+| # | 声明 | 实测 | 判定 |
+|---|---|---|---|
+| n-1 | 「`phase-r3-r6` §R3.0 表里 R8 两行**已合并为一行**」 | `5f65df4` **未触及 `phase-r3-r6-discovery.md`**（本轮只改了 test + policy）；实测该表 **R8 仍有 2 行**（`:363` 建契约 / `:364` 单向升级） | ⚠️ **未落地 → NIT**（两行语义一致、无冲突，纯冗余；可留待以后顺手合并） |
+| n-2 | `§5.0` 标题「两条」→「三条」 | `policy:353` 现为「### 5.0 **三条**归属规则」 ✅ | ✅ 已落地 |
+| n-3 | （我新发现，纯代码卫生）`test_state_check.py:690` 的 `name` 变量解出后未使用 | 无功能影响 | 可不处理 |
+
+### 10.4 最后一轮全量回归（快照 `5f65df4`）
+
+| 组 | 项 | 结果 |
+|---|---|---|
+| 机械 | 单测 | **120 tests OK** ✅ |
+| 机械 | 相对链接 | **418 条，0 断链** ✅ |
+| 机械 | deprecated / JSON / `--selftest` / 模板 / linter | exit 1（0 命中）/ 合法 / 0 / 0 / 9-9 硬违规 0 ✅ |
+| 机械 | `--list-rules` ↔ `policy §4` | **15 条逐字一致** ✅ |
+| 机械 | 三方 14 阶段读/写格 | **14/14 逐字一致** ✅ |
+| 表格 | `SKILL §0` = 7 段、`policy §5` = 6 段、7 个 phase 文件读写表 = 5 段（含 phase-r0/r2-r5/r8/r12） | 全部一致 ✅ |
+| 表格 | 新检查器「干净副本 OK / 注入损坏 failed=2」 | ✅ 有效 |
+| 状态机 | 阶段收工态探针 7 连 | post-R3/R6/R7/R8（升级）/R9/R13 = **exit 0**；post-R8（未升级）= **exit 3 · V3**（**正确**：status 未同步就该报） ✅ |
+| 归属 | 「只能经 R10」是否都带回指 | 8 处禁令全部回指 §1.6；唯一不带回指的 `policy:364` **就是 §5.0 规则 3 本体**（例外定义处） ✅ |
+| 角色 | `roles §4.2` 会议审稿人行 | 五列全 `—（仅校准表）`，派遣列无 venue ✅ |
+
+### 10.5 总收官最终结论
+
+**「三波可交付」。**
+
+- 三波全部验收通过：Wave 1（状态载体与 V1—V15 闸门）、Wave 2（发现层与 QD archive / 两阶段 fitness）、
+  Wave 3（角色层后移、五元组契约、`S-Integrity`、R12 pre/post）。
+- **跨波闭环全部成立**：`claims[]` 有唯一创建者（R3）、每个写 `failures[]` 的阶段负 `known_flaws` 义务、
+  `claims[].status` 升降归属明确（R8 单向升级 / R10 降级与否决，8 处禁令 + §5.0 三方一致）、
+  R0→R14 读写有据、V1—V15 全部可达且可满足（7 个阶段收工态探针实证）。
+- **枚举单源**（`(O,T,R)` / `epistemic_status` / `N1—N10` / `P1—P6`·`local` / `G1—G5` / `S1—S6` / 六维 /
+  五元组五字段）、**角色 19/19 闭合**、**`narrative_view` 视图性正确**。
+- **机械面全绿**（见 §10.4），新落盘的表格完整性检查器**经我反向注入验证有效**。
+
+**唯一未落地项是 1 个 NIT**（§R3.0 表 R8 两行未合并，`phase-r3-r6:363—364`；语义一致、无冲突），
+**不构成阻断，可以交付**。已知未做 3 项（`R2.2 occupancy map` 深化、README venue 扫尾、
+`example-d-narrative` 结构同步）已由 Lead 登记，不计入缺陷。
