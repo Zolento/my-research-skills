@@ -1,5 +1,6 @@
 # 参考文献库的生成物（按需保留，默认不提交缓存与大文件）
-docs/refs/cache/*.json
+# ★ 缓存现在按源分目录：cache/<source>/<hash>.json
+docs/refs/cache/**/*.json
 !docs/refs/cache/.gitkeep
 docs/refs/papers/*.json
 docs/refs/papers/*.md
