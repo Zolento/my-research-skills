@@ -45,7 +45,7 @@
 - 只对 B5（[phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §B5）判为 **「边缘 / 不足」** 的项做深化；
 - B5 已判 **「足够」且期间无新文献**的项，**不重做 L3** —— 直接引用 B5 结论并**标注
   来源**（`A002/I3` 的 B5 审核结论 + **当时的检索等级 search_level**）；
-- **继承时不得升级证据等级：** B5 的 shortlist 门槛是 **L2**（[phase-r3-r6-discovery.md](phase-r3-r6-discovery.md)
+- **继承时不得升级证据等级：** B5 快筛的门槛是 **L2**（进入 population 的最低检索等级）（[phase-r3-r6-discovery.md](phase-r3-r6-discovery.md)
   §B5.2）。若该 idea 的 B5 `search_level` **只到 L2**，C1 的创新性结论就**只能按 L2
   表述**（用「据本次检索未见」，见 [evidence-policy.md](evidence-policy.md)），
   **不得**升级为「已核实」；**要写「首次提出」类声称，必须该 idea 已达 L3，或由 C1
