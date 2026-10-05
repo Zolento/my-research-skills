@@ -61,7 +61,7 @@
 | `<路线字母>002` | `docs/<文件名>` | idea-discovery | — | B | draft | 含 I1..In |
 | `<路线字母>003` | `docs/<文件名>` | proposal | — | C | draft | 贡献 K1..Kn |
 | `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | C | draft | 实验 E1..En |
-| `<路线字母>005` | `docs/<文件名>` | narrative | — | D | draft | 一次调用：I1..In 的套路 |
+| `<路线字母>005` | `docs/<文件名>` | narrative | — | D | draft | 一次调用：I1..In 的 claim graph + 六槽位叙事 |
 | `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | E | draft | 对 `003` 的第 1 轮审阅 |
 
 > **`subtype` 列必填**：枚举内写 `—`，枚举外写原义（如 `paper-outline` /
@@ -85,17 +85,17 @@ A001 文献调研
 
 > 每个 idea 一行。**淘汰的 idea 不得删除**，标"已淘汰"并写理由（对应负面结论）。
 
-| Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
+| Idea | 状态 | 关联文档 | 最佳 preset | 备注 |
 |---|---|---|---|---|
 | `I1` | shortlist / 已进方案 / **已淘汰** | `<ID>/I1` … | `N2` | |
 
 ### 2.2 叙事追踪
 
-> 每个 idea 的叙事选型与得分。**被否决的套路**也要留痕。
+> 每个 idea 的 claim 与叙事选型。**门禁未过的叙事**与**被否决的 preset** 都要留痕。
 
-| Idea | 叙事文档 | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
-|---|---|---|---|---|---|
-| `I1` | `<ID>` | `N2/N3/N5/N9` | `N2` | | 否 / 是（哪套、为何） |
+| Idea | 叙事文档 | (O, T, R) | 候选 preset | 最佳 preset | 门禁 G1—G5 | 六维（S/O/SM/ED/G/NC） | 是否推荐 |
+|---|---|---|---|---|---|---|---|
+| `I1` | `<ID>` | `(Method, hidden-assumption, design-algorithm)` | `N2/N3/N5/N9` | `N2` | 全 pass / `G3 fail` | `5/4/3/4/3/4` | 是 / 否（哪套、为何） |
 
 ### 2.3 审阅追踪
 

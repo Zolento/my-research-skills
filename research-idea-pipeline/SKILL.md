@@ -30,7 +30,7 @@ metadata:
 # Research Idea Pipeline（顶会研究创意流水线）
 
 一套面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程辅助流水线。覆盖从文献调研、
-idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完整链路，并支持五个子流程的
+idea 发现、方案生成、多 preset 叙事生成与审稿到方案复核的完整链路，并支持五个子流程的
 独立调用与串联调用。
 
 **本 Skill 只做编排与串联。** 子代理的角色设定、评分维度、审查视角沿用统一角色库
@@ -47,7 +47,7 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 | **A** | `literature-survey` | 补充文献、扩大检索范围 | 是 | 被 B/C/D/E 调用，也可单独调用 |
 | **B** | `idea-discovery` | 文献调研 + 多子代理头脑风暴产出 idea 候选，**并做 idea 级创新性/可行性审核** | 是 | 接 A 之后 |
 | **C** | `proposal-generation` | 基于 idea 做创新性与可行性研究，产出方案 | 是 | 接 B 之后 |
-| **D** | `narrative-generation` | **基于 idea + 方案**生成多种顶会风格叙事逻辑，并拉起子代理评审，筛出最佳叙事 | 是 | 接 B（仅 idea）或接 C（推荐） |
+| **D** | `narrative-generation` | **基于 idea + 方案**先建证据台账与 claim graph，再生成 2—4 套真正不同的叙事，**经攻击面审核与硬门禁后**筛出最佳叙事 | 是 | 接 B（仅 idea）或接 C（推荐） |
 | **E** | `proposal-review` | 复核**已成型方案**的正确性与可行性，并守创新性底线（防复现） | 是 | 接 C/D，或接上一次 E 继续复核 |
 
 > **字母顺序 = 工作流顺序：** 文献调研 → idea 发现 → 方案生成 → 叙事生成 → 方案复核。
@@ -66,7 +66,7 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 | 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
 
 **B 偏文献调研与方法研究；E 偏基于方法的正确性审核，但 E 必须显式给出复现风险等级
-——做得很扎实的复现仍是拒稿理由。**（D 的定位见 [mode-d](references/mode-d-narrative-generation.md) §D0。）
+——做得很扎实的复现仍是拒稿理由。**（D 的定位见 [mode-d](references/mode-d-narrative-generation.md) 开篇「定位与边界」。）
 
 **解析规则：**
 
@@ -169,7 +169,7 @@ idea 发现、方案生成、多套路叙事生成与审稿到方案复核的完
 | A | **检索边界：** 理论锚点必须查定理 / 反例 / 不可能性与负结果；性能锚点必须查 SOTA 与评测协议 |
 | B | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；shortlist 只收服务主锚点的 idea |
 | C | **贡献类型与实验：** 理论锚点下 C4 必须含证明 / 反例；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
-| D | **叙事套路：** 见 [narrative-patterns.md](references/narrative-patterns.md) §1.2 的锚点 → 套路映射 |
+| D | **叙事资格（先于选 preset）：** 先做 **Anchor Eligibility Test**（[claim-first-policy.md](references/claim-first-policy.md) §6）——只有 `eligible` / `conditional` 的锚点才可用于组织叙事；与作者**目标锚点**冲突时**必须显式告知**。通过后再按 [narrative-patterns.md](references/narrative-patterns.md) §2 选 preset |
 | E | **评审权重：** 理论锚点首查证明正确性；性能锚点首查公平比较、指标口径与统计方案 |
 
 **各 Mode 详细流程：**
@@ -282,6 +282,10 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 **审稿人评价的两角度 + 会议特性（强化）：** 四个会议审稿人
 （R-CVPR / R-ICML / R-NeurIPS / R-MICCAI）的**每一次评价**都必须同时给出：
+
+> **作用域：** 本条适用于**仍使用会议审稿人的 Mode（B / C / E）**。**Mode D 已改用
+> 攻击面审稿人**（见 §3 派遣表），会议审稿人只在 **D6 venue calibration** 中以校准表的
+> 形式出现 —— 那里沿用「两角度 + 会议特性」的判据，但**不派子代理**。
 
 1. **理论角度** —— 命题 / 假设 / 推导是否成立、形式化是否完整、理论贡献深度；
 2. **应用角度** —— 能否落地、可验证性、影响面、与真实工作流的兼容性；
@@ -414,6 +418,19 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 > 据此找证据、提出方法、改进最终任务性能 —— **它不是交付物本身**。
 > 这条规则同时约束**执行者**与**所有子代理**（尤其 S-Theory、R-ICML）。
 
+**承重墙：可证伪的 central proposition（先于四步链）：**
+
+> **任何 idea / 方案 / 投稿叙事，如果写不出一个明确、可证伪、且能对应到证据的
+> central proposition，不得进入投稿叙事。**
+
+七类论文各自的命题形态、`C0—C5` 的 claim graph、以及 `Ci ← Ej` 的证据对照写法，见
+[claim-first-policy.md](references/claim-first-policy.md) §3 / §4。
+
+> **旧规则的降级（重要）：** 「第二段必须给出机制性原因，写不出来叙事不成立」
+> **不再是全局承重墙**，降级为**方法类 / 跨域类**的子规则。原因：研究实际走的是
+> `Observation → Hypothesis → Experiment → Mechanism`，在方案阶段强迫写"根本原因"，
+> 会把**待验证假设包装成已知原因**。判定承重墙的是**命题可否被证伪**，不是机制是否已知。
+
 **四步链（每个 idea / 方案都必须走得通）：**
 
 | 步 | 内容 | 产出 |
@@ -435,7 +452,8 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 - 每个方法都必须标 —— Mode B 的每个 idea、Mode C 的每条贡献、Mode D 的每套叙事。
   **不得留空，也不得模糊**（"受 X 启发"不是标注）。
-- **迁移必须诚实标成迁移。** 把迁移包装成原创属于**夸大**，违反 §D2.4 的包装纪律
+- **迁移必须诚实标成迁移。** 把迁移包装成原创属于**夸大**，违反
+  [mode-d](references/mode-d-narrative-generation.md) §D4.4 的包装纪律
   （包装只允许改参照系，不允许改事实）。
 - **迁移要成为贡献，必须证明迁移本身带来了新性质**（新的结构性质、理论条件或性能
   来源）。否则就只是"把 X 用到 Y 上" —— Mode B 的反模式、Mode E 的**复现风险高**。
@@ -473,13 +491,14 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 | 资源 | 位置 | 内容 |
 |---|---|---|
-| 子代理角色库 | [references/roles.md](references/roles.md) | R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / A-Author / A-Experimenter / S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
+| 子代理角色库 | [references/roles.md](references/roles.md) | 会议审稿人 R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI**（**B/C/E 用**）；**攻击面审稿人 R-Novelty / R-Causal / R-Experimental / R-Theory / R-Generalization / R-Utility（Mode D 主审）**；A-Author / A-Experimenter；S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro |
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
-| 叙事套路库 | [references/narrative-patterns.md](references/narrative-patterns.md) | 十套顶会叙事逻辑、跨域五步升级、禁用表述、叙事自检 |
+| 叙事 preset 库 | [references/narrative-patterns.md](references/narrative-patterns.md) | **十套叙事 preset（N1—N10，非互斥、非创新等级）**、**(O,T,R) + anchor 选 preset**、**六槽位 S1—S6**、跨域 **Transfer Legitimacy Argument（L1/L2/L3）**、禁用表述、叙事自检 |
+| **Claim-first 政策** | [references/claim-first-policy.md](references/claim-first-policy.md) | **Mode D 现行（P0）**：总纲公式（`Claim strength × Evidence alignment × Reviewer comprehensibility`）、**证据台账 `epistemic_status`**、**Claim Graph `C0—C5` + `Ci ← Ej`**、**可证伪 central proposition**、**`(O,T,R)` 三轴**、**Anchor Eligibility Test**。**Mode B/C/E 的接入登记为 P1**（见 `docs/mode-d-claim-first-spec.md` §9） |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、**锚点变更单**、`INDEX.md` 章节、`AGENTS.md` 优先与可达性校验、并发写入 |
-| 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **Mode D / E 共用**：1—5 标尺、**极性归一化**（S-Devil 反向）、门禁、逐维度中位数、**一票否决 + 带条件的推荐出口** |
-| 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五 Mode 共用**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述（各 Mode 不再各自定义） |
+| 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **两层**：**硬门禁 `G1—G5`（不聚合、不打分）** + **排序六维**（**Mode D 主用**）；1—5 标尺；极性归一化（**仅 Mode E 仍用**）；逐维度中位数、**一票否决 + 带条件的推荐出口** |
+| 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五 Mode 共用**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述；**§3 认知状态 ↔ 措辞等级映射**（各 Mode 不再各自定义） |
 | 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：三档 **asd-ste100（可选最强档，须用户显式声明）/ Strict / 中文-顺**、结构规则（硬）、词汇规则（方向；asd-ste100 档下升为执行）、中文六种机器味、**情态是内容** |
 | 受控中文 linter | [scripts/ste_lint_zh.py](scripts/ste_lint_zh.py) | 机械首查：分号 / 超长句 / 虚动词 / 营销词 / 套话 / 同义轮换 / 被动 / 复合体貌 / 含糊词 / 半角标点；`--baseline`、`--disable`、`--selftest`（MIT，vendored） |
 | 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
@@ -508,7 +527,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | A | 无（执行者直接完成检索与归纳） |
 | B | 头脑风暴：R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、A-Author、A-Experimenter、S-Devil（每个至少 3 个 idea）；<br>**idea 级审核（B5）**：四审稿人（创新性）+ S-Lit、**S-Nov（按需）**、S-Feas + **S-Theory（按需，仅含理论声称时）** + S-Devil（致命反驳） |
 | C | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**（创新性）；S-Lit（先前工作核实）；**S-Nov（按需，S-Lit 判"边缘"时）**；S-Feas（可行性）；S-Theory（理论基础）；A-Author（投稿人视角展开提案）；A-Experimenter（实验设计者视角展开实验） |
-| D | **叙事审核六子代理**：R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、S-Devil、S-Lit（**六子代理全部派遣、不得裁减，S-Lit 恒派**；idea 多时可另加 S-Feas / S-Repro） |
+| D | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **D6 venue calibration** 中以校准表出现 |
 | E | R-CVPR、R-ICML、R-NeurIPS、**R-MICCAI**、S-Devil、S-Feas、S-Lit（含**复现风险判定**）、S-Repro（**八子代理**严格审查 + 交叉质询）；**S-Nov（按需，S-Lit 判"边缘"或涉及"首次"时）** |
 
 **职责边界：** 不派遣 S-Repro 到 Mode B（idea 阶段无代码可复现）；B5 的审核是
@@ -517,10 +536,18 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 [mode-e](references/mode-e-proposal-review.md) §E0。
 
 **派遣原则：** 子代理必须**独立产出**，不得互相抄袭结论；汇总时去重并保留来源标注。
-**Mode D 与 Mode E 都要求交叉质询**：每个子代理对其余子代理的评分提出至少一条质疑
-或补充；**聚合前必须先做极性归一化**（[scoring-policy.md](references/scoring-policy.md)），
-综合评分取**归一化后**的中位数。**S-Devil 的「新颖性反驳」是反向维度**
-（`5 = 完全无新颖性`，越低越好），归一化为 **新颖性稳健度 = 6 − 反驳分**。
+**Mode D 与 Mode E 都要求交叉质询**：每个子代理对其余子代理的评分提出至少一条质疑或补充。
+
+**聚合规则分两套**（权威定义见 [scoring-policy.md](references/scoring-policy.md)）：
+
+- **Mode D：先过硬门禁 `G1—G5`**（任一 `fail` ⇒ `not_submission_ready`，**不参与排序**），
+  再按**六个同向维度**排序，**不做极性归一化**（D 已无反向维度）。
+- **Mode E：仍按极性归一化后的逐维度中位数聚合** —— 含 S-Devil 的**反向维度**，
+  定义见 [scoring-policy.md](references/scoring-policy.md) §2 与 §5（本文件不复述公式，
+  避免同一规则两份写法）。
+
+> ⚠️ **不得用「6 个子代理都同意」声称 reviewer consensus** —— 六个 reviewer **不是独立
+> 样本**（同一基础模型换 prompt，`corr ≫ 0`）。见 [scoring-policy.md](references/scoring-policy.md) §3。
 
 ### 3.1 派遣方式：Team 优先询问（强制）
 
@@ -539,7 +566,8 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **不得假装用了 Team：** 没有该能力时，输出中不得出现"已派发 teammate"之类表述。
 - **不得因为"Team 更高级"就默认启用：** Team 有持久化与并发写入成本，必须由用户选择。
 - **方式不改变标准：** 无论用 Team 还是默认子代理，**角色库、派遣矩阵、评分维度、
-  交叉质询与中位数规则完全一致**（见 [references/roles.md](references/roles.md)）。
+  交叉质询与聚合规则完全一致**（Mode D = 硬门禁 `G1—G5` + 六维排序；Mode E = 归一化后
+  逐维中位数 + 一票否决；见 [references/roles.md](references/roles.md)）。
   Team 只改变执行方式，**不改变审查标准**。
 - **用 Team 时必须守写作用域：** 并行写者写**互不重叠**的文件；写冲突按
   "重新读取后再提交"处理（见 [project-layout.md](references/project-layout.md) §5）。
@@ -598,19 +626,21 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **输入：** **idea 清单**（来自 Mode B 或用户提供）+ **方案**（来自 Mode C，推荐）；
   关键参考文献（可选）；目标会议（可选）；资源约束（可选）。
-- **定位：** **基于 idea + 方案建立多种顶会风格的叙事逻辑，并拉起子代理评审**；
-  决定"怎么讲才不被判增量"。**这是基于「预期贡献」的叙事预演，不是基于「实测结果」的
-  包装** —— 实验完成后应**回到 Mode D 复核叙事是否仍成立**。字母顺序上位于方案生成
-  与方案复核之间。
-- **流程：** D0.1 信息完整性检查 → D1 叙事套路锚定（每 idea ≥4 套候选）→
-  D2 每套叙事的生成（含跨域五步升级、五段式、包装前后对照；**详写最佳 2 套**）→
-  D3 六子代理评审（**六子代理全部派遣、S-Lit 恒派**）→
-  D4 交叉质询与共识（归一化后逐维度中位数）→ D5 最佳叙事推荐。
-- **交付物：** 多套路叙事清单（每 idea **≥4 套候选**，其中**详写最佳 2 套、各 ≥300 字**，
-  其余给摘要）+
-  六子代理独立评审意见 + 交叉质询记录 + 最佳叙事推荐 + 横向对比表 + 最终优先级建议。
+- **定位：** **Claim-first, evidence-constrained, narrative-last** —— 先确定**在现有证据下
+  最强但不过度**的科学主张，再找最短的故事让审稿人正确理解该主张。
+  **这是基于「预期贡献」的叙事预演，不是基于「实测结果」的包装** —— 实验完成后应
+  **回到 Mode D 复核叙事是否仍成立**。字母顺序上位于方案生成与方案复核之间。
+- **流程：** D0 证据台账 → D1 Claim Graph（`C0—C5`）→ D2 科学分类 `(O, T, R)` →
+  D3 Anchor Eligibility → D4 叙事实现（**2—4 套真正不同的 claim hierarchy**；六槽位
+  `S1—S6`；含包装前后对照）→ D5 攻击面审核（**R-Novelty / R-Causal / R-Experimental /
+  R-Theory / R-Generalization / R-Utility 六人全部派遣 + S-Lit 恒派 + S-Devil 不打分**）→
+  D6 venue calibration → D7 硬门禁 `G1—G5` → D8 六维排序 → D9 最佳叙事推荐。
+- **交付物：** 证据台账 + claim graph + 每套候选的六槽位叙事 + 六攻击面审稿人意见 +
+  S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
+  **缺失证据清单与最小必要实验 / 定理**。
 - **落盘：** `<routeX>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
-  （被覆盖的叙事套路 → **已证伪**；最佳叙事 → **已证实**；综合评分 <3 → Warnings）。
+  （被覆盖的叙事方向 → **已证伪**；最佳叙事 → **已证实**；门禁 `fail`、或**六维中位 <3
+  仅作 Warnings 标记**（**不是**综合评分、不进排序、不参与推荐）→ Warnings）。
 
 ### Mode E — proposal-review
 
@@ -726,22 +756,28 @@ E 方案复核。
       工作上停留或反复**；未完成的证明已标 **"待补证明 · 待核实"** 并转入后续步骤，
       而不是阻塞链路；**也没有声称"已证明"却未完成证明**。
 - [ ] **四个会议审稿人的评价都含「理论角度 + 应用角度 + 会议特性判定」三段**
+      （**仅 Mode B / C / E**；**Mode D 的 D6 只出汇总校准表，不派会议审稿人**）
       （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
       而非硬凑临床相关性。
 - [ ] **Mode B：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
       没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 shortlist 的 idea 已达 L2**，
       含「首次提出」声称的已达 L3 并附负检索记录。
-- [ ] **Mode D：每个 idea 至少 4 套候选，其中详写最佳 2 套（各 ≥300 字），其余给摘要**；
-      已用**五段式**；跨域类已完成
-      **五步升级**；最佳叙事**综合了全部子代理维度**（非只看创新性）；
-      **六子代理全部派遣（S-Lit 恒派）**；已做**叙事包装
-      （重新定位，非夸大）**；无禁用表述。
+- [ ] **Mode D：先有证据台账与 claim graph，再有叙事**：`C0—C5` 完整，每个 `Ci` 都有
+      `Ci ← Ej` 或标 `[待补]`；每套候选都能写出一句话的**可证伪 central proposition**；
+      候选是 **2—4 套真正不同的 claim hierarchy**（**不是**同一主张的四种措辞）；
+      每套用**六槽位 `S1—S6`**（`S5` 覆盖 `C0`—`C4`，`S6` 写出**不成立的条件**）；
+      跨域类已做 **anti-application stress test** 与 **Transfer Legitimacy（L1/L2/L3）**；
+      **六个攻击面审稿人全部派遣、S-Lit 恒派、S-Devil 不打分**；已做**叙事包装
+      （重新定位，非夸大）**；**D9 给出了缺失证据清单与最小必要实验 / 定理**；无禁用表述。
 - [ ] **Mode E：结论卡片给出了复现风险等级**，并回答了"设计层面贡献 vs 实现层面改进"；
       复现风险 = 高时总体判定不为"高"；**S-Devil 归一化后的新颖性稳健度 ≤ 2 时总体判定
       同样不为"高"**（除非走「带条件的推荐」并写明理由、缓解路径与验证点）。
-- [ ] **Mode D / E 的评分聚合前已做极性归一化**（S-Devil 反驳分 → 新颖性稳健度 =
-      `6 − 反驳分`），汇总表同时给出原始分与归一化分（见
-      [scoring-policy.md](references/scoring-policy.md)）。
+- [ ] **Mode D：硬门禁 `G1—G5` 已逐项判定**（任一 `fail` ⇒ `not_submission_ready`，
+      且**不参与六维排序**）；排序用的是**六个同向维度**，**未做也不需要极性归一化**。
+- [ ] **Mode E：聚合前已做极性归一化**（S-Devil 反驳分 → 新颖性稳健度 = `6 − 反驳分`），
+      汇总表同时给出原始分与归一化分（见
+      [scoring-policy.md](references/scoring-policy.md)）。**不得用「6 个都同意」声称
+      reviewer consensus** —— 六个 reviewer 不是独立样本。
 - [ ] 所有"首次提出"声称**已完成 L3 穷尽检索**、经 S-Lit 核实、附负检索记录，
       否则已降级为"据本次检索未见"或标注"待核实"；
       **全部措辞符合 [evidence-policy.md](references/evidence-policy.md) 的证据等级表**。
@@ -761,7 +797,7 @@ E 方案复核。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
 - [ ] **方案/审阅记录已落盘到所在路线的 `<routeX>/docs/`**，命名符合
       `<R><NNN>-<slug>.md` / `<ID>-review-r01.md`；且**文档前缀 = 路线字母**（不随 Mode 变化）。
-      **`slug` 未越界**（只用 §2.1 封闭枚举）；枚举外的派生物写的是 frontmatter 的
+      **`slug` 未越界**（只用 [project-layout.md](references/project-layout.md) §2.1 封闭枚举）；枚举外的派生物写的是 frontmatter 的
       `subtype`，且路线 `INDEX.md` 文档表**有 `subtype` 列**。
 - [ ] **落盘分档正确**：交付物在 `routeX/docs/`（**扁平，无子目录**）；
       子代理**原始评审件**在 `.research-idea-pipeline/<route>/<被审ID>-r<NN>/`，
@@ -793,8 +829,10 @@ E 方案复核。
    重复完整审查，同时用"变更追踪表"保证审查连续性。
 5. **为什么单设 Mode D 做叙事？** 同一 idea 在不同叙事下，审稿人的接收意愿差异显著：
    跨域迁移类 idea 在"跨域理论迁移"叙事下可能被判增量，换到"瓶颈突破/移除假设"叙事
-   下可能被视为理论贡献。**多套路并行生成 + 多子代理打分，才能找到该 idea 的最优
+   下可能被视为理论贡献。**多 preset 并行生成 + 多子代理打分，才能找到该 idea 的最优
    叙事位置。** 叙事包装不是夸大，而是**重新定位**。
+   （**本轮已改为：** 先定 claim 与证据，再过硬门禁 `G1—G5`，最后只在**通过门禁的
+   候选间**做六维比较 —— 见本节第 12—14 条。「多子代理」现指六个攻击面审稿人。）
 6. **为什么角色不变？** 本 Skill 只做编排，角色定义、评分维度、审查视角全部沿用
    统一角色库，保证审查标准的一致性。
 7. **为什么文档也按路线分目录，而不是集中到根 `docs/`？** 早期设计把文档集中到根
@@ -833,6 +871,33 @@ E 方案复核。
    效应影响」改成「实验受批次效应影响」——那不是简化，是**换了个结论**。句长上限最容易
    引诱人删掉的正是这些词，所以必须在政策里显式禁止。
 
+12. **为什么把叙事层从 Narrative-first 改成 Claim-first？** 旧哲学是「找到最有说服力的
+    故事」，它已经做到了 claim engineering，但**叙事层权力过大**：继续扩展会从"帮助发现
+    最强科学主张"滑向"帮助一个 idea 找最强包装"。新哲学是**「找到在现有证据下最强但
+    不过度的科学主张，然后找到最短的故事让审稿人正确理解它」**，即
+    `Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensibility`。
+    **其中 Evidence alignment 最难伪造**：它要求每个 major claim 都有专门的 identifying
+    evidence（`Ci ← Ej`），而不是"所有实验都支持这篇论文"就够了。
+    这也是把总纲从「A 有结构性缺口、B 恰好补上」换成「条件 `Y` 下存在可验证缺口 `G`，
+    本文建立新知识 `K`」的原因 —— **`B → K` 只是产生 `K` 的一种方式**，否则 N4（现象）、
+    N8（评测）、N10（负结果）会被迫硬塞一个 `B`。
+13. **为什么删掉 11 维中位数与「新颖性稳健度 = 6 − 反驳分」？** 它们看起来 rigorous，
+    实际是**伪精确**：六个 reviewer **不是独立样本**（同一基础模型换 prompt，`corr ≫ 0`），
+    所以"6 个都认为新颖"不等于真人 reviewer consensus；而 `6 − 反驳分` 没有概率解释。
+    改为**两层**：**硬门禁 `G1—G5` 不打分、不聚合**（claim grounding / prior-work
+    distinction / identification / factual integrity / venue scope），**排序只用六个同向
+    维度**。门禁失败**不参与排序**，避免"高创新性 + 低可验证性"被中位数救回来。
+14. **为什么 reviewer 按「攻击面」分，而不是按会议分？** 真实的 paper failure mode 是
+    *novelty / causality / experimental design / theory / scope / utility* 六类，而
+    `R-CVPR`、`R-ICML`、`R-NeurIPS` 的意见**高度重合** —— 真实的 CVPR 审稿人可能是理论
+    审稿人，真实的 ICML 审稿人也可能主攻实验设计。所以 Mode D 改派六个攻击面审稿人，
+    会议差异改由 **D6 venue calibration** 单独一层承担：**按 contribution type 校准，
+    不是 venue 直接选 preset**。
+    **为什么同时删掉「必须有迁移合法性定理」？** 那是一条过拟合 ICML theory 的规则，
+    会让一个很好的 empirical insight 因为没有 theorem 被判"不可投稿"。改为
+    **Transfer Legitimacy Argument** 三级（`L1` 结构假设 + 证伪实验 / `L2` 形式化不变性 +
+    充分条件 / `L3` 定理 + 证明 + 紧性），硬约束变成**证据强度必须与声称的贡献等级匹配**。
+
 ---
 
 ## 8. 规则变更自检清单（维护本 Skill 时用）
@@ -841,16 +906,17 @@ E 方案复核。
 > 触发条件：改动任何**规则、命名、枚举、计数、路径**。
 
 **为什么需要它：** 本仓库的实际漂移记录显示，改了规则后**漏掉的从来不是规则本身**，
-而是下面 A 组这四类"看起来不像规则"的位置。
+而是下面 A 组这五类"看起来不像规则"的位置。
 
-### A. 四类高危位置（历史上反复漏）
+### A. 五类高危位置（历史上反复漏）
 
 | # | 位置 | 为什么危险 | 必做动作 |
 |---|---|---|---|
 | A1 | **设计依据 / 理由段**（§7、各文件开头的"为什么"） | 它在**论证旧设计**，读起来像权威依据。改规则后最容易整条漏掉，且在有人质疑设计时被当成正确论点引用 | **逐条读一遍 §7 与各"为什么"，问："这条还在支持当前规则吗？"** |
-| A2 | **速查 / 汇总表**（§4 各 Mode 速查、`project-layout` §6 落盘职责表、`roles` §4.2 派遣矩阵、`mode-d` D3.3 汇总表） | 汇总表是规则的**复制品**。改规则不改它 = 仓库里有两份互相矛盾的规则 | **所有"表格式汇总"逐个核对** |
+| A2 | **速查 / 汇总表**（§4 各 Mode 速查、`project-layout` §6 落盘职责表、`roles` §4.2 派遣矩阵、`mode-d` §D5.5 汇总表） | 汇总表是规则的**复制品**。改规则不改它 = 仓库里有两份互相矛盾的规则 | **所有"表格式汇总"逐个核对** |
 | A3 | **示例与模板**（`examples/*`、`templates/*`） | 示例会**示范旧写法**，且比正文更容易被照抄 | **示例里的文件名、路径、计数、命令逐个核对** |
 | A4 | **语义字段与规则的一致性**（§0.1/§0.2 锚点体系、`project-layout` §2.1 类型枚举、§3 frontmatter schema、`state.template.json`、§4 INDEX 章节） | 规则写"**必须**有 X"，但 schema / 枚举里**没有 X 的槽位**，或强制项与枚举表脱节。这种漂移**不在计数上、在语义上**，比 A2 更难发现：执行者只能自创值或让 frontmatter 失真 | **规则 → 字段 → 枚举 → 模板 → 示例，五处同步。** 每条新规则都问两句：①「它要求落盘的东西，**字段表里有槽位吗**？」②「它要求存在的文档类型，**枚举里有值吗**？」 |
+| A5 | **跨层漂移：claim 层 / 叙事层 / 评审层三层的耦合**（`claim-first-policy` 的枚举与门禁 ↔ `narrative-patterns` 的槽位与 preset ↔ `scoring-policy` 的门禁表与排序维度 ↔ `roles` 的攻击面角色 ↔ `state.template.json` 的 D 段 ↔ `examples/example-d-narrative.md`） | 三层是**同一套规则的三种呈现**。改一层而不改另两层，就会出现"claim 要求 `Ci ← Ej`，但叙事槽位里没有 `S5`"或"门禁叫 `G1—G5`，但评分政策还在算 11 维中位数"这类**跨文件互斥指令** | **改 claim 层或评审层的任何枚举 / 门禁 / 维度，必须同时扫这三层。** 机械做法：`grep -rn '<被改的枚举名>' --include=*.md .` 逐个确认；并在 `docs/mode-d-claim-first-spec.md` §10 记一行 |
 
 > **A4 的现实教训（B1—B5 那一批）：** 规则要求"锚点必须落盘"，但 frontmatter 没有
 > `anchor_role` / `serves` 的槽位；强制"锚点文档"，但类型枚举里没有 `anchor`；

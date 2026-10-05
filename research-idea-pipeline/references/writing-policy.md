@@ -151,7 +151,7 @@
 | 文件 | 管什么 | 与本政策的关系 |
 |---|---|---|
 | [evidence-policy.md](evidence-policy.md) | 证据等级 ↔ 措辞强度 | 本政策**不得**改动措辞强度。**冲突时以它为准** |
-| [scoring-policy.md](scoring-policy.md) | 评分标尺与极性 | 评分汇总表、评分表不受本政策约束（数字与表格优先） |
+| [scoring-policy.md](scoring-policy.md) | 评分标尺与极性；**两层结构（硬门禁 `G1—G5` + 排序六维，Mode D；中位数与一票否决，Mode E）** | 评分汇总表、评分表不受本政策约束（数字与表格优先） |
 | [roles.md](roles.md) §7 | 字数**下限** | 本政策是**上限方向**（去套话、去虚动词），**不得**把意见压到下限以下 |
 | [project-layout.md](project-layout.md) | 命名、ID、落盘位置、`subtype` | 本政策管正文形式，**不管**命名与位置；但 §8 第 6 条**强制枚举值原样** |
 | [../SKILL.md](../SKILL.md) §0.1 / §0.2 | **锚点体系与锚点变更单的规则** | 本政策**不管**锚点规则，只管这些文档的句子形式；枚举/字段名必须原样（§8 第 6 条） |
@@ -239,6 +239,11 @@ linter 查不到的部分，用下面五条补。
    | 锚点变更单 `类型` | `增补` / `替换`（**不写**「新增」「修改」「变更」） |
    | `type` 与文件名 `slug` | §2.1 的**封闭枚举**原样（`anchor` / `literature-survey` / …） |
    | `subtype` | **自由文本**，按原义写 —— 它是唯一允许自由命名的地方，且**不进文件名** |
+   | `epistemic_status` | `Observed` / `Supported` / `Hypothesized` / `Planned` / `Unknown` |
+   | 科学分类 `(O, T, R)` | 三轴的**英文枚举原样**（`Method` / `hidden-assumption` / `design-algorithm` …），**各取单值**，不写 `Method+Evaluation` |
+   | `anchor_eligibility` | `eligible` / `conditional` / `not-eligible` |
+   | 门禁 / 槽位 / 排序维度 | `G1 Claim grounding` … `G5 Venue scope`；`S1 Context` … `S6 Consequence & Boundary`；`Significance` / `Originality` / `Soundness margin` / `Explanatory depth` / `Generality` / `Narrative compression` |
+   | 攻击面审稿人名 | `R-Novelty` / `R-Causal` / `R-Experimental` / `R-Theory` / `R-Generalization` / `R-Utility` |
 
    **反面例子：** 把 `anchor_role: supporting` 写成 `anchor_role: 支撑`，或把 `类型: 替换`
    写成 `类型: 换方向` —— 两者都会让脚本与下一轮 agent 读不出来。

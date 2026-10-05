@@ -63,7 +63,7 @@
 ```
 routeA/docs/A002-ideas.md                 ← idea 候选清单（含 I1..In）
 routeA/docs/A003-proposal.md              ← 方案
-routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 ≥4 套候选叙事（详写最佳 2 套）
+routeA/docs/A005-narrative.md             ← Mode D 一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 S1—S6 + 门禁 G1—G5
 routeA/docs/A003-review-r01.md            ← 对 A003 的第 1 轮审阅
 routeA/docs/A003-review-r02.md            ← 对 A003 的第 2 轮审阅（接续复核）
 routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/ 下
@@ -76,7 +76,7 @@ routeB/docs/B002-ideas.md                 ← routeB 的文档在自己的 docs/
 | 序号来源 | 扫描 `routeX/docs/` 中匹配 `^<路线字母>\d{3}-` 的文件名，取**最大序号 +1** |
 | 递增范围 | **按路线独立**：routeA 是 A001/A002/…，routeB 是 B001/B002/… |
 | 复用 | **永不复用**，也不跳号 |
-| 子编号 | `I<n>` idea、`N<k>` 套路、`K<n>` 贡献、`E<n>` 实验。引用写作 `<文档ID>/<子编号>` |
+| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验。引用写作 `<文档ID>/<子编号>` |
 | 审阅记录 | **不占新序号**，挂在被审文档 ID 上：`A003-review-r01.md` / `-r02.md`（轮次零填充） |
 | 接续复核 | 递增 `-r02`、`-r03`（**零填充两位**），frontmatter 的 `review_round` 同步 |
 
@@ -131,19 +131,19 @@ reviewers: []
 | A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | B | reviewed | 12 个 idea（含 B5 审核） |
 | A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | C | reviewed | 贡献 K1..Kn |
 | A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | C | reviewed | 实验 E1..E7 |
-| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1 的 4 套叙事，最佳 N2 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | D | reviewed | 一次调用：I1 的 claim graph + 2—4 套六槽位叙事，最佳 N2 |
 | A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | E | reviewed | 中位数 4 |
 
 ### 2.1 Idea 追踪
-| Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
+| Idea | 状态 | 关联文档 | 最佳 preset | 备注 |
 |---|---|---|---|---|
 | I1 | 已进方案 | A002/I1 → A003 | N2 | 复现风险低 |
 | I7 | **已淘汰** | A002/I7 | — | 重叠不足（[作者, 会议/年份]） |
 
 ### 2.2 叙事追踪
-| Idea | 叙事文档 | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
-|---|---|---|---|---|---|
-| I1 | A005 | N2/N3/N5/N9 | **N2** | 4.0 | 否（N5 被否决） |
+| Idea | 叙事文档 | (O, T, R) | 候选 preset | 最佳 preset | 门禁 G1—G5 | 六维（S/O/SM/ED/G/NC） | 是否推荐 |
+|---|---|---|---|---|---|---|---|
+| I1 | A005 | (Method, hidden-assumption, design-algorithm) | N2/N3/N5/N9 | **N2** | 全 pass | 5/4/3/4/3/4 | 是（N5 未进排序） |
 
 ### 2.3 审阅追踪
 | 被审文档 | 轮次 | 文件 | 中位数 | 复现风险 | 结论 |

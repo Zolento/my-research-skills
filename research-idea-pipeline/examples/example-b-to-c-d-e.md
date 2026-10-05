@@ -1,6 +1,6 @@
 # 示例：串联调用 B → C → D → E
 
-演示主链路：从 idea 出发，到方案，到**多套路叙事选型**，最后到八子代理方案复核。
+演示主链路：从 idea 出发，到方案，到**多 preset 叙事选型**，最后到八子代理方案复核。
 
 > 字母顺序即工作流顺序：**A 文献调研 → B idea 发现 → C 方案生成 → D 叙事生成 →
 > E 方案复核**。本示例走 B→C→D→E，Mode A 按需在任一步被调用。
@@ -76,41 +76,66 @@
 输入：idea=I1（含 B5 审核结论），proposal=上一步输出，目标会议=ICML
 ```
 
-**执行要点：**
+**执行要点（D0—D9，顺序不得跳）：**
 
-1. **D0.1** 信息完整性检查 —— 缺核心机制/贡献/差异/假设/实验设计时先列**待补充清单**。
-2. **D1** 叙事套路锚定：这是**跨域类** idea（把扩散理论引入组合优化），因此**必须**
-   尝试 **N2 瓶颈突破 / N3 跨域理论迁移 / N5 统一框架 / N9 矛盾解决** 四套，
-   并执行**五步升级**（结构性缺陷 → 结构同构 → 迁移合法性 → 新算法 → 实证）。
-3. **D2** **≥4 套候选**，其中**详写最佳 2 套**：每套输出五段式主线（≥300 字）+ 贡献
-   清单 + 为什么之前没人做 + 该套路的弱点 + **包装前后对照**。其余候选给摘要。
-4. **D3** 六子代理独立打分（R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI** / S-Devil / S-Lit），
-   **六子代理全部派遣、S-Lit 恒派**。
-   四个会议审稿人各给 **理论角度 + 应用角度 + 会议特性判定**（本例无临床属性 → R-MICCAI
-   的会议特性维度记"不适用"）。
-5. **D4** 交叉质询：每人 ≥1 条质疑。评分差 ≥2 分记录分歧。**逐维度取中位数**。
+1. **D0 证据台账**：把已有实验 / 定理 / 文献登记为 `E1`、`E2`、…（路线内唯一，不复用）。
+   每条标 `epistemic_status`（`Observed` / `Supported` / `Hypothesized` / `Planned` / `Unknown`）。
+   **不得把 `Planned` 写成 `Observed`。** 无证据的条目留 `[待补]`。
+2. **D1 Claim Graph**：写 `C0`—`C5`，每条挂 `Ci ← Ej` 或标 `[待补]`。
+   `C0` 必须一句话。**只有 `Observed` / `Supported` 的 `Ej` 可以被引用。**
+3. **D2 科学分类**：本例登记 `(Method, hidden-assumption, design-algorithm)`。
+   枚举值一律用英文原样，各轴取单值，**不得**拼接。
+4. **D3 Anchor Eligibility**：逐 anchor 判 `eligible` / `conditional` / `not-eligible`。
+   本例作者想定位成 `理论`，但证据支持的是 `性能` 与 `现象` → **必须显式告知**
+   「你想定位成理论，但现有证据支持的是性能。最强可辩护 anchor 是性能」，
+   并写进路线 INDEX 的 Warnings。**不得**帮作者强化不被证据支持的故事。
+5. **D4 叙事实现**：本例是**跨域类**，所以**必须做一次 anti-application stress test**
+   （至少测 `N2` / `N3` / `N5` / `N9`），再生成 **2—4 套真正不同的 claim hierarchy**。
+   每套写满**六槽位** `S1`—`S6`：`S5` 给出 `Ci ← Ej` 对照，`S6` 写出**不成立的条件**。
+   详写的候选 **≥300 字**，其余候选给摘要。**同一 claim 换四种措辞不算候选。**
+6. **D5 攻击面审核**：六个攻击面审稿人**全部派遣** —— `R-Novelty` / `R-Causal` /
+   `R-Experimental` / `R-Theory` / `R-Generalization` / `R-Utility`，每人只在**自己的
+   主责维度**给一个 `1—5`。`S-Lit` **恒派**（本例判「部分重叠」）。`S-Devil` 必派但
+   **不打分**：出致命弱点清单 + 最简解释反例，逐条处置（接受或反驳）。
+   攻击面判定**不进任何向量**，只喂门禁与逐维理由。**不得**声称 reviewer consensus。
+7. **D6 venue calibration**：顺序固定为 `contribution type → evidence contract →
+   venue calibration`。**不得按 venue 选 preset**，也不派遣会议审稿人。
+8. **D7 硬门禁**：逐项判 `G1 Claim grounding` / `G2 Prior-work distinction` /
+   `G3 Identification` / `G4 Factual integrity` / `G5 Venue scope`，
+   每项写出**依据位置**。任一 `fail` ⇒ `not_submission_ready`，**不参与排序**。
+9. **D8 六维排序**：只排**通过门禁**的候选。六维是 `Significance` / `Originality` /
+   `Soundness margin` / `Explanatory depth` / `Generality` / `Narrative compression`，
+   **全部同向（高 = 好）**，因此 Mode D **不做极性归一化**。
+   `Soundness margin` 的实验侧与理论侧**两个读数并存，不得平均**。
+   排序写出**胜负维**与**代价维**，不给综合总分。
+10. **D9 输出**：最佳叙事 + runner-up + 逐维胜出理由 + 致命风险 + **缺失证据清单**
+    + **最小必要实验 / 定理**。
 
-**产物片段（套路对比）：**
+**产物片段（候选对比）：**
 
-| idea | 套路 | R-CVPR 方法/可验证 | R-ICML 原创/严谨 | R-NeurIPS 洞察/重要 | S-Devil 反驳→稳健度 | S-Lit 结论 | 综合中位数 |
-|---|---|---|---|---|---|---|---|
-| I1 | N2 瓶颈突破 | 4 / 3 | 4 / 3 | 4 / 3 | 2 → **4** | 部分重叠 | **4.0** |
-| I1 | N3 跨域迁移 | 3 / 3 | 3 / 4 | 3 / 3 | 3 → **3** | 部分重叠 | 3.0 |
-| I1 | N5 统一框架 | 2 / 2 | 3 / 2 | 3 / 3 | 4 → **2** | 部分重叠 | **否决** |
+| preset | `C0` 一句话 | `(O, T, R)` | anchor（资格） | 门禁 G1—G5 | 六维（S/O/SM/ED/G/NC） |
+|---|---|---|---|---|---|
+| N2 瓶颈突破/移除假设 | 在 `Y` 下结构性失效。改为硬约束可恢复可行性 | (Method, hidden-assumption, design-algorithm) | 性能（`eligible`） | 全 `pass` | 5/4/3/4/3/4 |
+| N9 矛盾解决 | 「可逆性是否必要」的矛盾来自口径差异 | (Phenomenon, contradiction, explain) | 现象（`eligible`） | 全 `pass` | 3/3/5/4/2/5 |
+| N3 跨域理论迁移 | 两领域共享结构 `S`，且满足迁移条件 `C` | (Method, hidden-assumption, prove) | 理论（`conditional`） | `G1 fail` | 不参与排序 |
+| N5 统一框架 | — | — | — | — | stress test 排除 |
 
-> **N5 被一票否决**：可验证性、理论严谨性、新颖性稳健度中位数均 ≤ 2 —— 即使它有
-> 故事性也不推荐。**不得只看创新性**（见 [mode-d §D4.1](../references/mode-d-narrative-generation.md)）。
-> **S-Devil 列方向相反**（5 = 完全无新颖性），聚合前须做 `稳健度 = 6 − 反驳分` 归一化。
+> **N3 的 `G1 fail` 来自 `C0` 的迁移条件半支没有证据**（L2 不变量待补）。
+> 门禁 `fail` 的候选**不得**推荐为最佳，也**不进排序表**。
+> **N5 被 stress test 排除**：现有证据只有一类方法，写不出「多类方法各自是特例」，
+> 只能退化成「把 B 用到 A」。
+> `S-Lit` 判「部分重叠」：机制层重叠、结论层不重叠 → 相关工作需显式划界。
 
 **包装前后对照（N2）：**
 
 | | 表述 | 依据 |
 |---|---|---|
 | 包装前 | 我们提出了一个可逆性约束模块 | — |
-| 包装后 | 现有离散扩散方法共享**"可逆性仅作采样技巧"**这一假设，导致在置换约束下**结构性失效**。我们移除该假设 | Mode C 提案 §1 的失效分析 + 实验 E2 |
-| 判定 | 只改参照系，未改事实 | 每句都能在提案中找到证据 ✓ |
+| 包装后 | 现有离散扩散方法共享**「可逆性仅作采样技巧」**这一假设，导致在置换约束下**结构性失效**。我们移除该假设 | `C2 ← E1`、`C3 ← E4`、`C0 ← E3` |
+| 判定 | 只改参照系，未改事实 | 每句都能落回 `Ci ← Ej` |
 
-**落盘：** `routeA/docs/A005-narrative.md` + 更新 INDEX（被覆盖套路 → 已证伪）
+**落盘：** `routeA/docs/A005-narrative.md` + 更新 INDEX（门禁 `fail` 的候选 → §4 已证伪。
+缺失证据与 anchor 冲突 → §5 TODO 与 §7 Warnings）
 
 → `next_mode_suggestion: "C | E"`
 
@@ -164,7 +189,7 @@ docs/
 ├── A002-ideas.md                         # Mode B（含 I1..In 与 B5 审核）
 ├── A003-proposal.md                      # Mode C
 ├── A004-experiment-plan.md               # Mode C
-├── A005-narrative.md                     # Mode D（一次调用：I1 的 ≥4 套候选叙事，详写最佳 2 套 + 最佳推荐）
+├── A005-narrative.md                     # Mode D（一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 + 门禁 + 最佳推荐）
 └── A003-review-r01.md                        # Mode E（含复现风险等级）
 ```
 

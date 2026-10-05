@@ -148,7 +148,7 @@ routeA/docs/
 | 前缀 | 含义 | 定义处 | 示例 |
 |---|---|---|---|
 | `I<n>` | **idea**（由 Mode B 产出，Mode C/D 引用） | `-ideas.md` | `I1`、`I3` |
-| `N<k>` | **叙事套路**（全局固定 1—10，见 [narrative-patterns.md](narrative-patterns.md) §1） | 套路库 | `N2`、`N9` |
+| `N<k>` | **叙事 preset**（全局固定 1—10，见 [narrative-patterns.md](narrative-patterns.md) §1；**非互斥**） | preset 库 | `N2`、`N9` |
 | `K<n>` | **贡献**（方案内；**不用 C**，避免与 Mode C 章节号 C1—C7 撞） | `-proposal.md` | `K1`、`K2` |
 | `E<n>` | **实验** | `-experiment-plan.md` | `E1`、`E4` |
 | `H<n>` | **假设** | `-experiment-plan.md` | `H1` |
@@ -202,50 +202,63 @@ routeA/docs/
 
 ### 2.4 叙事文档的内部结构
 
-**一次 Mode D 调用产出一份 `<R><NNN>-narrative.md`**，内含**全部 idea**的叙事，
-按 idea 分节：
+**一次 Mode D 调用产出一份 `<R><NNN>-narrative.md`**，内含**全部 idea** 的叙事。
+**结构按 claim-first 排列：先证据与主张，再叙事。**
 
 ```markdown
-# A005 — 多套路叙事（I1 / I3 / I5）
+# A005 — 叙事（I1 / I3）
 
 ## 摘要
 
-| idea | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
-|---|---|---|---|---|
-| I1 | N2/N3/N5/N9 | **N2** | 4.0 | 否 |
-| I3 | N2/N3/N5/N9 | N3 | 3.0 | 否 |
+| idea | (O, T, R) | 可辩护 anchor | 候选 preset | 最佳 preset | 门禁 G1—G5 | 六维（S/O/SM/ED/G/NC） |
+|---|---|---|---|---|---|---|
+| I1 | (Method, hidden-assumption, design-algorithm) | 性能 | N2/N3/N5/N9 | **N2** | 全 pass | 5/4/3/4/3/4 |
+| I3 | (Phenomenon, unexplained-phenomenon, characterize) | 现象 | N1/N4/N8 | N4 | G3 fail | 不参与排序 |
 
 ## idea I1
 
-### I1 / N2 瓶颈突破/移除假设     ← 套路编号与名称必须取自套路库 §1
-#### N2.1 套路名称与适配理由
-#### N2.2 五段式叙事主线（详写套 ≥300 字；摘要套只给摘要级主线）
-#### N2.3 贡献清单（标注贡献类型 + 方法来源）
-#### N2.4 为什么之前没人做
-#### N2.5 该套路的弱点
-#### N2.6 包装前后对照
+### I1 / 证据台账与 claim graph
 
-### I1 / N3 跨域理论迁移
+| E | 内容 | epistemic_status |
+|---|---|---|
+| E1 | … | Observed |
+| E2 | … | Supported |
+
+- `C0`（central proposition）：……
+- `C1 ← E1`　`C2 ← E2, E3`　`C3 ← E2`　`C4 ← [待补]`　`C5 ← [待补]`
+
+### I1 / N2 瓶颈突破/移除假设     ← preset 编号与名称必须取自 narrative-patterns.md §1
+#### S1 Context
+#### S2 Tension
+#### S3 Central Proposition（可证伪）
+#### S4 Resolution
+#### S5 Evidence Contract（`Ci ← Ej` 对照）
+#### S6 Consequence & Boundary（**含不成立的条件**）
+#### 包装前后对照
+#### 该 preset 的弱点（S-Devil）
+
+### I1 / N3 跨域理论迁移（Transfer Legitimacy = L2）
 ...
 
-## idea I3
-...
-
-## 交叉质询（跨 idea）
-
-## 最佳叙事推荐（跨 idea）
-
-## 最终优先级建议（跨 idea）
+## 攻击面评审（跨 idea）
+## 门禁判定 G1—G5（跨 idea）
+## 六维排序与最佳叙事推荐（跨 idea）
+## 缺失证据清单与最小必要实验 / 定理（跨 idea）
 ```
 
 **硬规则：**
 
 1. **一次调用一份文档**；同一批 idea 重做叙事取**新序号**，并在 frontmatter
    `supersedes` 指向旧 ID。
-2. **每个 idea 至少 4 套**套路候选，其中**详写最佳 2 套（各 ≥300 字）**，其余给摘要。
-3. **跨 idea 的内容（交叉质询、最佳推荐、最终建议）集中在本文件末尾**，
-   不要分散到 per-idea 小节里。
-4. 套路编号 `N<k>` **必须**取自套路库；跨文档引用写 `A005/I1/N2`。
+2. **先有证据台账与 claim graph，再有叙事。** `C0—C5` 完整，每个 `Ci` 有 `Ci ← Ej`
+   或标 `[待补]`；写不出**可证伪 central proposition** 的 idea **不得进入投稿叙事**。
+3. **每个 idea 2—4 套真正不同的 claim hierarchy**（不是同一主张的四种措辞），
+   每套填满**六槽位 `S1—S6`**。
+4. **门禁 `G1—G5` 命中的叙事不参与六维排序** —— 判定与理由仍写进文档，但不进排序表。
+5. **跨 idea 的内容（攻击面评审、门禁判定、六维排序、最佳推荐、缺失证据清单）
+   集中在本文件末尾**，不要分散到 per-idea 小节里。
+6. preset 编号 `N<k>` **必须**取自 [narrative-patterns.md](narrative-patterns.md) §1 的
+   十套表；跨文档引用写 `A005/I1/N2`。
 
 ### 2.5 硬规则（不随 Mode 变化）
 
@@ -402,7 +415,7 @@ A001 文献调研
 | A002 | [A002-ideas.md](docs/A002-ideas.md) | idea-discovery | — | B | reviewed | 10 个 idea（含 B5 审核） |
 | A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | — | C | reviewed | 贡献 K1—K3 |
 | A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | experiment-cards | C | reviewed | 实验 E1—E7 |
-| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | — | D | reviewed | 一次调用：I1/I3 各 4 套叙事，最佳 N2 / N3 |
+| A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | — | D | reviewed | 一次调用：I1/I3 的 claim graph + 2—4 套六槽位叙事，最佳 N2 / N3 |
 | A006 | [A006-proposal.md](docs/A006-proposal.md) | proposal | paper-outline | C | draft | 枚举外语义写 subtype |
 | A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | — | E | reviewed | 八子代理中位数 4，复现风险低 |
 
@@ -410,17 +423,17 @@ A001 文献调研
 > 派生物的语义**只能靠这一列保住**（见 §3.2）。
 
 ### 2.1 Idea 追踪（来自 A002）
-| Idea | 状态 | 关联文档 | 最佳叙事 | 备注 |
+| Idea | 状态 | 关联文档 | 最佳 preset | 备注 |
 |---|---|---|---|---|
 | I1 | 已进方案 | A002/I1 → A003 → A005 | N2 | 复现风险低 |
 | I3 | 已进方案 | A002/I3 → A006 | N3 | 理论严谨性待补 |
 | I7 | **已淘汰** | A002/I7 | — | 重叠不足（[作者, 会议/年份]） |
 
 ### 2.2 叙事追踪
-| Idea | 叙事文档 | 尝试套路 | 最佳套路 | 综合中位数 | 是否否决 |
-|---|---|---|---|---|---|
-| I1 | A005 | N2/N3/N5/N9 | **N2** | 4.0 | 否（N5 被否决） |
-| I3 | A006 | N2/N3/N5/N9 | N3 | 3.0 | 否 |
+| Idea | 叙事文档 | (O, T, R) | 候选 preset | 最佳 preset | 门禁 G1—G5 | 六维（S/O/SM/ED/G/NC） | 是否推荐 |
+|---|---|---|---|---|---|---|---|
+| I1 | A005 | (Method, hidden-assumption, design-algorithm) | N2/N3/N5/N9 | **N2** | 全 pass | 5/4/3/4/3/4 | 是（N5 未进排序） |
+| I3 | A006 | (Theory, identifiability, prove) | N2/N3/N5/N9 | N3 | G1 fail | 不参与排序 | 否（缺证据） |
 
 ### 2.3 审阅追踪
 | 被审文档 | 轮次 | 文件 | 中位数 | 复现风险 | 结论 |
@@ -521,7 +534,7 @@ A001 文献调研
 | **B** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `<routeX>/docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
 | **C** | 论文提案 | `<routeX>/docs/<R>NNN-proposal.md` | 对应 `INDEX.md` |
 | **C** | 实验流程计划书 | `<routeX>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
-| **D** | 多套路叙事清单（≥4 套候选/idea，**详写最佳 2 套、各 ≥300 字**）+ 六子代理评审（**全部派遣，S-Lit 恒派**） + 交叉质询 + 最佳叙事推荐 + 包装前后对照 | `<routeX>/docs/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的套路 → **§4 已证伪**；最佳叙事 → **§3 已证实**；评分 <3 → **§7 Warnings**） |
+| **D** | 证据台账 + claim graph（`C0—C5`）+ **2—4 套六槽位叙事（`S1—S6`）** + 六攻击面审稿人评审（**全部派遣，S-Lit 恒派，S-Devil 不打分**）+ **门禁 `G1—G5` 判定** + 六维排序 + 最佳叙事推荐 + **缺失证据清单与最小必要实验 / 定理** | `<routeX>/docs/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的叙事方向 → **§4 已证伪**；最佳叙事 → **§3 已证实**；门禁 `fail` 或六维中位 <3 → **§7 Warnings**） |
 | **E** | 审阅记录（**含复现风险等级**） | `<routeX>/docs/<被审ID>-review-r01.md`（接续则 `-r02.md`） | 对应 `INDEX.md`（§3/§4/§5/§7；**复现风险高 → §7 Warnings**） |
 
 > **中间产物的两条硬约束：**
