@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""state_check.py — Research World Model（R1）机械闸门：V1—V10 引用完整性审计
+"""state_check.py — Research World Model（R1）机械闸门：V1—V12 引用完整性审计
 
 契约来源
 --------
@@ -15,7 +15,7 @@
     python3 state_check.py <state.json> --check    # 显式化「只校验不写」
     python3 state_check.py <state.json> --json     # 机器可读结果（stdout 只有 JSON）
     python3 state_check.py <state.json> --quiet    # 只打印汇总行
-    python3 state_check.py --selftest              # 内置自检（V1—V10 全覆盖）
+    python3 state_check.py --selftest              # 内置自检（V1—V12 全覆盖）
     python3 state_check.py --list-rules            # 列出规则号与判据
 
 规则（逐字取自 spec §2.3，全部为硬违规）：
@@ -121,6 +121,8 @@ RULES: Dict[str, str] = {
     "V8": "X.parent 必须是存在的 X 或 null；树不得成环",
     "V9": "assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD",
     "V10": "每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure",
+    "V11": "stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别",
+    "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -266,7 +268,7 @@ class Report:
             return f"[env] 环境不满足（退出码 {EXIT_ENV}）：{self.error}"
         counts = "、".join(f"{key}={self.checked.get(key, 0)}" for key in CHECKED_KEYS)
         if not self.violations:
-            return f"[ok] 0 处硬违规：V1—V10 全部通过；{counts}"
+            return f"[ok] 0 处硬违规：V1—V12 全部通过；{counts}"
         breakdown = "、".join(f"{rule}×{count}" for rule, count in self.rule_counts().items())
         return (f"[hard] 共 {len(self.violations)} 处硬违规（{breakdown}）；state 不合规；{counts}")
 
@@ -663,9 +665,59 @@ def _v10(ctx: _Context) -> List[Violation]:
     return out
 
 
+
+def _v11(ctx: _Context) -> List[Violation]:
+    """V11：stage == "X2" ⇒ claim_targeted 必须为空数组（X2 只做基线校准）。"""
+    out: List[Violation] = []
+    for index, record in ctx.experiments:
+        stage = record.get("stage")
+        if not (_text_ok(stage) and stage.strip() == "X2"):
+            continue
+        targets = record.get("claim_targeted")
+        if not isinstance(targets, list):
+            targets = []
+        nonblank = [t for t in targets if _text_ok(t)]
+        if nonblank:
+            out.append(Violation(
+                "V11",
+                f"experiments[{index}].claim_targeted",
+                f"stage=X2（基线校准）不得承担 claim 判别，却给了 {len(nonblank)} 条 claim_targeted",
+                targets,
+                _subject_of(record, "id"),
+            ))
+    return out
+
+
+def _v12(ctx: _Context) -> List[Violation]:
+    """V12：status == "failed" ⇒ 必须有某条 F.referenced_by 含该 X 的非空 id。"""
+    referenced = set()
+    for _, record in ctx.failures:
+        ids = record.get("referenced_by")
+        if isinstance(ids, list):
+            for item in ids:
+                if _text_ok(item):
+                    referenced.add(str(item).strip())
+    out: List[Violation] = []
+    for index, record in ctx.experiments:
+        status = record.get("status")
+        if not (_text_ok(status) and status.strip() == "failed"):
+            continue
+        xid = record.get("id")
+        if not (_text_ok(xid) and str(xid).strip() in referenced):
+            out.append(Violation(
+                "V12",
+                f"experiments[{index}].status",
+                "status=failed 的节点必须有一条 failures[].referenced_by 引用它（失败不得消失）",
+                record.get("status"),
+                _subject_of(record, "id"),
+            ))
+    return out
+
+
 CHECKS: Dict[str, Callable[[_Context], List[Violation]]] = {
     "V1": _v1, "V2": _v2, "V3": _v3, "V4": _v4, "V5": _v5,
     "V6": _v6, "V7": _v7, "V8": _v8, "V9": _v9, "V10": _v10,
+    "V11": _v11, "V12": _v12,
 }
 
 
@@ -757,7 +809,7 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
-        description="Research World Model（R1）机械闸门：V1—V10 引用完整性审计"
+        description="Research World Model（R1）机械闸门：V1—V12 引用完整性审计"
                     "（docs/r-architecture-wave1-spec.md §2.3）",
     )
     parser.add_argument("state", nargs="?", default=None,
@@ -766,7 +818,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="只校验不写入（默认行为即如此；显式化以便与 refs_index.py 口径一致）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行，不逐条打印违规")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V10 全覆盖）")
+    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V12 全覆盖）")
     parser.add_argument("--list-rules", action="store_true", help="列出 V1—V10 与判据")
     return parser
 
@@ -885,7 +937,7 @@ def selftest() -> int:
         detected.update(report.rules())
         return report
 
-    print("state_check.py 自检（V1—V10）：")
+    print("state_check.py 自检（V1—V12）：")
     clean = check_state(base, source="<selftest>")
     check("合法 state 退出码 0", clean.exit_code == EXIT_OK and clean.ok)
     check("合法 state 无违规", clean.violations == [])
@@ -949,7 +1001,31 @@ def selftest() -> int:
     v10c = report_with(lambda d: d["repairs"][0].update(closure="DONE"))
     check("V10 关闭枚举不合法 → 3", v10c.exit_code == EXIT_HARD and v10c.rules() == ["V10"])
 
-    check("自检覆盖 V1—V10", set(RULE_ORDER) - detected == set(),
+    v11 = report_with(lambda d: d["experiments"][0].update(stage="X2"))
+    check("V11 X2 承担 claim 判别 → 3",
+          v11.exit_code == EXIT_HARD and v11.rules() == ["V11"]
+          and v11.violations[0].path == "experiments[0].claim_targeted")
+    v11ok = report_with(lambda d: d["experiments"][0].update(stage="X2", claim_targeted=[]))
+    check("V11 合法反例：X2 + 空 claim_targeted → 0",
+          v11ok.exit_code == EXIT_OK and v11ok.violations == [])
+
+    def _unrecorded_failure(d):
+        d["experiments"].append({
+            "id": "X99", "parent": None, "stage": "X3", "claim_targeted": ["C0"],
+            "alternative_targeted": [], "code_commit": "c", "data_split": "s", "seed": 0,
+            "metric": "m", "result": "r", "interpretation": "i", "unexpected": [],
+            "known_flaws": [], "next_branches": [], "status": "failed",
+        })
+
+    v12 = report_with(_unrecorded_failure)
+    check("V12 failed 未被 failures[] 记录 → 3",
+          v12.exit_code == EXIT_HARD and v12.rules() == ["V12"]
+          and v12.violations[0].path == "experiments[1].status")
+    v12ok = report_with(lambda d: d["experiments"][0].update(status="failed"))
+    check("V12 合法反例：failed 且已被 F 引用 → 0",
+          v12ok.exit_code == EXIT_OK and v12ok.violations == [])
+
+    check("自检覆盖 V1—V12", set(RULE_ORDER) - detected == set(),
           f"未覆盖 {sorted(set(RULE_ORDER) - detected)}")
 
     check("缺八类数组 → 4", check_state({"foo": 1}).exit_code == EXIT_ENV)

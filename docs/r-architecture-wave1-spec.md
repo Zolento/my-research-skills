@@ -142,6 +142,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V8 | `X.parent` 必须是存在的 `X` 或 `null`；树不得成环 | 硬 |
 | V9 | `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 `X` 或 `TBD` | 硬 |
 | V10 | 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure` | 硬 |
+| V11 | `stage == "X2"`（基线校准）⇒ `claim_targeted` 必须为空数组 —— **`X2` 不得承担 claim 判别** | 硬 |
+| V12 | `status == "failed"` 的 `X` 必须被某条 `failures[].referenced_by` 引用（**失败不得消失**） | 硬 |
 
 **退出码（与仓库既有脚本一致）：** `0` 全部通过；`3` 存在硬违规；`4` 环境不满足（文件缺失等）。
 **`--json` 输出机器可读结果；`--check` 只校验不写。**
@@ -283,3 +285,4 @@ R0 只写 `contract`；R7 写 `assurance[]`（`discriminating_test` 无 `X` 时�
 |---|---|---|
 | 2026-10-06 | 初版 | Lead |
 | 2026-10-06 | 依 `docs/verify-r-wave1.md` §9 修 M-3/M-4/M-6/M-7/M-8 与 MINOR；R14 决策枚举统一为 `continue\|pivot\|archive\|submit`（本节 §1 的图同步） | Lead |
+| 2026-10-06 | Wave 2 首批：新增 **V11 / V12** 闸门（清 Wave 1 的「有规则无闸门」欠账）；实现于 `state_check.py`，测试 +3 用例 | Lead |

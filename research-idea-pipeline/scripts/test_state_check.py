@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import copy
 import json
 import sys
 import tempfile
@@ -212,7 +213,7 @@ class TestValidState(unittest.TestCase):
         path = self.tmp.write(valid_state())
         code, out, err = _run(str(path))
         self.assertEqual(code, sc.EXIT_OK, msg=out + err)
-        self.assertIn("V1—V10 全部通过", out)
+        self.assertIn("V1—V12 全部通过", out)
 
     def test_valid_state_report_is_clean(self) -> None:
         report = sc.check_state(valid_state())
@@ -411,6 +412,40 @@ class TestHardRules(unittest.TestCase):
 # 环境不满足：退出码 4
 # ---------------------------------------------------------------------------
 
+class TestV11V12(unittest.TestCase):
+    """V11（X2 不得承担 claim 判别）与 V12（failed 必须进 failures[]）—— Wave 2 首批闸门。"""
+
+    def test_v11_x2_with_claim_targeted_is_hard(self) -> None:
+        doc = valid_state()
+        doc["experiments"][0]["stage"] = "X2"
+        report = sc.check_state(doc)
+        self.assertEqual(report.exit_code, sc.EXIT_HARD)
+        self.assertEqual(report.rules(), ["V11"])
+        self.assertEqual(report.violations[0].path, "experiments[0].claim_targeted")
+
+    def test_v11_x2_with_empty_claim_targeted_is_clean(self) -> None:
+        doc = valid_state()
+        doc["experiments"][0]["stage"] = "X2"
+        doc["experiments"][0]["claim_targeted"] = []
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
+    def test_v12_failed_without_failure_record_is_hard(self) -> None:
+        doc = valid_state()
+        node = copy.deepcopy(doc["experiments"][0])
+        node.update(id="X99", stage="X3", status="failed", claim_targeted=["C0"])
+        doc["experiments"].append(node)
+        report = sc.check_state(doc)
+        self.assertEqual(report.exit_code, sc.EXIT_HARD)
+        self.assertEqual(report.rules(), ["V12"])
+        self.assertEqual(report.violations[0].subject, "X99")
+        self.assertTrue(report.violations[0].path.endswith(".status"), msg=report.violations[0].path)
+
+    def test_v12_failed_already_referenced_is_clean(self) -> None:
+        doc = valid_state()
+        doc["experiments"][0]["status"] = "failed"   # X1 已被 failures[] 引用
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
+
 class TestEnvironment(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = _TmpState()
@@ -521,12 +556,12 @@ class TestJsonOutput(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestCli(unittest.TestCase):
-    def test_list_rules_covers_v1_to_v10(self) -> None:
+    def test_list_rules_covers_v1_to_v12(self) -> None:
         code, out, _err = _run("--list-rules")
         self.assertEqual(code, sc.EXIT_OK)
         for rule in sc.RULE_ORDER:
             self.assertIn(rule, out)
-        self.assertEqual(sc.RULE_ORDER, [f"V{n}" for n in range(1, 11)])
+        self.assertEqual(sc.RULE_ORDER, [f"V{n}" for n in range(1, 13)])
 
     def test_selftest_passes(self) -> None:
         code, out, _err = _run("--selftest")
@@ -540,7 +575,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(caught.exception.code, sc.EXIT_ERROR)
 
     def test_every_rule_has_judgement_text(self) -> None:
-        self.assertEqual(len(sc.RULES), 10)
+        self.assertEqual(len(sc.RULES), 12)
         for rule, text in sc.RULES.items():
             self.assertTrue(text.strip(), msg=rule)
 
