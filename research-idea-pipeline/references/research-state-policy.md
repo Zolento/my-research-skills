@@ -191,8 +191,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `expected_information_gain` | 数值（如 `0.0`） | ✅ | EIG 排序用（spec §4） |
 | `status` | `active` \| `elite` \| `archived` \| `killed` | ✅ | |
 | `niche` | `N1`—`N10` 之一（**V6 强制**；复用 preset 名，不引入第二套枚举） | ✅ | V6；QD archive 的前提 |
-| `island` | `P1`—`P6` / `local` | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制** |
-| `generation` | 整数 ≥ 0 | `0` = 初始候选，每次 R6 进化 +1；**V14 强制** |
+| `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制** |
+| `generation` | 整数 ≥ 0 | ✅ | `0` = 初始候选，每次 R6 进化 +1；**V14 强制** |
 
 ### 3.5 `experiments[]` — Experiment Graph（`X<n>`）
 

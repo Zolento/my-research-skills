@@ -201,7 +201,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | R 阶段 | 锚点的作用 |
 |---|---|
 | **R2 / R5** | **检索边界：** 理论锚点必须查定理 / 反例 / 不可能性与负结果；性能锚点必须查 SOTA 与评测协议 |
-| **R3—R6** | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；shortlist 只收服务主锚点的 idea |
+| **R3—R6** | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；QD archive 的 elite 集合 只收服务主锚点的 idea |
 | **R8** | **贡献类型与实验：** 理论锚点下 C4 必须含证明 / 反例；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
 | **R12** | **叙事资格（先于选 preset）：** 先做 **Anchor Eligibility Test**（[claim-first-policy.md](references/claim-first-policy.md) §6）——只有 `eligible` / `conditional` 的锚点才可用于组织叙事；与作者**目标锚点**冲突时**必须显式告知**。通过后再按 [narrative-patterns.md](references/narrative-patterns.md) §2 选 preset |
 | **R7 / R10 / R13** | **评审权重：** 理论锚点首查证明正确性；性能锚点首查公平比较、指标口径与统计方案 |
@@ -677,7 +677,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   **不派遣 S-Repro。**
 - **交付物：** **population + QD archive**（每个出现过的 niche 至少一个 `elite`）+ 技术路线归纳表 +
   创新性边界界定 + **失败记忆**（被搁置的候选写 `failures[]`，不得删除）。
-  **不再产出「shortlist（3—5 个）」——该概念在 Wave 2 起作废。**
+  **不再产出「QD archive 的 elite 集合（3—5 个）」——该概念在 Wave 2 起作废。**
 - **预算：** 默认 4 islands（`P1`—`P4`；`P5`/`P6` 按需启用）× 每岛 3—6 候选；进化 ≤2 轮。
 - **两阶段 fitness：** Search 期只看结构新颖度 / 跨域意外度 / 表示距离 / 演绎产出，
   **不看 venue fit** —— venue 适配在 R12 / R13 才生效。
@@ -815,7 +815,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
       而非硬凑临床相关性。
 - [ ] **R3—R6：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
-      没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 shortlist 的 idea 已达 L2**，
+      没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 QD archive 的 elite 集合 的 idea 已达 L2**，
       含「首次提出」声称的已达 L3 并附负检索记录。
 - [ ] **R12：先有证据台账与 claim graph，再有叙事**：`C0—C5` 完整，每个 `Ci` 都有
       `Ci ← Ej` 或标 `[待补]`；每套候选都能写出一句话的**可证伪 central proposition**；

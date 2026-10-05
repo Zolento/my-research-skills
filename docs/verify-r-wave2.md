@@ -385,3 +385,133 @@ Lead 指定的 grep 结果：`grep -n 'range(1\|len(sc.RULES)\|== 1[0-9]' script
 但 Wave 2 的**接线层有两处空洞（SKILL §4/§7、policy §3.4）**、**旧发现流程仍与新流程同时可执行**
 （含一个过不了 `state_check` 的示例 state 片段）、**少了一整节 R2 内容**，且 spec 自身的
 P1—P6 与 4 islands 互相矛盾；这些都是行级到段落级修复，修完即可交付。
+
+---
+
+## 8. 增量复核（修复后收官确认）
+
+**快照：** `4fccc32`（工作树干净；`docs/verify-r-wave2.md` 已被该提交一并提交）。
+下面所有命令在该快照上执行。**只读**：本次仅向本文件追加本节。
+
+### 8.1 逐条确认（6 MAJOR + 6 MINOR + 3 NIT）
+
+| 项 | 声明 | 现值（文件:行号） | 判定 |
+|---|---|---|---|
+| **M-1** | 从 `git show f8dda53:…` 取回被吞的 31 行，恢复为 `## R2.1` / `## R2.2` | `phase-r2-r5-field-mapping-retrieval.md:214`（`## R2.1 field grammar …`）、`:229`（`## R2.2 occupancy map（Wave 3 深化）（占用图）`），位置在 `:247` 的 `## R5.` 之前 | ✅ **达成**，且**逐行等于原文**（见 §8.2） |
+| **M-2** | SKILL §4 R3—R6 重写；§7 新增第 15 条 | `SKILL.md:666—685`：R3 双轨（两轨产生候选前不得互看）→ R4 五维聚类 → **QD archive** → R5 共演化 → R6 进化；含「预算：默认 4 islands（P1—P4；P5/P6 按需）× 每岛 3—6；进化 ≤2 轮」与「两阶段 fitness：Search 期不看 venue fit」；**明写「不再产出 shortlist（3—5 个）——该概念在 Wave 2 起作废」**（`:680`）。`§7` 新增 `:956`「15. 为什么两阶段 fitness？」（含 QD archive / V15 / EIG 只作记录） | ✅ **达成** |
+| **M-3** | 作用域裁决注点名 B5.4/B6/B8；三节各加横幅 | 注 `:16—22` 点名 `B5.4`/`B6`/`B8` 并指向 R4.2/R6.3 与模板；横幅：`:154`（**B5 节**）、`:232`（B6）、`:283`（B8），B6 横幅含「shortlist 这个概念在 Wave 2 起作废」（`:233`） | ⚠️ **基本达成**：横幅挂在 **B5 父节**（`:152`）而非 `### B5.4`（`:217`）本身 → §8.6 MINOR-1 |
+| **M-4** | B8 片段整块换成 Research World Model 片段，「再喂一次 validator，**应为 exit 0**」 | 片段 `:293—305`（围栏内 `:294—304`）顶层键 `phase / hypotheses / failures / literature / uncertainties`，`hypotheses` 带 `niche=N2 / island=P2 / generation=0 / status=elite` ✅；**但实测 `exit=3`，规则 `V4`（`failures[0]` 未被任何 `claims[].known_flaws` / `experiments[].known_flaws` 引用）**；且 `F1.referenced_by=["H2"]` 用了 **H id**，而 policy §3.7 规定该字段只收 `C` / `X` id | ❌ **未达成（exit 3 ≠ 0）→ MAJOR（见 §8.3）** |
+| **M-5** | policy §3.4 补 `island` / `generation`；`niche` 行改 N1—N10 | `research-state-policy.md:193`（`niche` = `N1`—`N10` 之一，V6 强制）、`:194`（`island` = `P1`—`P6` / `local`）、`:195`（`generation` = 整数 ≥ 0） | ⚠️ **达成**，但两行**缺「必填」列**（3 列 vs 表头 4 列）→ §8.6 MINOR-2 |
+| **M-6** | `island` 澄清为 `P1`—`P6`/`local`，`P1`—`P4` 默认、`P5`/`P6` 按需；三处同步；**不改用户默认预算** | `state_check.py:109` `ISLANDS=("P1"…"P6","local")`、`:129` RULES 文本；spec `:45`（**默认 4** + P5/P6 按需说明）、`:65`、`:78`（V13 `{P1..P6, local}`）；`policy:194`、`:312`；`phase-r3-r6:344` 预算表；`SKILL.md:681` 段；模板 `:166` `island="P2"`（新枚举下合法） | ✅ **达成**（五处一致，默认值未动）——残留两处 5 值旧写法见 §8.4 |
+| m-1 | policy §4 **V6 行扩展** | `policy:305` **仍是**「每条 `H` 的 `niche` 非空」——未扩展（只有 §3.4 `:193` 改了） | ❌ **未达成** → MINOR |
+| m-2 | V11—V15 行列归位 | `policy:310—314`：规则文本回到「规则（逐字）」列，「硬」回到「违规」列 ✅ | ✅ 达成 |
+| m-3 | 执行契约同步 V1—V15 | `policy:323—324` **仍是**「列出 V1—V10 与判据」「内置自检，V1—V10 全覆盖」 | ❌ **未达成** → MINOR |
+| m-4 | `state_check.py` docstring 同步 V1—V15 | docstring **三个范围并存**：`:2` 标题「V1—**V12**」、`:18`「V1—**V12** 全覆盖」、`:22—32` 规则清单仍只到 **V10**、`:46` 判据补充写「V1—**V15** 之外不新增」；`:6` 契约来源仍只引 `r-architecture-wave1-spec.md` | ⚠️ **部分** → MINOR |
+| m-5 | R6.3 venue 措辞消歧 | `phase-r3-r6:432—437`：「**消歧：** 会议审稿人角色在 R3—R6 仍可用于 concept 级快筛，但**不得**用「会议适配度」排序候选；`venue-standards` 作为**排序依据**只在 R12/R13 生效」 | ✅ 达成 |
+| m-6 | 测试下限改为 `RULES` 与 `CHECKS` 集合相等 | `test_state_check.py:622—623`：`assertTrue(len(sc.RULES) >= len(sc.CHECKS))` + **`assertEqual(set(sc.RULES), set(sc.CHECKS))`** | ✅ 达成（`:622` 冗余但无害） |
+| n-1 | selftest 标签按数值排序 | `state_check.py:1114`：`max(RULE_ORDER, key=lambda r: int(r[1:]))` | ✅ 达成 |
+| n-2 | V15 补 2 个显式合法反例 | `test_state_check.py:477` `test_v15_two_niches_each_with_elite_is_clean`、`:482` `test_v15_elite_counts_even_with_active_sibling` | ✅ 达成 |
+| n-3 | 旧 niche 名登记 deprecated | `deprecated-terms.txt` 末节新增 `assumption-breaking` / `new-formulation` / `remote-theory-transfer` / `benchmark-inversion` 四条；扫描仍 exit 1（0 命中） | ✅ 达成（**故意不登记 `impossibility` 是对的**：它作为 P6 的合法标签出现在 `phase-r3-r6:344`，登记会造成假阳性） |
+
+### 8.2 M-1：恢复块与原文逐行比对（不只是「标题回来了」）
+
+**方法：** `git show f8dda53:<file>` 取 `### field grammar` 到 `### R5 共演化检索` 之间
+（原文 31 行），与当前文件 `## R2.1` 到 `## R5.` 之间的块（33 行）做 `difflib` 逐行比对；
+标题行单列（因为要求改名）。
+
+```
+原文块行数=31  恢复块行数=33   序列相似度=0.9845
+diff：
+  - ### field grammar `{P, A, R, D, O, M, T, E}`   →  + ## R2.1 field grammar `{P, A, R, D, O, M, T, E}`
+  - ### occupancy map（占用图）                     →  + ## R2.2 occupancy map（Wave 3 深化）（占用图）
+  +（块尾追加 `---` + 空行，共 2 行）
+```
+
+**结论：正文 28 行（field grammar 说明 + 8 行文法表 + occupancy map 说明 + 拥挤度代码块 +
+negative space 规则）逐字一致；差异仅为两处标题改名与 2 行分隔符。** ✅ 恢复无二次损失。
+
+### 8.3 M-4：B8 片段喂 validator 的实测结果
+
+```bash
+cd research-idea-pipeline
+python3 - <<'PY'
+import re,json,subprocess,sys
+txt=open('references/phase-r3-r6-discovery.md',encoding='utf-8').read()
+seg=txt[txt.index('## B8'):]
+json.dump(json.loads(re.findall(r'```json\n(.*?)\n```',seg,re.S)[0]),
+          open('/tmp/b8_new.json','w'),ensure_ascii=False)
+PY
+python3 scripts/state_check.py /tmp/b8_new.json --json
+#   exit = 3
+#   violations = [("V4", "failures[0]", "未被任何 claims[].known_flaws 或 experiments[].known_flaws 引用")]
+#   顶层键 = ['phase','hypotheses','failures','literature','uncertainties']（无 claims / experiments）
+```
+
+**为什么**：片段含 `failures[F1]` 却没有 `claims[]` / `experiments[]`，V4 要求每条 `F` 被
+`claims[].known_flaws` 或 `experiments[].known_flaws` 引用 → 必判 3。另外
+`F1.referenced_by: ["H2"]` 用的是 Hypothesis id，policy §3.7 规定该数组只收 `C`/`X` id。
+**修法（二选一，一行级）：**
+①把片段补成**可跑的最小完整 state**：加 `claims:[{…, "known_flaws":["F1"]}]` 与
+`experiments:[{…, "known_flaws":["F1"]}]`，并把 `referenced_by` 改成 `["C1","X1"]`；
+②或删掉片段里的 `failures` 条目，并在片段上方标注「**节选，不可直接跑 validator**；
+完整骨架见模板（模板 exit 0 已实测）」。
+
+### 8.4 M-6：枚举五处一致性 + 残留旧写法
+
+| 位置 | 现值 | 一致 |
+|---|---|---|
+| spec §2 表 | `:45`「**默认 4**；P5/P6 按需启用…不占默认预算」 | ✅ |
+| spec §2.3 V13 | `:78` `{P1..P6, local}` | ✅ |
+| `state_check.py` | `:109` `("P1","P2","P3","P4","P5","P6","local")`；`:129` RULES 文本同 | ✅ |
+| policy §3.4 / §4 V13 | `:194`、`:312` 同 | ✅ |
+| phase 预算表 | `:344`「**默认 4**（P1—P4…）+ P5/P6 按需启用…启用即上调，须说明理由」 | ✅ |
+| SKILL §4 R3—R6 | `:678`「默认 4 islands（P1—P4；P5/P6 按需启用）× 每岛 3—6」 | ✅ |
+| 模板 | `:166` `"island": "P2"`（新枚举下合法） | ✅ |
+
+**默认值未被改动** ✅（用户拍板的「4 islands × 3—6」在三处（spec/policy/phase）都保留为默认）。
+**残留的两处 5 值旧写法（新发现）：**
+
+| # | 位置 | 原文 | 影响 |
+|---|---|---|---|
+| 甲 | `phase-r3-r6-discovery.md:338` | 「5. 每轨的候选都写 `island`（**`P1`—`P4` / `local`**）与 `generation: 0`（V13/V14 强制）」 | 同一文件内与 `:344` 的预算表（含 P5/P6）**自相矛盾**；按此写，P5/P6 候选会被误标 |
+| 乙 | `state_check.py:545` | `def _v13(...): """V13：island ∈ {P1, P2, P3, P4, local}。"""` | docstring 与 `:109` 的 `ISLANDS` 不一致（代码正确，文档滞后） |
+
+### 8.5 机械面复跑（快照 `4fccc32`）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | 相对链接（去围栏） | **410 条，0 断链** ✅ |
+| 2 | deprecated（含新增 4 条旧 niche 名） | **exit 1，0 命中** ✅（`assumption-breaking` 等仅存在于 `.py` 测试/自检，不在扫描范围） |
+| 3 | JSON（模板 + refs 索引） | 合法 ✅ |
+| 4 | 单测 `unittest discover -s scripts` | **116 tests OK** ✅（上一轮 114，+2 = V15 两个合法反例） |
+| 5 | `state_check --selftest` | exit 0 ✅（标签已按数值排序） |
+| 6 | 模板 `--check` | exit 0 ✅ |
+| 7 | `--list-rules` | 15 条 ✅ |
+| 8 | examples + templates linter | 9/9 硬违规 0 ✅ |
+
+### 8.6 新发现（本轮修复引入 / 未覆盖）
+
+| # | 级别 | 现象 | 文件:行号 | 修法 |
+|---|---|---|---|---|
+| 1 | **MAJOR** | **M-4 未达成**：B8 的新 state 片段实测 **exit 3（V4）**，而该节同时写「写回后**必须**跑 `state_check.py`，硬违规须为 0」；且 `referenced_by` 用了 H id | `phase-r3-r6-discovery.md:293—305`（片段，含围栏）、`:308—309`（强制跑闸门） | 见 §8.3 的两个修法 |
+| 2 | MINOR | `island` 硬规则仍是 5 值写法，与同文件 `:344` 及 spec/policy/validator 的 7 值枚举矛盾 | `phase-r3-r6-discovery.md:338` | 改为「`island`（`P1`—`P6` / `local`；`P1`—`P4` 默认，`P5`/`P6` 按需）」 |
+| 3 | MINOR | **policy §4 的 V6 行未扩展**（仍是「非空」），而 §3.4 `:193` 与 `state_check.py` 已强制 N1—N10；policy §4 自称「该表与 `state_check.py` 一一对应」 | `research-state-policy.md:305`（对照 `:294` 的对齐声明） | 改为「`niche` 非空**且 ∈ `N1`—`N10`**（V6 强制）」 |
+| 4 | MINOR | **执行契约仍写 V1—V10**（`--list-rules` / `--selftest` 两行） | `research-state-policy.md:323—324` | 改为 `V1—V15` |
+| 5 | MINOR | `state_check.py` docstring **三个范围并存**（标题 V1—V12、清单 V1—V10、判据 V1—V15），契约来源仍只引 Wave 1 spec | `scripts/state_check.py:2`、`:18`、`:22—32`、`:46`、`:6` | 统一为 V1—V15；契约来源补 `r-architecture-wave2-spec.md` §4 |
+| 6 | MINOR | `policy §3.4` 新增的 `island` / `generation` 两行**缺「必填」列**（3 列 vs 表头 4 列），渲染时说明文字落到必填列 | `research-state-policy.md:194—195` | 补 `✅` 列（与 `:193` 的 4 列对齐） |
+| 7 | MINOR | **B5.4 自身无横幅**：横幅挂在 B5 父节（`:154`），而 `### B5.4 优先级判定规则`（`:217`）——本轮最冲突的排名表——读者可能只看到排名表 | `phase-r3-r6-discovery.md:154`、`:217` | 在 `### B5.4` 下再加一行同名横幅 |
+| 8 | MINOR | 现行规则仍出现「shortlist」（Wave 2 已宣布作废）：SKILL §0.1 锚点表 R3—R6 行与 §6 自检项 | `SKILL.md:204`、`:818`（`:680` 是「已作废」声明，正确） | 改为「population / QD archive」 |
+| 9 | NIT | 其它文件的 shortlist 残留：`phase-r2-r5:151`（A 段检索门槛）、`project-layout.md:534`（落盘职责表）、`phase-r8-evidence-contract.md:48`（B5 门槛继承）、`examples/example-b-to-c-d-e.md:27/29`、`templates/INDEX.md:90` | 见左 | 前两处建议本轮顺手改；examples / templates 未列入 Wave 2 §6 文件地图，可登记 Wave 3 |
+| 10 | NIT | `_v13` docstring 仍是 5 值 | `scripts/state_check.py:545` | 与 `:109` 对齐 |
+
+### 8.7 收官结论
+
+**仍需修（1 项 MAJOR + 6 项 MINOR，均行级）。** 6 项 MAJOR 中 **5 项完整落地**
+（M-1 逐行等于原文、M-2 §4/§7 已接 Wave 2、M-3 点名+横幅、M-5 §3.4 已补、M-6 五处一致且默认预算未动），
+**M-4 未达成**（片段 exit 3 ≠ 0）；MINOR/NIT 清单中 **V11—V15 列归位、R6.3 消歧、测试集合相等、
+selftest 数值标签、V15 合法反例、deprecated 旧 niche 名 6 项已落地**，
+**V6 行扩展、执行契约 V1—V15、docstring 同步 3 项未落地或部分落地**。
+机械面全绿（410 链接 0 断链、116 测试、deprecated 0、模板 0、linter 0）。
+
+按你的闸门（「只剩 NIT 才可直接说可交付」），当前**还差 M-4（必须修，否则示例照抄会被自己的闸门判 3）
+与 6 项 MINOR**；其中 MINOR-2/3/4/5/6/7 各自都是一行到一行半。**修完这 7 处即可交付。**

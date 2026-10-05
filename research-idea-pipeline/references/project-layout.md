@@ -531,7 +531,7 @@ A001 文献调研
 | Mode | 产出文档（交付物） | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
 | **R2 / R5** | 文献调研报告（含负检索记录） | `<routeX>/docs/<R>NNN-literature-survey.md` | 对应 `INDEX.md`（§7 Warnings：未达饱和必须记） |
-| **R3—R6** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + shortlist + 淘汰清单 | `<routeX>/docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
+| **R3—R6** | idea 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + population + 淘汰清单 | `<routeX>/docs/<R>NNN-ideas.md` | 对应 `INDEX.md`（§2 文档索引；**放弃的 idea → §4 已证伪**；未核实的无人区声称 → §7 Warnings） |
 | **R8** | 论文提案 | `<routeX>/docs/<R>NNN-proposal.md` | 对应 `INDEX.md` |
 | **R9—R11** | 实验流程计划书 | `<routeX>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**） | 对应 `INDEX.md`（§5 TODO、§6 Bugs、§8 依赖） |
 | **R12** | 证据台账 + claim graph（`C0—C5`）+ **2—4 套六槽位叙事（`S1—S6`）** + 六攻击面审稿人评审（**全部派遣，S-Lit 恒派，S-Devil 不打分**）+ **门禁 `G1—G5` 判定** + 六维排序 + 最佳叙事推荐 + **缺失证据清单与最小必要实验 / 定理** | `<routeX>/docs/<R>NNN-narrative.md` | 对应 `INDEX.md`（被覆盖的叙事方向 → **§4 已证伪**；最佳叙事 → **§3 已证实**；门禁 `fail` 或六维中位 <3 → **§7 Warnings**） |

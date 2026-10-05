@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""state_check.py — Research World Model（R1）机械闸门：V1—V12 引用完整性审计
+"""state_check.py — Research World Model（R1）机械闸门：V1—V15 引用完整性审计
 
 契约来源
 --------
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
-与 §2.3（引用完整性规则 V1—V10）、§5（R10 处置 / 关闭枚举）。
+与 §2.3（引用完整性规则 V1—V15）、§5（R10 处置 / 关闭枚举）。
 
 **为什么必须有这个脚本：**「八类一等对象」只写在 policy 里，执行者会写成散文。
 没有 validator，"一等对象"是宣言，不是机制。本脚本把 §2.3 的十条规则变成可执行判定，
@@ -15,7 +15,7 @@
     python3 state_check.py <state.json> --check    # 显式化「只校验不写」
     python3 state_check.py <state.json> --json     # 机器可读结果（stdout 只有 JSON）
     python3 state_check.py <state.json> --quiet    # 只打印汇总行
-    python3 state_check.py --selftest              # 内置自检（V1—V12 全覆盖）
+    python3 state_check.py --selftest              # 内置自检（V1—V15 全覆盖）
     python3 state_check.py --list-rules            # 列出规则号与判据
 
 规则（逐字取自 spec §2.3，全部为硬违规）：
@@ -395,7 +395,7 @@ class _Context:
 
 
 # ---------------------------------------------------------------------------
-# V1—V10
+# V1—V15
 # ---------------------------------------------------------------------------
 
 def _v1(ctx: _Context) -> List[Violation]:
@@ -542,7 +542,7 @@ def _v6(ctx: _Context) -> List[Violation]:
 
 
 def _v13(ctx: _Context) -> List[Violation]:
-    """V13：island ∈ {P1, P2, P3, P4, local}。"""
+    """V13：island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）。"""
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("island")
@@ -877,7 +877,7 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
-        description="Research World Model（R1）机械闸门：V1—V12 引用完整性审计"
+        description="Research World Model（R1）机械闸门：V1—V15 引用完整性审计"
                     "（docs/r-architecture-wave1-spec.md §2.3）",
     )
     parser.add_argument("state", nargs="?", default=None,
@@ -886,8 +886,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="只校验不写入（默认行为即如此；显式化以便与 refs_index.py 口径一致）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行，不逐条打印违规")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V12 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V10 与判据")
+    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V15 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V15 与判据")
     return parser
 
 
@@ -930,7 +930,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 # ---------------------------------------------------------------------------
 
 def _selftest_state() -> Dict[str, Any]:
-    """自检用的最小合法 world model（覆盖 V1—V10 的通过侧）。"""
+    """自检用的最小合法 world model（覆盖 V1—V15 的通过侧）。"""
     return {
         "_schema": "research-idea-pipeline/research-state@1",
         "claims": [{

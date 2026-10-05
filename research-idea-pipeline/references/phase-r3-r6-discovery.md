@@ -15,7 +15,7 @@
 > ⚠️ **作用域裁决（Wave 2）：** 本文件同时含两代内容 ——
 > **`B0`—`B8`** 是旧的 idea-discovery 流程，**`R3`—`R6`** 是 Wave 2 起生效的发现层正式规则。
 > **冲突时一律以 `R3`—`R6` 为准**；`B2`（局限分析）、`B4`（发散策略）、`B5`（审核）
-> 作为 **R3 的输入约束**保留，不再单独驱动「一轮 brainstorm → shortlist」那条路径。
+> 作为 **R3 的输入约束**保留，不再单独驱动「一轮 brainstorm → population（QD archive 的候选池）」那条路径。
 > **被取代的节（点名）：** `B5.4`（按创新性/可行性/重叠度排名）、`B6`（推荐 shortlist 3—5 个）、
 > `B8`（挑选 1—3 个进入 R8 + `state.json` 片段）—— 三者的**筛选动作已由 `R4.2`（QD archive）
 > 与 `R6.3`（两阶段 fitness）取代**；`B8` 的 state 片段口径已作废，改用
@@ -33,7 +33,7 @@
 | **理论** | 是否需要理论支撑、前提是否合理 | 证明是否成立、假设是否必要 |
 | **复现性** | **不涉及**（无代码，不派 S-Repro） | **必查**（S-Repro） |
 | **审查深度** | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
-| **产出** | 排序后的 shortlist + 淘汰理由 | 审查结论卡片 + 修改建议 |
+| **产出** | 排序后的 population（QD archive 的候选池） + 淘汰理由 | 审查结论卡片 + 修改建议 |
 
 **一句话记法：B 管"值得做吗"，E 管"做对了吗"。**
 
@@ -51,7 +51,7 @@
 
 > **锚定点（核心目标）必须先确认**（见 [../SKILL.md](../SKILL.md) §0.1）。
 > 本 Mode 受锚点约束：**理论**锚点优先"假设挑战"类推导，**性能**锚点优先"问题重构 /
-> 组合创新"；**shortlist 只收服务主锚点的 idea**，与锚点无关的候选即使新颖也降级。
+> 组合创新"；**population（QD archive 的候选池） 只收服务主锚点的 idea**，与锚点无关的候选即使新颖也降级。
 > 锚点与候选明显不匹配时，**在同一份输出里显式指出冲突**。
 >
 > **派遣方式：** 环境有 Team 能力时**必须先询问用户**是否使用 Team；用户显式要求但
@@ -182,14 +182,14 @@
 
 ### B5.2 检索门禁
 
-- **进入 shortlist 的门槛 = 完成 L2**（强化级，见
+- **进入 population（QD archive 的候选池） 的门槛 = 完成 L2**（强化级，见
   [literature-policy.md](literature-policy.md) §3.1）。B5 是**概念级快筛**，
-  L2 的检索广度已足以支撑 shortlist 决策。
+  L2 的检索广度已足以支撑 population（QD archive 的候选池） 决策。
 - **只有要写进文档的「首次提出」类声称才要求 L3**（穷尽级），且必须附
   **负检索记录**；「首次提出」的三项门禁见
   [evidence-policy.md](evidence-policy.md)（措辞等级统一在该文件，本节不另立）。
 - **不可控例外：** 在线源因 429/不可用而无法达到对应等级（不可控因素）时，该 idea
-  仍可进入 shortlist，但必须：① 标注"据本次检索未见 · 待核实"；② **不得**使用
+  仍可进入 population（QD archive 的候选池），但必须：① 标注"据本次检索未见 · 待核实"；② **不得**使用
   "首次提出"；③ 记入 `INDEX.md` 的 **Warnings**，并在源恢复后补做。
 - 无论哪种情况，未完成对应等级时都**不得**把新颖性判定标为"已核实"。
 
@@ -207,7 +207,7 @@
 - **理论前提：** 自洽 / 有缺口 / 不适用（S-Theory）
 - **最接近先前工作：** [作者, 会议/年份]（S-Lit）
 - **重叠度：** 足够 / 边缘 / 不足
-- **检索等级：** L2 已达成 / 未达成（shortlist 门槛）；若含「首次提出」声称则须
+- **检索等级：** L2 已达成 / 未达成（population（QD archive 的候选池） 门槛）；若含「首次提出」声称则须
   另标 L3 已达成 / 未达成；未达成对应等级时标"据本次检索未见 · 待核实"
 - **致命反驳（S-Devil）：** ……
 - **反驳是否可缓解：** 是（缓解路径：……）/ 否
@@ -215,6 +215,10 @@
 ```
 
 ### B5.4 优先级判定规则
+
+> ⚠️ **本节已被 R4.2 取代**：这张排名表**不得**用来筛到 3—5 个候选；
+> 筛选动作走 **QD archive**（每个 niche 留一个 elite）。它只作为 **R3 的 concept 级快筛**输入。
+
 
 | 优先级 | 条件 |
 |---|---|
@@ -240,7 +244,7 @@
 | I1 | 假设挑战 | … | … | Concept & Feasibility | R-ICML | 4 | 3 | 足够 | 高 |
 | I2 | … | … | … | … | … | … | … | … | … |
 
-**推荐 shortlist（3—5 个）** —— 从"高/中"中挑选，每个附：
+**推荐 population（QD archive 的候选池）（3—5 个）** —— 从"高/中"中挑选，每个附：
 ① 解决的具体局限（回指 B2 哪一条）；② 为什么现在能做；③ 最可能被攻击的一点。
 
 **淘汰清单** —— 被放弃的 idea + 淘汰理由（重叠不足 / 可行性过低 / 致命反驳不可缓解）。
@@ -267,13 +271,13 @@
 1. **写文档：** `<routeX>/docs/<R>NNN-ideas.md`（ID 按
    [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
-   + 推荐 shortlist + 淘汰清单 + 创新性边界界定。
+   + 推荐 population（QD archive 的候选池） + 淘汰清单 + 创新性边界界定。
 2. **frontmatter：** `id / route / phase: R3—R6 / type: idea-discovery / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增本文件行；
    - §3 已证实：被 S-Lit 证实"重叠足够"的 idea 方向；
    - §4 已证伪：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea；
-   - §5 TODO：进入 shortlist 的 idea → 转成"进入 R8"的任务；"待核实"的无人区
+   - §5 TODO：进入 population（QD archive 的候选池） 的 idea → 转成"进入 R8"的任务；"待核实"的无人区
      条目 → 检索任务；
    - §7 Warnings：**未完成 L2 的"无人区"声称、未完成 L3 的"首次"声称必须记为 Warning**；
    - §9 变更日志。
@@ -281,11 +285,11 @@
 ## B8. 输出后
 
 > ⚠️ **本节已被 R11 取代**：写回的**必须是 Research World Model**（八类一等对象 + `island` / `generation`）；
-> 旧的 `state.json` 片段（`idea_candidates` / `shortlist` / `rejected`）**已删除**，照抄会被 `state_check.py` 判 exit 4。
+> 旧的 `state.json` 片段（`idea_candidates` / `population（QD archive 的候选池）` / `rejected`）**已删除**，照抄会被 `state_check.py` 判 exit 4。
 
 
 1. **写回 Research World Model**（不是附 state.json 片段），`next_phase_suggestion: "R8"`。
-2. 进入 R8 的是 **QD archive 的 elite 集合**（每个 niche 一个），**不是**「从 shortlist 挑 1—3 个」；
+2. 进入 R8 的是 **QD archive 的 elite 集合**（每个 niche 一个），**不是**「从 population（QD archive 的候选池） 挑 1—3 个」；
    并把 B2 的局限分析与 B5 的快筛结论一并传入。
 
 **state 片段示例：**
@@ -293,14 +297,20 @@
 ```json
 {
   "phase": "R3—R6",
-  "hypotheses": [
-    {"id": "H1", "statement": "…", "niche": "N2", "island": "P2", "generation": 0,
-     "status": "elite", "falsifier": "…"}
-  ],
-  "failures": [{"id": "F1", "kind": "deprioritized", "what": "…", "why": "…", "referenced_by": ["H2"]}],
+  "claims": [{"id": "C1", "statement": "…", "falsifier": "…", "status": "ungrounded",
+              "supporting_evidence": [], "refuting_evidence": [], "known_flaws": ["F1"]}],
+  "hypotheses": [{"id": "H1", "statement": "…", "niche": "N2", "island": "P2", "generation": 0,
+                  "status": "elite", "falsifier": "…",
+                  "structural_signature": {"assumption_distance": 2, "formulation_distance": 3,
+                                           "representation_distance": 1, "theory_lens_distance": 3,
+                                           "mechanism_distance": 2}}],
+  "experiments": [{"id": "X1", "parent": null, "stage": "X1", "claim_targeted": ["C1"],
+                   "status": "planned", "known_flaws": ["F1"]}],
+  "failures": [{"id": "F1", "kind": "deprioritized", "what": "…", "why": "…",
+                "referenced_by": ["C1", "X1"]}],
   "literature": [{"id": "LIT1", "ref": "[作者, 会议/年份]", "relation": "shares-assumption"}],
   "uncertainties": [{"id": "U1", "question": "…", "importance": "high", "uncertainty": "high",
-                     "cheapest_discriminating_test": "TBD", "status": "open"}]
+                     "cheapest_discriminating_test": "X1", "status": "open"}]
 }
 ```
 
@@ -335,7 +345,7 @@ problem ─────────┤                        （基线：把现
 3. **P4 每个 theory lens 必须产出 `explanation + prediction + algorithmic consequence`
    三者中至少两个**，否则是理论包装，退 `failures[]`（`kind: unsupported`）。
 4. **P6 产出的方向必须写成可证伪命题**（否则它是抱怨，不是研究问题）。
-5. 每轨的候选都写 `island`（`P1`—`P4` / `local`）与 `generation: 0`（V13/V14 强制）。
+5. 每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）与 `generation: 0`（V13/V14 强制）。
 
 ### R3.1 生成预算（默认值，可缩放）
 
