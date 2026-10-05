@@ -449,5 +449,241 @@ class CheckDraftTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
 
+class SketchPrimitiveTests(unittest.TestCase):
+    """Checks for references/sketch-primitives.md (E16/E17/W5–W8)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = self._tmp.name
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def write(self, name: str, text: str) -> str:
+        path = os.path.join(self.dir, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        return path
+
+    def run_check(self, argv):
+        buffer = io.StringIO()
+        err_buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(err_buffer):
+            code = check_draft.main(argv)
+        return code, buffer.getvalue() + err_buffer.getvalue()
+
+    def with_sketch(self, value: str) -> str:
+        return make_valid().replace(
+            "**FIGURE_TYPE**: method-overview (推断)",
+            "**FIGURE_TYPE**: method-overview (推断)\n\n**SKETCH_STYLE**: %s" % value,
+        )
+
+    def with_variants(self, value: str) -> str:
+        return make_valid().replace(
+            "**FIGURE_TYPE**: method-overview (推断)",
+            "**FIGURE_TYPE**: method-overview (推断)\n\n**SKETCH_VARIANTS**: %s" % value,
+        )
+
+    def with_diagram(self, diagram: str) -> str:
+        return make_valid().replace(DRAFT_A_DIAGRAM, diagram)
+
+    def check_text(self, text: str):
+        return self.run_check([self.write("case.md", text)])
+
+    # -- mode enforcement --------------------------------------------------
+    def test_clean_allows_flat_boxes(self):
+        code, out = self.check_text(self.with_sketch("clean"))
+        self.assertEqual(code, 0, out)
+
+    def test_clean_forbids_pseudo3d(self):
+        diagram = "\n".join(
+            [
+                "   ┌──────────────┐",
+                "  /  Flow Prior  /|",
+                " /──────────────/ |",
+                " |              | |",
+                " |    U-Net     | /",
+                " └──────────────┘/",
+            ]
+        )
+        text = self.with_sketch("clean").replace(DRAFT_A_DIAGRAM, diagram)
+        code, out = self.check_text(text)
+        self.assertEqual(code, 3, out)
+        self.assertIn("E16", out)
+        self.assertIn("pseudo-3D", out)
+
+    def test_clean_forbids_tensor_stack(self):
+        diagram = "\n".join(
+            [
+                "┌──────────┐",
+                "│ Tensor   │",
+                "├──────────┤",
+                "│ Tensor   │",
+                "└──────────┘",
+            ]
+        )
+        text = self.with_sketch("clean").replace(DRAFT_A_DIAGRAM, diagram)
+        code, out = self.check_text(text)
+        self.assertEqual(code, 3, out)
+        self.assertIn("E16", out)
+        self.assertIn("tensor stacks", out)
+
+    def test_clean_forbids_image_placeholder(self):
+        diagram = "\n".join(
+            [
+                "┌──────────────┐",
+                "│   MRI Input  │",
+                "│   [slice]    │",
+                "└──────────────┘",
+            ]
+        )
+        text = self.with_sketch("clean").replace(DRAFT_A_DIAGRAM, diagram)
+        code, out = self.check_text(text)
+        self.assertEqual(code, 3, out)
+        self.assertIn("E16", out)
+        self.assertIn("image-frame", out)
+
+    def test_enhanced_allows_pseudo3d(self):
+        diagram = "\n".join(
+            [
+                "   ┌──────────────┐",
+                "  /  Flow Prior  /|",
+                " /──────────────/ |",
+                " |              | |",
+                " |    U-Net     | /",
+                " └──────────────┘/",
+            ]
+        )
+        text = self.with_sketch("enhanced").replace(DRAFT_A_DIAGRAM, diagram)
+        _code, out = self.check_text(text)
+        self.assertNotIn("E16", out)
+
+    def test_sketch_value_outside_enum_errors(self):
+        code, out = self.check_text(self.with_sketch("fancy"))
+        self.assertEqual(code, 3, out)
+        self.assertIn("E17", out)
+
+    # -- overuse warnings --------------------------------------------------
+    def test_tensor_stack_over_five_layers_warns(self):
+        layers = ["│ Tensor   │" for _ in range(6)]
+        diagram = "┌──────────┐\n" + "\n├──────────┤\n".join(layers) + "\n└──────────┘"
+        text = self.with_sketch("enhanced").replace(DRAFT_A_DIAGRAM, diagram)
+        code, out = self.check_text(text)
+        self.assertEqual(code, 2, out)
+        self.assertIn("W5", out)
+
+    def test_more_than_three_pseudo3d_blocks_warns(self):
+        one = "\n".join(
+            [
+                "   ┌──────────────┐",
+                "  /  Flow Prior  /|",
+                " /──────────────/ |",
+                " |              | |",
+                " |    U-Net     | /",
+                " └──────────────┘/",
+            ]
+        )
+        text = self.with_sketch("enhanced").replace(
+            DRAFT_A_DIAGRAM, "\n\n\n".join([one] * 4)
+        )
+        _code, out = self.check_text(text)
+        self.assertIn("W6", out)
+
+    def test_both_variants_needs_two_diagram_blocks(self):
+        code, out = self.check_text(self.with_variants("both"))
+        self.assertEqual(code, 2, out)
+        self.assertIn("W7", out)
+
+    def test_auto_style_allows_pseudo3d(self):
+        diagram = "\n".join(
+            [
+                "   ┌──────────────┐",
+                "  /  Flow Prior  /|",
+                " /──────────────/ |",
+                " |              | |",
+                " |    U-Net     | /",
+                " └──────────────┘/",
+            ]
+        )
+        text = self.with_sketch("auto").replace(DRAFT_A_DIAGRAM, diagram)
+        _code, out = self.check_text(text)
+        self.assertNotIn("E16", out)
+
+    def test_sketch_variants_value_outside_enum_errors(self):
+        code, out = self.check_text(self.with_variants("double"))
+        self.assertEqual(code, 3, out)
+        self.assertIn("E17", out)
+        self.assertIn("SKETCH_VARIANTS", out)
+
+    # -- shape encodes semantics ------------------------------------------
+    def test_fork_glyph_is_not_treated_as_a_box(self):
+        # `┌──▶` is a documented fork glyph (ascii-design-language.md §1),
+        # not a box top with a missing corner.
+        fork = "\n".join(
+            ["      ┌──▶ Branch A", "   ───┤", "      └──▶ Branch B"]
+        )
+        code, out = self.check_text(self.with_diagram(fork))
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("W4", out)
+
+    def test_box_with_missing_top_right_corner_still_warns(self):
+        broken = "\n".join(["┌────────────", "│ DC Step    │", "└────────────┘"])
+        _code, out = self.check_text(self.with_diagram(broken))
+        self.assertIn("W4", out)
+
+    def test_double_line_box_requires_model_row(self):
+        diagram = "\n".join(
+            ["╔══════════════╗", "║ Flow Prior   ║", "╚══════════════╝"]
+        )
+        # make_valid() declares only `data` and `operator` rows, and no row is
+        # labelled "Flow Prior", so the box is not traceable.
+        text = self.with_diagram(diagram)
+        code, out = self.check_text(text)
+        self.assertEqual(code, 2, out)
+        self.assertIn("W8", out)
+        self.assertIn("not traceable", out)
+
+    def test_double_line_box_on_non_model_row_warns(self):
+        # "DC Step" exists in make_valid()'s inventory as an `operator`.
+        diagram = "\n".join(
+            ["╔══════════════╗", "║ DC Step      ║", "╚══════════════╝"]
+        )
+        code, out = self.check_text(self.with_diagram(diagram))
+        self.assertEqual(code, 2, out)
+        self.assertIn("W8", out)
+        self.assertIn("not `model`", out)
+
+    def test_double_line_box_on_model_row_is_clean(self):
+        diagram = "\n".join(
+            ["╔══════════════╗", "║ DC Step      ║", "╚══════════════╝"]
+        )
+        text = self.with_diagram(diagram).replace(
+            "| N2 | operator | DC Step |", "| N2 | model | DC Step |"
+        )
+        code, out = self.check_text(text)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("W8", out)
+
+    def test_double_line_swatch_outside_drafts_is_ignored(self):
+        # A legend swatch in the preamble is documentation, not a figure node.
+        swatch = "model  ╔════╗\n       ║ m  ║\n       ╚════╝\n\n"
+        text = make_valid().replace("## 1. Figure Understanding", swatch + "## 1. Figure Understanding")
+        code, out = self.check_text(text)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("W8", out)
+
+    def test_double_line_box_misalignment_is_checked(self):
+        diagram = "\n".join(
+            ["╔══════════════╗", "║ Flow Prior   ║", "    ╚══════════════╝"]
+        )
+        _code, out = self.check_text(self.with_diagram(diagram))
+        self.assertIn("W4", out)
+
+    def test_rounded_box_misalignment_is_checked(self):
+        diagram = "\n".join(["╭────────╮", "│  Loss  │", "    ╰────────╯"])
+        _code, out = self.check_text(self.with_diagram(diagram))
+        self.assertIn("W4", out)
+
+
 if __name__ == "__main__":
     unittest.main()

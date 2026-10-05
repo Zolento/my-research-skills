@@ -15,7 +15,7 @@ description: >-
   paper figure, overview figure, training diagram, inference diagram, optimization
   diagram, motivation figure, ablation figure, SVG handoff, 画图, 示意图, 结构图,
   方法图, 论文插图, 字符图, 字符示意图, 架构图, 流程图, 训练图, 推理图, 优化图.
-argument-hint: "FIGURE_TYPE=method-overview [DETAIL_LEVEL=medium] [NUM_DRAFTS=3] [FOCUS=...] [代码根目录 | 论文路径]"
+argument-hint: "FIGURE_TYPE=auto [SKETCH_STYLE=auto] [SKETCH_VARIANTS=single] [DETAIL_LEVEL=medium] [NUM_DRAFTS=3] [FOCUS=...] [代码根目录 | 论文路径]"
 metadata:
   author: academic-figure-draft-architect
   version: "1.0.0"
@@ -53,7 +53,7 @@ semantic correctness  >  scientific clarity  >  visual hierarchy  >  aesthetic n
 | **不临摹论文已有 Figure** | 要理解方法后**重新构图**；已有 Figure 只作为证据来源之一 |
 | **不为了图好看而补模块** | 见 §0.2 禁止清单 |
 
-### 0.2 十二条禁止（违反即返工）
+### 0.2 十四条禁止（违反即返工）
 
 1. 根据经验**补造不存在的模块**（Feature Extractor / Cross Attention / Alignment Module /
    Fusion Block / Semantic Encoder / Contrastive Loss / Consistency Loss / Refinement
@@ -69,6 +69,11 @@ semantic correctness  >  scientific clarity  >  visual hierarchy  >  aesthetic n
 10. 直接生成 SVG。
 11. 为了对称添加不存在的数据流。
 12. 为了简洁**删掉论文核心贡献**；或让所有候选 draft 使用几乎相同的布局（假多样性）。
+13. **为"像论文图"而补造架构细节**——材料只说"一个网络"时，不得画成完整
+    U-Net / encoder-decoder 分支。形状是 hint，不是证据
+    （见 [sketch-primitives.md](references/sketch-primitives.md) §6 约束 C）。
+14. **用形状暗示不存在的计算或类型**——伪 3D 块、双线框、`[ FFT ]` 都不改变节点的
+    `Inputs` / `Outputs`，也不得让 `operator` 画成 `model` 的形状。
 
 ### 0.3 五条不变量
 
@@ -91,7 +96,9 @@ pipeline / 用户口述方法 / 指定的 figure 类型。
 | 参数 | 取值 | 缺省行为 |
 |---|---|---|
 | `FOCUS` | 自由文本（要重点表现什么） | 缺省＝按 `FIGURE_TYPE` 的默认侧重点（[figure-types.md](references/figure-types.md)） |
-| `FIGURE_TYPE` | `method-overview` / `architecture` / `training` / `inference` / `optimization` / `motivation` / `comparison` / `ablation` | 缺省＝`method-overview`，**并在输出开头声明这是推断值** |
+| `FIGURE_TYPE` | `auto` / `method-overview` / `architecture` / `training` / `inference` / `optimization` / `domain_adaptation` / `motivation` / `comparison` / `ablation` | 缺省＝**`auto`**：自行推断，**并在输出开头声明推断结果**（见 §1.1） |
+| `SKETCH_STYLE` | `auto` / `clean` / `enhanced` / `block_architecture` / `stage_panel` / `loop_centric` | 缺省＝**`auto`**：自行推断，并在输出开头声明（[sketch-primitives.md](references/sketch-primitives.md) §8.1） |
+| `SKETCH_VARIANTS` | `single` / `both` | 缺省＝**`single`**；`both` 时每份 Draft 段给 clean + enhanced 两个 `text` 块（同 §8.2） |
 | `TARGET_PAPER` | 目标论文 / 会议 | 缺省＝只影响详略与画幅建议，不影响语义 |
 | `DETAIL_LEVEL` | `overview` / `medium` / `detailed` | 缺省＝`medium` |
 | `NUM_DRAFTS` | 2–5，缺省 3 | **简单方法 2 个；复杂且存在多个合理 figure story 时 4 个；上限 5** |
@@ -102,6 +109,42 @@ pipeline / 用户口述方法 / 指定的 figure 类型。
 **参数缺失不阻塞任务**——按材料做合理判断。但**凡是由推断补上的参数，必须在输出开头
 用一行声明**（例：`FIGURE_TYPE 未给出，按材料推断为 method-overview`）。
 **`NUM_DRAFTS` 与 `MUST_NOT_INCLUDE` 是硬约束**：前者决定产出数量，后者决定禁止清单。
+
+### 1.1 类别与风格：**主动推断，不要主动询问**
+
+**默认不问用户"要哪种图 / 哪种画风"。** 读完代码、论文与用户目标后，
+`FIGURE_TYPE` 与 `SKETCH_STYLE` 通常都能自己判断。
+
+**推断依据（按优先级）：**
+
+1. 用户已声明的目标；
+2. 论文的哪一节（Method / 训练流程 / 实验对比 / Motivation）；
+3. 代码结构（是否有 solver 循环、多阶段训练、source/target 划分）；
+4. 科学贡献的类型；
+5. 本次最需要被看见的信息。
+
+**什么时候才问：** 仅当存在**两个以上明显不同、且都合理的叙事重点**，
+而且选择会**实质改变这张图在讲什么**时。例如：
+
+> 这张图有两个合理重点：
+> A. 强调 source pretraining → target adaptation → reconstruction 的完整方法流程；
+> B. 强调 reconstruction solver 内部 DC ↔ prior 的迭代机制。
+> 若无偏好，我默认选 A，并把 B 作为局部 inset 草图。
+
+**不要问什么：**
+
+- ❌ "你想要什么画风？" / "要立体块还是平面框？" —— 纯视觉风格由 `SKETCH_STYLE` 决定，
+  agent 自己选；
+- ❌ "这算什么 figure type？" —— 那正是本 skill 该判断的事；
+- ❌ 只要存在多个 cosmetic 风格可选就发问。
+
+**不需要澄清时：** ① 选最合适的默认；② 用一行说明选了什么；③ 需要时再产出多个 draft。
+
+**两个维度不要绑死：** `FIGURE_TYPE` 与 `SKETCH_STYLE` 相互独立。
+同一个 `optimization` 可以是 `clean`、`enhanced` 或 `loop_centric`。
+
+> 推断结果必须落盘：`FIGURE_TYPE` / `SKETCH_STYLE` 的推断值写进参数块，
+> 并在 `Figure Understanding` 之前用一行声明（与 §1 的缺省声明规则一致）。
 
 ---
 
@@ -260,13 +303,19 @@ python3 scripts/check_draft.py --json path/to/*.draft.md
 | 源码 / 论文阅读规范 | [references/source-reading.md](references/source-reading.md) | 入口函数清单、计算图追踪、迭代 solver 识别、多阶段训练、train/infer 差异、引用格式 |
 | Figure 语义模型 | [references/figure-semantics.md](references/figure-semantics.md) | Entities/Relations 词表、关系→视觉映射、层级（L1–L4）、内部十问、train/infer 与冻结规则 |
 | 视觉语法库 | [references/visual-grammar.md](references/visual-grammar.md) | A–H 八种 grammar、选择规则、多样性矩阵、信息密度预算 |
-| 字符图设计语言 | [references/ascii-design-language.md](references/ascii-design-language.md) | 字形集、线型语义、样式层级、中英混排宽度与对齐规则、反模式 |
+| 字符图设计语言 | [references/ascii-design-language.md](references/ascii-design-language.md) | 字形集（三个框族）、线型语义、样式层级、中英混排宽度与对齐规则、反模式 |
+| 速写原语与形状图例 | [references/sketch-primitives.md](references/sketch-primitives.md) | **形状编码语义**（`┌─┐` data / `╔═╗` model / `[ FFT ]` operator / `╭─╮` loss / state 不加框）、伪 3D、tensor 堆叠、图像框、`SKETCH_STYLE` / `SKETCH_VARIANTS`、机器校验条件 |
+| 速写模板库 | [references/sketch-templates.md](references/sketch-templates.md) | 高频场景的现成字符模板（U-Net / 迭代求解 / skip / train-infer 分栏 / 域适配 / 扩散 / motivation） |
 | Figure 类型侧重 | [references/figure-types.md](references/figure-types.md) | 8 种 `FIGURE_TYPE` 的侧重点、必备元素、典型错误 |
 | 输出契约 | [references/output-contract.md](references/output-contract.md) | 十段式 schema、表格列名、Status 取值、SVG Handoff 字段、机器校验条件 |
 | Draft 模板 | [templates/figure-draft.template.md](templates/figure-draft.template.md) | 十段式骨架（可直接复制） |
 | 元素表模板 | [templates/element-inventory.template.md](templates/element-inventory.template.md) | 元素表列定义与填写示例 |
 | 示例：代码驱动 | [examples/example-code-grounded.md](examples/example-code-grounded.md) | 从一个小型真实源码库产出 3 个 draft 的完整示例 |
 | 示例：证据不足 | [examples/example-uncertainty.md](examples/example-uncertainty.md) | 材料不足时如何降级到 Uncertainties、如何守 MUST_NOT_INCLUDE |
+| 示例：形状图例 | [examples/example-sketch-legend.md](examples/example-sketch-legend.md) | **形状编码语义**的完整用法 + `SKETCH_VARIANTS: both` 的 clean/enhanced 双画法对照 |
+| 示例：域适配 | [examples/example-domain-adaptation.md](examples/example-domain-adaptation.md) | `FIGURE_TYPE: domain_adaptation` + `SKETCH_STYLE: stage_panel`；source-free 分隔带与冻结/可训练 |
+| 示例：auto 推断 | [examples/example-auto-inference.md](examples/example-auto-inference.md) | `auto` 的推断声明，以及**何时才该问**、该问什么（叙事重点，不是画风） |
+| 示例索引 | [examples/README.md](examples/README.md) | 示例覆盖矩阵：`FIGURE_TYPE` × grammar × 参数取值，未覆盖项显式标注 |
 | 自检脚本 | [scripts/check_draft.py](scripts/check_draft.py) | 契约校验（缺段 / 字符图 / D 级进图 / 悬空 ID / Status / 多样性 / 对齐） |
 | 离线测试 | [scripts/test_check_draft.py](scripts/test_check_draft.py) | stdlib unittest，全离线 |
 
@@ -302,6 +351,26 @@ python3 scripts/check_draft.py --json path/to/*.draft.md
 - [ ] 至少存在**两种不同的信息分组方式**。
 - [ ] 至少存在**两种不同的视觉中心或主阅读方向**。
 - [ ] 每份 draft 声明的 visual grammar 不同，且与该方法**真的相配**。
+
+### 速写原语（Sketch primitives）
+
+> 形状图例与三类约束见 [sketch-primitives.md](references/sketch-primitives.md)；
+> 脚本只能查几何，**该不该用**由本节判断。
+
+- [ ] **形状与 `Type` 一致**：`model` 用双线框 `╔═╗`（或 `enhanced` 档的伪 3D），
+      `operator` 用 `[ FFT ]`，`loss` 用 `╭─╮` 或 `( Loss )`，`state` 不加框
+      （脚本查得到的一部分：W8）。
+- [ ] **形状没有暗示不存在的结构**：没有为"像 U-Net"而补出 encoder/decoder 分支；
+      没有在没有张量语义时画 tensor 堆叠；伪 3D 块仍是同一个节点，`Inputs`/`Outputs` 未变。
+- [ ] **没有滥用**：伪 3D 块 ≤3 个、tensor 堆叠可见层数 3–5、同一份图不超过两种框族。
+- [ ] **图像框角标只用 `[image]` / `[slice]`**，且只用于真实存在的图像类对象。
+- [ ] **对齐未被形状破坏**：三个框族（`┌┐└┘` / `╔╗╚╝` / `╭╮╰╯`）的边框都成直线。
+- [ ] 用了形状时，`SVG Handoff Notes` 增加了 `Sketch primitives:` 一行。
+- [ ] **没有给每个节点发明独特字形**——复用 4–8 个原语即可；目标是 wireframe，不是 ASCII art。
+- [ ] `SKETCH_STYLE` / `SKETCH_VARIANTS` 未声明时按缺省 `auto` / `single` 处理，
+      且已在输出开头声明推断结果。
+- [ ] **类别与风格是推断出来的**，没有为了纯视觉风格去问用户；
+      真要发问时问的是**叙事重点**（§1.1）。
 
 ### SVG 就绪（SVG readiness）
 

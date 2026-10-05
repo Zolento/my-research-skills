@@ -1,7 +1,8 @@
 # FIGURE_TYPE 侧重与必备元素
 
 `FIGURE_TYPE` 决定**强调什么 / 省略什么**，不改变证据标准。
-缺省 `method-overview`（缺省时必须声明这是推断值）。
+**缺省 `auto`**：由材料自行推断出下表之一，并在输出开头声明推断结果
+（推断规则见 `SKILL.md` §1.1）。
 
 ## 速查
 
@@ -12,6 +13,7 @@
 | `training` | data / loss / gradient / trainable-frozen | E / F | 训练输入、reference data、loss、梯度、冻结标记 | 把 loss 画成 inference 输入；冻结块有梯度箭头 |
 | `inference` | 部署期可得信息 / solver-model 交互 / 最终输出 | A / D | 部署期输入集（明确排除 GT）、main path、输出 | 画出 target / 参考数据 |
 | `optimization` | 状态 x_k / operator / update rule / iteration | D / H | 状态变量、算子、更新规则、迭代次数、初值 | 压成单程 pipeline；缺 prev → next 闭合 |
+| `domain_adaptation` | source → 冻结/迁移 → target 的数据可用性变化 | G / E | source 阶段、checkpoint / 迁移接口、target 阶段、**数据可用性约束** | 把 source 数据画成 target 阶段可得；冻结与可训练混淆 |
 | `motivation` | 现有问题 / 失败机制 / 提出的洞见 / 预期纠正 | F / B | 失败机制、why、提出的洞见 | 把 hypothesis 画成已验证事实 |
 | `comparison` | 各方法**同一抽象层级**的并列 | 统一语法的并列 / H | 基线、本方法、共享的输入输出 | baseline 一个框 vs 本方法十几个框（不公平视觉比较） |
 | `ablation` | 变体 / 阶段差异 | H / F | 基准配置、被移除 / 替换的组件、共享部分 | 变体抽象层级不一致 |
@@ -48,6 +50,15 @@
 - 强调状态 `x_k`、operator、update rule、iteration。
 - recurrence 必须闭合（回流线 + `repeat K`）。
 - 若同时有 model architecture，需在同一图中体现"被调用的模型"与"调用它的循环"两个层次。
+
+### domain_adaptation
+
+- 强调 **source → 迁移接口 → target** 的流程与**数据可用性边界**。
+- **必须画分隔带**表达 source-free / zero-shot / unpaired 等约束
+  （例：`──────── NO SOURCE DATA AVAILABLE ────────`）。
+- checkpoint / prior 的**冻结与可训练状态必须可见**；迁移接口（adapter / finetune）
+  要标出它属于哪一侧。
+- source 阶段的数据**不得**出现在 target 阶段的输入里。
 
 ### motivation
 

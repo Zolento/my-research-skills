@@ -81,6 +81,10 @@ Temporal / Stage View
   不能替代字符图。
 - **各 draft 的 grammar 必须互不相同**；全文不同 grammar 数 **≥2**，否则判"假多样性"。
 - `Best for` / `Strength` / `Weakness` 三段应齐（缺失为警告）。
+- `SKETCH_VARIANTS: both` 时每份 draft 需要 **2 个 `text` 块**（先 clean 后 enhanced）；
+  两个变体**共用同一个 grammar**，不得因此新增 draft、也不得算作多样性。
+  风格与份数由 `SKETCH_STYLE` / `SKETCH_VARIANTS` 两个正交参数控制，
+  形状图例与语义见 [sketch-primitives.md](sketch-primitives.md) §8。
 
 ## 4. Recommended Draft
 
@@ -205,8 +209,14 @@ python3 scripts/check_draft.py --json <draft.md>
 | `Status` 首字段为 `inferred`（D 级不得进入正式 draft） | 错误 |
 | `--forbid` 命中 / `--require` 未命中 | 错误 |
 | 字符图 `[? ...]` 未在 Uncertainties 出现 | 警告 |
-| 框上下边界显示宽度不一致（含**并排框**）/ 框右边界不齐 / `┌` 同行缺 `┐` / 找不到闭合的 `└` | 警告（`--strict` 下为错误） |
+| 框上下边界显示宽度不一致（含**并排框**，覆盖单线 `┌┐└┘`、双线 `╔╗╚╝`、圆角 `╭╮╰╯` 三族）/ 框右边界不齐 / 同行缺配对角 / 找不到闭合角 | 警告（`--strict` 下为错误） |
 | Draft 缺 `Best for` / `Strength` / `Weakness`；Evidence Summary 无数据行 | 警告 |
+| `SKETCH_STYLE: clean` 下出现伪 3D 几何 / tensor 堆叠 / `[image]`·`[slice]` 角标 | 错误（`E16`） |
+| `SKETCH_STYLE` 或 `SKETCH_VARIANTS` 取值不在枚举内 | 错误（`E17`） |
+| tensor 堆叠可见层数 > 5 | 警告（`W5`） |
+| 单份 draft 的伪 3D 块 > 3 | 警告（`W6`） |
+| `SKETCH_VARIANTS: both` 但某 Draft 段的 `text` 块少于 2 | 警告（`W7`） |
+| 双线框 `╔` 未落到元素表的 `model` 行（追溯到非 `model` 行，或完全无法追溯） | 警告（`W8`） |
 
 **`--forbid` 的扫描范围 = 「图的内容」，不是整篇文档：**
 只扫 **`text` fenced 字符块** + **Evidence Summary 表** + **Figure Element Inventory 表**。

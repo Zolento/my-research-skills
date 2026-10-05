@@ -6,7 +6,10 @@ clear hierarchy、clear visual center。
 ## 1. 字形集（只用这些，保证跨字体稳定）
 
 ```
-框：      ┌ ─ ┐    │    └ ┘    ├ ┤ ┬ ┴ ┼
+框（单线）：┌ ─ ┐    │    └ ┘        ← data / operator / stage
+框（双线）：╔ ═ ╗    ║    ╚ ╝        ← model（形状图例见 sketch-primitives.md §1）
+框（圆角）：╭ ─ ╮    │    ╰ ─ ╯        ← loss / objective
+分支/连接：├ ┤ ┬ ┴ ┼
 箭头：    ▶ ◀ ▲ ▼      → ← ↑ ↓      ─  │
 分叉：    ├─▶  └─▶  ──▶  ──┐  ┌──  ──┘  └──
 循环：    回流线用 ─ ┐ ┌ ┘ │ 组成闭环，并在旁标 repeat K
@@ -15,6 +18,13 @@ clear hierarchy、clear visual center。
           [CORE CONTRIBUTION] [? uncertain]
 变量：    纯文本 + Unicode 下标（x_k、x_{k+1}、v_θ、θ₀）
 ```
+
+**形状编码语义，不是装饰。** 三种框族各自绑定一类对象；完整图例（含 tensor 堆叠、
+图像框、`[ FFT ]` 算子、state 不加框）见
+[sketch-primitives.md](sketch-primitives.md) §1。**不在这张表里的字形不要用。**
+
+**一段 draft 内优先复用 4–8 个原语**，不要给每个节点发明独特字形——那样必然
+同时出现错位与风格不一致，下游 SVG 代理也无法解析。
 
 **回退原则：** emoji（`🔒`）在部分字体下破坏对齐，**优先用方括号标记**；
 一份 draft 内只用一种冻结写法。
@@ -100,7 +110,7 @@ input x ─▶ [Model] ─▶ prediction        （无 target）
 | 层级 | 字符表达 | SVG 对应 |
 |---|---|---|
 | **Level 1** domain / stage 容器 | `═══` 分隔带 + 大写标题，或大框 | 背景带 / 容器 |
-| **Level 2** 主要模块 | 双线或粗框 `┏━┓` / 常规模块框 | 主要 group |
+| **Level 2** 主要模块 | 双线框 `╔═╗`（模型）或常规模块框 | 主要 group |
 | **Level 3** 算子 / loss / 标记 | 小框、单行框、方括号标记 | 次要 group |
 | **Level 4** 注释 | 无框文本、`repeat K`、`[TRAIN ONLY]` | 无框文本 |
 
@@ -129,4 +139,7 @@ frozen checkpoint）用最轻的画法。
 ❌ 中文标签不补宽度导致右边框歪斜
 ❌ 一张图塞进两个互不相干的 story
 ❌ 用颜色/emoji 表达关键语义（渲染环境不可控）
+❌ 给每个节点发明独特字形（应复用 4–8 个原语，见 §1 与 sketch-primitives.md）
+❌ 用 `★` 标核心贡献（用 `[CORE CONTRIBUTION]`，对齐与字体兼容）
+❌ 同一份图里堆三种以上框族（形状失了区分力，只涨噪声）
 ```

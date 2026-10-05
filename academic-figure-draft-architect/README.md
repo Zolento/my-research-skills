@@ -28,8 +28,10 @@ academic-figure-draft-architect/
 │   ├── source-reading.md                 # 源码 / 论文阅读规范（入口函数、迭代 solver、多阶段）
 │   ├── figure-semantics.md               # Entities/Relations → 布局；内部十问；train/infer
 │   ├── visual-grammar.md                 # A–H 八种视觉语法 + 多样性矩阵 + 密度预算
-│   ├── ascii-design-language.md          # 字形 / 线型语义 / 中英混排宽度 / 反模式
-│   ├── figure-types.md                   # 8 种 FIGURE_TYPE 的侧重与必备元素
+│   ├── ascii-design-language.md          # 字形集（三个框族）/ 线型语义 / 中英混排宽度 / 反模式
+│   ├── sketch-primitives.md              # ★ 形状编码语义图例 + 伪 3D / tensor 堆叠 / 图像框
+│   ├── sketch-templates.md               # 速写模板库：高频论文方法图模式（54 个，全部对齐校验）
+│   ├── figure-types.md                   # 9 种 FIGURE_TYPE 的侧重与必备元素
 │   └── output-contract.md                # ★ 十段式 schema + 机器校验条件
 ├── scripts/
 │   ├── check_draft.py                    # 契约校验（缺段 / 字符图 / D 级进图 / 悬空 ID / 对齐）
@@ -38,9 +40,13 @@ academic-figure-draft-architect/
 │   ├── figure-draft.template.md          # 十段式骨架
 │   └── element-inventory.template.md     # 元素表列定义 + 填写示例 + 反例
 └── examples/
+    ├── README.md                         # 示例覆盖矩阵（FIGURE_TYPE × grammar × 参数）
     ├── demo-source/                      # 示例用的小型真实源码库（自监督 MRI 重建 + flow prior）
     ├── example-code-grounded.md          # ★ 代码驱动：3 个结构不同的 draft 全流程
-    └── example-uncertainty.md            # 证据不足时的降级处理与不确定性清单
+    ├── example-uncertainty.md            # 证据不足时的降级处理与不确定性清单
+    ├── example-sketch-legend.md          # 形状图例 + SKETCH_VARIANTS: both 双画法
+    ├── example-domain-adaptation.md      # domain_adaptation 类型 + stage_panel 风格
+    └── example-auto-inference.md         # auto 推断声明 + 何时才该问（问叙事重点）
 ```
 
 ---
@@ -84,7 +90,9 @@ academic-figure-draft-architect/
 
 | 参数 | 取值 | 缺省 |
 |---|---|---|
-| `FIGURE_TYPE` | method-overview / architecture / training / inference / optimization / motivation / comparison / ablation | `method-overview`（推断时须声明） |
+| `FIGURE_TYPE` | auto / method-overview / architecture / training / inference / optimization / domain_adaptation / motivation / comparison / ablation | `auto`（推断后须声明） |
+| `SKETCH_STYLE` | auto / clean / enhanced / block_architecture / stage_panel / loop_centric | `auto`（推断后须声明） |
+| `SKETCH_VARIANTS` | single / both | `single`；`both` = 每段 Draft 给 clean + enhanced 两块 |
 | `DETAIL_LEVEL` | overview / medium / detailed | `medium` |
 | `NUM_DRAFTS` | 2–5 | `3`（简单 2；复杂多 story 4；上限 5） |
 | `FOCUS` | 自由文本 | 按 FIGURE_TYPE 默认侧重 |
@@ -93,6 +101,8 @@ academic-figure-draft-architect/
 | `KNOWN_FACTS` | 用户已确认事实 | 空；按 A 级 + `[user]` 处理 |
 
 **参数缺失不阻塞任务**，但补上的参数必须在输出开头声明。
+**类别与风格默认由 agent 推断，不主动询问用户**——只有存在两个都合理、且会实质改变
+图在讲什么的**叙事重点**时才问（`SKILL.md` §1.1）。
 
 ---
 

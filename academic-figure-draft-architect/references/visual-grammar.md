@@ -89,6 +89,7 @@ Iterative Loop。
 | training | E / F | G |
 | inference | A / D | B |
 | optimization | D / H | C |
+| domain_adaptation | G（source→target） | E |
 | motivation | F（问题→机制→洞见） | B |
 | comparison | 统一语法的并列（同抽象层级） | H |
 | ablation | H（阶段/变体视图） | F |

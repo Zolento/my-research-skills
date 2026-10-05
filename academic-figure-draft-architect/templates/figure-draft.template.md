@@ -6,7 +6,9 @@
 **参数（缺省值也要写出，并声明哪些是推断的）：**
 
 ```yaml
-FIGURE_TYPE: <method-overview|architecture|training|inference|optimization|motivation|comparison|ablation>
+FIGURE_TYPE: <auto|method-overview|architecture|training|inference|optimization|domain_adaptation|motivation|comparison|ablation>
+SKETCH_STYLE: <auto|clean|enhanced|block_architecture|stage_panel|loop_centric>
+SKETCH_VARIANTS: <single|both>
 DETAIL_LEVEL: <overview|medium|detailed>
 NUM_DRAFTS: <2-5>
 FOCUS: <重点表现什么 | 未给出，按 FIGURE_TYPE 默认侧重>
@@ -16,6 +18,10 @@ MUST_NOT_INCLUDE: [<内容>, ...]
 KNOWN_FACTS: [<用户确认的事实>, ...]
 sources: [<代码根目录 / 论文路径 / 用户说明>]
 ```
+
+> `FIGURE_TYPE` / `SKETCH_STYLE` 为 `auto` 时，把推断结果写进上面的值，
+> 并在 `Figure Understanding` 之前用一行声明推断依据（`SKILL.md` §1.1）。
+> `SKETCH_VARIANTS: both` 时每段 Draft 内放两个 `text` 块（先 clean 后 enhanced）。
 
 ---
 
