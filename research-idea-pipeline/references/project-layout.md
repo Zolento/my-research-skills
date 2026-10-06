@@ -630,7 +630,10 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
   null result / falsification / regime failure）才形成正式 route 文档。
 - **Bugs 必须可复现**（给出命令或脚本路径），登记在 `STATUS.md` 的
   Next recommended actions 或该 route 的工程记录里，**不占 `docs/` 正式文档序号**。
-- `最后更新` 字段每次改动都要刷新。
+- **`最后更新` 的范围（写死，避免歧义）：** 只有**带 frontmatter 的文档**与
+  **`INDEX.md`** 有该字段（`routes/<R>/docs/*.md`、路线 `INDEX.md`、根 `INDEX.md`）。
+  **`STATUS.md` 刻意没有该字段** —— 它是 `research-state.json` 的幂等投影（§4.2），
+  写入墙钟时间会破坏 DI-4。本桶（工程记录 / Bugs）里出现的 `最后更新` 同样只指前者。
 - **`.gitignore` 不得吞掉保留物：** `results/*/summary.*` 与
   `.research-idea-pipeline/**/research-state.json` 必须可进版本库（见 §9）。
 
@@ -847,7 +850,8 @@ X021  ⟷  experiments/A/X021-identifiability/
 - **`STATUS.md` 可由 `render_status.py` 幂等重生成**（DI-4）；
 - **每条 route 恰好一份 canonical `research-state.json`**（DI-3）；
 - **`routes/*/src/` 为空或不存在**（DI-6）；
-- 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新；
+- 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新（**范围见 §4.2：`STATUS.md`
+  刻意没有该字段**）；
 - **锚点体系完整**：根 `INDEX.md` 声明了**项目主锚点**；每条路线有 `<R>000-anchor.md`，
   frontmatter 含 `core_goal` / `anchor_role` / `serves` / `serves_evidence`
   （`supporting` 时后两者必填且可证伪）；路线锚点与本路线 INDEX 一致；

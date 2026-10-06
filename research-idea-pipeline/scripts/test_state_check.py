@@ -1371,6 +1371,67 @@ class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
             self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
 
 
+class TestSemanticEntryFirst(unittest.TestCase):
+    """MEDIUM：语义入口优先，`phase=` 降为专家 / 调试覆盖。
+
+    起因：`description` 承诺「日常用四个入口 start-project / continue-research /
+    explore / audit，用户不需要知道 `R` 编号」，但 §0 的标题与兜底规则都是 phase-first
+    （「未给 phase，**先反问用户**要跑哪些阶段」）。两套 UX 并存的结果是
+    「用户一调用 → Agent 盯着 `R0`—`R14` 不知道从哪开始」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    ENTRIES = ("start-project", "continue-research", "explore", "audit")
+    TIERS = ("1. 语义入口", "2. 自然语言意图", "3. 显式 `phase=`", "4. 兜底")
+
+    def _skill(self):
+        return (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    def _section0(self):
+        text = self._skill()
+        return text[text.index("## 0. 入口"):text.index("| Phase | 名称 |")]
+
+    def _prompts(self):
+        return (self.ROOT / "references" / "invocation-prompts.md").read_text(encoding="utf-8")
+
+    def test_section_title_is_semantic_entry_first(self) -> None:
+        self.assertIn("## 0. 入口：**语义入口优先**", self._skill())
+
+    def test_four_tiers_appear_in_the_fixed_order(self) -> None:
+        section = self._section0()
+        positions = []
+        for tier in self.TIERS:
+            self.assertIn(tier, section, f"§0 缺少解析层：{tier}")
+            positions.append(section.index(tier))
+        self.assertEqual(positions, sorted(positions), "四层的顺序被改动了")
+
+    def test_phase_is_labelled_as_an_expert_override(self) -> None:
+        section = self._section0()
+        self.assertIn("专家 / 调试覆盖", section)
+
+    def test_all_four_entries_are_documented_in_both_files(self) -> None:
+        skill, prompts = self._skill(), self._prompts()
+        for entry in self.ENTRIES:
+            self.assertIn(entry, skill, f"§0 未登记语义入口 {entry}")
+            self.assertIn(entry, prompts, f"invocation-prompts 未登记入口 {entry}")
+
+    def test_argument_hint_promotes_the_semantic_entries(self) -> None:
+        fm = self._skill()[3:self._skill().index("\n---\n", 3)]
+        self.assertRegex(fm, r'argument-hint:\s*"<start-project\|continue-research\|explore\|audit>')
+
+    def test_no_rule_asks_the_user_to_pick_stages_first(self) -> None:
+        self.assertNotIn("若未给出 phase，**先反问用户**", self._skill())
+
+    def test_phase_override_does_not_silently_beat_a_semantic_entry(self) -> None:
+        # 两者同时出现必须显式声明裁决，不得静默选一个
+        self.assertIn("不要同时给出语义入口与 `phase=`", self._section0())
+
+    def test_last_updated_scope_is_pinned(self) -> None:
+        text = (self.ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
+        self.assertIn("`STATUS.md` 刻意没有该字段", text)
+        self.assertIn("**`最后更新` 的范围（写死，避免歧义）：**", text)
+
+
 class TestQdNicheDecoupling(unittest.TestCase):
     """HIGH-1：QD niche 与 R12 叙事 preset 是**两套独立枚举**。
 

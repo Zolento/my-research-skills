@@ -20,7 +20,7 @@ description: >-
   proposal review, mock review, reviewer critique, paradigm escape,
   research state, MICCAI, medical image analysis, clinical validation,
   proposal, narrative, review, 定位
-argument-hint: "phase=R0..R14 [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
+argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
   version: "2.0.0"
@@ -38,9 +38,27 @@ metadata:
 
 ---
 
-## 0. 入口：解析 phase 参数
+## 0. 入口：**语义入口优先**
 
-用户通过 `phase` 参数指定调用哪些 R 阶段。`$ARGUMENTS` 的第一项即 `phase`。
+**用户不需要知道 `R` 编号。** 常态入口是四个语义入口；`phase=` 是专家 / 调试用的**覆盖入口**。
+
+**解析顺序（固定，命中即停 —— 这是唯一顺序，不得自行调整）：**
+
+| 层 | 输入长什么样 | 处理 |
+|---|---|---|
+| **1. 语义入口**（常态） | `start-project` / `continue-research` / `explore` / `audit` | 按 [invocation-prompts.md](references/invocation-prompts.md) 的固定契约执行。用户只描述目标，不选阶段 |
+| **2. 自然语言意图** | 「多给我一些新方向」「攻击一下我现在的路线」 | **映射到第 1 层的四个入口之一**，并在输出开头**声明映射结果**（对应表见 [invocation-prompts.md](references/invocation-prompts.md)） |
+| **3. 显式 `phase=`**（**专家 / 调试覆盖**） | `phase=R8` / `phase=R3-R6` / `phase=R7,R10,R13` | 按该阶段的读写契约执行。**这是覆盖入口，不是常态入口** |
+| **4. 兜底** | 以上都无法解析 | **才**反问用户要跑哪些阶段；不得猜测 |
+
+**裁决规则（机器读者必须按这条走）：**
+
+- **不要同时给出语义入口与 `phase=`。** 两者同时出现时**按语义入口执行**，并在输出开头
+  **显式声明**这次裁决 —— 不得静默选一个。
+- **`phase=` 不因为"更具体"就自动赢。** 它的定位是专家 / 调试覆盖：只在前两层都没命中时才生效。
+- **旧 `mode=` 参数不再接受**（旧 A—E 阶段字母已退役）。收到时**必须报错**并给出映射
+  （A→R2/R5、B→R3/R4/R6、C→R8、D→R12、E→R7/R10/R13），
+  **不得**静默按旧模式执行，也不得猜测用户「其实想跑哪个」。
 
 **架构 = 以 Research State 为中心的双循环**（权威定义见
 [research-state-policy.md](references/research-state-policy.md)）：
@@ -99,16 +117,14 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 `claims[].status`** —— 改 claim 状态**默认只能经 R10**（例外见 §1.6：R8 的证据驱动单向升级），这是防"自己给自己判分"的结构性措施。
 **做得很扎实的复现仍是拒稿理由。**
 
-**解析规则：**
+**解析细则（配合上表四层）：**
 
-1. 若 `$ARGUMENTS` 含 `phase=R0|R1|…|R14`（大小写不敏感；逗号分隔或 `R3-R6` 区间均可），
+1. 第 3 层的 `phase=` 写法：`R0|R1|…|R14`（大小写不敏感；逗号分隔或 `R3-R6` 区间均可），
    按上述顺序依次执行这些阶段。
-2. **旧的 `mode=` 参数入口不再接受**（旧 A—E 阶段字母已退役）。收到时**必须报错**并给出映射提示
-   （A→R2/R5、B→R3/R4/R6、C→R8、D→R12、E→R7/R10/R13），
-   **不得**静默按旧模式执行，也不得猜测用户"其实想跑哪个"。
-3. 若未给出 phase，**先反问用户**要跑哪些阶段，不要猜测；只有意图极其明确时才可按
-   意图推断，并在输出开头声明所推断的阶段。
-4. phase 之外的参数按该阶段的输入约定解析（见下）。
+2. 第 1 / 2 层命中时**不得**再要求用户选阶段 —— 入口自己决定跑什么
+   （`start-project` 只跑 `B0`—`B6`；`explore` 跑 `R3`—`R6`；`audit` 跑 `R7`/`R10`/`R13`）。
+3. 第 4 层才反问；反向推断（从意图猜阶段序号）**不是**允许的捷径。
+4. 阶段之外的参数按该阶段的输入约定解析（见下）。
 5. **写回义务：** 每个阶段收尾**必须**更新 World Model 的对应字段（读/写列见上表），
    并跑 `python3 scripts/state_check.py <state.json>`，**硬违规须为 0**。
 6. **档位参数（可选）**：若 `$ARGUMENTS` 含 `writing=asd-ste100`，或用户在自然语言里
