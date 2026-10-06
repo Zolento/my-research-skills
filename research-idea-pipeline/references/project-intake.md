@@ -27,9 +27,11 @@
    替用户「定」锚点。
 2. **读根 `AGENTS.md`**（若存在）与根 `README.md` / `INDEX.md`，**并逐个校验其引用的路径是否存在**；
    悬空引用记入根 `INDEX.md` 的 Warnings。
-3. **确定路线**（`routes/<R>`），读该路线的 `README.md` / `INDEX.md`（进度、已证实 / 已证伪、TODO、Warnings）。
+3. **确定路线**（`routes/<R>`），读该路线的 `README.md` / `STATUS.md` / `INDEX.md`
+   （身份证、当前状态、材料目录）。
 4. **按 §2 的九个维度盘点**，每条都写清三件事：**看什么 → 落到哪个字段 → 缺失时怎么办**。
-5. **骨架缺失时先补齐**（目录 + 两层 `README.md` / `INDEX.md` + `docs/refs/index.json`，
+5. **骨架缺失时先补齐**（目录 + 路线 `README.md` / `STATUS.md` / `INDEX.md` +
+   根 `README.md` / `INDEX.md` + `docs/refs/index.json`，
    见 [project-layout.md](project-layout.md) §7），再落盘。
 
 ---
