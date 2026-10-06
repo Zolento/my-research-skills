@@ -1,30 +1,18 @@
 ---
 name: research-idea-pipeline
 description: >-
-  面向 CVPR / ICML / NeurIPS / MICCAI 投稿的研究创意全流程流水线，覆盖文献调研、idea
-  发现、方案生成、多套路论文叙事生成与审稿、方案复核五个可独立调用、也可串联调用
-  的子流程。文献检索先查本地文献库，并默认再做多源扩检（本地命中不是终点）；
-  遇到 429 限流自动指数退避等待。
-  End-to-end research-idea pipeline for top-conference submissions: literature
-  survey, idea discovery, proposal generation, multi-pattern paper narrative
-  generation and review, and proposal review. Use when the user wants to
-  brainstorm research ideas, find a gap in the literature, turn an idea into a
-  full paper proposal plus experiment plan, find the best top-conference
-  narrative/framing for an idea or proposal, or rigorously review a proposal
-  before submission. Prefers the local literature library and falls back to the
-  arXiv Python package with exponential backoff on HTTP 429. Triggers:
-  research idea, idea discovery, brainstorm ideas, find a gap, novel idea,
-  literature survey, related work, proposal, research proposal, experiment plan,
-  narrative, paper narrative, storytelling, framing, positioning, narrative
-  review, proposal review, mock review, reviewer critique, 找 idea, 头脑风暴,
-  研究创意, 文献调研, 相关工作, 方案生成, 方案复核, 审阅方案, 投稿方案, 顶会投稿,
-  论文叙事, 叙事套路, 讲故事, 卖点, 定位, 叙事评审, 医学影像, 医学图像, 临床验证,
-  MICCAI, medical image analysis, clinical validation.
-argument-hint: "phase=R0..R14 [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
-metadata:
-  author: research-idea-pipeline
-  version: "1.4.0"
-  upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
+  以 Research State 为中心的科研搜索系统，面向 CVPR / ICML / NeurIPS / MICCAI 投稿：
+  双循环（Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复）共 15 个阶段
+  R0—R14，由 24 条硬规则机械强制。适合文献调研、寻找研究缺口、从 idea 走到可投稿方案、
+  多套路叙事与对抗审查、以及用证据淘汰错误解释。
+  首次进入已有代码项目走 Bootstrap（只观察不推进）；日常用四个入口
+  start-project / continue-research / explore / audit。
+  End-to-end research search system centered on a Research State: a dual loop
+  (Discovery expands and preserves diversity; Assurance attacks and repairs)
+  across 15 stages R0-R14, with 24 machine-enforced hard rules. Use when the
+  user wants to survey literature, find a research gap, turn an idea into a
+  submittable proposal plus experiment plan, generate and adversarially review
+  paper narratives, or let evidence eliminate wrong explanations.
 ---
 
 # Research Idea Pipeline（顶会研究创意流水线）

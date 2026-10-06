@@ -19,46 +19,55 @@ A 文献调研 → B idea 发现 → C 方案生成 → D 叙事生成 → E 方
 
 ```
 research-idea-pipeline/
-├── SKILL.md                          # 入口：mode 分发 + 全局不变量 + 状态传递
+├── SKILL.md                          # 入口：phase 分发（R0—R14）+ 全局不变量 + 首次运行编排
 ├── README.md                         # 本文件
 ├── references/
-│   ├── roles.md                      # 共享角色：venue calibration 的会议视角（仅 R12/R13）+ 六攻击面审稿人（R7 / R12）+ 证据核验员 + S-Integrity
-│   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊（TMI/JMLR/Nature MI）+ contribution type → evidence contract → venue calibration + 防复现标准
-│   ├── narrative-patterns.md         # 十套叙事 preset（非互斥）+ (O,T,R) 选 preset + 六槽位 S1—S6 + Transfer Legitimacy
-│   ├── claim-first-policy.md         # R12 现行（P0）：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
-│   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
-│   ├── project-layout.md             # Wave 6 目录规范：DI invariant、routes/、README/STATUS/INDEX、XID、DEC
-│   ├── scoring-policy.md             # 两层：硬门禁 G1—G5 + 排序六维（D）；极性归一化/中位数/一票否决（E）
-│   ├── evidence-policy.md            # 五类共享政策：证据等级 ↔ 允许/禁止表述（唯一定义）
-│   ├── project-intake.md             # 存量项目接管清单（9 维度；已有信息不得重复询问）
-│   ├── invocation-prompts.md         # 四个用户入口调用契约（start / continue / explore / audit）
+│   ├── research-state-policy.md      # ★ R1 权威：八类一等对象、逐阶段读写、引用完整性 V1—V24
+│   ├── project-layout.md             # ★ 目录规范：八条 DI invariant、routes/、README/STATUS/INDEX、XID、DEC
 │   ├── scheduler-policy.md           # 跨阶段调度：R0—R14 是能力不是 workflow；八级 next_action_policy + EIG÷cost
-│   ├── writing-policy.md             # 落盘文档/对话返回/子代理意见共用：受控中文三档（asd-ste100 / Strict / 中文-顺）
-│   ├── phase-r2-r5-field-mapping-retrieval.md   # R2 / R5：文献调研（A1—A7）
-│   ├── phase-r3-r6-discovery.md      # R3—R6：发现 + idea 级审核（B0—B8）
-│   ├── phase-r8-evidence-contract.md # R8：方案生成（C1—C7）
-│   ├── phase-r12-narrative.md # R12：claim-first 叙事 + 攻击面审核 + 硬门禁（D0—D9）
-│   └── phase-r7-r10-r13-assurance-repair-review.md     # R7 / R10 / R13：方案级正确性 + 防复现（E0—E8）
+│   ├── invocation-prompts.md         # 四个用户入口调用契约（start-project / continue-research / explore / audit）
+│   ├── project-intake.md             # 存量项目接管清单（9 维度；已有信息不得重复询问）
+│   ├── claim-first-policy.md         # claim 语义：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
+│   ├── evidence-policy.md            # 措辞等级 ↔ 认知状态（唯一定义）
+│   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
+│   ├── scoring-policy.md             # 两层评分：硬门禁 G1—G5 + 排序六维；极性归一化/中位数/一票否决
+│   ├── roles.md                      # 共享角色：八攻击面审稿人 + 证据核验员；venue 角色仅作 R12/R13 校准
+│   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，兼 QD archive niche）+ (O,T,R) 选 preset + 六槽位 S1—S6
+│   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊 + contribution type
+│   ├── writing-policy.md             # 受控中文三档（asd-ste100 / Strict / 中文-顺）
+│   └── phase-r0-contract.md          # R0：研究契约（只写 contract）
+│       phase-r2-r5-field-mapping-retrieval.md   # R2 / R5：领域测绘 + 共演化检索
+│       phase-r3-r6-discovery.md      # R3—R6：双轨发现 / 隔离种群 / 进化
+│       phase-r8-evidence-contract.md # R8：证据契约 + 结果预注册
+│       phase-r9-r11-experiment-loop.md          # R9 / R10 / R11：实验树 / 修复门 / 状态回写
+│       phase-r12-narrative.md        # R12：claim-first 叙事（state 的视图）
+│       phase-r7-r10-r13-assurance-repair-review.md  # R7 / R10 / R13：对抗保证 / 元认知修复 / artifact 审计
 ├── scripts/
+│   ├── state_check.py                # ★ 机械闸门：V1—V24（退出码 0 / 3 硬违规 / 4 环境）
+│   ├── render_status.py              # ★ 把 state 投影为 routes/<R>/STATUS.md（幂等；--check 校验过期）
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
 │   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
 │   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check / --migrate）
-│   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）：分号/超长句/虚动词/营销词/套话
-│   ├── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
+│   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）
+│   ├── test_state_check.py           # 离线测试：V1—V24 反例 + 表格完整性 + Carrier 完整性 + 打包完整性
+│   ├── test_render_status.py         # 离线测试：STATUS 幂等 + 三方节集合一致
+│   ├── test_golden_path.py           # 集成测试：R0→R14 字面执行 + 5 条对抗路径
+│   ├── test_literature_search.py     # 离线测试（不联网）
 │   └── test_refs_index.py            # 离线测试：索引旧 schema 迁移（保留旧字段）
 ├── templates/
-│   ├── INDEX.md                      # 路线级 INDEX.md 骨架（资产目录 + 时间线）
 │   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（路线总表投影）
 │   ├── README.route.md               # 路线级 README.md 骨架（路线身份证）
+│   ├── INDEX.md                      # 路线级 INDEX.md 骨架（资产目录 + 时间线）
 │   ├── STATUS.md                     # 路线级 STATUS.md 骨架（state 的人类投影）
-│   └── research-state.template.json           # Research State 骨架
+│   ├── research-state.template.json  # Research State 骨架（八类对象 + 附加槽位）
+│   └── scheduler.template.json       # 调度 telemetry 骨架（不进 state）
 ├── examples/
+│   ├── example-project-layout.md     # 多路线目录与文档管理（新目录规范的完整示例）
+│   ├── example-d-narrative.md        # claim-first 叙事与选型
 │   ├── example-b-to-c-d-e.md         # 主链路串联
-│   ├── example-d-narrative.md        # claim-first 叙事与选型（D0—D9）
 │   ├── example-a-standalone.md       # 单独文献调研
 │   ├── example-followup-review.md    # 接续复核
-│   ├── example-project-layout.md     # 多路线目录与文档管理
 │   └── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
 ```
@@ -507,19 +516,23 @@ title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migra
 人类可读产出写入**所在路线的 `routes/<R>/docs/`**；
 当前状态由 `research-state.json` 投影成 `routes/<R>/STATUS.md`（**禁止手改**）。
 
-接续规则：
+**接续规则以权威读写表为准**（[research-state-policy.md](references/research-state-policy.md) §5）。
+该表在**三处逐字一致**：`SKILL.md` §0、policy §5、以及各 `phase-*.md` 的「读 / 写 World Model」表
+（由 `scripts/test_state_check.py` 的 `TestTableIntegrity` 与比较器机械核对）。
 
-- R8 读取 R3—R6 的 `idea_candidates`（含 B5 的 `review` 评分）。
-- R12 读取 R3—R6 的 idea 与 R8 的 `proposal`。
-- R7 / R10 / R13 读取 R8 的 `proposal` + `experiment_plan`，以及 R12 的最佳叙事推荐。
-- 接续 E 读取上一次 E 的 `review_output` + `open_questions`。
-- 任意阶段调用 R2 / R5 时，传递 `query` + `scope` + `level`。
+**四条不可越界的铁律：**
+
+1. **写回是收工条件** —— 任何阶段不得在未写回 state 的情况下宣告完成。
+2. **只写本阶段那一行** —— 表中未列出的字段不得顺手改；跨阶段修改必须走 `repairs[].state_delta`。
+3. **状态迁移只能取枚举值** —— 不得自造 `mostly-supported` 这类中间态。
+4. **认识论权限边界** —— **`R14` 能杀研究分支，不能杀真理主张**：`claims[].status`
+   只能经 `R8`（证据驱动的单向升级）或 `R10`（`state_delta`）改变（`SKILL.md` §1.7，由 `V22` 机械强制）。
 
 ---
 
-## 相对原规范的四点工程修正
+## 检索脚本的四点工程修正
 
-原规范中有四处在真实环境会失效，已修正并记录在
+检索链路有四处在本环境会失效，已在实现中修正并记录在
 [literature-policy.md §5.2 / §5.3](references/literature-policy.md)：
 
 1. **`arxiv.HTTPError` 并非 arxiv 包稳定导出的异常。** 实际 429 多为
@@ -550,12 +563,24 @@ title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migra
 
 ---
 
-## 安装（待审核通过后再执行）
+## 安装
 
-本项目刻意**未**安装。审核通过后：
+走仓库的 `npx skills` 流程（仓库根 `README.md` 有完整的安装与维护说明）：
 
 ```bash
-ln -s "$PWD/research-idea-pipeline" ~/.claude/skills/research-idea-pipeline
+npx skills add Zolento/my-research-skills -g -s research-idea-pipeline -y
 ```
 
-安装后通过 `phase=R0..R14` 触发调用；需要最强受控档时加 `writing=asd-ste100`。
+本机开发时也可直接装开发版：
+
+```bash
+rsync -a --delete --exclude '__pycache__' \
+  research-idea-pipeline/ ~/.agents/skills/research-idea-pipeline/
+```
+
+> `~/.claude/skills/research-idea-pipeline` 通常是指向 `~/.agents/skills/` 的软链 —— 装一处即两处生效。
+
+**调用**：指定 `phase=R0..R14` 即可；**首次进入已有项目**走 Bootstrap（`SKILL.md` §0.3，只观察不推进）；
+日常用四个入口 `start-project` / `continue-research` / `explore` / `audit`
+（契约见 [references/invocation-prompts.md](references/invocation-prompts.md)）。
+需要最强受控档时加 `writing=asd-ste100`。
