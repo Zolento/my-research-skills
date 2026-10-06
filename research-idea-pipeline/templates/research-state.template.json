@@ -1,6 +1,7 @@
 {
   "_schema": "research-idea-pipeline/research-state@1",
-  "_usage": "R1 Research World Model 骨架（Research State）。顶层直接是八类一等对象数组（claims / evidence / assumptions / hypotheses / experiments / literature / failures / uncertainties）+ V9/V10 强制的 assurance / repairs；不要把它们包在 world_model / state 之类的单键下。字段名与枚举逐字定义见 references/research-state-policy.md §3，引用完整性 V1—V17 见该文件 §4，位置读写时机见 §5。R1 是常驻对象：任何 R 阶段开工前先读本对象，收工前就地写回（同一份文件覆盖更新，不按阶段切分）。落盘路径：.research-idea-pipeline/<route>/research-state.json（机器状态档，不贴进 docs 正文）。写回后必须跑 python3 scripts/state_check.py --check <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 V1—V17。字面量 TBD 只有两个合法位置：uncertainties[].cheapest_discriminating_test 与 assurance[].discriminating_test；其它字段里的 TBD / 「示例占位」必须替换为真实值（尤其 experiments[].code_commit / result 与 evidence[].source_ref），否则模板条目不得被当作实验结论引用。空引用写 []，不使用 null 或省略键；ID 路线内唯一、永不复用。",
+  "state_version": 0,
+  "_usage": "R1 Research World Model 骨架（Research State）。顶层直接是八类一等对象数组（claims / evidence / assumptions / hypotheses / experiments / literature / failures / uncertainties）+ V9/V10 强制的 assurance / repairs；不要把它们包在 world_model / state 之类的单键下。字段名与枚举逐字定义见 references/research-state-policy.md §3，引用完整性 V1—V21 见该文件 §4，位置读写时机见 §5。R1 是常驻对象：任何 R 阶段开工前先读本对象，收工前就地写回（同一份文件覆盖更新，不按阶段切分）。落盘路径：.research-idea-pipeline/<route>/research-state.json（机器状态档，不贴进 docs 正文）。写回后必须跑 python3 scripts/state_check.py --check <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 V1—V21。字面量 TBD 只有两个合法位置：uncertainties[].cheapest_discriminating_test 与 assurance[].discriminating_test；其它字段里的 TBD / 「示例占位」必须替换为真实值（尤其 experiments[].code_commit / result 与 evidence[].source_ref），否则模板条目不得被当作实验结论引用。空引用写 []，不使用 null 或省略键；ID 路线内唯一、永不复用。",
   "contract": {
     "goal": "（示例占位）研究目标，用户原话",
     "primary_anchor": "performance | theory | phenomenon | benchmark | feasibility | negative",
@@ -28,6 +29,15 @@
       "known_flaws": [
         "F1"
       ],
+      "depends_on": [
+        "E1",
+        "AS1"
+      ],
+      "validity": {
+        "status": "valid",
+        "reason": "E1 与 AS1 均未失效，跨中心落差的机制主张暂可引用（示例占位）",
+        "since_state_version": 0
+      },
       "contract": {
         "statement": "（示例占位）",
         "scope": "…",
@@ -54,7 +64,7 @@
       "statement": "解耦不增加标注数据需求（C0 的子主张，示例占位）",
       "parent": "C0",
       "subclaims": [],
-      "status": "supported",
+      "status": "partially-supported",
       "supporting_evidence": [
         "E2"
       ],
@@ -62,7 +72,15 @@
       "nearest_alternative": "增益来自额外正则化强度，而不是解耦本身",
       "falsifier": "控制参数量与正则强度后，解耦带来的增益消失",
       "scope": "单中心训练 / acceleration=4（示例占位）",
-      "known_flaws": []
+      "known_flaws": [],
+      "depends_on": [
+        "C0"
+      ],
+      "validity": {
+        "status": "valid",
+        "reason": "文献证据 T1，达 partially-supported 阈值，但未达 supported（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "C1",
@@ -75,7 +93,13 @@
       "nearest_alternative": "低场增益来自 SNR 变化，而不是解耦",
       "falsifier": "低场对照实验（SNR 归一化后）显示解耦前后无差异",
       "scope": "低场系统 / 尚未验证（示例占位）",
-      "known_flaws": []
+      "known_flaws": [],
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "尚无证据，也未被任何失效上游波及（示例占位）",
+        "since_state_version": 0
+      }
     }
   ],
   "evidence": [
@@ -89,7 +113,16 @@
       "strength": "strong",
       "scope": "brain MRI / acceleration=4",
       "epistemic_status": "Observed",
-      "source_ref": "X7（seed=0）的跨中心对照结果（示例占位）"
+      "source_ref": "X7（seed=0）的跨中心对照结果（示例占位）",
+      "verification_tier": "T2",
+      "depends_on": [
+        "X7"
+      ],
+      "validity": {
+        "status": "valid",
+        "reason": "X7 已 done 且结果已写入（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "E2",
@@ -101,7 +134,16 @@
       "strength": "partial",
       "scope": "多中心重建综述覆盖范围（示例占位）",
       "epistemic_status": "Supported",
-      "source_ref": "[作者, 会议/年份]（示例占位）"
+      "source_ref": "[作者, 会议/年份]（示例占位）",
+      "verification_tier": "T1",
+      "depends_on": [
+        "LIT2"
+      ],
+      "validity": {
+        "status": "valid",
+        "reason": "文献节点仍未撤回（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "E3",
@@ -111,7 +153,16 @@
       "strength": "weak",
       "scope": "机制解释 / 尚未产生证据",
       "epistemic_status": "Planned",
-      "source_ref": "待补：X8 的机制对照（示例占位，不得当作证据引用）"
+      "source_ref": "待补：X8 的机制对照（示例占位，不得当作证据引用）",
+      "verification_tier": "T0",
+      "depends_on": [
+        "X8"
+      ],
+      "validity": {
+        "status": "pending",
+        "reason": "X8 尚未运行，证据尚未产生（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "E4",
@@ -121,7 +172,14 @@
       "strength": "weak",
       "scope": "低场系统的非正式观察（未复现）",
       "epistemic_status": "Hypothesized",
-      "source_ref": "非正式观察记录（示例占位，不得进 supporting_evidence）"
+      "source_ref": "非正式观察记录（示例占位，不得进 supporting_evidence）",
+      "verification_tier": "T0",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "仅登记为假说，未被引用（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "E5",
@@ -131,7 +189,14 @@
       "strength": "weak",
       "scope": "未知",
       "epistemic_status": "Unknown",
-      "source_ref": "待补（示例占位，不得当作证据引用）"
+      "source_ref": "待补（示例占位，不得当作证据引用）",
+      "verification_tier": "T0",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "仅登记为未知，未被引用（示例占位）",
+        "since_state_version": 0
+      }
     }
   ],
   "assumptions": [
@@ -142,7 +207,13 @@
       "challenged_by": [
         "H1"
       ],
-      "if_false": "C0 降级为相关性主张，问题重构失去依据，需改为多机制并列"
+      "if_false": "C0 降级为相关性主张，问题重构失去依据，需改为多机制并列",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "仍被显式接受，未被挑战推翻（示例占位）",
+        "since_state_version": 0
+      }
     }
   ],
   "hypotheses": [
@@ -166,7 +237,15 @@
       "island": "P2",
       "generation": 0,
       "operator": "assumption_breaker",
-      "parents": []
+      "parents": [],
+      "depends_on": [
+        "AS1"
+      ],
+      "validity": {
+        "status": "valid",
+        "reason": "AS1 未被推翻（示例占位）",
+        "since_state_version": 0
+      }
     }
   ],
   "experiments": [
@@ -193,7 +272,39 @@
       "next_branches": [
         "X8"
       ],
-      "status": "done"
+      "status": "done",
+      "preregistration": {
+        "frozen_at_state_version": 0,
+        "outcomes": [
+          {
+            "id": "O1",
+            "observation": "跨中心 PSNR 落差 ≥ 0.5 dB",
+            "update": [
+              {
+                "target": "C0",
+                "op": "weaken"
+              }
+            ]
+          },
+          {
+            "id": "O2",
+            "observation": "落差 < 0.1 dB，解耦前后无差异",
+            "update": [
+              {
+                "target": "C0",
+                "op": "retain-with-alternative"
+              }
+            ]
+          }
+        ]
+      },
+      "result_at_state_version": 0,
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "结果已按预注册写入（示例占位）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "X8",
@@ -215,19 +326,41 @@
       "unexpected": [],
       "known_flaws": [],
       "next_branches": [],
-      "status": "planned"
+      "status": "planned",
+      "preregistration": null,
+      "result_at_state_version": null,
+      "depends_on": [
+        "X7"
+      ],
+      "validity": {
+        "status": "pending",
+        "reason": "尚未运行（示例占位）",
+        "since_state_version": 0
+      }
     }
   ],
   "literature": [
     {
       "id": "LIT1",
       "ref": "[作者, 会议/年份]（示例占位）",
-      "relation": "shares-assumption"
+      "relation": "shares-assumption",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "LIT2",
       "ref": "[作者, 会议/年份]（示例占位）",
-      "relation": "solves-analogous-problem"
+      "relation": "solves-analogous-problem",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     }
   ],
   "failures": [
@@ -239,7 +372,13 @@
       "referenced_by": [
         "C0",
         "X7"
-      ]
+      ],
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     }
   ],
   "uncertainties": [
@@ -249,7 +388,13 @@
       "importance": "critical",
       "uncertainty": "high",
       "cheapest_discriminating_test": "X8",
-      "status": "open"
+      "status": "open",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "U2",
@@ -257,7 +402,13 @@
       "importance": "high",
       "uncertainty": "medium",
       "cheapest_discriminating_test": "TBD",
-      "status": "open"
+      "status": "open",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     },
     {
       "id": "U3",
@@ -265,17 +416,25 @@
       "importance": "medium",
       "uncertainty": "low",
       "cheapest_discriminating_test": "X7",
-      "status": "closed"
+      "status": "closed",
+      "depends_on": [],
+      "validity": {
+        "status": "valid",
+        "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
+        "since_state_version": 0
+      }
     }
   ],
   "assurance": [
     {
       "kill_condition": "若 X8 显示解耦前后跨中心落差的改善 ≤ 0.1 dB，则 C0 的机制主张被杀死（示例占位）",
-      "discriminating_test": "X8"
+      "discriminating_test": "X8",
+      "verification_tier": "T0"
     },
     {
       "kill_condition": "若低场对照在 SNR 归一化后显示解耦无增益，则 C1 被杀死（示例占位；当前无预算，登记为待办）",
-      "discriminating_test": "TBD"
+      "discriminating_test": "TBD",
+      "verification_tier": "T0"
     }
   ],
   "repairs": [

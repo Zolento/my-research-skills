@@ -15,7 +15,7 @@
 覆盖点
 ------
 1. 合法 state → 0；`--json` 的 `ok=true` 且可解析
-2. V1—V17 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
+2. V1—V21 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
    V10 四字段齐备 + 处置/关闭两个枚举）
 3. 环境：缺文件 / 非法 JSON / 空文件 / 根非对象 / 缺八类数组 / 数组类型错 / 条目非对象 → 4
 4. `--json` 在 0 / 3 / 4 三种情况下都可解析；`--check` 与默认行为等价
@@ -53,6 +53,7 @@ def valid_state() -> Dict[str, Any]:
     """合法骨架。任何一条 V 规则的反例都在它上面做单点变异。"""
     return {
         "_schema": "research-idea-pipeline/research-state@1",
+        "state_version": 0,
         "claims": [
             {
                 "id": "C17",
@@ -66,6 +67,8 @@ def valid_state() -> Dict[str, Any]:
                 "falsifier": "若 R2（机制应失效）与 R1 结果近似，则 C17 不成立",
                 "scope": "brain MRI / acceleration=4",
                 "known_flaws": ["F3"],
+                "depends_on": ["E32"],
+                "validity": {"status": "valid", "reason": "X7 的统计证据仍成立", "since_state_version": 0},
             },
             {
                 "id": "C18",
@@ -79,6 +82,8 @@ def valid_state() -> Dict[str, Any]:
                 "falsifier": "若 multi-coil 上增量消失则 C18 不成立",
                 "scope": "multi-coil / acceleration=4",
                 "known_flaws": [],
+                "depends_on": [],
+                "validity": {"status": "valid", "reason": "尚无证据也未受失效影响", "since_state_version": 0},
             },
         ],
         "evidence": [
@@ -86,17 +91,25 @@ def valid_state() -> Dict[str, Any]:
                 "id": "E32", "kind": "experiment", "supports": ["C17"], "contradicts": [],
                 "strength": "strong", "scope": "brain MRI / acceleration=4",
                 "epistemic_status": "Observed", "source_ref": "X7",
+                "verification_tier": "T2",
+                "depends_on": ["X7"],
+                "validity": {"status": "valid", "reason": "X7 已 done 且结果已写入", "since_state_version": 0},
             },
             {
                 "id": "E33", "kind": "experiment", "supports": [], "contradicts": [],
                 "strength": "weak", "scope": "brain MRI / acceleration=4",
                 "epistemic_status": "Planned", "source_ref": "X8",
+                "verification_tier": "T0",
+                "depends_on": ["X8"],
+                "validity": {"status": "pending", "reason": "X8 尚未产生结果", "since_state_version": 0},
             },
         ],
         "assumptions": [
             {
                 "id": "AS13", "statement": "adaptation must modify prior parameters",
                 "status": "explicit", "challenged_by": ["H42"], "if_false": "C17 改写为通用微调",
+                "depends_on": [],
+                "validity": {"status": "valid", "reason": "仍被显式接受", "since_state_version": 0},
             },
         ],
         "hypotheses": [
@@ -112,6 +125,8 @@ def valid_state() -> Dict[str, Any]:
                 "expected_information_gain": 0.4, "status": "active",
                 "niche": "N2", "island": "P2", "generation": 0, "status": "elite",
                 "operator": "assumption_breaker", "parents": [],
+                "depends_on": ["AS13"],
+                "validity": {"status": "valid", "reason": "上游假设未被推翻", "since_state_version": 0},
             },
         ],
         "experiments": [
@@ -122,6 +137,16 @@ def valid_state() -> Dict[str, Any]:
                 "result": "0.8dB", "interpretation": "机制成立",
                 "unexpected": [], "known_flaws": ["F3"], "next_branches": ["X8"],
                 "status": "done",
+                "preregistration": {
+                    "frozen_at_state_version": 0,
+                    "outcomes": [{
+                        "id": "O1", "observation": "R2 上 PSNR 下降",
+                        "update": [{"target": "C17", "op": "strengthen"}],
+                    }],
+                },
+                "result_at_state_version": 0,
+                "depends_on": [],
+                "validity": {"status": "valid", "reason": "结果已按预注册写入", "since_state_version": 0},
             },
             {
                 "id": "X8", "parent": "X7", "stage": "X4", "claim_targeted": ["C17"],
@@ -129,31 +154,43 @@ def valid_state() -> Dict[str, Any]:
                 "data_split": "fastMRI test", "seed": 0, "metric": "PSNR",
                 "result": "", "interpretation": "", "unexpected": [],
                 "known_flaws": [], "next_branches": [], "status": "planned",
+                "preregistration": None,
+                "result_at_state_version": None,
+                "depends_on": ["X7"],
+                "validity": {"status": "pending", "reason": "尚未运行", "since_state_version": 0},
             },
         ],
         "literature": [
-            {"id": "LIT9", "ref": "[Author, 2024]", "relation": "shares-assumption"},
+            {"id": "LIT9", "ref": "[Author, 2024]", "relation": "shares-assumption",
+             "depends_on": [], "validity": {"status": "valid", "reason": "与当前 scope 一致", "since_state_version": 0}},
         ],
         "failures": [
             {
                 "id": "F3", "kind": "inconclusive", "what": "R2 未分离出机制",
                 "why": "样本量不足", "referenced_by": ["C17", "X7"],
+                "depends_on": ["X7"],
+                "validity": {"status": "valid", "reason": "失败记录仍成立", "since_state_version": 0},
             },
         ],
         "uncertainties": [
             {
                 "id": "U3", "question": "机制在 R2 是否失效", "importance": "critical",
                 "uncertainty": "high", "cheapest_discriminating_test": "X8", "status": "open",
+                "depends_on": ["C17"],
+                "validity": {"status": "valid", "reason": "仍待判别实验", "since_state_version": 0},
             },
             {
                 "id": "U4", "question": "multi-coil 外推是否成立", "importance": "high",
                 "uncertainty": "medium", "cheapest_discriminating_test": "TBD", "status": "open",
+                "depends_on": [],
+                "validity": {"status": "valid", "reason": "尚无判别实验", "since_state_version": 0},
             },
         ],
         "assurance": [
             {
                 "kill_condition": "若 X8 上 R2 与 R1 结果近似则 kill 该机制分支",
                 "discriminating_test": "X8",
+                "verification_tier": "T0",
             },
         ],
         "repairs": [
@@ -841,3 +878,185 @@ class TestTableIntegrity(unittest.TestCase):
                 m = re.match(r"^\s*\*\*(R\d+)\*\*", cells[1])
                 if m:
                     self.assertEqual(len(cells), 5, f"{path.name} {m.group(1)} 列数 {len(cells)}")
+
+
+# ---------------------------------------------------------------------------
+# V18—V21：状态失效传播 / 验证可信度层级 / 结果预注册
+# ---------------------------------------------------------------------------
+
+class TestV18V21(unittest.TestCase):
+    """Wave 5 的四条规则：单点变异 → 退出码 3 → 只报该规则。"""
+
+    OBJ8 = ("claims", "evidence", "assumptions", "hypotheses",
+            "experiments", "literature", "failures", "uncertainties")
+
+    def _rules(self, doc: Dict[str, Any]):
+        return sc.check_state(doc, source="<test>").rules()
+
+    def _status(self, doc: Dict[str, Any]) -> int:
+        return sc.check_state(doc, source="<test>").exit_code
+
+    # ---- V18：validity 四键 ----
+
+    def test_v18_validity_missing(self):
+        doc = valid_state()
+        del doc["claims"][0]["validity"]
+        self.assertEqual(self._rules(doc), ["V18"])
+        self.assertEqual(self._status(doc), sc.EXIT_HARD)
+
+    def test_v18_status_out_of_enum(self):
+        doc = valid_state()
+        doc["claims"][0]["validity"]["status"] = "ok"
+        self.assertEqual(self._rules(doc), ["V18"])
+
+    def test_v18_reason_blank(self):
+        doc = valid_state()
+        doc["claims"][0]["validity"]["reason"] = "   "
+        self.assertEqual(self._rules(doc), ["V18"])
+
+    def test_v18_since_version_negative(self):
+        doc = valid_state()
+        doc["claims"][0]["validity"]["since_state_version"] = -1
+        self.assertEqual(self._rules(doc), ["V18"])
+
+    def test_v18_since_version_ahead_of_state_version(self):
+        doc = valid_state()
+        doc["claims"][0]["validity"]["since_state_version"] = 5
+        self.assertEqual(self._rules(doc), ["V18"])
+
+    def test_v18_assurance_is_exempt(self):
+        """V18 只管八类一等对象：assurance / repairs 没有 validity 不算违规。"""
+        doc = valid_state()
+        for item in doc.get("assurance", []):
+            item.pop("validity", None)
+        for item in doc.get("repairs", []):
+            item.pop("validity", None)
+        self.assertNotIn("V18", self._rules(doc))
+
+    # ---- V19：一跳传播 ----
+
+    def test_v19_invalid_upstream_but_downstream_valid(self):
+        doc = valid_state()
+        doc["evidence"][0]["validity"]["status"] = "invalid"  # E32
+        self.assertIn("V19", self._rules(doc))  # C17.depends_on 含 E32 且自身 valid
+
+    def test_v19_downstream_stale_is_legal(self):
+        doc = valid_state()
+        doc["evidence"][0]["validity"]["status"] = "invalid"
+        doc["claims"][0]["validity"]["status"] = "stale"
+        self.assertNotIn("V19", self._rules(doc))
+
+    def test_v19_dangling_depends_on(self):
+        doc = valid_state()
+        doc["claims"][1]["depends_on"] = ["E999"]
+        self.assertIn("V19", self._rules(doc))
+
+    def test_v19_empty_depends_on_is_legal(self):
+        doc = valid_state()
+        for key in self.OBJ8:
+            for item in doc.get(key, []):
+                item["depends_on"] = []
+        self.assertNotIn("V19", self._rules(doc))
+
+    def test_v19_does_not_iterate(self):
+        """V19 只查一跳：X7(invalid) → E32 必须转 stale；但 C17 依赖的是 E32（stale），
+        不得再被追着传染 —— 多跳是 R11 的责任，不是校验器的。"""
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["id"] == "X7":
+                exp["validity"]["status"] = "invalid"
+        # X7 的两个**直接**依赖者满足一跳；C17 依赖的是 E32（两跳），必须不被追着传染。
+        doc["evidence"][0]["validity"]["status"] = "stale"   # E32 满足一跳
+        doc["failures"][0]["validity"]["status"] = "stale"   # F3 满足一跳
+        doc["claims"][0]["validity"]["status"] = "valid"     # C17 是两跳，合法
+        self.assertNotIn("V19", self._rules(doc))
+
+    def test_v19_one_hop_actually_fires(self):
+        """同一构造，但 E32 仍写 valid —— 一跳必须报。"""
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["id"] == "X7":
+                exp["validity"]["status"] = "invalid"
+        doc["claims"][0]["validity"]["status"] = "valid"
+        self.assertIn("V19", self._rules(doc))
+
+    # ---- V20：升级权限 ----
+
+    def test_v20_supported_needs_t2(self):
+        doc = valid_state()  # C17 = supported, E32 = T2
+        doc["evidence"][0]["verification_tier"] = "T1"
+        self.assertIn("V20", self._rules(doc))
+
+    def test_v20_supported_with_t2_is_legal(self):
+        self.assertNotIn("V20", self._rules(valid_state()))
+
+    def test_v20_partially_supported_with_t1_is_legal(self):
+        doc = valid_state()
+        doc["claims"][0]["status"] = "partially-supported"
+        doc["evidence"][0]["verification_tier"] = "T1"
+        self.assertNotIn("V20", self._rules(doc))
+
+    def test_v20_partially_supported_with_t0_is_violation(self):
+        doc = valid_state()
+        doc["claims"][0]["status"] = "partially-supported"
+        doc["evidence"][0]["verification_tier"] = "T0"
+        self.assertIn("V20", self._rules(doc))
+
+    def test_v20_missing_tier_is_violation(self):
+        doc = valid_state()
+        del doc["evidence"][0]["verification_tier"]
+        self.assertIn("V20", self._rules(doc))
+
+    def test_v20_ungrounded_is_not_checked(self):
+        doc = valid_state()
+        doc["claims"][0].update(status="ungrounded", supporting_evidence=[])
+        self.assertNotIn("V20", self._rules(doc))
+
+    def test_v20_llm_tier_t0_cannot_upgrade(self):
+        """T0 = LLM 自评上限：即便证据 tier 齐全，T0 也不得支撑 supported。"""
+        doc = valid_state()
+        doc["evidence"][0]["verification_tier"] = "T0"
+        self.assertIn("V20", self._rules(doc))
+
+    # ---- V21：结果预注册 ----
+
+    def test_v21_done_without_preregistration(self):
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["status"] == "done":
+                exp["preregistration"] = None
+        self.assertIn("V21", self._rules(doc))
+
+    def test_v21_done_frozen_after_result(self):
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["status"] == "done":
+                exp["result_at_state_version"] = 0
+                exp["preregistration"]["frozen_at_state_version"] = 3
+        self.assertIn("V21", self._rules(doc))
+
+    def test_v21_running_needs_preregistration_only(self):
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["status"] == "done":
+                exp["status"] = "running"
+                exp["result_at_state_version"] = None
+        self.assertNotIn("V21", self._rules(doc))
+
+    def test_v21_planned_is_not_checked(self):
+        self.assertNotIn("V21", self._rules(valid_state()))  # X8 = planned
+
+    def test_v21_bad_op_is_violation(self):
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp.get("preregistration"):
+                exp["preregistration"]["outcomes"][0]["update"][0]["op"] = "improve"
+        self.assertIn("V21", self._rules(doc))
+
+    def test_v21_done_with_frozen_equal_result_is_legal(self):
+        doc = valid_state()
+        for exp in doc["experiments"]:
+            if exp["status"] == "done":
+                exp["preregistration"]["frozen_at_state_version"] = 0
+                exp["result_at_state_version"] = 0
+        self.assertNotIn("V21", self._rules(doc))
