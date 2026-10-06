@@ -169,3 +169,48 @@ python3 scripts/state_check.py --selftest                → selftest OK
    已在 `test_golden_path.py` 以 `skipTest` 登记为**已知缺口**。
    建议二选一：① 规范要求"把支持证据一并写进 `depends_on`"；② 让 V19 把
    `supporting_evidence` / `refuting_evidence` 也视为传播边。
+
+
+---
+
+# 附录：修复状态（Round 5）
+
+| 原发现 | 状态 | 修法 |
+|---|---|---|
+| **MAJOR-1** §1.7 零机械落点 | ✅ **已修** | 新增 **V22**：`claims[].status ∈ {killed, contradicted}` 必须被一条 `repairs[]` 覆盖，且该条 `targets` 含此 claim 的 id、`disposition` ∈ 五值。**决策层越权写 `killed` 现在会被校验器拦下。** 为做精确核对，`repairs[]` 新增必填字段 `targets`（id 数组）—— 见下方"实现过程中的两处自我修正" |
+| **MAJOR-2** Integrity Gate 零机械足迹 | ✅ **已修** | 新增 **V23**：`reviews[].integrity_gate == "fail"` 时必须存在 `repairs[]`（`disposition` ∈ 五值）或 `failures[]`（`kind` ∈ 六值） |
+| **MINOR-5** `decision.verdict` 未校验 | ✅ **已修** | 新增 **V24**：`decision.verdict` 必须是 `continue / pivot / archive / submit` 之一 |
+| **MINOR-3** SKILL §0 无读写表 | ❌ **假阳性** | `SKILL.md:63` **确实有**读写表（表头为 `| Phase | 名称 | 作用 | 读 state | 写 state |`）。复验者按 policy/phase 的表头 `| 阶段 | 读` 去 grep，自然搜不到。三方比较器始终 0 不一致 |
+| MINOR-1 `assurance[]` 只在 R7 写列 | ⏳ 未修 | 涉及写表增列，留待下一轮 |
+| MINOR-2 `validity`/`verification_tier`/`depends_on` 不在写列 | ⏳ 未修 | 同上 |
+| MINOR-4「关闭 niche」未实现 | ⏳ 未修 | 需要在字段/C15 豁免/流程三者选一 |
+| 支持边 ≠ 传播边（golden path 发现） | ⏳ 未修 | `V19` 沿 `depends_on` 传播，而证据支持走 `supporting_evidence` |
+
+## 实现过程中的两处**自我修正**（值得记录）
+
+1. **V22 最初用子串匹配 `state_delta` 里的 claim id** —— 结果基线 state 里一条无关的 repair
+   恰好提到 `C0`，就把 `killed` **误判为"已覆盖"**。子串匹配同时会漏报与误报，**这本身是 bug**。
+   已改为显式 `repairs[].targets` 字段（精确、可机械核对）。
+2. **V24 的规则文本在 policy 里为表格转义写成 `\|`，脚本里是裸 `|`** → 逐字比较器立刻报不一致。
+   本仓库约定规则文本避免用 `|`，已统一为 `/` 分隔。
+
+> 这两处都由**机械比较器/自检**当场抓住，而不是靠人读文档。
+
+## 新增的机械闸门
+
+| 规则 | 内容 |
+|---|---|
+| **V22** | `claims[].status ∈ {killed, contradicted}` 必须被至少一条 `repairs[]` 覆盖（该条 `repairs[].targets` 含此 claim 的 id，且 `disposition` ∈ 五值） |
+| **V23** | `reviews[].integrity_gate == "fail"` 时必须存在 `repairs[]`（`disposition` ∈ 五值）或 `failures[]`（`kind` ∈ 六值） |
+| **V24** | `decision.verdict` 存在时必须是 `continue / pivot / archive / submit` 之一 |
+
+**闸门快照（Round 5 末）**：
+```
+187 tests OK（+1 为 Path D 升级为真实断言）    selftest V1—V24 全覆盖
+模板 --check exit 0                          规则表 24/24 逐字不一致 0
+三方读写 14 阶段不一致 0                      链接 469 断链 0
+deprecated 0 命中                            linter 全绿
+```
+
+**Golden Path 的 3 条 skipTest 缺口**（仍如实登记，不假装覆盖）：
+Path A 支持边不是传播边｜Path C 假范式新颖性｜Path E 叙事幻觉不得创建 claim。

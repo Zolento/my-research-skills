@@ -6,7 +6,7 @@
 本仓库已经有三层正确性，但此前只覆盖了前两层：
 
 * **Layer A 静态一致性** — 表格 / 枚举 / schema / 链接 / linter（`TestTableIntegrity` 等）
-* **Layer B 转移正确性** — `S_t + action → S_{t+1}` 是否合法（`TestV18V21` 等，V1—V21）
+* **Layer B 转移正确性** — `S_t + action → S_{t+1}` 是否合法（`TestV18V21` 等，V1—V24）
 * **Layer C 流程可执行性** — 从 `R0` 一路走到 `R14`，**每个消费者需要的字段，
   在它被消费之前是否真的有生产者？**  ← 本文件
 
@@ -441,7 +441,12 @@ class TestAdversarialGoldenPaths(_Base):
     # ---- D decision ≠ truth ----
 
     def test_path_d_decision_layer_cannot_kill_a_claim(self):
-        """R14 可 archive 分支，不得改 claim 真值。校验器不拦 —— 因为写集合本身禁止。"""
+        """R14 可 archive 分支，**不得**改 claim 真值（SKILL §1.7）。
+
+        本条是 §1.7 的**机械落点**：`V22` 要求 `claims[].status ∈ {killed, contradicted}`
+        必须被一条 `repairs[].targets` 覆盖（且 disposition ∈ 五值）。
+        决策层没有这条 repair，因此越权写 `killed` 会被校验器拦下。
+        """
         state = r0_contract()
         for stage, mutate in GOLDEN_PATH:
             if stage != "R0":
@@ -449,16 +454,53 @@ class TestAdversarialGoldenPaths(_Base):
         before = [c["status"] for c in state["claims"]]
         state["decision"] = {"verdict": "archive", "rationale": "路线停止", "next_phase": "R1"}
         state["hypotheses"][0]["status"] = "archived"
-        self.assertClean(state, "D-archive")
-        self.assertEqual([c["status"] for c in state["claims"]], before)
-        # 反证：如果真的写了 claims[].killed，状态是否仍然"合法"？
-        # 若合法，说明该禁令目前只靠读写表（文档）而不靠校验器 —— 如实记录。
+        self.assertClean(state, "D-archive 合法")
+        self.assertEqual([c["status"] for c in state["claims"]], before,
+                         "R14 不得改变 claims[].status")
+
+        # 越权：决策层直接把 claim 置 killed —— 必须被 V22 拦住
         state["claims"][0]["status"] = "killed"
         report = self.check(state)
-        if report.exit_code == sc.EXIT_OK:
-            self.skipTest(
-                "已知缺口：claims[].status=killed 在 R14 语境下仍能为 exit 0；"
-                "该禁令目前只由 policy §5 读写表（文档）保证，无机械闸门")
+        self.assertEqual(report.exit_code, sc.EXIT_HARD,
+                         "R14 越权写 killed 必须使校验失败（V22）")
+        self.assertIn("V22", report.rules())
+
+        # 合规修法：由 R10 留下覆盖该 claim 的 repair（disposition ∈ 五值）即可通过
+        cid = state["claims"][0]["id"]
+        state["repairs"].append({
+            "flaw": "该主张被证据证否（critical）",
+            "disposition": "REPAIR_CLAIM",
+            "state_delta": f"{cid}.status → killed",
+            "closure": "RESOLVED",
+            "targets": [cid],
+        })
+        self.assertClean(state, "D-经 R10 合法否决")
+
+    def test_path_d_gate_fail_must_close_the_loop(self):
+        """**MAJOR-2 的机械落点**：`integrity_gate == "fail"` 必须有闭环动作。"""
+        state = r0_contract()
+        for stage, mutate in GOLDEN_PATH:
+            if stage != "R0":
+                mutate(state)
+        state["reviews"] = [{"stage": "R13", "artifact": "code",
+                             "integrity_gate": "fail", "findings": ["leakage"]}]
+        # 工整路径里已有 failures[]，故此处先清掉以暴露缺口
+        state["failures"] = []
+        state["repairs"] = []
+        state["claims"][0]["known_flaws"] = []
+        for x in state["experiments"]:
+            x["known_flaws"] = []
+        report = self.check(state)
+        self.assertIn("V23", report.rules(),
+                      "integrity_gate=fail 且无 repairs/failures 时必须报 V23")
+        # 合规修法：留下闭环动作
+        state["failures"].append({"id": "F9", "kind": "engineering-failure",
+                                  "what": "完整性审计发现泄漏", "why": "训练/测试同受试者",
+                                  "referenced_by": ["X1"], "depends_on": [],
+                                  "validity": _validity()})
+        # V4：每条 F 必须被某个已知 flaws 引用
+        state["experiments"][-1]["known_flaws"] = ["F9"]
+        self.assertClean(state, "D-gate fail 已闭环")
 
     # ---- E 叙事幻觉不得创建 claim（**当前无机械闸门 → 记为缺口**）----
 

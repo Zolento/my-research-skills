@@ -676,10 +676,10 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 离线测试 | [scripts/test_literature_search.py](scripts/test_literature_search.py) | stdlib unittest，全离线（环境发现 / 跨源合并 / 等级判定） |
 | PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3）、**`--migrate` 旧 schema 迁移（保留旧字段）** |
 | 索引迁移测试 | [scripts/test_refs_index.py](scripts/test_refs_index.py) | 离线测试：三种旧索引形状的迁移、「保留旧字段」、`--check` 退出码与提示 |
-| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、V1—V21 |
-| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 V1—V21** |
-| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V21 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
-| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V21 每条一个反例 + 退出码行为 |
+| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、V1—V24 |
+| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 V1—V24** |
+| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V24 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
+| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V24 每条一个反例 + 退出码行为 |
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | **调用契约（四个用户入口）** | [references/invocation-prompts.md](references/invocation-prompts.md) | `start-project` / `continue-research` / `explore` / `audit`：固定用户调用契约，**用户不需要知道 `R` 编号**；防止实际使用时绕过新哲学（一上手就发散、编造状态） |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |

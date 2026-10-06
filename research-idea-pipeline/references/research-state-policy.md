@@ -1,7 +1,7 @@
-# Research State 政策（R1 权威：八类一等对象、写入时机、引用完整性 V1—V21）
+# Research State 政策（R1 权威：八类一等对象、写入时机、引用完整性 V1—V24）
 
 **本文件是 R1 Research World Model（简称 `state`）的唯一权威定义。** 八类一等对象的 ID 前缀、
-逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V21 都写在这里。各 phase 文件只引用本文件，
+逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V24 都写在这里。各 phase 文件只引用本文件，
 **不得**各自再定义一遍枚举——各写一遍就是新的漂移源。
 
 **权威顺序：** 仓库级 spec [r-architecture-wave1-spec.md](../../docs/r-architecture-wave1-spec.md)
@@ -10,11 +10,11 @@
 [scoring-policy.md](scoring-policy.md)（评分类）> 各 phase 文件。
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
 
-**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4 的 V1—V21
+**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4 的 V1—V24
 **没有 validator，「一等对象」是宣言，不是机制**（spec §2.3）。
 
 **骨架：** [../templates/research-state.template.json](../templates/research-state.template.json)
-（模板自身**必须**通过 V1—V21）。
+（模板自身**必须**通过 V1—V24）。
 
 ---
 
@@ -388,6 +388,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `repairs[]` | `flaw` | 字符串 | ✅ | V10；发现的缺陷（含 critical flaw） |
 | `repairs[]` | `disposition` | `REPAIR_CLAIM` \| `RUN_TEST` \| `FIX_IMPLEMENTATION` \| `NARROW_SCOPE` \| `KILL_BRANCH` | ✅ | V10；五值封冻 |
 | `repairs[]` | `state_delta` | 字符串 | ✅ | V10；**实际改动了哪些字段**，必须可核对 |
+| `repairs[]` | `targets` | id 数组，可为 `[]` | ✅ | **V22**；该修复**直接作用**的对象 id —— 供「claim 被否决必须走 R10」做**精确**核对（不用易误判的子串匹配） |
 | `repairs[]` | `closure` | `RESOLVED` \| `ACCEPTED_LIMITATION` | ✅ | V10；两值封冻 |
 
 **修复门的硬规则（spec §5）：**
@@ -401,9 +402,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ---
 
-## 4. 引用完整性 V1—V21（`state_check.py` 机械强制）
+## 4. 引用完整性 V1—V24（`state_check.py` 机械强制）
 
-**结论：V1—V21 全部是硬违规；任何一条未清零，state 不得作为下一阶段的输入。**
+**结论：V1—V24 全部是硬违规；任何一条未清零，state 不得作为下一阶段的输入。**
 
 **规则表（规则文本逐字取自 spec §2.3；`state_check.py` 与该表一一对应）：**
 
@@ -430,6 +431,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V19 | 一跳传播：若 A.depends_on 含 B 且 B.validity.status == invalid，则 A.validity.status 不得为 valid | 硬 | `E3.validity.status: "invalid"`，而 `C2.depends_on: ["E3"]` 且 `C2.validity.status: "valid"` |
 | V20 | claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2） | 硬 | `C0.status: "supported"`，而其支持证据全是 `T0`（LLM 自评）；或证据缺 `verification_tier` |
 | V21 | status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version | 硬 | `X12` 已 `done` 却无 `preregistration`；或 `frozen_at_state_version: 5 > result_at_state_version: 4`；或 `op: "improve"` 越界 |
+| V22 | claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值） | 硬 | `C5.status: "killed"` 而没有任何 `repairs[].targets` 含 `C5`——**决策层无权改 claim 真值**（SKILL §1.7） |
+| V23 | reviews[].integrity_gate == "fail" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值） | 硬 | `integrity_gate: "fail"`，而 `repairs[]` 与 `failures[]` 都没有对应记录——**Gate 不是 warning** |
+| V24 | decision.verdict 存在时必须是 continue / pivot / archive / submit 之一 | 硬 | `"verdict": "banana"`，或空串 |
 
 **执行契约（spec §2.3）：**
 
@@ -438,8 +442,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | 退出码 | `0` 全部通过；`3` 存在硬违规；`4` 环境不满足（文件缺失、非法 JSON、结构不符等） |
 | `--json` | 输出机器可读结果 |
 | `--check` | 只校验不写（默认行为即只校验） |
-| `--list-rules` | 列出 V1—V21 与判据（本表与它逐字一致） |
-| `--selftest` | 内置自检，V1—V21 全覆盖 |
+| `--list-rules` | 列出 V1—V24 与判据（本表与它逐字一致） |
+| `--selftest` | 内置自检，V1—V24 全覆盖 |
 | 收工门槛 | 退出码**必须**为 `0`；`3` / `4` 都**不得**当作通过 |
 
 **与 `state_check.py` 实现的对应（一一对齐，不得各自解释）：**
@@ -457,8 +461,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 **边界（不得扩大解释）：**
 
-1. V1—V21 覆盖**引用完整性**。§3 的**字段齐备性**（键是否齐备）是另一层硬要求，
-   以 `state_check.py` 的实际实现与审计清单为准——**不得**因为「V1—V21 没查」就省略字段。
+1. V1—V24 覆盖**引用完整性**。§3 的**字段齐备性**（键是否齐备）是另一层硬要求，
+   以 `state_check.py` 的实际实现与审计清单为准——**不得**因为「V1—V24 没查」就省略字段。
 2. V5 只否决 `Hypothesized` / `Unknown` 进 `supporting_evidence`；`Planned` 条目的引用纪律
    见 [claim-first-policy.md](claim-first-policy.md) §2 与 [evidence-policy.md](evidence-policy.md) §3
    ——**不得**当作证据引用（R8 的 Evidence Contract 只收 `Observed` / `Supported`）。
@@ -559,15 +563,15 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | [scoring-policy.md](scoring-policy.md) §3 / §4 | `G1—G5` 门禁、六维排序 | 门禁与排序**读** state：`claims[].supporting_evidence`（`G1`）、`literature[].relation` 与最近前作（`G2`）、`evidence[].epistemic_status`（`G4`）、`hypotheses[].niche` / `experiments[].stage`（实验设计质量）。**state 只存事实与状态，不存评分**；门禁 `fail` 的后果**必须**回写成 `repairs[]` / `claims[].status` / `failures[]`，**不得**只停留在评分表里 |
 | [project-layout.md](project-layout.md) §6（落盘三档）/ §3.1（正文禁令） | 落盘路径与「什么不得贴进正文」 | 机器状态 → `.research-idea-pipeline/routes/<R>/research-state.json`（**常驻、就地覆盖**：每轮只保留一份当前 state；过程快照若需要，放 `.research-idea-pipeline/routes/<R>/` 下的中间产物档）。交付物仍在 `routes/<R>/docs/`；**不得**把 state / 原始 JSON 贴进正文（该文件 §3.1 的既有禁令） |
 | [../SKILL.md](../SKILL.md) §1.6（本轮新增） | 「critical flaw ⇒ state change」不变量 | 本文件 §1 硬规则 2 与 §3.9 是它的执行细则；两处措辞**必须**一致 |
-| [../scripts/state_check.py](../scripts/state_check.py) | V1—V21 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
-| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V21（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
+| [../scripts/state_check.py](../scripts/state_check.py) | V1—V24 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
+| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V24（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
 
 **维护规则：**
 
 1. 节号 `§1—§6` **冻结**。新增或移动节属于破坏性变更，**必须**同轮更新本节与全部引用点，
    并在 spec 的变更记录里记一行。
 2. 引用本文件时**必须**写 `research-state-policy.md §N`，**不得**只写「见 state 政策」。
-3. §2 的 ID 前缀、§3 的字段与枚举、§4 的 V1—V21 一旦改动，**必须**同轮扫三处：
+3. §2 的 ID 前缀、§3 的字段与枚举、§4 的 V1—V24 一旦改动，**必须**同轮扫三处：
    `state_check.py`（规则实现）、`research-state.template.json`（骨架）、全部 `phase-*.md`
    （读写时机），**不得**只改一处。
 
@@ -591,7 +595,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ### 3.11 附加槽位（与八类对象同级或挂在对象下，全部已在模板中占位）
 
-**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们（`state_check.py` 忽略未知键；V1—V21 不覆盖形状校验）。**
+**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们（`state_check.py` 忽略未知键；V1—V24 不覆盖形状校验）。**
 旧表述「不得自加字段」的**准确含义是**：**新加字段必须同时改本表、模板与 `state_check.py`**，
 而不是「只准用八类对象」。
 

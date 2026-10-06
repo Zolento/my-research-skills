@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""state_check.py — Research World Model（R1）机械闸门：V1—V21 引用完整性审计
+"""state_check.py — Research World Model（R1）机械闸门：V1—V24 引用完整性审计
 
 契约来源
 --------
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
-与 §2.3（引用完整性规则 V1—V21）、§5（R10 处置 / 关闭枚举）；
+与 §2.3（引用完整性规则 V1—V24）、§5（R10 处置 / 关闭枚举）；
 V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4；
 V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5 跨阶段机制）。
 
@@ -17,7 +17,7 @@ V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5
     python3 state_check.py <state.json> --check    # 显式化「只校验不写」
     python3 state_check.py <state.json> --json     # 机器可读结果（stdout 只有 JSON）
     python3 state_check.py <state.json> --quiet    # 只打印汇总行
-    python3 state_check.py --selftest              # 内置自检（V1—V21 全覆盖）
+    python3 state_check.py --selftest              # 内置自检（V1—V24 全覆盖）
     python3 state_check.py --list-rules            # 列出规则号与判据
 
 规则（逐字取自 spec §2.3，全部为硬违规）：
@@ -80,7 +80,7 @@ V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
-    * V1—V21 之外**不新增**硬规则（契约 = Wave 1 spec §2.3 + Wave 2 spec §4 +
+    * V1—V24 之外**不新增**硬规则（契约 = Wave 1 spec §2.3 + Wave 2 spec §4 +
       Wave 4 的 V16/V17 + Wave 5 spec §1.4/§2.4/§3.3 的 V18—V21）。
 
 退出码（与仓库既有脚本一致）：
@@ -142,6 +142,12 @@ DISPOSITIONS: Tuple[str, ...] = (
     "REPAIR_CLAIM", "RUN_TEST", "FIX_IMPLEMENTATION", "NARROW_SCOPE", "KILL_BRANCH",
 )
 CLOSURES: Tuple[str, ...] = ("RESOLVED", "ACCEPTED_LIMITATION")
+# Wave 5 收尾：决策枚举与失败类型（V23/V24 用）
+DECISION_VERDICTS: Tuple[str, ...] = ("continue", "pivot", "archive", "submit")
+FAILURE_KINDS: Tuple[str, ...] = (
+    "falsified", "unsupported", "inconclusive",
+    "failed-to-reproduce", "engineering-failure", "deprioritized",
+)
 # Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
 NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
 ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
@@ -159,7 +165,7 @@ ISLAND_OPERATOR: Dict[str, str] = {
 }
 
 # Wave 5（P0-3…P0-5）：八类一等对象键（不含 assurance / repairs）、validity 状态、
-# 验证可信度层级（T = Tier，刻意避开规则号 V1—V21 的命名空间）、预注册算子的冻结枚举。
+# 验证可信度层级（T = Tier，刻意避开规则号 V1—V24 的命名空间）、预注册算子的冻结枚举。
 FIRST_CLASS_KEYS: Tuple[str, ...] = tuple(key for key, _ in OBJECT_KEYS)
 VALIDITY_STATUSES: Tuple[str, ...] = ("valid", "stale", "invalid", "pending")
 VERIFICATION_TIERS: Tuple[str, ...] = ("T0", "T1", "T2", "T3", "T4", "T5")
@@ -193,6 +199,9 @@ RULES: Dict[str, str] = {
     "V19": "一跳传播：若 A.depends_on 含 B 且 B.validity.status == invalid，则 A.validity.status 不得为 valid",
     "V20": "claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2）",
     "V21": "status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version",
+    "V22": "claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值）",
+    "V23": "reviews[].integrity_gate == \"fail\" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值）",
+    "V24": "decision.verdict 存在时必须是 continue / pivot / archive / submit 之一",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -204,6 +213,11 @@ RULE_ORDER: List[str] = list(RULES)
 def _text_ok(value: Any) -> bool:
     """文本字段的「非空」口径：必须是 strip 后非空的字符串。"""
     return isinstance(value, str) and bool(value.strip())
+
+
+def _text(value: Any) -> str:
+    """取字符串的 strip 结果；非字符串返回空串（供"包含 id"这类包含性判断用）。"""
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _is_blank(value: Any) -> bool:
@@ -457,6 +471,8 @@ class _Context:
     uncertainties: List[Tuple[int, Dict[str, Any]]]
     assurance: List[Tuple[int, Dict[str, Any]]]
     repairs: List[Tuple[int, Dict[str, Any]]]
+    reviews: List[Tuple[int, Dict[str, Any]]] = field(default_factory=list)
+    decision: Dict[str, Any] = field(default_factory=dict)
     evidence_by_id: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     evidence_index: Dict[str, int] = field(default_factory=dict)
     experiment_by_id: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -476,6 +492,8 @@ class _Context:
             uncertainties=_entries(doc, "uncertainties"),
             assurance=_entries(doc, "assurance"),
             repairs=_entries(doc, "repairs"),
+            reviews=_entries(doc, "reviews"),
+            decision=(doc.get("decision") if isinstance(doc.get("decision"), dict) else {}),
             state_version=doc.get("state_version"),
         )
         context.evidence_by_id = _index_by_id(context.evidence)
@@ -492,7 +510,7 @@ class _Context:
 
 
 # ---------------------------------------------------------------------------
-# V1—V21
+# V1—V24
 # ---------------------------------------------------------------------------
 
 def _v1(ctx: _Context) -> List[Violation]:
@@ -1267,6 +1285,79 @@ def _v21(ctx: _Context) -> List[Violation]:
     return out
 
 
+def _v22(ctx: _Context) -> List[Violation]:
+    """V22：claim 被否决 / 反驳必须走 R10——不得由决策层直接改真值。
+
+    校验器只看最终 JSON，看不见"谁写的"。本条用**可机械核对的追溯性**补上：
+    凡 status ∈ {killed, contradicted} 的 claim，必须有一条 `repairs[]` 覆盖它
+    （`disposition` ∈ 五值 **且** `state_delta` 里出现该 claim 的 id）。
+    于是「R14 越权写 killed」的 state **无法通过校验**——除非同时伪造一条 repair，
+    那已从"静默越权"变成"显式造假"，可审计。
+    """
+    out: List[Violation] = []
+    covered: List[str] = []
+    for _, repair in ctx.repairs:
+        disposition = repair.get("disposition")
+        targets = repair.get("targets")
+        if (_text_ok(disposition) and disposition.strip() in DISPOSITIONS
+                and isinstance(targets, list)):
+            covered.extend(_text(x) for x in targets if _text(x))
+    for index, claim in ctx.claims:
+        status = claim.get("status")
+        if not (_text_ok(status) and status.strip() in ("killed", "contradicted")):
+            continue
+        cid = _text(claim.get("id"))
+        if cid and cid in covered:
+            continue
+        out.append(Violation(
+            "V22", f"claims[{index}].status",
+            f"status={status.strip()} 必须被一条 repairs[] 覆盖"
+            f"（该条 targets 须含 {cid or '该 claim 的 id'}，且 disposition ∈ 五值）—— "
+            "claim 真值只能经 R8 或 R10 改变，决策层无此权限",
+            status, _subject_of(claim),
+        ))
+    return out
+
+
+def _v23(ctx: _Context) -> List[Violation]:
+    """V23：Integrity Gate fail **不是 warning**，必须留下闭环动作（repairs 或 failures）。"""
+    failed = [(i, r) for i, r in ctx.reviews
+              if _text(r.get("integrity_gate")) and r["integrity_gate"].strip() == "fail"]
+    if not failed:
+        return []
+    has_repair = any(
+        _text(r.get("disposition")) and r["disposition"].strip() in DISPOSITIONS
+        for _, r in ctx.repairs
+    )
+    has_failure = any(
+        _text(f.get("kind")) and f["kind"].strip() in FAILURE_KINDS
+        for _, f in ctx.failures
+    )
+    if has_repair or has_failure:
+        return []
+    return [
+        Violation(
+            "V23", f"reviews[{index}].integrity_gate",
+            "integrity_gate=fail 必须产生 repairs[]（disposition ∈ 五值）或 "
+            "failures[]（kind ∈ 六值）—— 它是 Gate，不是 warning",
+            r.get("integrity_gate"), _subject_of(r, "artifact"),
+        )
+        for index, r in failed
+    ]
+
+
+def _v24(ctx: _Context) -> List[Violation]:
+    """V24：`decision.verdict` 只能取四值之一。"""
+    verdict = ctx.decision.get("verdict")
+    if verdict is None:
+        return []
+    if _text(verdict) and verdict.strip() in DECISION_VERDICTS:
+        return []
+    detail = ("必须是非空字符串" if not _text(verdict)
+              else "不是 " + " / ".join(DECISION_VERDICTS) + " 之一")
+    return [Violation("V24", "decision.verdict", detail, verdict, "decision")]
+
+
 CHECKS: Dict[str, Callable[[_Context], List[Violation]]] = {
     "V1": _v1, "V2": _v2, "V3": _v3, "V4": _v4, "V5": _v5,
     "V6": _v6, "V7": _v7, "V8": _v8, "V9": _v9, "V10": _v10,
@@ -1274,6 +1365,7 @@ CHECKS: Dict[str, Callable[[_Context], List[Violation]]] = {
     "V13": _v13, "V14": _v14, "V15": _v15,
     "V16": _v16, "V17": _v17,
     "V18": _v18, "V19": _v19, "V20": _v20, "V21": _v21,
+    "V22": _v22, "V23": _v23, "V24": _v24,
 }
 
 
@@ -1365,7 +1457,7 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
-        description="Research World Model（R1）机械闸门：V1—V21 引用完整性审计"
+        description="Research World Model（R1）机械闸门：V1—V24 引用完整性审计"
                     "（docs/r-architecture-wave1-spec.md §2.3）",
     )
     parser.add_argument("state", nargs="?", default=None,
@@ -1374,8 +1466,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="只校验不写入（默认行为即如此；显式化以便与 refs_index.py 口径一致）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行，不逐条打印违规")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V21 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V21 与判据")
+    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V24 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V24 与判据")
     return parser
 
 
@@ -1418,7 +1510,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 # ---------------------------------------------------------------------------
 
 def _selftest_state() -> Dict[str, Any]:
-    """自检用的最小合法 world model（覆盖 V1—V21 的通过侧）。"""
+    """自检用的最小合法 world model（覆盖 V1—V24 的通过侧）。"""
     return {
         "_schema": "research-idea-pipeline/research-state@1",
         "state_version": 0,
@@ -1496,8 +1588,7 @@ def _selftest_state() -> Dict[str, Any]:
         }],
         "repairs": [{
             "flaw": "C0 not supported", "disposition": "RUN_TEST",
-            "state_delta": "U1→X1 已排队；C0.status→partially-supported", "closure": "RESOLVED",
-        }],
+            "state_delta": "U1→X1 已排队；C0.status→partially-supported", "closure": "RESOLVED", "targets": []}],
     }
 
 
@@ -1776,11 +1867,16 @@ def selftest() -> int:
           v20c.exit_code == EXIT_HARD and v20c.rules() == ["V20"])
 
     def _contradicted_with_t1(d):
+        cid = d["claims"][0]["id"]
         d["claims"][0].update(status="contradicted", refuting_evidence=["E1"])
         d["evidence"][0].update(verification_tier="T1")
+        # 补一条覆盖该 claim 的 repair，使 V22 满足 —— 本用例只测 V20 的阈值
+        d["repairs"].append({"flaw": "该主张被反驳", "disposition": "REPAIR_CLAIM",
+                             "state_delta": f"{cid}.status → contradicted",
+                             "closure": "RESOLVED", "targets": [cid]})
 
     v20d = report_with(_contradicted_with_t1)
-    check("V20 contradicted 需 ≥ T2（T1 不够）→ 3",
+    check("V20 contradicted 需 ≥ T2（T1 不够）→ 3（V22 已由 repair 满足）",
           v20d.exit_code == EXIT_HARD and v20d.rules() == ["V20"])
 
     def _partial_with_t1(d):
@@ -1791,8 +1887,8 @@ def selftest() -> int:
     check("V20 合法反例：partially-supported + T1 → 0",
           v20ok.exit_code == EXIT_OK and v20ok.violations == [])
     v20ok2 = report_with(lambda d: d["claims"][0].update(status="killed"))
-    check("V20 合法反例：killed 不由 V20 管辖 → 0",
-          v20ok2.exit_code == EXIT_OK and v20ok2.violations == [])
+    check("V20 不管辖 killed；该状态由 V22 管（无 repair 时应只报 V22）",
+          v20ok2.exit_code == EXIT_HARD and v20ok2.rules() == ["V22"])
 
     # --- V21 ---
     v21a = report_with(lambda d: d["experiments"][0].pop("preregistration"))
@@ -1838,6 +1934,97 @@ def selftest() -> int:
     v21ok2 = report_with(_running_with_prereg)
     check("V21 合法反例：running 已有合法 preregistration → 0",
           v21ok2.exit_code == EXIT_OK and v21ok2.violations == [])
+
+    # ---- V22：claim 真值只能经 R8 / R10 改变 ----
+
+    def _kill_claim_without_repair(d):
+        d["claims"][0]["status"] = "killed"
+
+    v22a = report_with(_kill_claim_without_repair)
+    check("V22 killed 但无 repairs 覆盖 → 3",
+          v22a.exit_code == EXIT_HARD and v22a.rules() == ["V22"]
+          and v22a.violations[0].path == "claims[0].status")
+
+    def _contradict_without_repair(d):
+        d["claims"][0]["status"] = "contradicted"
+
+    v22b = report_with(_contradict_without_repair)
+    check("V22 contradicted 但无 repairs 覆盖 → 3",
+          v22b.exit_code == EXIT_HARD and v22b.rules() == ["V22"])
+
+    def _kill_with_repair(d):
+        cid = d["claims"][0]["id"]
+        d["claims"][0]["status"] = "killed"
+        d["repairs"].append({"flaw": "该主张被证否", "disposition": "REPAIR_CLAIM",
+                             "state_delta": f"{cid}.status → killed",
+                             "closure": "RESOLVED", "targets": [cid]})
+
+    v22ok = report_with(_kill_with_repair)
+    check("V22 合法反例：killed 且有 repairs 覆盖 → 0",
+          v22ok.exit_code == EXIT_OK and v22ok.violations == [])
+
+    def _kill_with_repair_missing_id(d):
+        d["claims"][0]["status"] = "killed"
+        d["repairs"].append({"flaw": "含糊的修复", "disposition": "REPAIR_CLAIM",
+                             "state_delta": "调整了某条主张", "closure": "RESOLVED",
+                             "targets": []})
+
+    v22c = report_with(_kill_with_repair_missing_id)
+    check("V22 repairs 存在但 targets 未含该 id → 3",
+          v22c.exit_code == EXIT_HARD and v22c.rules() == ["V22"])
+
+    # ---- V23：Integrity Gate fail 必须闭环 ----
+
+    def _gate_fail_no_closure(d):
+        d.pop("repairs", None)
+        d.pop("failures", None)
+        d["reviews"] = [{"stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+
+    v23a = report_with(_gate_fail_no_closure)
+    check("V23 integrity_gate=fail 且无 repairs/failures → 3",
+          v23a.exit_code == EXIT_HARD and v23a.rules() == ["V23"]
+          and v23a.violations[0].path == "reviews[0].integrity_gate")
+
+    def _gate_fail_with_failure(d):
+        d["reviews"] = [{"stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+
+    v23ok = report_with(_gate_fail_with_failure)
+    check("V23 合法反例：gate=fail 但已有 failures[] 闭环 → 0",
+          v23ok.exit_code == EXIT_OK and v23ok.violations == [])
+
+    def _gate_pass(d):
+        d["reviews"] = [{"stage": "R13", "artifact": "code",
+                         "integrity_gate": "pass", "findings": []}]
+
+    v23ok2 = report_with(_gate_pass)
+    check("V23 合法反例：gate=pass 不要求闭环 → 0",
+          v23ok2.exit_code == EXIT_OK and v23ok2.violations == [])
+
+    # ---- V24：decision.verdict 枚举 ----
+
+    def _bad_verdict(d):
+        d["decision"] = {"verdict": "banana", "rationale": "x", "next_phase": "R9"}
+
+    v24a = report_with(_bad_verdict)
+    check("V24 decision.verdict 越界 → 3",
+          v24a.exit_code == EXIT_HARD and v24a.rules() == ["V24"]
+          and v24a.violations[0].path == "decision.verdict")
+
+    def _good_verdict(d):
+        d["decision"] = {"verdict": "continue", "rationale": "x", "next_phase": "R9"}
+
+    v24ok = report_with(_good_verdict)
+    check("V24 合法反例：verdict=continue → 0",
+          v24ok.exit_code == EXIT_OK and v24ok.violations == [])
+
+    def _no_decision(d):
+        d.pop("decision", None)
+
+    v24ok2 = report_with(_no_decision)
+    check("V24 合法反例：无 decision 键 → 0",
+          v24ok2.exit_code == EXIT_OK and v24ok2.violations == [])
     v21ok3 = report_with(lambda d: d["experiments"][0]["preregistration"]["outcomes"][0]
                          ["update"][0].update(op="retain-with-alternative"))
     check("V21 合法反例：七值内的 op → 0",

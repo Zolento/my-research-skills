@@ -15,7 +15,7 @@
 覆盖点
 ------
 1. 合法 state → 0；`--json` 的 `ok=true` 且可解析
-2. V1—V21 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
+2. V1—V24 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
    V10 四字段齐备 + 处置/关闭两个枚举）
 3. 环境：缺文件 / 非法 JSON / 空文件 / 根非对象 / 缺八类数组 / 数组类型错 / 条目非对象 → 4
 4. `--json` 在 0 / 3 / 4 三种情况下都可解析；`--check` 与默认行为等价
@@ -198,7 +198,7 @@ def valid_state() -> Dict[str, Any]:
                 "flaw": "C17 not supported",
                 "disposition": "RUN_TEST",
                 "state_delta": "U3→X8 已排队；C17.status→partially-supported",
-                "closure": "RESOLVED",
+                "closure": "RESOLVED", "targets": [],
             },
         ],
     }
