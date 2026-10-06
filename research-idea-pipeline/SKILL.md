@@ -69,7 +69,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
 | **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
-| **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `assurance[].discriminating_test` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R10** | `metacognitive-repair` | **critical flaw ⇒ state 必须改变** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
@@ -613,7 +613,9 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 - **机制型 claim 必须做 regime shift 测试**：构造机制应成立的 `RS1` 与应失效的 `RS2`
   （**注意：`RS<n>` 是 regime-shift 条件，不是阶段号**）；两者结果近似 ⇒ 该机制 claim
   **降级为 `partially-supported`**。
-- **artifact 审计的时机：** R7 / R8 阶段没有 code / logs / failed runs，**只能审计划中的证据契约**；
+- **artifact 审计的时机：** **R7 首轮**（R8 之前）没有 artifact，也**没有** `claims[].contract`，
+  只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`；
+  **R7 第二轮起**才逐条核契约；**R8** 只能审自己刚建的契约与刚冻结的 `preregistration`（都是预测）。
   真正的 artifact-aware 审计绑在 **R9 之后 / R13**。**禁止在无 artifact 的阶段要求 artifact 审计。**
 
 > 权威定义与字段映射见
@@ -888,7 +890,8 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 - **R13：** 审 artifact 而非论文（code / logs / **failed runs** / dataset 与 metric 选择历史）；
   Integrity 检查（cherry-picking / leakage / metric misuse / post-hoc bias）是 **Gate**。
-  **R7/R8 无 artifact，只能审计划中的证据契约** —— 不得在无 artifact 阶段要求 artifact 审计。
+  **R7 首轮无 artifact 也无契约，只能审 seed claim / hypothesis / assumption** ——
+  不得在无 artifact 阶段要求 artifact 审计。
 - **R14：** `continue | pivot | archive | submit`，并回写 `decision`。
 
 ## 5. R 阶段衔接与状态回写

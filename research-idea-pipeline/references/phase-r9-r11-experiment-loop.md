@@ -202,7 +202,9 @@ Claim ↔ Method ↔ Code ↔ Result ↔ Conclusion
 
 | 阶段 | 有什么 artifact | 允许要求什么审计 |
 |---|---|---|
-| R7 / R8 | **没有** code / logs / failed runs | **只能审「计划中的证据契约」** |
+| **R7 首轮**（R8 之前） | 没有 code / logs / failed runs，也**没有** `claims[].contract` | **只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`** |
+| **R7 第二轮起**（R8 之后） | 有 `claims[].contract`，仍无 artifact | 逐条核契约：`kill_rule` 是否可判定、`expected_outcomes` ↔ `preregistration.outcomes[].id`、`minimal_discriminating_experiment` 是否指向真实 `X` |
+| **R8** | 无 artifact | **只能审它自己刚建的 `claims[].contract` 与刚冻结的 `preregistration`** —— 两者都是**预测**，不是结果 |
 | R9 之后 / R13 | 有完整 trace | artifact-aware 审计：code ↔ method、logs ↔ result、failed runs 是否被隐藏、metric / dataset 选择历史 |
 
 **禁止在无 artifact 的阶段要求 artifact 审计。** 那会产出一条永远无法执行、只能填「待补」的规则。

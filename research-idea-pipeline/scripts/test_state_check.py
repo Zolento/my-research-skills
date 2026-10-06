@@ -1192,6 +1192,47 @@ class TestR8ContractParity(unittest.TestCase):
             self.assertIn(op, text, f"R8 文档未登记 preregistration op：{op}")
 
 
+class TestR7FirstPassAuditTarget(unittest.TestCase):
+    """R7 首轮不得要求审一个尚不存在的 `claims[].contract`。
+
+    起因（总收官审计 MAJOR-7）：多份文档写「R7 / R8 只能审**计划中的证据契约**」，
+    但 `claims[].contract` 由 **R8** 建立，而 R8 排在 R7 **之后** ——
+    首轮 R7 没有契约可审，`hypotheses[]` 也没有 contract 字段承载。
+    该规则只能产出「待补」。首轮的攻击对象必须是 R3—R6 已落盘的三类对象。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DOCS = (
+        "references/phase-r7-r10-r13-assurance-repair-review.md",
+        "references/phase-r9-r11-experiment-loop.md",
+        "SKILL.md",
+        "references/research-state-policy.md",
+    )
+
+    def test_no_unbacked_planned_contract_phrase(self) -> None:
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("计划中的证据契约", text,
+                             f"{rel} 仍要求审「计划中的证据契约」（无承载）")
+
+    def test_r7_doc_names_the_first_pass_targets(self) -> None:
+        text = (self.ROOT / "references" / "phase-r7-r10-r13-assurance-repair-review.md"
+                ).read_text(encoding="utf-8")
+        self.assertIn("首轮 R7 没有契约可审", text)
+        for target in ("`claims[]`", "`hypotheses[]`", "`assumptions[]`"):
+            self.assertIn(target, text, f"R7 文档未点名首轮攻击对象 {target}")
+
+    def test_r7_read_set_includes_assumptions(self) -> None:
+        # 攻击面 R-Theory 打的就是 tacit 假设；读集少了 assumptions 就自相矛盾。
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            row = next((line for line in text.splitlines()
+                        if line.startswith("| **R7**") and "`claims`" in line), None)
+            if row is None:
+                continue
+            self.assertIn("`assumptions`", row, f"{rel} 的 R7 读集缺 assumptions")
+
+
 class TestPhaseDocNoLegacyFlow(unittest.TestCase):
     """迁移后的 phase 文档不得再含旧字母流程的**活跃**小节。
 

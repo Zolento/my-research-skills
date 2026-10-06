@@ -6,9 +6,22 @@
 **R10 的权威定义在 [phase-r9-r11-experiment-loop.md](phase-r9-r11-experiment-loop.md)。**
 本文件只登记「R7 / R13 发现的问题必须交给 R10」，**不另立一套处置规则**。
 
-**首轮 R7 审什么：** R8 的证据契约在 R7 **之后**才建立，因此**首轮** R7 审的是
-R3—R6 的候选与其**计划中的**证据契约（写在 `hypotheses[]` / `assurance[]` 里）；
-从第二轮起才审 R8 正式建立的 `claims[].contract`。
+**首轮 R7 审什么（本文件最容易搞错的一处）：**
+`claims[].contract` 由 R8 建立，R8 排在 R7 **之后**，所以**首轮 R7 没有契约可审**。
+首轮的攻击对象是 R3—R6 已经落盘的三类对象：
+
+| 首轮攻击对象 | 攻击面读什么 |
+|---|---|
+| `claims[]`（seed，`status: ungrounded`） | `falsifier` / `nearest_alternative` / `scope` |
+| `hypotheses[]` | `falsifier` / `nearest_prior` / `structural_signature` / `expected_information_gain` |
+| `assumptions[]` | `statement` / `status`（**`tacit` 的假设是重点**） / `if_false` |
+
+**产出落到 `assurance[]`**：`kill_condition` + `discriminating_test`（`verification_tier` 上限 `T0`）。
+**不得**要求首轮审一个还不存在的 `claims[].contract` —— 那会产出一条只能填「待补」的规则。
+
+**第二轮起**（R8 建成 `claims[].contract` 之后）才把契约本身加入攻击对象：逐条核
+`kill_rule` 是否可判定、`expected_outcomes` 的键是否与派生实验的
+`preregistration.outcomes[].id` 对应、`minimal_discriminating_experiment` 是否指向真实 `X`。
 
 ---
 
@@ -438,7 +451,9 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 
 | 阶段 | 有什么 artifact | 允许要求什么审计 |
 |---|---|---|
-| R7 / R8 | **没有** code / logs / failed runs | **只能审「计划中的证据契约」** |
+| **R7 首轮**（R8 之前） | 没有 code / logs / failed runs，也**没有** `claims[].contract` | **只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`** |
+| **R7 第二轮起**（R8 之后） | 有 `claims[].contract`，仍无 artifact | 逐条核契约：`kill_rule` 是否可判定、`expected_outcomes` ↔ `preregistration.outcomes[].id`、`minimal_discriminating_experiment` 是否指向真实 `X` |
+| **R8** | 无 artifact | **只能审它自己刚建的 `claims[].contract` 与刚冻结的 `preregistration`** —— 两者都是**预测**，不是结果 |
 | R9 之后 / R13 | 完整 trace | artifact-aware 审计（含 Integrity Gate） |
 
 **禁止在无 artifact 的阶段要求 artifact 审计** —— 那会产出一条永远无法执行、只能填「待补」的规则。
@@ -449,7 +464,7 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） |
 
