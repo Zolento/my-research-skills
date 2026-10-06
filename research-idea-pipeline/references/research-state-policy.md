@@ -214,6 +214,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    - 到达上限仍未收敛 → **不得静默继续**：须落 `uncertainties[]`（`importance: critical`），
      并在 `repairs[]` 记一条 `disposition: FIX_IMPLEMENTATION`，然后才可进入下一阶段。
    - 传播**只允许改 `validity`**；任何 `claims[].status` 的改动必须走 R8 或 R10（§5 硬规则 4）。
+   - **传播产生的下游状态一律写 `stale`（不得写 `invalid`）。**
+     理由：`invalid` 只表示「该对象自身已被证伪 / 撤回」，是**独立判定**的结果，不是传染出来的。
+     加上这条后，不动点**唯一**且**一趟即达**（`stale` 不传染），执行者之间不会有分歧；
+     若某对象确应 `invalid`，必须由它**自身的**证据或处置给出理由。
 
 ### 3.1 `claims[]` — Claim Graph（`C<n>`）
 
