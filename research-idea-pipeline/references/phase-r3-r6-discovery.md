@@ -519,7 +519,7 @@ Niche N8（Benchmark/评测）           elite: H62
 | 事件 | 动作 |
 |---|---|
 | 新候选进 archive | 与该 niche 的 elite 比较；胜者 `elite`，败者 `active`（**两者都留在 population**，不删） |
-| 某 niche 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`，或**关闭该 niche**（否则 V15 会在下一次校验时报出） |
+| 某 niche 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`。**若该 niche 只有这一条候选，则 R14 不得把它 `archive`** —— 用 `decision`（`pivot` / `archive`）表达"这条路停止"，**不要**靠改 `hypotheses[].status` 来表达；否则 V15 会在下一次校验时报出。**本仓库没有"关闭 niche"机制，不要发明它。** |
 | 候选被 R6 判 `killed` | `status: killed` 并写 `failures[]`（`kind: deprioritized`） |
 
 ---

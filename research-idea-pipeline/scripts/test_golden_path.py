@@ -371,24 +371,28 @@ class TestAdversarialGoldenPaths(_Base):
         state["hypotheses"][0]["validity"]["status"] = "valid"
         self.assertClean(state, "A-两跳不被追踪")
 
-    def test_path_a_support_edge_is_not_a_propagation_edge_KNOWN_GAP(self):
-        """**已登记缺口**：V19 沿 `depends_on` 传播，而证据支持走 `supporting_evidence`。
+    def test_path_a_support_edge_is_a_propagation_edge(self):
+        """**证据链就是传播边**：`V19` 把 claim 的 supporting/refuting evidence 也视为依赖。
 
-        因此「E 失效 ⇒ 依赖它的 C 变 stale」**不会自动发生** —— 除非 claim 显式把该证据
-        写进 `depends_on`。本用例证明这一点：同样把 E2 置 invalid，若 C1 的 `depends_on`
-        不含 E2，则 V19 **不报**（校验器无法从 `supporting_evidence` 推出依赖）。
-
-        这与「证据失效传播」的直觉预期不同，属**语义缺口**而非实现 bug。
-        建议二选一：① 规范要求「把支持证据一并写进 depends_on」；
-        ② 让 V19 把 `supporting_evidence` / `refuting_evidence` 也视为传播边。
+        因此「E 失效 ⇒ 依赖它的 C 不得仍标 `valid`」是**自动可检**的，
+        不要求执行者额外把该证据再登记进 `depends_on`。
+        （悬空引用仍由 `V2` 负责，`V19` 不重复报。）
         """
         state = self._state_at_r10()
         state["claims"][0]["depends_on"] = ["H1"]        # 故意不声明依赖 E2
-        state["evidence"][1]["validity"]["status"] = "invalid"
+        state["evidence"][1]["validity"]["status"] = "invalid"  # E2 是 C1 的支持证据
         report = self.check(state)
-        self.assertNotIn("V19", report.rules(),
-                         "若已把支持边纳入 V19，请更新本缺口用例")
-        self.skipTest("已知缺口：支持边（supporting_evidence）不是传播边（depends_on）")
+        self.assertIn("V19", report.rules(),
+                      "支持证据失效时，claim 不得仍标 valid —— V19 必须沿证据边传播")
+        # 合规修法：下游转 stale 即可
+        state["claims"][0]["validity"]["status"] = "stale"
+        self.assertClean(state, "A-证据边传播后转 stale")
+
+        # 悬空证据不得由 V19 重复报（V2 负责）
+        state["claims"][0]["supporting_evidence"] = ["E999"]
+        state["claims"][0]["validity"]["status"] = "valid"
+        rules = self.check(state).rules()
+        self.assertNotIn("V19", rules, "悬空证据的判定权属 V2，V19 不应重复报")
 
     # ---- B 负结果不得 narrative salvage ----
 

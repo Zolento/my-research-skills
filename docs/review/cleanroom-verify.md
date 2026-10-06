@@ -214,3 +214,47 @@ deprecated 0 命中                            linter 全绿
 
 **Golden Path 的 3 条 skipTest 缺口**（仍如实登记，不假装覆盖）：
 Path A 支持边不是传播边｜Path C 假范式新颖性｜Path E 叙事幻觉不得创建 claim。
+
+
+---
+
+# 附录二：Round 6 —— 清剩余项
+
+| 原发现 | 状态 | 修法 |
+|---|---|---|
+| **MINOR-1** `assurance[]` 只在 R7 写列，但 R9/R13 的 bullet 与之矛盾 | ✅ **已修** | ① **R9 写格新增 `assurance[].discriminating_test`**（三处同步）——R9 创建 X，本就该把 kill condition 接到真实判别实验上；② **R13 的 bullet 不再声称写 `assurance[]`**，改为写 `reviews[]`（assurance 归 R7） |
+| **MINOR-2** `validity` / `verification_tier` / `depends_on` 不在任何写列 | ✅ **已修（说明性）** | 读/写表后新增「公共字段的写授权」条款：**创建或更新某对象时，该对象的这些必填字段随对象一并授权写入**；**未创建该对象的阶段仍不得单独修改它们** |
+| **MINOR-4** 「关闭该 niche」未实现 | ✅ **已修（删除未实现的机制）** | 改为可执行规则：若该 niche **只有这一条候选**，则 **R14 不得把它 `archive`** —— 用 `decision`（`pivot` / `archive`）表达"这条路停止"，不要靠改 `hypotheses[].status`。并明写「**本仓库没有"关闭 niche"机制，不要发明它**」 |
+| **支持边 ≠ 传播边**（golden path 发现） | ✅ **已修** | **`V19` 扩展：claim 的 `supporting_evidence` / `refuting_evidence` 也是传播边。** 悬空引用仍由 `V2` 负责（V19 不重复报）。规则文本三处同步 |
+| Path C 假范式新颖性 | ⏳ **仍为缺口** | 需要 `structural-equivalence` 双 pass（P1-1，属新功能而非 bug） |
+| Path E 叙事幻觉不得创建 claim | ⏳ **仍为缺口** | 校验器无法区分「谁写的」；需 provenance 或阶段标记（属新功能） |
+
+## 本轮把 3 条 `skipTest` 缺口中的 1 条**升级为真实断言**
+
+Path A 从「已知缺口」变成「**证据链就是传播边**」的**真实断言**：
+```
+state["claims"][0]["depends_on"] = ["H1"]        # 故意不声明依赖 E2
+state["evidence"][1]["validity"]["status"] = "invalid"
+→ V19 必须报（支持证据失效 ⇒ claim 不得仍标 valid）
+→ 下游转 stale 后 exit 0
+→ 悬空证据不得由 V19 重复报（V2 负责）
+```
+
+## Round 6 末闸门快照
+
+```
+187 tests OK（skipped=2：C / E 两条如实登记的缺口）
+selftest OK（V1—V24 全覆盖）        模板 --check exit 0
+规则表 24/24 逐字不一致 0            三方读写 14 阶段不一致 0
+链接 469 断链 0                      deprecated 0 命中
+linter 全绿                          工作树干净
+```
+
+## 结论
+
+**clean-room 报出的 2 个 MAJOR + 5 个 MINOR 中，4 个 MINOR 已修、1 个经核实为假阳性
+（MINOR-3）、2 个 MAJOR 已修并各有机械规则与真实断言锁定。**
+
+**剩下的 2 条不是 bug，是未实现的功能**：
+structural-equivalence 双 pass（P1-1）与叙事阶段的 provenance/权限闸门。
+它们已在 golden path 里以 `skipTest` **如实登记**，不会被误当成"已覆盖"。

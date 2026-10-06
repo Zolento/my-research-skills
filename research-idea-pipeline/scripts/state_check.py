@@ -196,7 +196,7 @@ RULES: Dict[str, str] = {
     "V16": "hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应",
     "V17": "hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）",
     "V18": "每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数",
-    "V19": "一跳传播：若 A.depends_on 含 B 且 B.validity.status == invalid，则 A.validity.status 不得为 valid",
+    "V19": "一跳传播：若 A 依赖 B（A.depends_on 含 B，或 A 是 claim 且其 supporting_evidence / refuting_evidence 含 B）且 B.validity.status == invalid，则 A.validity.status 不得为 valid",
     "V20": "claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2）",
     "V21": "status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version",
     "V22": "claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值）",
@@ -1104,7 +1104,7 @@ def _v18(ctx: _Context) -> List[Violation]:
 
 
 def _v19(ctx: _Context) -> List[Violation]:
-    """V19：一跳传播 —— depends_on 指向 validity.status == invalid 的对象时，本对象不得标 valid。"""
+    """V19：一跳传播 —— 依赖（`depends_on`，claim 另含支持/反驳证据）指向 invalid 对象时，本对象不得标 valid。"""
     out: List[Violation] = []
     by_id: Dict[str, Dict[str, Any]] = {}
     for _key, _index, entry in _first_class(ctx):
@@ -1126,24 +1126,40 @@ def _v19(ctx: _Context) -> List[Violation]:
             continue
 
         own_status = _validity_status_of(entry)
-        for position, ref in enumerate(depends):
-            path = f"{base}.depends_on[{position}]"
+        # 证据链也是依赖：claim 的支持/反驳证据失效时，该 claim 不得仍标 valid。
+        # (路径, 引用, 本规则是否负责该引用的"悬空"判定)
+        edges: List[Tuple[str, Any, bool]] = [
+            (f"{base}.depends_on[{i}]", ref, True) for i, ref in enumerate(depends)
+        ]
+        if key == "claims":
+            # 证据链也是依赖边；但**悬空**由 V2 负责，V19 只管传播（避免重复报）
+            for field_name in ("supporting_evidence", "refuting_evidence"):
+                refs = entry.get(field_name)
+                if isinstance(refs, list):
+                    edges.extend(
+                        (f"{base}.{field_name}[{i}]", ref, False)
+                        for i, ref in enumerate(refs)
+                    )
+
+        for path, ref, owns_dangling in edges:
             if not _text_ok(ref):
-                out.append(Violation("V19", path, "不是非空对象 id", ref, subject))
+                if owns_dangling:
+                    out.append(Violation("V19", path, "不是非空对象 id", ref, subject))
                 continue
             target = ref.strip()
             upstream = by_id.get(target)
             if upstream is None:
-                out.append(Violation(
-                    "V19", path, "depends_on 指向不存在的对象（悬空依赖）", ref, subject,
-                ))
-                continue
+                if owns_dangling:
+                    out.append(Violation(
+                        "V19", path, "depends_on 指向不存在的对象（悬空依赖）", ref, subject,
+                    ))
+                continue  # 证据边的悬空由 V2 负责
             if _validity_status_of(upstream) != "invalid":
                 continue
             if own_status == "valid":
                 out.append(Violation(
                     "V19", f"{base}.validity.status",
-                    f"depends_on 含 {target}（validity.status=invalid），本对象不得标 valid"
+                    f"依赖 {target}（validity.status=invalid），本对象不得标 valid"
                     "（须转 stale / invalid / pending）",
                     entry.get("validity", {}).get("status"), subject,
                 ))

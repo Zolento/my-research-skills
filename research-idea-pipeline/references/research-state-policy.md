@@ -189,6 +189,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 **失效传播（V19，只查一跳）：** 若 `A.depends_on` 含 `B` 且 `B.validity.status == invalid`，
 则 `A.validity.status` **不得为 `valid`**（`stale` / `invalid` / `pending` 都可以）。
 
+> **证据链也是依赖：** 对 `claims[]`，其 `supporting_evidence` / `refuting_evidence` 指向的
+> `evidence[]` **同样构成依赖边**。即「E 失效 ⇒ 依赖它的 C 不得仍标 `valid`」是自动可检的，
+> **不要求**执行者额外把证据再登记进 `depends_on`。
+
 **为什么放在八类对象上而不建一张边表：** 边表会变成**第九类一等对象**，
 违反 Wave 5 spec §0.5 的不扩张承诺。
 
@@ -428,7 +432,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
 | V17 | hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环） | 硬 | `"parents": ["H9"]` 但无 `H9`；`"parents": []` 而 `generation: 1`；`H3.parents: ["H4"]` 且 `H4.parents: ["H3"]` |
 | V18 | 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数 | 硬 | 缺 `validity`；`"status": "ok"`；`"reason": ""`；`since_state_version: 7` 而 `state_version: 3` |
-| V19 | 一跳传播：若 A.depends_on 含 B 且 B.validity.status == invalid，则 A.validity.status 不得为 valid | 硬 | `E3.validity.status: "invalid"`，而 `C2.depends_on: ["E3"]` 且 `C2.validity.status: "valid"` |
+| V19 | 一跳传播：若 A 依赖 B（A.depends_on 含 B，或 A 是 claim 且其 supporting_evidence / refuting_evidence 含 B）且 B.validity.status == invalid，则 A.validity.status 不得为 valid | 硬 | `E3.validity.status: "invalid"`，而 `C2.depends_on: ["E3"]` 且 `C2.validity.status: "valid"` |
 | V20 | claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2） | 硬 | `C0.status: "supported"`，而其支持证据全是 `T0`（LLM 自评）；或证据缺 `verification_tier` |
 | V21 | status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version | 硬 | `X12` 已 `done` 却无 `preregistration`；或 `frozen_at_state_version: 5 > result_at_state_version: 4`；或 `op: "improve"` 越界 |
 | V22 | claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值） | 硬 | `C5.status: "killed"` 而没有任何 `repairs[].targets` 含 `C5`——**决策层无权改 claim 真值**（SKILL §1.7） |
@@ -508,7 +512,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
 | **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
 | **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） | `phase-r8-evidence-contract.md` |
-| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
+| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `assurance[].discriminating_test` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
 | **R11** Update World Model | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
 | **R12** Narrative | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） | `phase-r12-narrative.md` |
@@ -531,9 +535,14 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 - **R10**：读 全 state + artifact（code / logs / failed runs）；写 `repairs[]`（`flaw` / `disposition` / `state_delta` / `closure` 齐备），并**立即执行 `state_delta`**：改 `claims[].status` / `scope` / `known_flaws`、`experiments[].status`、`uncertainties[].status`、`hypotheses[].status`。一致性审计链 `Claim ↔ Method ↔ Code ↔ Result ↔ Conclusion`
 - **R11**：读 全 state；写 把 R2—R10 的增量**归并**成一份一致 state：去重、ID 永不复用、`TBD` 要么消掉要么保留并挂 `U`；跑 `state_check.py`，退出码非 `0` **不得**进入 R12
 - **R12**：读 `claims[]`、`evidence[]`、`literature[]`、`assurance[]`、`uncertainties[]`；写 默认**零写入**（叙事是视图，不是 artifact）；仅当叙事暴露新缺口时新增 `uncertainties[]`（`status: open`）。**不得**新增 `evidence[]`，**不得**提高既有条目的 `epistemic_status`
-- **R13**：读 全 state + artifact（code / logs / failed runs）；写 `failures[]`（`failed-to-reproduce` / `engineering-failure` / `inconclusive`）、`experiments[].unexpected` / `interpretation`、`assurance[]`；缺口**必须**交 R10 落成 `repairs[]`，**不得**只写进 review
+- **R13**：读 全 state + artifact（code / logs / failed runs）；写 `reviews[]`、`failures[]`（`failed-to-reproduce` / `engineering-failure` / `inconclusive`）、`experiments[].unexpected` / `interpretation`；`assurance[]` **不归 R13**（归 R7）；缺口**必须**交 R10 落成 `repairs[]`，**不得**只写进 review
 - **R14**：读 全 state + `repairs[]` 未闭环项；写 `repairs[].closure`（`RESOLVED` / `ACCEPTED_LIMITATION`）、`uncertainties[].status`（`closed`）、`hypotheses[].status`；**不写 `claims[].status` —— `killed` 只能经 R10**；`ACCEPTED_LIMITATION` **必须**同时写进 `C.scope` 或 `C.known_flaws`。决策 `continue` / `pivot` / `archive` / `submit` 回 R3 / R9（与上表逐字一致）
 
+
+**公共字段的写授权（补 MINOR-2）：** `depends_on` / `validity` 是八类对象的**公共必填字段**，
+`verification_tier` 是 `evidence` / `assurance` 的必填字段。**创建或更新某对象时，
+该对象的这些必填字段随对象一并授权写入** —— 不必在写表里逐格列出（写表列的是**对象与语义字段**，
+不是每一条子字段）。**未创建该对象的阶段仍然不得单独修改它们。**
 
 **读写的四条硬规则：**
 
