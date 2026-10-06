@@ -91,7 +91,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "假设移除", "theory_lens": "transfer-learning",
         "nearest_prior": "LIT1", "falsifier": "若解除 AS1 后能力不恢复则 H1 不成立",
         "expected_information_gain": 0.6, "status": "elite",
-        "niche": "N2", "island": "P2", "operator": "assumption_breaker",
+        "niche": "assumption-shift", "island": "P2", "operator": "assumption_breaker",
         "parents": [], "generation": 0,
         "depends_on": ["AS1"], "validity": _validity()})
     s["hypotheses"].append({
@@ -102,7 +102,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "问题重构", "theory_lens": "partial-identification",
         "nearest_prior": "LIT1", "falsifier": "若部分识别界为空则 H2 无意义",
         "expected_information_gain": 0.5, "status": "elite",
-        "niche": "N1", "island": "P1", "operator": "reframe",
+        "niche": "formulation-shift", "island": "P1", "operator": "reframe",
         "parents": [], "generation": 0,
         "depends_on": [], "validity": _validity()})
     # 同 niche（N2）的第二条候选：R4 的「重排 elite 归属」必须**同 niche 有替代者**才合法，
@@ -115,7 +115,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "假设移除（部分）", "theory_lens": "transfer-learning",
         "nearest_prior": "LIT1", "falsifier": "若部分解除无增益则 H3 不成立",
         "expected_information_gain": 0.4, "status": "active",
-        "niche": "N2", "island": "P2", "operator": "assumption_breaker",
+        "niche": "assumption-shift", "island": "P2", "operator": "assumption_breaker",
         "parents": [], "generation": 0,
         "depends_on": ["AS1"], "validity": _validity()})
     # R3 同时创建 seed claims（status: ungrounded, falsifier 必填）
@@ -144,7 +144,7 @@ def r6_evolution(s: Dict[str, Any]) -> None:
         "novelty_source": "简化（删假设优先于加）", "theory_lens": "transfer-learning",
         "nearest_prior": "H1", "falsifier": "若简化版无增益则 H4 不成立",
         "expected_information_gain": 0.3, "status": "active",
-        "niche": "N2", "island": "P2", "operator": "simplification",
+        "niche": "assumption-shift", "island": "P2", "operator": "simplification",
         "parents": ["H1"], "generation": 1,
         "depends_on": ["AS1"], "validity": _validity()})
 
@@ -167,8 +167,16 @@ def r7_adversarial_assurance(s: Dict[str, Any]) -> None:
 def r8_evidence_contract(s: Dict[str, Any]) -> None:
     """R8：建 contract；**创建 experiments 的 planned 条目并冻结 preregistration**；证据驱动升级。"""
     s["claims"][0]["contract"] = {
-        "statement": "解除 AS1 恢复能力", "scope": "target domain",
-        "kill_rule": "若 O2 出现则 C1 降级", "expansion_rule": "若 O1 出现且对照通过则扩到多中心",
+        "statement": "解除 AS1 恢复能力",
+        "scope": "target domain",
+        "critical_assumptions": ["AS1"],
+        "supporting_required": ["E1"],
+        "refuting": "等训练步数下增益消失",
+        "nearest_alternative": "增益来自更多的训练步数，而不是解除 AS1",
+        "minimal_discriminating_experiment": "X1",
+        "expected_outcomes": {"O1": "supports C1", "O2": "supports ALT-1", "O3": "inconclusive"},
+        "kill_rule": "若 O2 出现则 C1 降级",
+        "expansion_rule": "若 O1 出现且对照通过则扩到多中心",
     }
     s["experiments"].append({
         "id": "X1", "parent": None, "stage": "X3", "claim_targeted": ["C1"],
@@ -481,30 +489,42 @@ class TestAdversarialGoldenPaths(_Base):
         self.assertClean(state, "D-经 R10 合法否决")
 
     def test_path_d_gate_fail_must_close_the_loop(self):
-        """**MAJOR-2 的机械落点**：`integrity_gate == "fail"` 必须有闭环动作。"""
+        """**MAJOR-2 的机械落点**：`integrity_gate == "fail"` 必须有**关联的**闭环动作。
+
+        注意这不是"state 里随便有一条 repair 就算闭环" —— `V23` 要求
+        `repairs[].source_review` / `failures[].source_review` 指向该 review 的 `id`。
+        全局存在性会让一条无关的旧记录替任何新 failure 闭环，等于 Gate 无效。
+        """
         state = r0_contract()
         for stage, mutate in GOLDEN_PATH:
             if stage != "R0":
                 mutate(state)
-        state["reviews"] = [{"stage": "R13", "artifact": "code",
+        state["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
                              "integrity_gate": "fail", "findings": ["leakage"]}]
-        # 工整路径里已有 failures[]，故此处先清掉以暴露缺口
+        # 清掉工整路径里的 failures/repairs，暴露缺口
         state["failures"] = []
         state["repairs"] = []
         state["claims"][0]["known_flaws"] = []
         for x in state["experiments"]:
             x["known_flaws"] = []
-        report = self.check(state)
-        self.assertIn("V23", report.rules(),
-                      "integrity_gate=fail 且无 repairs/failures 时必须报 V23")
-        # 合规修法：留下闭环动作
+        self.assertIn("V23", self.check(state).rules(),
+                      "integrity_gate=fail 且无关联闭环时必须报 V23")
+
+        # 绕过尝试：放一条**合法但与 REV9 无关**的 repair —— 必须仍然失败
+        state["repairs"] = [{"flaw": "无关的旧缺陷", "disposition": "RUN_TEST",
+                             "state_delta": "X2 已排队", "closure": "RESOLVED",
+                             "targets": [], "source_review": None}]
+        self.assertIn("V23", self.check(state).rules(),
+                      "无关的 repair 不得替新的 gate=fail 闭环")
+
+        # 合规修法：留下**关联**该 review 的闭环动作
         state["failures"].append({"id": "F9", "kind": "engineering-failure",
                                   "what": "完整性审计发现泄漏", "why": "训练/测试同受试者",
                                   "referenced_by": ["X1"], "depends_on": [],
+                                  "source_review": "REV9",
                                   "validity": _validity()})
-        # V4：每条 F 必须被某个已知 flaws 引用
         state["experiments"][-1]["known_flaws"] = ["F9"]
-        self.assertClean(state, "D-gate fail 已闭环")
+        self.assertClean(state, "D-gate fail 已按 review 关联闭环")
 
     # ---- E 叙事幻觉不得创建 claim（**当前无机械闸门 → 记为缺口**）----
 

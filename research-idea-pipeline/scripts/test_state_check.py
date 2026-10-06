@@ -31,6 +31,7 @@ import copy
 import pathlib
 import re
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -123,7 +124,7 @@ def valid_state() -> Dict[str, Any]:
                 "novelty_source": "assumption-breaking", "theory_lens": "transfer-learning",
                 "nearest_prior": "LoRA", "falsifier": "R2 不降级",
                 "expected_information_gain": 0.4, "status": "active",
-                "niche": "N2", "island": "P2", "generation": 0, "status": "elite",
+                "niche": "assumption-shift", "island": "P2", "generation": 0, "status": "elite",
                 "operator": "assumption_breaker", "parents": [],
                 "depends_on": ["AS13"],
                 "validity": {"status": "valid", "reason": "上游假设未被推翻", "since_state_version": 0},
@@ -494,6 +495,18 @@ class TestV13V15(unittest.TestCase):
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V13"])
 
+    def test_v13_island_p3_is_hard(self) -> None:
+        """`P3` 只产 typed intermediate，不是 candidate（HIGH-2）。"""
+        doc = valid_state()
+        doc["hypotheses"][0].update(island="P3", operator="abstraction")
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.rules(), ["V13"])
+        self.assertIn("typed intermediate", report.violations[0].detail)
+
+    def test_candidate_islands_exclude_p3(self) -> None:
+        self.assertEqual(sc.CANDIDATE_ISLANDS,
+                         ("P1", "P2", "P4", "P5", "P6", "local"))
+
     def test_v13_local_track_is_legal(self) -> None:
         doc = valid_state(); doc["hypotheses"][0]["island"] = "local"
         doc["hypotheses"][0]["operator"] = "local"  # V16：generation-0 必须与 island 对应
@@ -511,18 +524,21 @@ class TestV13V15(unittest.TestCase):
 
     def test_v15_niche_without_elite_is_hard(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="active"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="mechanism-shift", status="active"))
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V15"])
 
     def test_v15_two_niches_each_with_elite_is_clean(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="elite"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="mechanism-shift", status="elite"))
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
     def test_v15_elite_counts_even_with_active_sibling(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N2", status="active"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="assumption-shift", status="active"))
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
     def test_v6_niche_must_be_preset_name(self) -> None:
@@ -572,7 +588,11 @@ class TestV16V17(unittest.TestCase):
         self.assertIn("assumption_breaker", r.violations[0].render())
 
     def test_v16_every_generation0_island_operator_pair_is_clean(self) -> None:
+        # 只覆盖 candidate island：`P3` 不产 candidate（V13 拒绝），
+        # 其合法性由 TestV13V15.test_v13_island_p3_is_hard 单独锁住。
         for island, operator in sc.ISLAND_OPERATOR.items():
+            if island not in sc.CANDIDATE_ISLANDS:
+                continue
             doc = valid_state()
             doc["hypotheses"][0]["island"] = island
             doc["hypotheses"][0]["operator"] = operator
@@ -829,6 +849,11 @@ class TestTableIntegrity(unittest.TestCase):
         end = text.index(stop, begin) if stop else len(text)
         rows = []
         for line in text[begin:end].split("\n"):
+            # markdown 表格在空行处结束。**必须**在这里停：一条误插进表体中间的
+            # blockquote 会把表切成两半，而原来的 "\n\n>" 停止标记会被同一条 note 带偏，
+            # 于是列检查只覆盖前半张表却仍然全绿（Batch 8 就是这么漏的）。
+            if not line.strip():
+                break
             cells = line.split("|")
             if len(cells) < 3:
                 continue
@@ -840,6 +865,8 @@ class TestTableIntegrity(unittest.TestCase):
     def test_policy_readwrite_table_columns(self) -> None:
         rows = self._rows("references/research-state-policy.md", "| 阶段 | 读什么", "\n\n>")
         self.assertTrue(rows, "policy §5 读不到阶段行")
+        # 行数守卫：表体若被一行 blockquote 切开，列检查只会覆盖前半张表却仍然全绿
+        self.assertEqual(len(rows), 14, "policy §5 应恰好 14 个阶段行（表被切开了？）")
         for stage, cells in rows:
             # 4 列表格：| 阶段 | 读 | 写 | 文件 | → split("|") 得 6 段
             self.assertEqual(len(cells), 6, f"policy {stage} 列数 {len(cells)}")
@@ -847,6 +874,7 @@ class TestTableIntegrity(unittest.TestCase):
     def test_skill_stage_table_has_effect_column(self) -> None:
         rows = self._rows("SKILL.md", "| Phase | 名称 |", "\n\n")
         self.assertTrue(rows, "SKILL §0 读不到阶段行")
+        self.assertEqual(len(rows), 15, "SKILL §0 应恰好 15 个阶段行（表被切开了？）")
         for stage, cells in rows:
             self.assertEqual(len(cells), 7, f"SKILL {stage} 列数 {len(cells)}")
             name, effect, read = cells[2].strip(), cells[3].strip(), cells[4].strip()
@@ -878,6 +906,1456 @@ class TestTableIntegrity(unittest.TestCase):
                 m = re.match(r"^\s*\*\*(R\d+)\*\*", cells[1])
                 if m:
                     self.assertEqual(len(cells), 5, f"{path.name} {m.group(1)} 列数 {len(cells)}")
+
+
+# ---------------------------------------------------------------------------
+# 规则副本比对 / R8 契约三方一致 / phase 文档不得残留旧字母流程
+# ---------------------------------------------------------------------------
+
+class TestRuleTableParity(unittest.TestCase):
+    """一条规则有多个副本 → 必须有检查比对副本。
+
+    规则正文的权威副本是 policy §4 的规则表；`state_check.py` 的 `RULES` 是执行副本。
+    两者逐字不一致时，文档与代码各自「正确」，合起来是错的。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _policy_rows(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return dict(re.findall(r"^\| (V\d+) \| (.+?) \| 硬 \|", text, re.M))
+
+    def test_policy_rule_table_is_parseable(self) -> None:
+        # 正则静默失配时，下面的比对会「全绿」——先锁住解析结果本身。
+        rows = self._policy_rows()
+        self.assertEqual(len(rows), len(sc.RULES), "policy §4 解析到的规则数不等于 RULES")
+        self.assertIn("V1", rows)
+        self.assertIn("V24", rows)
+
+    def test_policy_rule_text_matches_validator(self) -> None:
+        rows = self._policy_rows()
+        self.assertEqual(set(rows), set(sc.RULES), "policy §4 的规则号集合与 RULES 不一致")
+        for rule, expected in sc.RULES.items():
+            self.assertEqual(rows[rule].strip(), expected.strip(), f"{rule} 文档与代码不一致")
+
+    def _policy_shape_rows(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return dict(re.findall(r"^\| (S\d+) \| (.+?) \| 形状 \|", text, re.M))
+
+    def test_policy_shape_table_is_parseable(self) -> None:
+        rows = self._policy_shape_rows()
+        self.assertEqual(len(rows), len(sc.SHAPES), "policy §4.0 解析到的形状规则数不等于 SHAPES")
+        self.assertIn("S1", rows)
+
+    def test_policy_shape_text_matches_validator(self) -> None:
+        rows = self._policy_shape_rows()
+        self.assertEqual(set(rows), set(sc.SHAPES), "policy §4.0 的编号集合与 SHAPES 不一致")
+        for rule, expected in sc.SHAPES.items():
+            self.assertEqual(rows[rule].strip(), expected.strip(), f"{rule} 文档与代码不一致")
+
+
+class TestShapeGate(unittest.TestCase):
+    """S1—S7：形状门。位置在 V1—V24 **之前**，且形状失败时不执行 V 规则。
+
+    起因（总收官审计 MAJOR-4）：`state_check.py` 只做「引用完整性」，
+    八类枚举、`structural_signature` 五键、`contract` 形状**零校验** ——
+    非法值可以静默通过，`--check` 仍是 exit 0。
+    """
+
+    def _shape(self, doc):
+        return sc.check_state(doc, source="<test>").shape_rules()
+
+    def test_valid_state_passes_shape_gate(self) -> None:
+        report = sc.check_state(valid_state(), source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.exit_code, sc.EXIT_OK)
+
+    # ---- S1 ----
+    def test_s1_missing_first_class_array(self) -> None:
+        doc = valid_state(); doc.pop("literature")
+        self.assertEqual(self._shape(doc), ["S1"])
+
+    def test_s1_all_eight_empty_is_clean(self) -> None:
+        doc = {key: [] for key in sc.FIRST_CLASS_KEYS}
+        self.assertEqual(self._shape(doc), [])
+
+    # ---- S2 ----
+    def test_s2_empty_id(self) -> None:
+        doc = valid_state(); doc["claims"][0]["id"] = ""
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_duplicate_id(self) -> None:
+        doc = valid_state()
+        doc["claims"].append(dict(doc["claims"][0]))
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_wrong_prefix(self) -> None:
+        doc = valid_state(); doc["claims"][0]["id"] = "Q17"
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_literature_must_use_lit_prefix(self) -> None:
+        # policy §3.6：`LIT<n>`；**不得**写成 `L<n>`
+        doc = valid_state(); doc["literature"][0]["id"] = "L1"
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    # ---- S3 ----
+    def test_s3_stage_out_of_enum(self) -> None:
+        doc = valid_state(); doc["experiments"][0]["stage"] = "X9"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_missing_required_enum(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0].pop("status")
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_literature_relation_out_of_enum(self) -> None:
+        doc = valid_state(); doc["literature"][0]["relation"] = "sounds-good"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_claim_status_out_of_enum(self) -> None:
+        doc = valid_state(); doc["claims"][0]["status"] = "maybe-true"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_every_listed_enum_is_enforced(self) -> None:
+        # 防止有人往 ENUM_FIELDS 加字段却忘了它真的被查
+        for key, field, allowed in sc.ENUM_FIELDS:
+            doc = valid_state()
+            if not doc.get(key):
+                continue
+            doc[key][0][field] = "definitely-not-in-enum"
+            self.assertEqual(self._shape(doc), ["S3"], f"{key}[].{field} 未被 S3 强制")
+            self.assertNotIn("definitely-not-in-enum", allowed)
+
+    # ---- S4 ----
+    def test_s4_missing_one_of_five_keys(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"].pop("mechanism_distance")
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_signature_not_object(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["structural_signature"] = "flat"
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_distance_not_nonneg_int(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"]["mechanism_distance"] = -1
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_extra_key_rejected(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"]["vibes_distance"] = 1
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    # ---- S5 ----
+    def test_s5_contract_missing_keys(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {"statement": "x", "scope": "y"}
+        self.assertEqual(self._shape(doc), ["S5"])
+
+    def test_s5_contract_full_ten_keys_is_clean(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {
+            "statement": "x", "scope": "y", "critical_assumptions": ["AS13"],
+            "supporting_required": ["E32"], "refuting": "z",
+            "nearest_alternative": "alt", "minimal_discriminating_experiment": "X7",
+            "expected_outcomes": {"O1": "supports C17"},
+            "kill_rule": "若 O1 不成立则降级", "expansion_rule": "若 O1 成立则扩范围",
+        }
+        self.assertEqual(self._shape(doc), [])
+
+    def test_s5_expected_outcomes_must_be_object(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {
+            "statement": "x", "scope": "y", "critical_assumptions": [],
+            "supporting_required": [], "refuting": "z",
+            "nearest_alternative": "alt", "minimal_discriminating_experiment": "X7",
+            "expected_outcomes": ["O1"], "kill_rule": "k", "expansion_rule": "e",
+        }
+        self.assertEqual(self._shape(doc), ["S5"])
+
+    def test_s5_absent_contract_is_legal(self) -> None:
+        # R1 骨架里未建契约的 claim 合法（模板 C0a / C1 就是这类）
+        doc = valid_state()
+        doc["claims"][1].pop("contract", None)
+        self.assertNotIn("S5", self._shape(doc))
+
+    # ---- S6 ----
+    def test_s6_integrity_gate_out_of_enum(self) -> None:
+        doc = valid_state(); doc["reviews"] = [{"id": "REV1", "integrity_gate": "maybe"}]
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_reviews_not_array(self) -> None:
+        doc = valid_state(); doc["reviews"] = {"id": "REV1"}
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_decision_not_object(self) -> None:
+        doc = valid_state(); doc["decision"] = "continue"
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_reviews_id_absence_is_left_to_v23(self) -> None:
+        # gate=fail 却无 id 是 V23 的判据；S6 不得抢报，否则规则号被掩盖
+        doc = valid_state()
+        doc["reviews"] = [{"integrity_gate": "fail"}]
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V23"])
+
+    def test_s6_decision_verdict_enum_is_left_to_v24(self) -> None:
+        doc = valid_state()
+        doc["decision"] = {"verdict": "banana"}
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V24"])
+
+    # ---- S7 ----
+    def test_s7_state_version_must_be_nonneg_int(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        self.assertEqual(self._shape(doc), ["S7"])
+
+    def test_s7_negative_state_version(self) -> None:
+        doc = valid_state(); doc["state_version"] = -1
+        self.assertEqual(self._shape(doc), ["S7"])
+
+    # ---- 顺序与互斥 ----
+    def test_shape_runs_before_rules(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["id"] = ""          # S2
+        doc["claims"][0]["falsifier"] = ""   # V1
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape_rules(), ["S2"])
+        self.assertEqual(report.rules(), [], "形状失败时不得执行 V 规则")
+        self.assertEqual(report.violations, [])
+        self.assertEqual(report.exit_code, sc.EXIT_HARD)
+
+    def test_v19_depends_on_type_is_not_duplicated_in_shape(self) -> None:
+        # 去重契约：depends_on 的类型属 V19，S 不得重复报
+        doc = valid_state(); doc["claims"][0]["depends_on"] = "E32"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V19"])
+
+    def test_shape_rules_are_reported_in_order(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["id"] = ""
+        doc["state_version"] = "0"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape_rules(), ["S2", "S7"])
+
+    def test_shape_violations_are_machine_readable(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        payload = sc.check_state(doc, source="<test>").as_dict()
+        self.assertEqual(payload["shape_counts"], {"S7": 1})
+        self.assertEqual(payload["violations"], [])
+        self.assertTrue(payload["shape"][0]["line"].startswith("S7"))
+
+    def test_summary_names_shape_gate(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        self.assertIn("[shape]", sc.check_state(doc, source="<test>").summary())
+
+    def test_list_rules_includes_shape_gate(self) -> None:
+        code, out, _err = _run("--list-rules")
+        self.assertEqual(code, sc.EXIT_OK)
+        for rule in sc.SHAPE_ORDER:
+            self.assertIn(rule, out)
+            self.assertIn(sc.SHAPES[rule], out)
+
+
+class TestReadWriteTableParity(unittest.TestCase):
+    """三处「读 / 写」表的**单元格内容**必须逐字一致。
+
+    三处 = SKILL §0、policy §5、各 `phase-*.md` 的「读 / 写 World Model」。
+    `TestTableIntegrity` 只查列数与列错位，**看不见内容漂移**。
+
+    起因：Batch 8 改了 R3 的写集，SKILL 与 policy 都改了，却漏了
+    `phase-r3-r6-discovery.md` 自己的那张表 —— 三方不一致，而所有表格检查全绿。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    @staticmethod
+    def _parse(text: str, anchor: str):
+        """返回 {R 阶段: (读格, 写格)}。
+
+        **必须给锚点**：文件里更早的表格也可能同时含「读」「写」两个字，
+        扫全文会解析到错的表 —— 那样这个检查会静默变成空集。
+        """
+        lines = text[text.index(anchor):].split("\n")
+        header_index = None
+        read_index = write_index = 0
+        for index, line in enumerate(lines):
+            if "读" in line and "写" in line and line.strip().startswith("|"):
+                cells = [cell.strip() for cell in line.split("|")]
+                read_index = next(j for j, cell in enumerate(cells) if "读" in cell)
+                write_index = next(j for j, cell in enumerate(cells) if "写" in cell)
+                header_index = index
+                break
+        if header_index is None:
+            return {}
+        rows = {}
+        for line in lines[header_index + 2:]:
+            cells = line.split("|")
+            if len(cells) <= max(read_index, write_index):
+                if line.strip().startswith("|"):
+                    continue
+                break
+            match = re.match(r"^\s*\*\*(R\d+(?:\s*/\s*R\d+)?)", cells[1].replace(" ", ""))
+            if match:
+                rows[match.group(1)] = (cells[read_index].strip(), cells[write_index].strip())
+        return rows
+
+    POLICY_ANCHOR = "| 阶段 | 读什么"
+    SKILL_ANCHOR = "| Phase | 名称 |"
+    PHASE_ANCHOR = "## 读 / 写 World Model"
+
+    def _policy(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return self._parse(text, self.POLICY_ANCHOR)
+
+    def test_skill_matches_policy(self) -> None:
+        skill = self._parse((self.ROOT / "SKILL.md").read_text(encoding="utf-8"),
+                            self.SKILL_ANCHOR)
+        policy = self._policy()
+        self.assertTrue(skill and policy, "读/写表解析失败（表头或阶段行找不到）")
+        for stage in sorted(set(skill) & set(policy)):
+            self.assertEqual(skill[stage], policy[stage], f"SKILL §0 的 {stage} 行与 policy §5 不一致")
+
+    def test_every_phase_table_matches_policy(self) -> None:
+        policy = self._policy()
+        checked = 0
+        for path in sorted((self.ROOT / "references").glob("phase-*.md")):
+            text = path.read_text(encoding="utf-8")
+            if "## 读 / 写 World Model" not in text:
+                continue
+            rows = self._parse(text, self.PHASE_ANCHOR)
+            for stage in sorted(set(rows) & set(policy)):
+                self.assertEqual(rows[stage], policy[stage],
+                                 f"{path.name} 的 {stage} 行与 policy §5 不一致")
+                checked += 1
+        self.assertGreaterEqual(checked, 6, "解析到的 phase 读/写行太少（解析器失效？）")
+        # 三道守卫：解析器一旦失效，检查必须变红，而不是静默通过
+        self.assertEqual(len(policy), 14, "policy §5 应解析到 14 个阶段")
+
+
+class TestContractKeyParity(unittest.TestCase):
+    """`claims[].contract` 的十个键：validator ↔ 模板 ↔ R8 文档，三处必须一致。
+
+    起因：迁移后契约键只在模板里；golden path 只写了 4 键却仍然 exit 0。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_validator_keys_match_template(self) -> None:
+        tmpl = json.loads((self.ROOT / "templates" / "research-state.template.json")
+                          .read_text(encoding="utf-8"))
+        self.assertEqual(list(sc.CONTRACT_KEYS), list(tmpl["claims"][0]["contract"]))
+
+    def test_validator_keys_match_r8_doc_table(self) -> None:
+        text = (self.ROOT / "references" / "phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        begin = text.index("### R8.2.2")
+        end = text.index("### R8.2.3", begin)
+        self.assertEqual(list(sc.CONTRACT_KEYS),
+                         re.findall(r"^\| `([a-z_]+)` \|", text[begin:end], re.M))
+
+    def test_signature_keys_match_policy(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines()
+                   if line.startswith("| `structural_signature` |"))
+        for key in sc.STRUCTURAL_SIGNATURE_KEYS:
+            self.assertIn(f"`{key}`", row, f"policy §3.4 未登记结构签名键 {key}")
+
+
+class TestR8ContractParity(unittest.TestCase):
+    """R8 的头号产物 `claims[].contract` —— spec、模板两处必须一致。
+
+    起因：R8 迁移后 `contract` 只在模板里存在，spec 侧没有字段表，
+    `state_check.py` 零校验。本组同时锁住键集合与键顺序。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    SPEC = "references/phase-r8-evidence-contract.md"
+
+    def _spec_keys(self):
+        text = (self.ROOT / self.SPEC).read_text(encoding="utf-8")
+        begin = text.index("### R8.2.2")
+        end = text.index("### R8.2.3", begin)
+        return re.findall(r"^\| `([a-z_]+)` \|", text[begin:end], re.M)
+
+    def test_spec_contract_table_has_ten_keys(self) -> None:
+        keys = self._spec_keys()
+        self.assertEqual(len(keys), 10, f"§R8.2.2 契约键数不是 10：{keys}")
+
+    def test_spec_keys_match_template_contract(self) -> None:
+        tmpl = json.loads((self.ROOT / "templates" / "research-state.template.json")
+                          .read_text(encoding="utf-8"))
+        contract = tmpl["claims"][0]["contract"]
+        self.assertEqual(self._spec_keys(), list(contract),
+                         "§R8.2.2 的契约键与模板 claims[].contract 不一致（含顺序）")
+
+    def test_preregistration_op_seven_values_documented(self) -> None:
+        text = (self.ROOT / self.SPEC).read_text(encoding="utf-8")
+        for op in sc.PREREG_OPS:
+            self.assertIn(op, text, f"R8 文档未登记 preregistration op：{op}")
+
+
+class TestR7FirstPassAuditTarget(unittest.TestCase):
+    """R7 首轮不得要求审一个尚不存在的 `claims[].contract`。
+
+    起因（总收官审计 MAJOR-7）：多份文档写「R7 / R8 只能审**计划中的证据契约**」，
+    但 `claims[].contract` 由 **R8** 建立，而 R8 排在 R7 **之后** ——
+    首轮 R7 没有契约可审，`hypotheses[]` 也没有 contract 字段承载。
+    该规则只能产出「待补」。首轮的攻击对象必须是 R3—R6 已落盘的三类对象。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DOCS = (
+        "references/phase-r7-r10-r13-assurance-repair-review.md",
+        "references/phase-r9-r11-experiment-loop.md",
+        "SKILL.md",
+        "references/research-state-policy.md",
+    )
+
+    def test_no_unbacked_planned_contract_phrase(self) -> None:
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("计划中的证据契约", text,
+                             f"{rel} 仍要求审「计划中的证据契约」（无承载）")
+
+    def test_r7_doc_names_the_first_pass_targets(self) -> None:
+        text = (self.ROOT / "references" / "phase-r7-r10-r13-assurance-repair-review.md"
+                ).read_text(encoding="utf-8")
+        self.assertIn("首轮 R7 没有契约可审", text)
+        for target in ("`claims[]`", "`hypotheses[]`", "`assumptions[]`"):
+            self.assertIn(target, text, f"R7 文档未点名首轮攻击对象 {target}")
+
+    def test_r7_read_set_includes_assumptions(self) -> None:
+        # 攻击面 R-Theory 打的就是 tacit 假设；读集少了 assumptions 就自相矛盾。
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            row = next((line for line in text.splitlines()
+                        if line.startswith("| **R7**") and "`claims`" in line), None)
+            if row is None:
+                continue
+            self.assertIn("`assumptions`", row, f"{rel} 的 R7 读集缺 assumptions")
+
+
+class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
+    """`examples/` 是用户照抄的对象 —— 示例示范旧写法比正文陈旧更危险。
+
+    起因：正文改完后，`examples/` 仍在走 B→C→D→E 并派遣「八子代理」，
+    而且两个文件名本身编码了退役流水线（`example-b-to-c-d-e` / `example-a-standalone`）。
+    正文扫描当时把 `examples/` 排除了，所以这一层一直没被检查。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    RETIRED_WORDS = (
+        "B→C", "C→D", "D→E", "八子代理", "七个子代理",
+        "创新性研究", "可行性研究", "论文格式展开", "实验流程设计",
+    )
+    RETIRED_FILE_NAMES = ("example-b-to-c-d-e.md", "example-a-standalone.md")
+
+    def test_examples_have_no_retired_pipeline_wording(self) -> None:
+        offenders = []
+        for path in sorted((self.ROOT / "examples").glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            for word in self.RETIRED_WORDS:
+                if word in text:
+                    offenders.append(f"{path.name}: {word}")
+        self.assertEqual(offenders, [], f"示例仍在示范退役流程：{offenders}")
+
+    def test_no_example_file_name_encodes_retired_pipeline(self) -> None:
+        names = {path.name for path in (self.ROOT / "examples").glob("*.md")}
+        for bad in self.RETIRED_FILE_NAMES:
+            self.assertNotIn(bad, names, f"示例文件名仍在编码退役流水线：{bad}")
+
+    def test_every_example_is_registered_in_readme(self) -> None:
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        for path in sorted((self.ROOT / "examples").glob("*.md")):
+            self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
+
+
+class TestDeprecatedTermScan(unittest.TestCase):
+    """已退役措辞不得回到正文。`references/deprecated-terms.txt` 是权威清单。
+
+    起因：这份扫描一直是**手工**跑的，而手工扫描会漏 —— 本仓库已经漏过两层
+    （只扫 `*.md` 却排除了 `examples/`；也只扫 Markdown 却没扫 Python 的 docstring）。
+    做成测试后，清单与正文的比对不再依赖人记得跑。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    FENCE = re.compile(r"```.*?```", re.S)
+    # 清单自己含被禁词；dev-only 的 docs/ 不随包发布
+    EXEMPT = ("references/deprecated-terms.txt",)
+    # 逐个判断的**语境例外**：某个退役词在「不要用它」这类说明里有合法用途。
+    # 例外必须显式登记在这里，不能靠放宽正则。
+    CONTEXT_ALLOW = {
+        "next_phase_suggestion": ("不是",),
+    }
+
+    @staticmethod
+    def _plain(line: str) -> str:
+        return re.sub(r"^\s*>\s*", "", line).replace("**", "").replace("`", "")
+
+    def _patterns(self):
+        raw = (self.ROOT / "references" / "deprecated-terms.txt").read_text(encoding="utf-8")
+        return [line.strip() for line in raw.splitlines()
+                if line.strip() and not line.lstrip().startswith("#")]
+
+    def test_pattern_list_is_not_empty(self) -> None:
+        self.assertGreaterEqual(len(self._patterns()), 20, "退役词清单骤减，疑似被清空")
+
+    def test_no_deprecated_term_appears_in_shipped_docs(self) -> None:
+        patterns = [(raw, re.compile(raw)) for raw in self._patterns()]
+        offenders = []
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel in self.EXEMPT or rel.startswith("docs/"):
+                continue
+            text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
+            for lineno, line in enumerate(text.splitlines(), 1):
+                plain = self._plain(line)
+                for raw, pattern in patterns:
+                    if not pattern.search(line):
+                        continue
+                    if any(ok in plain for ok in self.CONTEXT_ALLOW.get(raw, ())):
+                        continue
+                    offenders.append(f"{rel}:{lineno}: [{raw}]")
+                    break
+        self.assertEqual(offenders, [], "已退役措辞出现在正文：\n  " + "\n  ".join(offenders))
+
+
+class TestNegativeStatusAuthority(unittest.TestCase):
+    """R8 只能**升级**；`contradicted` / `killed` **只能经 R10**（MAJOR-1）。
+
+    起因：verification-tier 映射表（policy）与 phase-r8 §R8.2.5 都授权 R8 写
+    `contradicted`，与 SKILL §1.6 / policy §5.0 / phase-r8 §R8.0 / `V22` **四者冲突**：
+    `V22` 要求任何 `contradicted` / `killed` 的 claim 被一条 `repairs[].targets` 覆盖，
+    而 **R8 的写集不含 `repairs[]`**。R8 直接改就造出一个
+    「状态已变、无 repair 覆盖」的 state —— V22 报错，且**没有任何阶段能事后补**。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_no_table_authorizes_r8_for_a_negative_status(self) -> None:
+        for rel, anchor in (("references/research-state-policy.md",
+                             "| 目标迁移 | 最低需要 | 授权方 |"),
+                            ("references/phase-r8-evidence-contract.md",
+                             "| 迁移 | 门槛 | 归属 |")):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            block = text[text.index(anchor):]
+            block = block[:block.index("\n\n")]
+            for line in block.splitlines():
+                if "contradicted" not in line and "killed" not in line:
+                    continue
+                self.assertNotRegex(line, r"\|\s*\*{0,2}R8\*{0,2}\s*\|",
+                                    f"{rel} 仍把负向状态授权给 R8：{line.strip()[:70]}")
+
+    def test_detection_and_mutation_are_separated(self) -> None:
+        text = (self.ROOT / "references/phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        self.assertIn("**证据检测 ≠ 认识论状态突变。**", text)
+        self.assertIn("必须转 R10", text)
+
+    def test_policy_states_the_only_legal_action(self) -> None:
+        text = (self.ROOT / "references/research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("R8 检测到 ≥ `T2` 反驳证据时的唯一合法动作", text)
+
+    def test_v22_forces_negative_status_through_r10(self) -> None:
+        # 字面执行：绕过 R10 直接写 contradicted → V22 必须报
+        doc = valid_state()
+        doc["claims"][0]["status"] = "contradicted"
+        report = sc.check_state(doc, source="<test>")
+        self.assertIn("V22", report.rules(),
+                      "绕过 R10 的负向状态变更必须被 V22 拦住")
+
+    def test_r8_write_set_excludes_repairs(self) -> None:
+        # R8 的读/写表不得授权 repairs[]
+        text = (self.ROOT / "references" / "phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        block = text[text.rindex("## 读 / 写 World Model"):]
+        row = next(line for line in block.splitlines() if line.startswith("| **R8**"))
+        writes = row.split("|")[3]
+        self.assertNotIn("repairs", writes)
+
+
+class TestEvolutionOperatorSemantics(unittest.TestCase):
+    """R6 的进化算子：crossover 只用 `H`；未收敛走 telemetry（HIGH-1 + HIGH-2）。"""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _r61(self):
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        return text[text.index("### R6.1"):text.index("### R6.2")]
+
+    def test_crossover_parents_are_hypotheses_only(self) -> None:
+        section = self._r61()
+        row = next(line for line in section.splitlines() if line.startswith("| `cross-domain crossover`"))
+        self.assertIn("两个已有的 `H` candidate", row)
+        self.assertIn("`parents` **必须引用两个 `H`**", row)
+        self.assertIn("**`P3` 的骨架不是 candidate，不得当 `parents`**", row)
+
+    def test_p3_is_typed_context_not_a_crossover_parent(self) -> None:
+        section = self._r61()
+        self.assertIn("`H_P2 × H_P4 → H_new`", section)
+        self.assertIn("**不是** `P3 × H_P4`", section)
+        self.assertIn("derived_from_intermediate", section)
+
+    def test_stagnation_goes_to_telemetry(self) -> None:
+        section = self._r61()
+        self.assertIn("**只有能提炼成一个具体科学问题时**", section)
+        self.assertIn("operator_stats", section)
+        self.assertIn("stagnation", section)
+        # 旧行为不得回来
+        self.assertNotIn("落 `uncertainties[]` 并交 R7", section)
+
+    def test_stagnation_is_not_itself_an_uncertainty(self) -> None:
+        section = self._r61()
+        self.assertIn("**「两轮没收敛」本身不是科学未知。**", section)
+        self.assertIn("**不能进**", section)
+
+
+class TestReleaseGateWording(unittest.TestCase):
+    """`release_check.py` 的自我描述必须与实际行为一致（MINOR）。"""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_header_does_not_claim_to_print_only_the_verdict(self) -> None:
+        text = (self.ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
+        self.assertNotIn("唯一的发布闸门。它只输出 PASS 或 FAIL", text)
+        self.assertIn("**verdict 只看 exit code 与最后一行**", text)
+
+    def test_skill_design_note_does_not_claim_r12_uses_the_reverse_score(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        start = text.index("10. **为什么 R7 / R10 / R13 也必须做极性归一化？**")
+        note = text[start:text.index("11. **为什么要给", start)]
+        self.assertIn("**R12 已不使用该反向分**", note)
+        self.assertNotIn("R7 / R10 / R13 与 R12 同样使用", note)
+
+
+class TestResidualSemanticVocabulary(unittest.TestCase):
+    """**词表 ≠ 语义。** 逐处判断「这个词还在不在表达旧语义」。
+
+    起因（用户第三轮复核）：`deprecated-terms.txt` 只是我列进去的旧词，
+    而旧语义**不一定表现成旧标题**：
+    - `B5` 是显式旧编号 → 词表能抓；
+    - 「会议 persona 在 R3 快筛」没有旧编号，但行为是旧的；
+    - `next_phase_suggestion` 没写 A—E，但心智模型还是线性 pipeline；
+    - narrative 的「已证实 / 已证伪」没有 deprecated term，却违反 epistemic boundary。
+
+    因此本类做**上下文判定**，不做事后补词。每处允许的语境都显式列在这里。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    # 允许语境（逐个判断的结果，不是宽容）
+    B5_ALLOWED = ("Bootstrap", "Initial Uncertainty Map", "Recommend Next Action",
+                  "B1—B5", "slug 枚举")
+    EPISTEMIC_ALLOWED = ("不再承载", "不含", "禁止出现", "不得用来", "不是",
+                        "已证实 / 已证伪 / TODO")  # 最后一项是 INDEX 的禁用词清单
+    NPS_ALLOWED = ("不是",)                      # 只允许出现在「不要用它」的说明里
+
+    def _docs(self):
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            yield rel, path.read_text(encoding="utf-8")
+
+    def _lines(self):
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                yield rel, lineno, line
+
+    @staticmethod
+    def _plain(line):
+        """去掉 blockquote 前缀与强调符 —— 否则 allowlist 会被 `> ` 与 `**` 挡住。"""
+        return re.sub(r"^\s*>\s*", "", line).replace("**", "").replace("`", "")
+
+    def test_mode_word_is_gone(self) -> None:
+        offenders = [f"{rel}:{lineno}: {line.strip()[:70]}"
+                     for rel, lineno, line in self._lines()
+                     if re.search(r"\bMode\b", line)]
+        self.assertEqual(offenders, [], "旧 Mode 术语仍在（应为 R 阶段 / 本阶段）：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_b5_only_in_bootstrap_or_drift_registry(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if not re.search(r"\bB5\b", line):
+                continue
+            if any(ok in self._plain(line) for ok in self.B5_ALLOWED):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "B5 出现在非 Bootstrap / 非漂移类别的语境：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_next_phase_suggestion_is_gone(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if "next_phase_suggestion" not in line:
+                continue
+            if any(ok in line for ok in self.NPS_ALLOWED):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [],
+                         "`next_phase_suggestion` 仍在用（应为 `next_action_recommendation`）：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_epistemic_words_are_not_applied_to_narratives(self) -> None:
+        for rel, lineno, line in self._lines():
+            for word in ("已证实", "已证伪"):
+                if word not in line:
+                    continue
+                if any(ok in self._plain(line) for ok in self.EPISTEMIC_ALLOWED):
+                    continue
+                self.fail(f"{rel}:{lineno} 用 epistemic 词描述修辞方案：{line.strip()[:80]}")
+
+    def test_venue_persona_never_joins_discovery(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if "会议审稿人" not in line:
+                continue
+            # R3—R6 出现，且不是否定句 → 说明会议 persona 又被放回 Discovery
+            if "R3—R6" not in line:
+                continue
+            if any(ok in line for ok in ("不派遣", "不参与", "不得", "不是", "只用于",
+                                         "只在", "不再", "仅 venue", "仅用于")):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "会议 persona 被放回 R3—R6：\n  " + "\n  ".join(offenders))
+
+
+class TestSemanticInvariants(unittest.TestCase):
+    """行为层的语义不变量。**机器一致性 + 字面执行不能互相替代。**
+
+    本类只查「文档是否还在教旧行为」—— 它不查测试是否通过，
+    因为测试通过不代表执行规范已经改对（V15 就是反例）。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _read(self, rel):
+        return (self.ROOT / rel).read_text(encoding="utf-8")
+
+    def test_anchor_tri_state_exists(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        for token in ("`serving`", "`challenging`", "`orthogonal`"):
+            self.assertIn(token, text, f"锚点关系三分类缺 {token}")
+        self.assertIn("**必须允许**", text, "challenging 候选必须被明确允许")
+
+    def test_only_orthogonal_is_excluded_from_the_archive(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        section = text[text.index("锚点关系分三类"):]
+        section = section[:section.index("**为什么必须收")]
+        rows = [re.sub(r"^\s*>\s*", "", line)
+                for line in section.splitlines()
+                if re.sub(r"^\s*>\s*", "", line).startswith("| `")]
+        self.assertEqual(len(rows), 3, msg=f"锚点表应恰好 3 行，实际 {len(rows)}")
+        excluded = [row for row in rows if "❌" in row]
+        self.assertEqual(len(excluded), 1, "只允许一类不进档案")
+        self.assertIn("`orthogonal`", excluded[0])
+
+    def test_island_extinction_goes_to_telemetry_not_uncertainties(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        section = text[text.index("### R6.2"):text.index("### R6.3")]
+        self.assertIn("island` **允许全灭**", section)
+        self.assertIn("不进 `uncertainties[]`", section)
+        self.assertIn("operator_stats", section)
+        # 旧行为（强制保活 + 把 system behavior 记成科学未知）不得回来
+        self.assertNotIn("进化不得让某个 island 的候选全被", section)
+
+    def test_operator_stats_has_a_documented_shape(self) -> None:
+        # carrier 有模板但没有 spec 就是 A4 类缺陷（有槽位、无规则）
+        text = self._read("references/scheduler-policy.md")
+        self.assertIn("### 4.1 `operator_stats`", text)
+        for field in ("generations", "viable", "killed", "dormant",
+                      "recurring_failure_patterns"):
+            self.assertIn(field, text, f"§4.1 未登记 operator_stats 字段 {field}")
+
+    def test_operator_stats_template_matches_the_policy(self) -> None:
+        """carrier 与 spec 必须同形 —— 有槽位无规则（或反过来）都是 A4 类缺陷。"""
+        tmpl = json.loads((self.ROOT / "templates" / "scheduler.template.json")
+                          .read_text(encoding="utf-8"))
+        self.assertEqual(set(tmpl["operator_stats"]),
+                         {"note", "by_operator", "recurring_failure_patterns"})
+        section = self._read("references/scheduler-policy.md")
+        section = section[section.index("### 4.1"):section.index("## 5. 运行时机")]
+        self.assertEqual({m.group(1) for m in re.finditer(r"`by_operator\[<算子>\]\.(\w+)`", section)},
+                         {"generations", "viable", "killed", "dormant"})
+
+    def test_r12_maps_narrative_outcomes_to_status_sections(self) -> None:
+        text = self._read("SKILL.md")
+        section = text[text.index("### R12 — 叙事"):text.index("### R7 / R10 / R13")]
+        self.assertIn("Most important negative findings", section)
+        self.assertIn("Strongest supported findings", section)
+
+    def test_global_checklist_scopes_venue_standards_to_r12_r13(self) -> None:
+        text = self._read("SKILL.md")
+        self.assertIn("只有 R12 / R13 的 venue calibration 与投稿评估**引用具体顶会标准", text)
+
+    def test_challenging_candidate_admission_has_no_mechanical_gate(self) -> None:
+        """已知缺口：锚点关系只写在文档里，`hypotheses[]` 没有对应字段。
+
+        「QD archive 是否真的收了 `challenging` 候选」因此**没有机械闸门**。
+        加字段等于给八类科学对象加属性 —— 按用户意见留待 dogfood 观察一次再定。
+        """
+        self.skipTest("已知缺口：锚点关系（serving/challenging/orthogonal）无 state 字段，"
+                      "QD archive 是否真的收了 challenging 候选无机械闸门")
+
+
+class TestShippedHintsStayInPackage(unittest.TestCase):
+    """面向用户的输出不得把读者指向**不随包安装**的文件。
+
+    起因（repo-wide literal execution audit 抓到）：`state_check.py` 的违规提示与
+    `--help` 都写着「规则定义见 docs/r-architecture-wave1-spec.md §2.3」——
+    那是 dev-only 文件，装到 `~/.agents/skills/` 之后必然不存在。
+    **指路指向不存在的文件，比不指路更糟。**
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _write(self, doc):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump(doc, handle, ensure_ascii=False)
+        handle.close()
+        name = pathlib.Path(handle.name)
+        self.addCleanup(lambda: name.unlink(missing_ok=True))
+        return str(name)
+
+    def test_help_stays_in_package(self) -> None:
+        # 直接取 help 文本：`main(["--help"])` 会抛 SystemExit
+        text = sc.build_parser().format_help()
+        self.assertNotIn("docs/", text, "--help 指向了不随包安装的文件")
+        self.assertIn("references/research-state-policy.md", text, "help 必须指向包内权威规则表")
+
+    def test_violation_hint_stays_in_package(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["falsifier"] = ""
+        code, out, err = _run("--check", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out + err, "违规提示指向了不随包安装的文件")
+
+    def test_shape_hint_stays_in_package(self) -> None:
+        doc = valid_state()
+        doc["state_version"] = "0"
+        code, out, err = _run("--check", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out + err, "形状提示指向了不随包安装的文件")
+
+    def test_json_output_does_not_leak_dev_paths(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["falsifier"] = ""
+        code, out, _err = _run("--check", "--json", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out)
+
+    def test_validator_docstring_marks_dev_specs_as_unshipped(self) -> None:
+        text = (self.ROOT / "scripts" / "state_check.py").read_text(encoding="utf-8")
+        self.assertIn("这些 spec 不随 skill 安装", text)
+
+
+class TestReleaseCheckGate(unittest.TestCase):
+    """`scripts/release_check.py` 的每个步骤都要能真的判 FAIL。
+
+    为什么需要它：一次真实事故是「闸门跑了，但**读数读错**」——
+    于是把发布闸门收敛成单一 `PASS` / `FAIL`。代价是闸门自己成了单点，
+    所以它的每一步都必须有反例：**步骤失效时要变红，而不是恒真。**
+
+    **不在这里调 `step_tests()`** —— 它会重跑整个测试套件，造成递归。
+    「全套测试通过」这一步由 `release_check.py` 自己跑；AGENTS.md 的发布清单以它为准。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    MUTATED = ("SKILL.md", "references/research-state-policy.md")
+
+    @classmethod
+    def setUpClass(cls):
+        # 还原守卫：变异测试写的是**真实仓库文件**。任何提前退出都不得留下改动。
+        cls._originals = {rel: (cls.ROOT / rel).read_text(encoding="utf-8")
+                          for rel in cls.MUTATED}
+
+    @classmethod
+    def tearDownClass(cls):
+        for rel, original in cls._originals.items():
+            path = cls.ROOT / rel
+            if path.read_text(encoding="utf-8") != original:
+                path.write_text(original, encoding="utf-8")
+
+    def setUp(self):
+        import release_check  # noqa: PLC0415 — 同目录模块，按需导入以免影响其他测试
+        self.rc = release_check
+
+    def _mutate(self, rel, old, new, step):
+        path = self.ROOT / rel
+        original = path.read_text(encoding="utf-8")
+        self.assertIn(old, original, msg=f"{rel} 里找不到待改文本")
+        path.write_text(original.replace(old, new, 1), encoding="utf-8")
+        try:
+            return step()
+        finally:
+            path.write_text(original, encoding="utf-8")
+
+    def test_rule_table_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_rule_table_parity()
+        self.assertTrue(ok, detail)
+        self.assertIn("逐字一致", detail)
+
+    def test_rule_table_step_detects_a_text_drift(self) -> None:
+        ok, _ = self._mutate("references/research-state-policy.md",
+                             "| V1 | 每个 C 的 falsifier 非空 | 硬 |",
+                             "| V1 | 每个 C 的 falsifier 不许为空 | 硬 |",
+                             self.rc.step_rule_table_parity)
+        self.assertFalse(ok, "规则文本漂移时该步骤必须 FAIL")
+
+    def test_readwrite_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_readwrite_parity()
+        self.assertTrue(ok, detail)
+
+    def test_readwrite_step_detects_a_cell_drift(self) -> None:
+        ok, _ = self._mutate("SKILL.md",
+                             "`literature` / `assumptions` / `failures` / `contract.constraints`",
+                             "`literature` / `assumptions` / `failures`",
+                             self.rc.step_readwrite_parity)
+        self.assertFalse(ok, "读写格漂移时该步骤必须 FAIL")
+
+    def test_referenced_scripts_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_referenced_scripts_exist()
+        self.assertTrue(ok, detail)
+
+    def test_referenced_scripts_step_detects_a_missing_script(self) -> None:
+        ok, _ = self._mutate("SKILL.md", "name: research-idea-pipeline",
+                             "name: research-idea-pipeline\n\n见 `scripts/no_such_script.py`。",
+                             self.rc.step_referenced_scripts_exist)
+        self.assertFalse(ok, "引用了不存在的脚本时该步骤必须 FAIL")
+
+    def test_every_step_is_present_and_named(self) -> None:
+        titles = [title for title, _ in self.rc.STEPS]
+        self.assertGreaterEqual(len(titles), 5)
+        for title in titles:
+            self.assertTrue(title.strip(), "步骤必须有名字")
+
+
+class TestNoThirdScoringSystem(unittest.TestCase):
+    """R3—R6 不得产生第三套数字评分，也不得提前做 venue fit。
+
+    冻结的设计只有两套聚合机制：R12 的 `G1—G5` + 六维；R7 / R10 / R13 的
+    极性归一化 + 逐维中位数。**R3—R6 只有 search descriptors 与判定**（coverage，
+    不做总分排序）。一旦文档里出现「双评分」或把 1—5 分塞给快筛角色，
+    执行者就会合理地重新造一个 `R3 novelty score + feasibility score`。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    BANNED = ("双评分", "可行性评分（1—5）", "审核评分")
+    NEGATIONS = ("不输出 1—5 分", "不产 1—5 分", "不是 1—5 评分")
+
+    def _docs(self):
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            yield rel, path.read_text(encoding="utf-8")
+
+    def test_no_third_numeric_scoring_wording(self) -> None:
+        offenders = []
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                for word in self.BANNED:
+                    if word in line and not any(neg in line for neg in self.NEGATIONS):
+                        offenders.append(f"{rel}:{lineno}: {word}")
+        self.assertEqual(offenders, [], "第三套数字评分措辞仍在：\n  " + "\n  ".join(offenders))
+
+    def test_s_feas_is_a_feasibility_and_resource_auditor(self) -> None:
+        text = (self.ROOT / "references" / "roles.md").read_text(encoding="utf-8")
+        self.assertIn("### S-Feas — 可行性与资源审计员（Feasibility & Resource Auditor）", text)
+        self.assertIn("**不输出 1—5 分，不输出顶会匹配度。**", text)
+
+    def test_s_feas_lines_never_prescribe_venue_fit(self) -> None:
+        offenders = []
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                if "S-Feas" not in line:
+                    continue
+                if "venue fit" in line and "不做 venue fit" not in line:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:60]}")
+                if "顶会匹配度" in line and "不输出顶会匹配度" not in line:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:60]}")
+        self.assertEqual(offenders, [], "S-Feas 仍在做 venue fit：\n  " + "\n  ".join(offenders))
+
+    def test_r3_fitness_table_puts_venue_fit_on_the_blind_side(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| **Search（R3—R6）**"))
+        self.assertTrue(row.rstrip().endswith("**venue fit** |"),
+                        "R3—R6 的 fitness 表必须把 venue fit 列在「不看」侧")
+
+    def test_r3_fast_screen_roles_use_the_non_scoring_skeleton(self) -> None:
+        text = (self.ROOT / "references" / "roles.md").read_text(encoding="utf-8")
+        self.assertIn("**骨架 3**", text)
+        self.assertIn("**不给分**", text)
+
+    def test_r12_review_dispatch_does_not_route_venue_fit_to_s_feas(self) -> None:
+        text = (self.ROOT / "references" / "phase-r12-narrative.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| `S-Feas`（按需） |"))
+        self.assertNotIn("顶会匹配度", row)
+        self.assertNotIn("venue", row)
+
+
+class TestV15LiveNicheSemantics(unittest.TestCase):
+    """MAJOR-6 收口：V15 的 live niche 语义必须在**全部 active 文档**里一致。
+
+    起因：`_v15()` 与 `RULES["V15"]` 早已是「只有 live niche 才要求 elite」，
+    selftest 也有「niche 全 killed → exit 0」，但 active 文档仍写着
+    「每个**出现过的** niche 至少一条 elite」，R4.3 甚至规定
+    「单候选 niche 的 elite 被 archive 时 R14 不得 archive」，R6.2 又写
+    「进化不得让某 niche 失去 elite」。
+    **校验器改对了，执行规范没改对** —— 执行者会据此把合法状态判成违规。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DOCS = ("references/phase-r3-r6-discovery.md", "references/research-state-policy.md",
+            "references/narrative-patterns.md", "SKILL.md",
+            "scripts/state_check.py")
+    BANNED = ("每个出现过的 niche", "每个出现过的 `niche`",
+              "不得把它 `archive`", "进化不得让某个 niche 失去 elite",
+              '本仓库没有"关闭 niche"机制')
+
+    def test_banned_wording_is_gone(self) -> None:
+        offenders = []
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            for word in self.BANNED:
+                if word in text:
+                    offenders.append(f"{rel}: {word}")
+        self.assertEqual(offenders, [], "V15 旧措辞仍在 active 文档：\n  " + "\n  ".join(offenders))
+
+    def test_validator_top_comment_matches_the_rule(self) -> None:
+        text = (self.ROOT / "scripts" / "state_check.py").read_text(encoding="utf-8")
+        self.assertIn("V15 每个 **live niche**", text)
+
+    def test_policy_states_the_canonical_reading(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("live niche = 至少存在一个", text)
+        self.assertIn("候选全部 `killed` / `archived` 的 niche 合法为空", text)
+
+    def test_all_dead_niche_is_legal(self) -> None:
+        doc = valid_state()
+        for hypothesis in doc["hypotheses"]:
+            hypothesis["status"] = "killed"
+        self.assertNotIn("V15", sc.check_state(doc, source="<test>").rules())
+
+    def test_live_niche_without_elite_is_hard(self) -> None:
+        doc = valid_state()
+        for hypothesis in doc["hypotheses"]:
+            hypothesis["status"] = "active"
+        self.assertIn("V15", sc.check_state(doc, source="<test>").rules())
+
+
+class TestControlledLanguageGate(unittest.TestCase):
+    """受控中文 linter（默认档）在 `examples/` 与 `templates/` 上**硬违规必须为 0**。
+
+    起因：我在四个提交信息里写「linter 硬违规 0」，但读的是输出的**最后一行**
+    （「情态（可能 / 也许 / …）永不标记：置信度是内容。」），**不是**计数行。
+    于是 Batch 7 引入的 5 处分号连续四批没被发现 —— 闸门跑了，读数读错了。
+    把闸门做成测试，就不再依赖人肉看输出。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    LINTER = "scripts/ste_lint_zh.py"
+
+    def test_managed_files_have_zero_hard_violations(self) -> None:
+        targets = [str(path) for path in sorted((self.ROOT / "examples").glob("*.md"))]
+        targets += [str(path) for path in sorted((self.ROOT / "templates").glob("*.md"))]
+        self.assertTrue(targets, "examples/ 与 templates/ 下找不到受管文件")
+        proc = subprocess.run(
+            [sys.executable, str(self.ROOT / self.LINTER), "--disable", "synonym-rotation", *targets],
+            capture_output=True, text=True, cwd=str(self.ROOT),
+        )
+        self.assertIn("硬违规", proc.stdout, f"linter 没有输出计数行：{proc.stdout[-400:]}")
+        self.assertIn("硬违规 0，baseline 0", proc.stdout,
+                      "受控中文 linter 出现硬违规：\n" + proc.stdout[-1200:])
+
+    def test_linter_is_present(self) -> None:
+        # 守卫：linter 被删/改名时，上面的检查不得静默变成「通过」
+        self.assertTrue((self.ROOT / self.LINTER).is_file(), f"{self.LINTER} 不存在")
+
+
+class TestSemanticEntryFirst(unittest.TestCase):
+    """MEDIUM：语义入口优先，`phase=` 降为专家 / 调试覆盖。
+
+    起因：`description` 承诺「日常用四个入口 start-project / continue-research /
+    explore / audit，用户不需要知道 `R` 编号」，但 §0 的标题与兜底规则都是 phase-first
+    （「未给 phase，**先反问用户**要跑哪些阶段」）。两套 UX 并存的结果是
+    「用户一调用 → Agent 盯着 `R0`—`R14` 不知道从哪开始」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    ENTRIES = ("start-project", "continue-research", "explore", "audit")
+    TIERS = ("1. 语义入口", "2. 自然语言意图", "3. 显式 `phase=`", "4. 兜底")
+
+    def _skill(self):
+        return (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    def _section0(self):
+        text = self._skill()
+        return text[text.index("## 0. 入口"):text.index("| Phase | 名称 |")]
+
+    def _prompts(self):
+        return (self.ROOT / "references" / "invocation-prompts.md").read_text(encoding="utf-8")
+
+    def test_section_title_is_semantic_entry_first(self) -> None:
+        self.assertIn("## 0. 入口：**语义入口优先**", self._skill())
+
+    def test_four_tiers_appear_in_the_fixed_order(self) -> None:
+        section = self._section0()
+        positions = []
+        for tier in self.TIERS:
+            self.assertIn(tier, section, f"§0 缺少解析层：{tier}")
+            positions.append(section.index(tier))
+        self.assertEqual(positions, sorted(positions), "四层的顺序被改动了")
+
+    def test_phase_is_labelled_as_an_expert_override(self) -> None:
+        section = self._section0()
+        self.assertIn("专家 / 调试覆盖", section)
+
+    def test_all_four_entries_are_documented_in_both_files(self) -> None:
+        skill, prompts = self._skill(), self._prompts()
+        for entry in self.ENTRIES:
+            self.assertIn(entry, skill, f"§0 未登记语义入口 {entry}")
+            self.assertIn(entry, prompts, f"invocation-prompts 未登记入口 {entry}")
+
+    def test_argument_hint_promotes_the_semantic_entries(self) -> None:
+        fm = self._skill()[3:self._skill().index("\n---\n", 3)]
+        self.assertRegex(fm, r'argument-hint:\s*"<start-project\|continue-research\|explore\|audit>')
+
+    def test_no_rule_asks_the_user_to_pick_stages_first(self) -> None:
+        self.assertNotIn("若未给出 phase，**先反问用户**", self._skill())
+
+    def test_phase_override_does_not_silently_beat_a_semantic_entry(self) -> None:
+        # 两者同时出现必须显式声明裁决，不得静默选一个
+        self.assertIn("不要同时给出语义入口与 `phase=`", self._section0())
+
+    def test_last_updated_scope_is_pinned(self) -> None:
+        text = (self.ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
+        self.assertIn("`STATUS.md` 刻意没有该字段", text)
+        self.assertIn("**`最后更新` 的范围（写死，避免歧义）：**", text)
+
+
+class TestQdNicheDecoupling(unittest.TestCase):
+    """HIGH-1：QD niche 与 R12 叙事 preset 是**两套独立枚举**。
+
+    起因：`N1`—`N10` 曾同时被当 Narrative preset 与 QD archive niche，理由是
+    「避免第二套枚举」。代价是 Narrative ontology 泄漏进 Discovery，而且映射**有损** ——
+    例如 preset「效率 / 可行性」在七个科学结构轴里没有对应项。
+    允许 `N1`—`N10` 的位置只有：R12 / narrative preset / venue calibration。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    # 一行的上下文若含这些词，说明它在讲 QD / Discovery
+    QD_MARKERS = ("QD archive", "QD niche", "QD 科学结构轴", "hypotheses[].niche",
+                  "population", "niche")
+    # 一行的上下文若含这些词，说明它在讲叙事 preset / 校准 —— 那就是合法位置
+    PRESET_SAFE_MARKERS = ("preset", "叙事", "narrative", "calibration", "修辞")
+
+    def test_qd_niches_are_exactly_the_seven_axes(self) -> None:
+        self.assertEqual(sc.QD_NICHES, (
+            "assumption-shift", "formulation-shift", "representation-shift",
+            "mechanism-shift", "theory-shift", "evaluation-shift", "boundary-shift"))
+
+    def test_no_qd_niche_is_a_preset_name(self) -> None:
+        for niche in sc.QD_NICHES:
+            self.assertIsNone(re.match(r"^N\d+$", niche), f"{niche} 是 preset 编号，不是科学结构轴")
+
+    def test_there_is_no_local_niche(self) -> None:
+        # local 已经是 island；niche 回答的是「改了什么结构」
+        self.assertNotIn("local", sc.QD_NICHES)
+
+    def test_n_presets_never_appear_in_qd_context(self) -> None:
+        offenders = []
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            header = ""
+            for lineno, line in enumerate(lines, 1):
+                # 表格数据行继承自己的表头作为上下文（否则「最佳 preset」列的值会误报）
+                if re.fullmatch(r"\|[\s:|-]+\|", line.strip()) and lineno >= 2:
+                    header = lines[lineno - 2]
+                context = line + " " + header
+                if not re.search(r"\bN(?:10|[1-9])\b", line):
+                    continue
+                if any(marker in context for marker in self.PRESET_SAFE_MARKERS):
+                    continue
+                if any(marker in context for marker in self.QD_MARKERS):
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "N1—N10 出现在 Discovery/QD 上下文：" + str(offenders))
+
+    def test_validator_rejects_a_preset_as_niche(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["niche"] = "N5"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.rules(), ["V6"])
+        self.assertIn("叙事 preset", report.violations[0].detail)
+
+    def test_island_and_niche_are_documented_as_orthogonal(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("`island` ≠ `niche`", text)
+        self.assertIn("没有 `local` niche", text)
+        self.assertIn("idea **从哪里生成**", text)
+        self.assertIn("科学结构上改变了什么", text)
+
+    def test_elite_is_a_within_niche_representative(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("R4 elite = within-niche representative, not global winner", text)
+
+    def test_new_niche_creation_is_reinterpreted(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("首次占据一个当前尚为空的合法 niche", text)
+        self.assertIn("动态发明第八个枚举值", text)
+
+    def test_narrative_patterns_drops_the_dual_identity_claim(self) -> None:
+        text = (self.ROOT / "references" / "narrative-patterns.md").read_text(encoding="utf-8")
+        self.assertNotIn("也是 **R4 的 QD archive niche 取值**", text)
+        self.assertIn("只是叙事 preset，不是 QD archive 的 niche", text)
+
+    def test_next_actions_template_does_not_steal_the_preset_namespace(self) -> None:
+        # `N<k>` 已被 project-layout 的 ID 表保留给叙事 preset
+        text = (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8")
+        section = text[text.index("## Next recommended actions"):text.index("## Current decision")]
+        self.assertNotRegex(section, r"`N\d+`", "Next recommended actions 不得用 `N<k>` 当动作序号")
+
+
+class TestEigContract(unittest.TestCase):
+    """HIGH-4：EIG 的生产者 / 消费者必须分开，`actual` 由结构化 delta 支撑。
+
+    起因：`scheduler-policy` 的自检要求「每个 done 实验都有 predicted 与 actual 的对照」，
+    但既没有规定 actual 从什么事实算，也没有模板承载 —— `EIG ÷ cost` 于是能退化成
+    「LLM 自己觉得这个实验挺有信息量」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DELTA_KEYS = ("claim_status_changes", "uncertainty_changes",
+                  "hypothesis_status_changes", "new_uncertainties",
+                  "unexpected_observations")
+    RATINGS = ("high", "medium", "low", "zero")
+
+    def _policy(self):
+        return (self.ROOT / "references" / "scheduler-policy.md").read_text(encoding="utf-8")
+
+    def _template(self):
+        return json.loads((self.ROOT / "templates" / "scheduler.template.json")
+                          .read_text(encoding="utf-8"))
+
+    def _section_61(self):
+        text = self._policy()
+        return text[text.index("### 6.1"):text.index("## 7.")]
+
+    def test_producer_and_consumer_are_named(self) -> None:
+        section = self._section_61()
+        self.assertIn("R9  scheduling", section)
+        self.assertIn("R11 state update", section)
+        self.assertIn("predicted_information_gain", section)
+        self.assertIn("actual_information_gain", section)
+
+    def test_rating_enum_is_frozen_and_complete(self) -> None:
+        section = self._section_61()
+        for rating in self.RATINGS:
+            self.assertIn(f"`{rating}`", section, f"§6.1 未登记 rating 值 {rating}")
+
+    def test_template_record_has_every_required_key(self) -> None:
+        record = self._template()["eig_calibration"]["records"][0]
+        for key in ("experiment", "predicted_information_gain", "observed_delta",
+                    "actual_information_gain"):
+            self.assertIn(key, record)
+
+    def test_template_delta_shape_matches_the_doc(self) -> None:
+        delta = self._template()["eig_calibration"]["records"][0]["observed_delta"]
+        self.assertEqual(sorted(delta), sorted(self.DELTA_KEYS))
+        section = self._section_61()
+        for key in self.DELTA_KEYS:
+            self.assertIn(f'"{key}"', section, f"§6.1 未登记 observed_delta 键 {key}")
+
+    def test_template_rating_is_supported_by_its_delta(self) -> None:
+        record = self._template()["eig_calibration"]["records"][0]
+        delta = record["observed_delta"]
+        if record["actual_information_gain"] == "high":
+            supported = bool(delta["claim_status_changes"]) or any(
+                change.get("status_to") == "closed" for change in delta["uncertainty_changes"])
+            self.assertTrue(supported, "模板里的 high rating 没有 delta 支撑")
+
+    def test_the_bare_rating_contract_is_gone(self) -> None:
+        text = self._policy()
+        self.assertNotIn("`actual_information_gain` 的对照记录。", text)
+
+    def test_report_is_honest_about_the_missing_validator(self) -> None:
+        # 契约不是闸门。必须写明，否则读者会以为它已机械闭环。
+        self.assertIn("没有机械校验器", self._policy())
+
+    def test_actual_information_gain_has_a_mechanical_gate(self) -> None:
+        """已知缺口：`scheduler.json` 没有 schema，也没有校验器。
+
+        EIG 三件套目前只由 scheduler-policy §6.1 的**契约**与 R11 的自检保证。
+        把它变成闸门需要一份 scheduler schema（未实现）。**不要把契约说成闸门。**
+        """
+        self.skipTest("已知缺口：scheduler.json 无 schema/校验器；EIG 三件套只由 "
+                      "scheduler-policy §6.1 契约与 R11 自检保证，无机械闸门")
+
+    def test_r11_is_named_as_the_writer(self) -> None:
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        self.assertIn("eig_calibration.records", text)
+
+    def test_r9_is_named_as_the_producer(self) -> None:
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        self.assertIn("predicted_information_gain", text)
+
+
+class TestR11PartialUncertainty(unittest.TestCase):
+    """HIGH-3：R11 必须允许 `high → medium → low` 的部分下降。
+
+    起因：R11 曾写「第 3 步不允许只关不增」，把 `uncertainty` 与 `status` 混成一个维度 ——
+    而 state 明确允许 `uncertainty high→medium` 且 `status open`。合法科研状态被判「不闭环」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DELTA_CODES = ("①", "②", "③", "④", "⑤", "⑥", "⑦")
+
+    def _r11(self):
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        return text[text.index("## R11"):text.index("## 自检")]
+
+    def test_the_banned_rule_is_gone(self) -> None:
+        self.assertNotIn("只关不增", self._r11())
+
+    def test_partial_reduction_is_explicitly_allowed(self) -> None:
+        text = self._r11()
+        self.assertIn("high → medium", text)
+        self.assertIn("可保持 `open`", text)
+
+    def test_seven_delta_conditions_are_listed(self) -> None:
+        text = self._r11()
+        for code in self.DELTA_CODES:
+            self.assertIn(f"| {code} |", text, f"R11 的 delta 表缺条件 {code}")
+
+    def test_policy_states_the_two_axes_are_independent(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| `uncertainty` |"))
+        self.assertIn("与 `status` 独立", row)
+
+    def test_no_doc_keeps_the_old_four_step_wording(self) -> None:
+        for rel in ("SKILL.md", "references/phase-r9-r11-experiment-loop.md"):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("四步，缺一不可", text, f"{rel} 仍把 R11 写成四步")
+
+    def test_no_rule_forbids_partial_reduction(self) -> None:
+        doc = valid_state()
+        doc["uncertainties"][0].update(uncertainty="medium", status="open")
+        self.assertEqual(sc.check_state(doc, source="<test>").exit_code, sc.EXIT_OK)
+
+
+class TestCandidateBoundary(unittest.TestCase):
+    """`P3` 只产 typed intermediate，不进 Research State（HIGH-2）。
+
+    起因：`policy §5.0` 写「每个候选必须产出至少一条 `C`」，而「候选」没有定义 ——
+    `P3` 的 `domain-free skeleton` 被默认当成候选，执行者于是被迫
+    「把骨架包成 `H` + 造一条 `C`」，把表示探索提前变成可证伪假设。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_r3_doc_defines_candidate_and_excludes_p3(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("R3.0.1 什么才算 candidate", text)
+        self.assertIn("不进 `hypotheses[]`、不产 `C`", text)
+        self.assertIn("populations/intermediates/", text)
+        self.assertIn("derived_from_intermediate", text)
+
+    def test_policy_rule1_references_the_definition(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("每个 **candidate** 必须产出至少一条 `C`", text)
+        self.assertIn("§R3.0.1", text)
+
+    def test_no_doc_keeps_the_undefined_wording(self) -> None:
+        for rel in ("SKILL.md", "references/research-state-policy.md",
+                    "references/phase-r3-r6-discovery.md"):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("每个候选必须产出至少一条", text,
+                             f"{rel} 仍在用未定义的「候选」")
+
+    def test_project_layout_registers_the_intermediates_dir(self) -> None:
+        text = (self.ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
+        self.assertIn("populations/intermediates/", text)
+
+    def test_skill_entry_states_the_p3_boundary(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`P3` 只产 typed intermediate，不产 candidate", text)
+
+    def test_genealogy_stays_within_hypotheses(self) -> None:
+        # `parents` 只引用 `H`：P3 的来源关系不得进 state 谱系
+        self.assertNotIn("intermediates", sc.FIRST_CLASS_KEYS)
+        self.assertNotIn("P3", sc.CANDIDATE_ISLANDS)
+
+
+class TestPhaseDocNoLegacyFlow(unittest.TestCase):
+    """迁移后的 phase 文档不得再含旧字母流程的**活跃**小节。
+
+    起因：迁移只加 precedence note，旧 `B/C/E` 小节仍原地可执行 ——
+    注释不是隔离。对 LLM 读者，留着就等于两套流程并存。
+
+    已退役的内部小节号字母：`B`（旧 discovery 流程）、`C`（旧方案生成流程）、
+    `E`（旧方案复核流程）。`A`（R2 / R5）与 `D`（R12）是**当前**命名，不在禁止之列。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    R8 = "references/phase-r8-evidence-contract.md"
+    LEGACY_FLOW_WORDS = ("创新性研究", "可行性研究", "论文格式展开", "实验流程设计")
+    RETIRED_LETTERS = ("B", "C", "E")
+    VENUE_ROLES = ("R-CVPR", "R-ICML", "R-NeurIPS", "R-MICCAI")
+
+    def _phase_files(self):
+        return sorted((self.ROOT / "references").glob("phase-*.md"))
+
+    def test_r8_has_no_legacy_letter_headings(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        offenders = re.findall(r"^#{1,3}\s+C\d+[.．]", text, re.M)
+        self.assertEqual(offenders, [], f"R8 文档仍含旧 C 级小节标题：{offenders}")
+
+    def test_r8_has_no_legacy_flow_words(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        for word in self.LEGACY_FLOW_WORDS:
+            self.assertNotIn(word, text, f"R8 文档仍含旧流程词：{word}")
+
+    def test_no_retired_letter_headings_in_any_phase_doc(self) -> None:
+        offenders = []
+        for path in self._phase_files():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                m = re.match(r"^#{1,3}\s+([A-Z])\d+[.．]", line)
+                if m and m.group(1) in self.RETIRED_LETTERS:
+                    offenders.append(f"{path.name}: {line.strip()}")
+        self.assertEqual(offenders, [], f"phase 文档仍含退役字母小节标题：{offenders}")
+
+    def test_no_retired_section_refs_in_skill(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        for ref in ("§B0", "§B1", "§B5", "§C1", "§C4", "§E0", "§E2", "§E8"):
+            self.assertNotIn(ref, text, f"SKILL.md 仍引用退役小节号 {ref}")
+
+    def test_no_venue_role_is_dispatched_in_phase_docs(self) -> None:
+        # 会议审稿人只在 R12 / R13 的 calibration 表里出现，不得成为任何阶段的派遣项。
+        offenders = []
+        for path in self._phase_files():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if any(role in line for role in self.VENUE_ROLES) and "●" in line:
+                    offenders.append(f"{path.name}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], f"phase 文档把会议审稿人列为派遣角色：{offenders}")
+
+    def test_r8_deliverables_exclude_experiment_plan(self) -> None:
+        # project-layout.md §2.2 把 experiment-plan.md 归 R9—R11。
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        begin = text.index("## R8.4 交付物与落盘")
+        end = text.index("## 读 / 写 World Model", begin)
+        for line in text[begin:end].splitlines():
+            if line.startswith("| **"):
+                self.assertNotIn("NNN-experiment-plan.md", line,
+                                 "experiment-plan.md 属于 R9—R11，不得出现在 R8 交付物表")
+
+    def test_r8_states_contract_ownership_boundary(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        for phrase in ("不创建 claim", "不重做", "不要求 artifact"):
+            self.assertIn(phrase, text, f"R8 文档缺少边界声明：{phrase}")
 
 
 # ---------------------------------------------------------------------------

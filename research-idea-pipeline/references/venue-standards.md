@@ -272,7 +272,7 @@ R12 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审稿
 
 ## 5. 贡献类型标注规范
 
-任何 Mode 输出的贡献点都必须标注类型。两种标注体系二选一，**全篇保持一致**。
+任何阶段输出的贡献点都必须标注类型。两种标注体系二选一，**全篇保持一致**。
 
 **按 NeurIPS 五类**（口径以 §3.1 的 S2 原文为准；分类由**作者**选择，审稿人按该类校准解读）：
 
@@ -400,7 +400,7 @@ R12 的 `D6` 只输出**校准表**，不派子代理、不产出三段式审稿
 - ❌ 引用 **【待核实】** 条目却把它当作已核实的官方规则使用。
 - ❌ 贡献点不标注类型。
 - ❌ 未经 S-Lit 核实即使用"首次提出 / first to"。
-- ❌ 以"没人做过"作为新颖性的唯一论据（需说明**为什么之前没人做**，见 R8 §C3 第 4 节）。
+- ❌ 以"没人做过"作为新颖性的唯一论据（需说明**为什么之前没人做**，见 R8 §R8.2.6 第 4 节）。
 - ❌ R7 / R10 / R13 结论卡片缺少**复现风险等级**。
 - ❌ 用 **venue 直接选 preset**（见 §10.0 的顺序硬规则）。
 - ❌ 用 `clinical significance` 冒充 `methodological innovation`（见 §9.4）。
@@ -629,7 +629,7 @@ preset **不是** venue 的函数。
 
 | 位置 | 引用内容 |
 |---|---|
-| [roles.md](roles.md) §1、§5、§6 | §0 两角度框架（限 R3—R6/R8/R7/R10/R13 会议审稿人 + `D6`） |
+| [roles.md](roles.md) §1、§5、§6 | §0 两角度框架（**只用于 R12 / R13 的 venue calibration 表**；会议 persona 不在**任何** R 阶段派遣） |
 | [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) / [phase-r8-evidence-contract.md](phase-r8-evidence-contract.md) / [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) | §0、§5.1、§6、§7 |
 | [phase-r12-narrative.md](phase-r12-narrative.md) | `D6` venue calibration → §10；贡献类型 → §5 |
 | [claim-first-policy.md](claim-first-policy.md) §5、§7.4 | §10（`(O, T, R)` 与证据契约 ← claim-first §5） |

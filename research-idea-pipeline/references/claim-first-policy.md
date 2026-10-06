@@ -13,7 +13,7 @@
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
 
 > **记法警告：** 本文件的 `A` / `B` 是**领域占位符**（A = 目标领域，B = 来源领域），
-> **与 Mode 字母 A/B/C/D/E 无关**。`Y` = 条件，`G` = 可验证的缺口，`K` = 本文建立的新知识，
+> **与已退役的 A/B/C/D/E 阶段字母无关**。`Y` = 条件，`G` = 可验证的缺口，`K` = 本文建立的新知识，
 > `X` = 作者口头想定位的锚点。这套记法与 [narrative-patterns.md](narrative-patterns.md) 一致。
 
 ---
@@ -45,7 +45,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 
 ### 1.1 顶层总纲：写 `G` 与 `K`，不要求有 `B`
 
-**结论：所有 Mode 的叙事层必须能写出 `G` 与 `K`。要求「必须有 B」的旧规则一律作废。**
+**结论：所有 R 阶段的叙事层必须能写出 `G` 与 `K`。要求「必须有 B」的旧规则一律作废。**
 
 **新总纲（逐字）：**
 
@@ -68,7 +68,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
    凡要求「必须有 B」的规则一律作废，改为「必须能写出 `G` 与 `K`」。
 3. 写不出 `G` 或 `K` 的叙事**不得**进入投稿叙事（承接 §4 的承重墙）。
 
-**引用本节的 Mode：** R12（D4 定位与 §1 因子分解）。R3—R6 / R8 / R7 / R10 / R13 为 P1。
+**引用本节的阶段：** R12（D4 定位与 §1 因子分解）。R3—R6 / R8 / R7 / R10 / R13 为 P1。
 
 ---
 
@@ -127,7 +127,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 - 措辞等级的判定与措辞选择**一律**以 [evidence-policy.md](evidence-policy.md) 为准。
   本文件只规定「哪种状态能升到哪一级」。
 
-**引用本节的 Mode：** R12（D0、D9）。[evidence-policy.md](evidence-policy.md) §3 做反向映射。
+**引用本节的阶段：** R12（D0、D9）。[evidence-policy.md](evidence-policy.md) §3 做反向映射。
 R3—R6 / R8 为 P1。
 
 ---
@@ -163,7 +163,7 @@ R3—R6 / R8 为 P1。
    （见 [narrative-patterns.md](narrative-patterns.md) §3）。claim graph 与槽位的对照
    **必须**一一落地，**不得**只在 claim graph 里写 `Ci ← Ej` 而槽位里没有对应证据句。
 
-**引用本节的 Mode：** R12（D1、D4 的 `S5`、D9）。
+**引用本节的阶段：** R12（D1、D4 的 `S5`、D9）。
 [scoring-policy.md](scoring-policy.md) §3 的 `G1` / `G4`。R3—R6 / R8 为 P1。
 
 ---
@@ -217,7 +217,7 @@ R3—R6 / R8 为 P1。
 2. 对应的台账条目**必须**标 `epistemic_status: Hypothesized` 与 `[待验证]`。
 3. 该条**必须**进 D9 的缺失证据清单。**不得**把假设写成已知原因。
 
-**引用本节的 Mode：** R12（D1 的 `C0`、D4 的 `S3`）。
+**引用本节的阶段：** R12（D1 的 `C0`、D4 的 `S3`）。
 [../SKILL.md](../SKILL.md) §1.5。[narrative-patterns.md](narrative-patterns.md) §2 / §4 / §7。
 
 ---
@@ -261,7 +261,7 @@ R3—R6 / R8 为 P1。
 
 该条与 [../SKILL.md](../SKILL.md) §0.1 规则 1 的 `core_goal` 单值纪律一致。
 
-**引用本节的 Mode：** R12（D2、D6）。[narrative-patterns.md](narrative-patterns.md) §2。
+**引用本节的阶段：** R12（D2、D6）。[narrative-patterns.md](narrative-patterns.md) §2。
 [venue-standards.md](venue-standards.md) §10。
 
 ---
@@ -304,7 +304,7 @@ R3—R6 / R8 为 P1。
    [../SKILL.md](../SKILL.md) §0.2 锚点变更单，且**只有用户能授权**。
 7. `anchor_role: orthogonal` 的路线**不得**进入 R12（[../SKILL.md](../SKILL.md) §0.1 规则 3）。
 
-**引用本节的 Mode：** R12（D3）。[../SKILL.md](../SKILL.md) §0.1 的 D 行。
+**引用本节的阶段：** R12（D3）。[../SKILL.md](../SKILL.md) §0.1 的 D 行。
 
 ---
 

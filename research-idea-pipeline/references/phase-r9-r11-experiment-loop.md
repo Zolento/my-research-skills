@@ -39,7 +39,14 @@ R10 让发现的问题**必须改变状态**，R11 让结果**必然回流**成�
 
 1. **`X` 是树**：`parent` 指向产生它的节点（`null` = 根）。`state_check.py` **V8** 机制强制
    父引用存在且**不成环**。
-2. **`claim_targeted` 必须非空**：说不清这次实验判别哪条 claim 的实验，不许做。
+2. **`claim_targeted` 按 stage 取值**（与 `V11` 一致，**不得要求全部非空**）：
+
+   | stage | `claim_targeted` | 理由 |
+   |---|---|---|
+   | `X1` 可行性 | **可为 `[]`** | 代码能跑通即可，不必判别 claim |
+   | `X2` 基线校准 | **必须为 `[]`** | 它校准**实验世界**，不判别论文主张。强制 `[]` 是防「调超参驱动」的结构性措施（**`V11` 机械强制**） |
+   | `X3` claim 判别 / `X4` 机制 / `X5` 边界 | **必须非空** | 说不清判别哪条 claim 的实验，不许做 |
+   | `X6` 复现 / 稳健性 | 继承 `parent` 的 `claim_targeted`，可为 `[]` | 它检验既有结论的稳定性，不新增判别 |
 3. **`unexpected` 是必填语义位。** 意外观察不是噪音 —— 它是 R3 paradigm escape 与
    `uncertainties[]` 的一等输入。
 4. **`known_flaws` 与 `result` 同时落盘**，不允许「先写结论，回头补 caveat」。
@@ -54,6 +61,9 @@ e* = argmax_e  E[ΔU | e] / cost(e)
 - **排序时必须写出三件事：** ① 这次实验改变哪条 `U`；② 预期改变方向；③ 成本口径
   （GPU 小时 / 数据 / 人力，写明单位）。
 - **禁止**用「预期能提升多少指标」当排序依据 —— 那是 benchmark 驱动的入口。
+- **同时写下预测值（生产者）：** 把 ①—③ 的结论写进 `scheduler.json` 的
+  `predicted_information_gain`（`high` / `medium` / `low`），供 R11 回填实际值对照。
+  **生产者在 R9，消费者在 R11** —— 见 [scheduler-policy.md](scheduler-policy.md) §6.1。
 
 **这是压掉 hyperparameter-tuning attractor 的主要机制：** 当选择标准是「最让我们知道
 自己是不是错了」，调参就不再是低风险高回报的选择。
@@ -70,6 +80,52 @@ e* = argmax_e  E[ΔU | e] / cost(e)
 
 **`state_check.py` V4 机械强制：** 每条 `F` 必须被某个 `claims[].known_flaws` 或
 `experiments[].known_flaws` 引用。**失败不得在叙事中消失**（R12 的视图也必须带上它们）。
+
+### R9.5 实验计划书（`<R>NNN-experiment-plan.md`，R9—R11 落盘）
+
+**归属：** 实验规划文档由 **R9—R11** 落盘（见 [project-layout.md](project-layout.md) §2.2 / §6.2）。
+**R8 不落盘本文件** —— R8 只创建 `planned` 实验条目并冻结 `preregistration`。
+
+按以下 **14 节（0—13）** 结构输出。逐节作答，缺节即视为交付不完整。
+
+| # | 章节 | 关键要求 |
+|---|---|---|
+| 0 | **信息完整性检查** | 数据 / 算力 / 基线是否可得；缺失项标注「待核实」 |
+| 1 | **贡献—实验映射表** | 每条 `K<n>` → 对应 `X<n>`；**不得有贡献无实验、无实验对应无贡献** |
+| 2 | **实验假设与变量设计** | 含**证伪条件**；自变量 / 因变量 / 控制变量 |
+| 3 | **数据与基准** | 数据集、划分、预处理、规模 |
+| 4 | **基线与公平比较** | 基线选取理由；**同算力 / 同数据 / 同调参预算** |
+| 5 | **评估指标与统计方案** | 主指标 + 次指标；随机种子数、误差棒、显著性检验 |
+| 6 | **实验阶段与流程** | **实验卡片**（见下）+ **审稿人质疑与回应** |
+| 7 | **消融矩阵** | 每个关键设计一个消融；标注优先级 |
+| 8 | **鲁棒性、泛化与公平性** | 分布偏移、超参敏感性、子群表现 |
+| 9 | **效率与资源预算** | 训练 / 推理成本、显存、GPU·小时 |
+| 10 | **可复现性清单** | 代码 / 数据 / 超参 / 种子 / 环境 / 算力披露 |
+| 11 | **预期结果与失败条件** | 明确的失败条件（什么结果意味着假设不成立） |
+| 12 | **实验优先级与依赖关系** | 依赖图；先做哪些、哪些可砍 |
+| 13 | **论文呈现计划** | 每个实验 → 哪张图表、放正文还是附录 |
+
+**实验卡片模板：**
+
+```markdown
+#### X<n>：<实验名>
+- **目的：** 判别 <C<n> 与 <nearest_alternative>>
+- **stage：** X1 | X2 | X3 | X4 | X5 | X6
+- **输入：** 数据 …；模型 …
+- **变量：** 自变量 …；控制变量 …
+- **输出：** 指标 …
+- **证伪条件：** 若 … 则 claim 不成立
+- **预算：** <GPU·小时>
+- **依赖：** `parent` = X<m>
+- **审稿人质疑：** … → **回应：** …
+```
+
+**硬规则：**
+
+- 每个实验卡片对应 `experiments[]` 里一个真实存在的 `X` 条目，**不得只写在文档里**。
+- 卡片的「证伪条件」与 `claims[].contract.kill_rule` **必须是同一份**。
+  两处不一致时以 `contract` 为准，并回写卡片。
+- 计划书**不得**引入契约中没有的 `X`。新增实验必须先回 R8 补契约与 `preregistration`。
 
 ---
 
@@ -149,7 +205,9 @@ Claim ↔ Method ↔ Code ↔ Result ↔ Conclusion
 
 | 阶段 | 有什么 artifact | 允许要求什么审计 |
 |---|---|---|
-| R7 / R8 | **没有** code / logs / failed runs | **只能审「计划中的证据契约」** |
+| **R7 首轮**（R8 之前） | 没有 code / logs / failed runs，也**没有** `claims[].contract` | **只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`** |
+| **R7 第二轮起**（R8 之后） | 有 `claims[].contract`，仍无 artifact | 逐条核契约：`kill_rule` 是否可判定、`expected_outcomes` ↔ `preregistration.outcomes[].id`、`minimal_discriminating_experiment` 是否指向真实 `X` |
+| **R8** | 无 artifact | **只能审它自己刚建的 `claims[].contract` 与刚冻结的 `preregistration`** —— 两者都是**预测**，不是结果 |
 | R9 之后 / R13 | 有完整 trace | artifact-aware 审计：code ↔ method、logs ↔ result、failed runs 是否被隐藏、metric / dataset 选择历史 |
 
 **禁止在无 artifact 的阶段要求 artifact 审计。** 那会产出一条永远无法执行、只能填「待补」的规则。
@@ -164,21 +222,38 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 
 ## R11 状态回写（`result → claim → uncertainty → next experiment`）
 
-每个 `X` 收工后**按序**执行四步，缺一不可：
+每个 `X` 收工后**按序**执行五步，缺一不可：
 
 | 步 | 动作 | 写哪个字段 |
 |---|---|---|
 | 1 | 把结果登记为证据 | `evidence[]` 新增 `E<n>`（`epistemic_status` 按实际：跑了 = `Observed`，只是推导 = `Supported`） |
 | 2 | 把证据连到 claim | `claims[].supporting_evidence` / `refuting_evidence`；`status` 按 §R10 更新 |
-| 3 | 更新不确定性 | `uncertainties[]`：`status` 转 `closed`，或**新增**由本次 `unexpected` 引出的 `U<n>` |
-| 4 | 生成下一步 | `experiments[]` 新增 `planned` 节点，`parent` 指向本次；或在 `next_branches` 里登记 |
+| 3 | 更新不确定性（**允许部分下降**） | `uncertainties[]`：`uncertainty` 可 `high → medium → low`，`status` 可保持 `open`；只在**已有充分判别证据**时转 `closed`；由 `unexpected` 引出的 `U<n>` **必须新增** |
+| 4 | 回填 EIG 对照（telemetry） | `scheduler.json` 的 `eig_calibration.records`：`predicted_information_gain` + **`observed_delta`** + `actual_information_gain`（生产者 / 消费者见 [scheduler-policy.md](scheduler-policy.md) §6.1） |
+| 5 | 生成下一步 | `experiments[]` 新增 `planned` 节点，`parent` 指向本次；或在 `next_branches` 里登记 |
 
 **硬规则：**
 
 - **`status` 变更只能在这里（经 R10）** —— 例外：R8 的证据驱动**单向升级**（见 [../SKILL.md](../SKILL.md) §1.6）。 Discovery（R3—R6）与 Assurance（R7）**不得**直接改
   `claims[].status` —— 这是防「自己给自己判分」的结构性措施。
-- 第 3 步**不允许只关不增**：一轮实验如果没有任何新不确定性，要么结论已足够强（走 R14），
-  要么本次实验没有信息量（应记为 `failures[]` 的 `inconclusive`）。
+- **第 3 步的判据是「有没有有意义的 state delta」，不是「有没有关掉一条 `U`」。**
+  出现下列**任意一条**，即算本次实验产生了信息：
+
+  | # | 有意义的 delta |
+  |---|---|
+  | ① | `claims[].status` / `supporting_evidence` / `refuting_evidence` 变了 |
+  | ② | 某条 `U` 的 `uncertainty` **下降一级**（`high → medium` 或 `medium → low`） |
+  | ③ | 某条 `U` 的 `status` 转 `closed` |
+  | ④ | 某条 `hypotheses[].status` 变了 |
+  | ⑤ | 新增了由 `unexpected` 引出的 `U<n>` |
+  | ⑥ | 登记了 `unexpected` 观察 |
+  | ⑦ | 本次被判 `inconclusive` 并写进 `failures[]` |
+
+  **只有 ①—⑦ 全不成立时，才判本次实验没有信息量**，并写 `failures[]`（`kind: inconclusive`）。
+- **`uncertainty` 与 `status` 是两个独立维度。** `high → medium` 而 `status` 仍 `open`
+  是**完全合法**的科研状态 —— **不得**因为「没关掉」就判它不闭环（见
+  [research-state-policy.md](research-state-policy.md) §3.8）。`closed` 需要**充分判别证据**，
+  不允许为了凑闭环而关。
 - 收尾跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
   **硬违规须为 0**。
 
@@ -195,7 +270,8 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 - [ ] `ACCEPTED_LIMITATION` 已同时写进 `C.scope` 或 `C.known_flaws`
 - [ ] 机制型 claim 做了 `RS1` / `RS2` 对比；结果近似时已降级
 - [ ] 未在无 artifact 的阶段要求 artifact 审计
-- [ ] R11 四步全做完，且新增了不确定性或已走 R14
+- [ ] R11 五步全做完；第 3 步有**至少一条**有意义的 delta（①—⑦，见 §R11 硬规则）
+- [ ] 每个 `done` 实验已回填 EIG 三件套，且 `actual_information_gain` 由 `observed_delta` 支撑
 - [ ] `state_check.py --check` 硬违规为 0
 
 ---

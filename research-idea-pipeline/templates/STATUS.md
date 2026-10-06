@@ -1,76 +1,65 @@
 <!--
 路线级 STATUS.md 骨架。
-用法：复制到 routes/<R>/STATUS.md。
-生成入口：scripts/render_status.py。
-要求：本文件是 research-state.json 的投影，不是第二份真相。
-      同一份 state 连续生成两次，内容必须一致。这就是幂等。
-      禁止手工补充 state 之外的事实。
+
+**canonical 形态由 `scripts/render_status.py` 决定。** 它是 executable specification。
+本文件必须与它**同形**，包括节名、顺序与每节的块形态。
+`scripts/test_render_status.py` 的 content-shape parity 机械核对这件事。
+
+用法：优先由 renderer 生成。手写初稿后也立刻交给 renderer 覆盖。
+
+两条硬要求。
+一、本文件是 `research-state.json` 的投影，不是第二份真相。
+二、同一份 state 连续生成两次，内容必须逐字节一致。这就是幂等。
+
+禁止手工补充 state 之外的事实。
+**刻意不写「最后更新（墙钟时间）」**，那会破坏幂等（DI-4）。
+时间线由 `routes/<R>/INDEX.md` 的 Recent Research Changes 承担。
 -->
 
-# routes/<R> — STATUS
+# Route <R> — STATUS
 
-> 本文件是 `research-state.json` 的投影，不是第二份真相。
-> 应由 `scripts/render_status.py` 生成，手改无效。
-> 要新增事实，先改 `research-state.json`，再重新生成。
-
----
+> **本文件是 `research-state.json` 的投影，不是第二份真相。**
+> **禁止手改** —— 手改会在下一次 render 时被覆盖。
+> 重新生成：`python3 scripts/render_status.py --root <项目根> --route <R>`。校验是否过期：加 `--check`（不一致退出码 3）。
 
 ## State version
 
-- State version：`<N>`
-
-> **刻意不写"最后更新（墙钟时间）"** —— 那会破坏幂等（同一份 state 两次生成将不一致），
-> 从而违反 DI-4。**时间线由 `routes/<R>/INDEX.md` 的「Recent Research Changes」承担**，
-> 它才是允许出现日期的那个投影。
+- State version：S0000
 
 ## Current thesis
 
-- 中心命题：`<一句话>`
-- status：`ungrounded` / `partially-supported` / `supported`
+<中心命题一句话>
+
+Status: <ungrounded | partially-supported | supported>
 
 ## Strongest supported findings
 
-| # | 结论 | 证据 | state 引用 |
-|---|---|---|---|
-| `S1` | | | `C1` |
+- `C1` — <结论>（supported）
 
 ## Active hypotheses
 
-| # | 假设 | 状态 | niche |
-|---|---|---|---|
-| `H1` | | | |
+- `H1` — <假设>（elite）
 
 ## Critical uncertainties
 
-- 待核实条数：`<N>`
-- `<不确定性>`（等级：High / Medium / Low）
+- `U1` — <未知是什么>（open）
 
 ## Open critical attacks
 
-| # | 攻击 | 状态 | 处置 |
-|---|---|---|---|
-| `A1` | | | |
+- `A1` — <什么结果会杀死该 claim>
 
 ## Active experiments
 
-| XID | Question | 状态 | 结果 |
-|---|---|---|---|
-| `X021` | | | |
+- `X1` — <这个实验问什么>（planned）
 
 ## Most important negative findings
 
-| # | 负结果 | 证据 | 处置 |
-|---|---|---|---|
-| `F1` | | | |
+- `F1` — <什么失败了>（inconclusive）
 
 ## Next recommended actions
 
-| # | 动作 | 优先级 | 依赖 |
-|---|---|---|---|
-| `N1` | | P0 | — |
+- `R1` — <发现的缺陷>（RUN_TEST）
 
 ## Current decision
 
-- 决策：`continue` / `pivot` / `archive` / `submit`
-- 依据：`<一句话>`
-- Revisit condition：`<触发条件>`
+CONTINUE

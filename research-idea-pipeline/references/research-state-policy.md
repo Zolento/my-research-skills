@@ -1,7 +1,7 @@
-# Research State 政策（R1 权威：八类一等对象、写入时机、引用完整性 V1—V24）
+# Research State 政策（R1 权威：八类一等对象、写入时机、Shape Gate S1—S7 与引用完整性 V1—V24）
 
 **本文件是 R1 Research World Model（简称 `state`）的唯一权威定义。** 八类一等对象的 ID 前缀、
-逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V24 都写在这里。各 phase 文件只引用本文件，
+逐字字段、每个 R 阶段的读写时机、Shape Gate S1—S7 与引用完整性 V1—V24 都写在这里。各 phase 文件只引用本文件，
 **不得**各自再定义一遍枚举——各写一遍就是新的漂移源。
 
 **权威顺序：** 仓库级 spec `docs/r-architecture-wave1-spec.md`
@@ -11,11 +11,11 @@
 [scoring-policy.md](scoring-policy.md)（评分类）> 各 phase 文件。
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
 
-**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4 的 V1—V24
+**机器强制：** [../scripts/state_check.py](../scripts/state_check.py) 逐条执行 §4.0 的 S1—S7 与 §4.1 的 V1—V24
 **没有 validator，「一等对象」是宣言，不是机制**（spec §2.3）。
 
 **骨架：** [../templates/research-state.template.json](../templates/research-state.template.json)
-（模板自身**必须**通过 V1—V24）。
+（模板自身**必须**通过 S1—S7 与 V1—V24）。
 
 ---
 
@@ -138,7 +138,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|
 | `ungrounded` → `partially-supported` | ≥ `T1` | R8 |
 | `partially-supported` → `supported` | ≥ `T2` | R8 |
-| 任一 → `contradicted` | ≥ `T2` | R8 |
+| 检测到 ≥ `T2` 反驳证据 | ≥ `T2` | **R8 只登记 `refuting_evidence`，并必须转 R10**；`contradicted` 由 **R10** 执行（见 §5.0 规则 3） |
 | 任一 → `killed` | ≥ `T2` 或 `T3` | **仅 R10** |
 | `T0` 证据 | **不得触发任何状态迁移** | 只能记 `plausible`，留在 `assurance[]` |
 
@@ -285,8 +285,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `falsifier` | 字符串 | ✅ | |
 | `expected_information_gain` | 数值（如 `0.0`） | ✅ | EIG 排序用（spec §4） |
 | `status` | `active` \| `elite` \| `archived` \| `killed` | ✅ | |
-| `niche` | `N1`—`N10` 之一（**V6 强制**；复用 preset 名，不引入第二套枚举） | ✅ | V6；QD archive 的前提 |
-| `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制** |
+| `niche` | 七个 QD 科学结构轴之一（**V6 强制**）：`assumption-shift` / `formulation-shift` / `representation-shift` / `mechanism-shift` / `theory-shift` / `evaluation-shift` / `boundary-shift` | ✅ | V6；QD archive 的前提。**与 R12 的叙事 preset `N1`—`N10` 无关**，不得混用 |
+| `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制**。**`P3` 不出现在这里** —— 它只产 typed intermediate（见 §5.0 规则 1） |
 | `operator` | 十二算子之一（见下表） | ✅ | 产生该候选的搜索算子；`generation == 0` 时**必须与 `island` 一一对应**；**V16 强制** |
 | `parents` | `H` id 数组，可为 `[]` | ✅ | 谱系：父候选；初始候选写 `[]`；**V17 强制**（必须存在、不得自指或成环、generation 严格大于每个 parent） |
 | `generation` | 整数 ≥ 0 | ✅ | `0` = 初始候选，每次 R6 进化 +1；**V14 强制** |
@@ -297,7 +297,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|
 | generation-0（island 算子） | `reframe` | `P1` | 问题重构：改 object / target variable / formulation / success criterion |
 | generation-0 | `assumption_breaker` | `P2` | 假设破坏：`AS_i → ¬AS_i →` 新 research world |
-| generation-0 | `abstraction` | `P3` | 领域擦除：出 `domain-free skeleton`，**不产完整方法** |
+| generation-0 | `abstraction` | `P3` | 领域擦除：出 `domain-free skeleton`，**不产完整方法**；**也不产出 `hypotheses[]` 条目**（该算子不会出现在任何 candidate 的 `operator` 上） |
 | generation-0 | `remote_analogy` | `P4` | 远域类比：`semantic distance high` + `structural correspondence high` |
 | generation-0 | `theory_lens` | `P5` | 理论视角：换 mathematical object 并导出 ≥2 类后果 |
 | generation-0 | `counterexample` | `P6` | 反例 / 不可能性 / 测量反转 |
@@ -377,7 +377,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `id` | `U<n>` | ✅ | |
 | `question` | 字符串 | ✅ | 未知是什么 |
 | `importance` | `critical` \| `high` \| `medium` \| `low` | ✅ | R9 只对 `critical` / `high` 且 `uncertainty: high` 的项排序（spec §4） |
-| `uncertainty` | `high` \| `medium` \| `low` | ✅ | 当前不确定程度 |
+| `uncertainty` | `high` \| `medium` \| `low` | ✅ | 当前不确定程度。**与 `status` 独立**：`high → medium → low` 可以发生而 `status` 仍 `open` —— 部分下降是合法进展（R11 §硬规则） |
 | `cheapest_discriminating_test` | 存在的 `X` id 或字面量 `TBD` | ✅ | V7 |
 | `status` | `open` \| `closed` | ✅ | 关闭**必须**有对应实验证据，不得口关 |
 
@@ -395,6 +395,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `repairs[]` | `state_delta` | 字符串 | ✅ | V10；**实际改动了哪些字段**，必须可核对 |
 | `repairs[]` | `targets` | id 数组，可为 `[]` | ✅ | **V22**；该修复**直接作用**的对象 id —— 供「claim 被否决必须走 R10」做**精确**核对（不用易误判的子串匹配） |
 | `repairs[]` | `closure` | `RESOLVED` \| `ACCEPTED_LIMITATION` | ✅ | V10；两值封冻 |
+| `reviews[]` | `id` | 非空字符串（例 `REV7`） | **`integrity_gate == fail` 时必填** | **V23**；没有 id 就无法与 `repairs[]` / `failures[]` 建立关联 |
+| `repairs[]` | `source_review` | `reviews[]` 的 id 或 `null` | ✅ | **V23**；该修复**因哪一次审查**而产生。**必须逐条对应** —— 全局存在性不算闭环 |
+| `failures[]` | `source_review` | `reviews[]` 的 id 或 `null` | ✅ | **V23**；同上，供「记成失败」的闭环路径使用 |
 
 **修复门的硬规则（spec §5）：**
 
@@ -407,7 +410,54 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ---
 
-## 4. 引用完整性 V1—V24（`state_check.py` 机械强制）
+## 4. 机械闸门：Shape Gate（S1—S7）+ 引用完整性（V1—V24）
+
+**执行顺序（强制）：** 顶层结构（退出码 `4`）→ **Shape Gate S1—S7** → **V1—V24**。
+形状失败时**不执行** V 规则 —— V 规则的措辞假设输入形状成立，
+在形状错误上跑会给出误导性的级联判定。
+
+### 4.0 Shape Gate S1—S7（在 V1—V24 之前跑）
+
+**结论：S1—S7 全部是硬违规（退出码 `3`）；任何一条未清零，state 不得作为下一阶段的输入。**
+
+**规则表（与 `state_check.py` 的 `SHAPES` 逐字一致）：**
+
+| # | 规则（逐字） | 违规 | 典型反例 |
+|---|---|---|---|
+| S1 | 八类一等对象数组全部存在，且每个都是对象数组 | 形状 | 只写 `claims` 就交工；`"experiments": {}` |
+| S2 | 每条一等对象条目有非空字符串 id，且 id 在本数组内唯一 | 形状 | `"id": ""`；两个 `C1`；claim 写成 `"id": "Q1"` |
+| S3 | 冻结枚举字段必须存在且取值在枚举内（只查 V1—V24 未覆盖的枚举） | 形状 | `experiments[0].stage: "X9"`；`literature[0].relation: "sounds-good"`；`hypotheses[0]` 缺 `status` |
+| S4 | 每条 hypothesis 的 structural_signature 是对象，五键齐全，值为非负整数 | 形状 | 只写 `{"assumption_distance": 2}`；`"structural_signature": "flat"` |
+| S5 | claims[].contract 存在时是对象，十个契约键齐全，类型正确 | 形状 | 契约只写 4 键；`expected_outcomes` 写成数组 |
+| S6 | reviews 存在时是对象数组，decision 存在时是对象；integrity_gate 取值在枚举内 | 形状 | `"reviews": {}`；`"decision": "continue"`；`integrity_gate: "maybe"` |
+| S7 | state_version 是非负整数 | 形状 | `"state_version": "0"`；`-1` |
+
+**S 与 V 的分工（不得互相重复）：**
+S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性由 V1—V24 负责。
+**已被 V 规则覆盖的字段不在 S 里重复** —— 否则一次改动会同时报 S 与 V，掩盖真正的规则号。
+分工清单：`falsifier` 属 V1；`kill_condition` 属 V9；`depends_on` 的类型与悬空属 V19；
+`reviews[].id`（`gate == fail` 时必填）属 V23；`decision.verdict` 的枚举属 V24；
+`epistemic_status` / `niche` / `island` / `operator` / `generation` / `validity.status` /
+`verification_tier` / `disposition` / `closure` / `preregistration.outcomes[].op`
+各自已有 V 规则。
+
+**S3 覆盖的枚举（改动前曾被静默放过）：**
+
+| 数组 | 字段 | 冻结取值 |
+|---|---|---|
+| `claims[]` | `status` | `ungrounded` \| `supported` \| `partially-supported` \| `contradicted` \| `killed` |
+| `evidence[]` | `kind` | `experiment` \| `literature` \| `theory` \| `observation` |
+| `evidence[]` | `strength` | `partial` \| `strong` \| `weak` |
+| `assumptions[]` | `status` | `explicit` \| `tacit` |
+| `hypotheses[]` | `status` | `active` \| `elite` \| `archived` \| `killed` |
+| `experiments[]` | `stage` | `X1` \| `X2` \| `X3` \| `X4` \| `X5` \| `X6` |
+| `experiments[]` | `status` | `planned` \| `running` \| `done` \| `failed` |
+| `literature[]` | `relation` | `supports` \| `contradicts` \| `shares-assumption` \| `shares-structure` \| `solves-analogous-problem` \| `uses-same-theory` |
+| `uncertainties[]` | `importance` | `critical` \| `high` \| `medium` \| `low` |
+| `uncertainties[]` | `uncertainty` | `high` \| `medium` \| `low` |
+| `uncertainties[]` | `status` | `open` \| `closed` |
+
+### 4.1 引用完整性 V1—V24
 
 **结论：V1—V24 全部是硬违规；任何一条未清零，state 不得作为下一阶段的输入。**
 
@@ -420,16 +470,16 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V3 | 无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规 | 硬 | 无证据的 `C3` 标 `supported`；有 `E1` 的 `C0` 标 `ungrounded` |
 | V4 | 每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用 | 硬 | `F3` 只出现在 `failures[].referenced_by` 里，没有任何 `known_flaws` 指向它 |
 | V5 | epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence | 硬 | `C0.supporting_evidence: ["E4"]`，而 `E4.epistemic_status: Hypothesized`；或写了 `"observed"`（大小写） |
-| V6 | 每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举） | 硬 | `"niche": ""` / `"niche": "N11"`（越界）；**旧描述性 niche 名同样违规**（见 `deprecated-terms.txt`） |
+| V6 | 每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift / representation-shift / mechanism-shift / theory-shift / evaluation-shift / boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10` | 硬 | `"niche": ""`；`"niche": "N5"`（**叙事 preset 越界**）→ 应写 `"boundary-shift"`；**旧描述性 niche 名同样违规**（见 `deprecated-terms.txt`） |
 | V7 | U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD | 硬 | 指向 `X18`，但 `experiments[]` 里没有 `X18`；或写「暂无」 |
 | V8 | X.parent 必须是存在的 X 或 null；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
 | V9 | assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
 | V10 | 每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
 | V11 | stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别 | 硬 | `{"stage":"X2","claim_targeted":["C0"]}` |
 | V12 | status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失） | 硬 | failed 实验没有对应 `F` |
-| V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需） | 硬 | `"island": "PX"` |
+| V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 **`P3` 不得出现**（P3 只产 typed intermediate，不产 candidate） | 硬 | `"island": "PX"`；`"island": "P3"` |
 | V14 | hypotheses[].generation 是非负整数 | 硬 | `"generation": "1"` / `-1` |
-| V15 | 每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性） | 硬 | `N5` 下全是 `active` |
+| V15 | 每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite | 硬 | `assumption-shift` 下全是 `active` |
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
 | V17 | hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环） | 硬 | `"parents": ["H9"]` 但无 `H9`；`"parents": []` 而 `generation: 1`；`H3.parents: ["H4"]` 且 `H4.parents: ["H3"]` |
 | V18 | 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数 | 硬 | 缺 `validity`；`"status": "ok"`；`"reason": ""`；`since_state_version: 7` 而 `state_version: 3` |
@@ -437,7 +487,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V20 | claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2） | 硬 | `C0.status: "supported"`，而其支持证据全是 `T0`（LLM 自评）；或证据缺 `verification_tier` |
 | V21 | status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version | 硬 | `X12` 已 `done` 却无 `preregistration`；或 `frozen_at_state_version: 5 > result_at_state_version: 4`；或 `op: "improve"` 越界 |
 | V22 | claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值） | 硬 | `C5.status: "killed"` 而没有任何 `repairs[].targets` 含 `C5`——**决策层无权改 claim 真值**（SKILL §1.7） |
-| V23 | reviews[].integrity_gate == "fail" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值） | 硬 | `integrity_gate: "fail"`，而 `repairs[]` 与 `failures[]` 都没有对应记录——**Gate 不是 warning** |
+| V23 | reviews[].integrity_gate == "fail" 时必须存在以 source_review 关联该 review id 的 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值） | 硬 | `integrity_gate: "fail"`，而 `repairs[]` 与 `failures[]` 都没有对应记录——**Gate 不是 warning** |
 | V24 | decision.verdict 存在时必须是 continue / pivot / archive / submit 之一 | 硬 | `"verdict": "banana"`，或空串 |
 
 **执行契约（spec §2.3）：**
@@ -447,8 +497,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | 退出码 | `0` 全部通过；`3` 存在硬违规；`4` 环境不满足（文件缺失、非法 JSON、结构不符等） |
 | `--json` | 输出机器可读结果 |
 | `--check` | 只校验不写（默认行为即只校验） |
-| `--list-rules` | 列出 V1—V24 与判据（本表与它逐字一致） |
-| `--selftest` | 内置自检，V1—V24 全覆盖 |
+| `--list-rules` | 列出 Shape Gate S1—S7 与 V1—V24 及判据（本文件 §4.0 / §4.1 两表与它逐字一致） |
+| `--selftest` | 内置自检，S1—S7 与 V1—V24 全覆盖 |
 | 收工门槛 | 退出码**必须**为 `0`；`3` / `4` 都**不得**当作通过 |
 
 **与 `state_check.py` 实现的对应（一一对齐，不得各自解释）：**
@@ -459,29 +509,37 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    `"disposition": "FIX"`。
 2. **V5 只收单个合法值**：`epistemic_status` **必须**是五值之一；**不得**把
    `"Observed | Supported | ..."` 这类枚举提示串填进字段（那是给人看的表，不是值）。
-3. **顶层结构**：state 顶层**直接**是八类数组；八类数组全部缺失 → 退出码 `4`（不算 world model）。
+3. **顶层结构**：state 顶层**直接**是八类数组；八类数组**全部**缺失 → 退出码 `4`（不算 world model）。
+   **任一数组缺失 → S1（退出码 `3`）** —— 模板 `_usage` 明写「不使用 null 或省略键」。
    `assurance` / `repairs` 键**缺失按空数组处理**（不算违规），键存在但不是数组 → 退出码 `4`。
 4. **ID 存在性**：V7 / V9 指向的 `X` 与 V2 引用的 `E` **必须**是真实存在的 id；
    **不得**写 `"X?"`、`"待补"`、`"E9 (文献)"` 这类带修饰的串。
 
 **边界（不得扩大解释）：**
 
-1. V1—V24 覆盖**引用完整性**。§3 的**字段齐备性**（键是否齐备）是另一层硬要求，
-   以 `state_check.py` 的实际实现与审计清单为准——**不得**因为「V1—V24 没查」就省略字段。
+1. **S1—S7 覆盖形状**（齐全 / 必填 / 类型 / 枚举 / 对象形状），**V1—V24 覆盖引用完整性**。
+   两层都是硬违规。**S 查不到的**（措辞等级、判据口径）见 §3 与各 policy 文件——
+   **不得**因为「机械闸门没查」就省略字段或放松措辞。
 2. V5 只否决 `Hypothesized` / `Unknown` 进 `supporting_evidence`；`Planned` 条目的引用纪律
    见 [claim-first-policy.md](claim-first-policy.md) §2 与 [evidence-policy.md](evidence-policy.md) §3
    ——**不得**当作证据引用（R8 的 Evidence Contract 只收 `Observed` / `Supported`）。
 3. V3 的判定是**双向**的：漏标 `ungrounded` 与错标 `ungrounded` 都是硬违规。
 4. 校验器报的是**字段与 ID**，不是措辞。措辞等级一律查 [evidence-policy.md](evidence-policy.md) §1 / §3，
    **不得**用 state 里的 `epistemic_status` 直接充当「已核实」。
+5. **V15 的 live niche 口径（唯一解释，不得各自发挥）：** **live niche = 至少存在一个
+   `status ∈ {active, elite}` 的候选**。每个 live niche 至少保留一条 `elite`。
+   **候选全部 `killed` / `archived` 的 niche 合法为空** —— 不要求重新制造 elite，
+   也不阻止 R14 `archive`。**不得**把它读成「每个**出现过的** niche 都要有 elite」。
 
 ---
 
 ### 5.0 三条归属规则（总收官审计 M-1 / M-2）
 
-1. **`claims[]` 的创建归属 = R3。** 每个候选必须产出至少一条 `C`（其 central proposition，
-   `status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
+1. **`claims[]` 的创建归属 = R3。** 每个 **candidate** 必须产出至少一条 `C`（其 central
+   proposition，`status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
    —— 否则 R7/R8 在读一个没人写的对象，V1/V2/V3 永不触发。
+   **candidate 的定义见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1：
+   `P3` 只产 typed intermediate，**不是** candidate，不产 `H` 也不产 `C`（`V13` 强制）。**
 2. **每个写 `failures[]` 的阶段（R6 / R7 / R9 / R13）同时负 `known_flaws` 义务**：
    把新 `F` 的 id 挂到对应 `claims[].known_flaws` 或 `experiments[].known_flaws`。
    —— 否则 V4 会在**这些阶段自己的收工检查**上报错，而写表又不授权它改 `known_flaws`。
@@ -490,6 +548,19 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 3. **`claims[].status` 的变更分两类：** **升级**（`ungrounded` → `partially-supported` / `supported`）
    由 **R8** 按证据驱动执行；**降级与否决**（`contradicted` / `killed`）**只能经 R10**。
    这条与 SKILL §1.6 的「默认只能经 R10」互为例外关系 —— 八处提及该禁令的地方都已回指本条。
+
+   **R8 检测到 ≥ `T2` 反驳证据时的唯一合法动作：**
+
+   ```text
+   R8 检测到 ≥ T2 反驳证据
+     → 写 claims[].refuting_evidence 与对应 evidence[] 条目
+     → 必须转 R10（disposition: RUN_TEST 或 REPAIR_CLAIM）
+     → 由 R10 执行 contradicted / killed
+   ```
+
+   **结构性表述：** **证据检测 ≠ 认识论状态突变。**
+   「我看到了反驳证据」是 R8 的职责；「这条 claim 是假的」是 R10 的判决。
+   负向状态变更必须经过 repair closure —— 否则 `V22` 会要求一条 R8 无权写的 `repairs[]`。
 
 > **终端产物（无显式读者，不是僵尸字段）：** `narrative_view`（R12 写、R13/R14 通过「全 state」隐含读）
 > 与 `decision`（R14 写、供人读与下一轮 R3/R9 的 `pivot`/`continue` 依据）。
@@ -507,11 +578,11 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|
 | **R0** Research Contract | — | `contract` + 模板骨架（含 `state_version: 0`） | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
+| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
 | **R4** Isolated Populations | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
-| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
+| **R7** | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
 | **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） | `phase-r8-evidence-contract.md` |
 | **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `assurance[].discriminating_test` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
@@ -524,13 +595,16 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 > 「读 / 写 World Model」表**必须逐字相同**；下面保留各阶段的细节语义，供执行时理解，
 > **不得**把它当成第二套口径。
 >
+> **`P3` 的骨架不进 state** —— 它写 `.research-idea-pipeline/routes/<R>/populations/intermediates/`
+> （search artifact；见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）。
+>
 - **R0**：读 用户输入、路线 `README.md` / `STATUS.md` / `INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
 - **R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（只读，用于定位缺口）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（缺口类主张先落 `U`，由 R3 转成 `C`）
-- **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）
+- **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**。**只给 candidate 建 `H` / `C`**；`P3` 的 typed intermediate 写 `.research-idea-pipeline/routes/<R>/populations/intermediates/`，**不进 state**（与上表逐字一致）
 - **R4**：读 `hypotheses[]`；写 `hypotheses[].status`（**QD archive 精修：只能重排 elite 归属**）。**`niche` / `operator` / `parents` / `generation: 0` 由 R3 创建时写入，R4 不得新建 niche**（与上表逐字一致）
 - **R5**：读 `hypotheses[]`；写 `literature[]` / `evidence[]`(kind=literature) —— **由当前候选反向决定下一轮 query**
 - **R6**：读 `hypotheses[]`、`uncertainties[]`、`failures[]`；写 `hypotheses[].status`（`active` / `elite` / `archived` / `killed`）、`expected_information_gain` 更新、`failures[]`（被搁置的假设记 `kind: deprioritized`）、`uncertainties[]`（收敛或新增）
-- **R7**：读 `claims[]`、`evidence[]`、`hypotheses[]`、`assurance[]`；写 `assurance[]`（`kill_condition`、`discriminating_test`）、`failures[]`（攻击暴露的缺口）、`uncertainties[]`。**无 artifact 的阶段只能审「计划中的证据契约」**，**不得**要求 artifact 审计（spec §5）
+- **R7**：读 `claims[]`、`evidence[]`、`assumptions[]`、`hypotheses[]`；写 `assurance[]`（`kill_condition`、`discriminating_test`）、`failures[]`（攻击暴露的缺口）、`uncertainties[]`。**首轮（R8 之前）审的是 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`** —— 此时还没有 `claims[].contract`；**第二轮起**才审契约。两个时点都**不得**要求 artifact 审计（spec §5）
 - **R8**：读 `claims[]`、`evidence[]`、`literature[]`、`assurance[]`；写 `evidence[]`（`epistemic_status` 定档、`kind`、`strength`、`scope`、`source_ref`、`supports` / `contradicts`）、`claims[].supporting_evidence` / `refuting_evidence` / `scope`、`uncertainties[]`（缺失证据 → `U` 条目，`cheapest_discriminating_test: TBD` 起步）
 - **R9**：读 `uncertainties[]`（`importance ∈ {critical, high}` 且 `uncertainty: high`）、`claims[]`、`evidence[]`；写 `experiments[]`（全字段；`parent` 建树、`stage` 六段、失败实验 `status: failed` **仍留在** `experiments[]`）、`failures[]`、`assurance[].discriminating_test` 指向新 `X`。排序**必须**写出：改哪条 `U`、预期改变方向、成本口径（EIG，spec §4）
 - **R10**：读 全 state + artifact（code / logs / failed runs）；写 `repairs[]`（`flaw` / `disposition` / `state_delta` / `closure` 齐备），并**立即执行 `state_delta`**：改 `claims[].status` / `scope` / `known_flaws`、`experiments[].status`、`uncertainties[].status`、`hypotheses[].status`。一致性审计链 `Claim ↔ Method ↔ Code ↔ Result ↔ Conclusion`
@@ -573,15 +647,15 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | [scoring-policy.md](scoring-policy.md) §3 / §4 | `G1—G5` 门禁、六维排序 | 门禁与排序**读** state：`claims[].supporting_evidence`（`G1`）、`literature[].relation` 与最近前作（`G2`）、`evidence[].epistemic_status`（`G4`）、`hypotheses[].niche` / `experiments[].stage`（实验设计质量）。**state 只存事实与状态，不存评分**；门禁 `fail` 的后果**必须**回写成 `repairs[]` / `claims[].status` / `failures[]`，**不得**只停留在评分表里 |
 | [project-layout.md](project-layout.md) §6（落盘三档）/ §3.1（正文禁令） | 落盘路径与「什么不得贴进正文」 | 机器状态 → `.research-idea-pipeline/routes/<R>/research-state.json`（**常驻、就地覆盖**：每轮只保留一份当前 state；过程快照若需要，放 `.research-idea-pipeline/routes/<R>/` 下的中间产物档）。交付物仍在 `routes/<R>/docs/`；**不得**把 state / 原始 JSON 贴进正文（该文件 §3.1 的既有禁令） |
 | [../SKILL.md](../SKILL.md) §1.6（本轮新增） | 「critical flaw ⇒ state change」不变量 | 本文件 §1 硬规则 2 与 §3.9 是它的执行细则；两处措辞**必须**一致 |
-| [../scripts/state_check.py](../scripts/state_check.py) | V1—V24 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
-| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V24（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
+| [../scripts/state_check.py](../scripts/state_check.py) | S1—S7 与 V1—V24 的机械强制 | §4.0 / §4.1 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
+| [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 S1—S7 与 V1—V24（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |
 
 **维护规则：**
 
 1. 节号 `§1—§6` **冻结**。新增或移动节属于破坏性变更，**必须**同轮更新本节与全部引用点，
    并在 spec 的变更记录里记一行。
 2. 引用本文件时**必须**写 `research-state-policy.md §N`，**不得**只写「见 state 政策」。
-3. §2 的 ID 前缀、§3 的字段与枚举、§4 的 V1—V24 一旦改动，**必须**同轮扫三处：
+3. §2 的 ID 前缀、§3 的字段与枚举、§4.0 的 S1—S7、§4.1 的 V1—V24 一旦改动，**必须**同轮扫三处：
    `state_check.py`（规则实现）、`research-state.template.json`（骨架）、全部 `phase-*.md`
    （读写时机），**不得**只改一处。
 
@@ -605,7 +679,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ### 3.11 附加槽位（与八类对象同级或挂在对象下，全部已在模板中占位）
 
-**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们（`state_check.py` 忽略未知键；V1—V24 不覆盖形状校验）。**
+**⚠️ 更正：本节列出的槽位是 R 阶段的落盘目标，模板与 `state_check.py` 都**不拒绝**它们**
+**（`state_check.py` 忽略未知键；S1—S7 只校验本表已登记槽位的形状 —— 新增槽位必须同轮登记，否则形状不受保护）。
+
 旧表述「不得自加字段」的**准确含义是**：**新加字段必须同时改本表、模板与 `state_check.py`**，
 而不是「只准用八类对象」。
 
@@ -664,22 +740,21 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `pivot_proposal` | **无同名值** → 这是 **R14 的 `decision: pivot`**，不是 R10 处置；R10 用 `KILL_BRANCH` + `state_delta` 收掉旧分支 |
 | `accept_limitation` | **它是 `closure`，不是 `disposition`** → `closure: ACCEPTED_LIMITATION`，并同步写 `C.scope` 或 `C.known_flaws` |
 
-#### 3.12.4 niche 描述性概念 → `N1`—`N10`
+#### 3.12.4 niche 描述性概念 → 七个 QD 科学结构轴
 
 | 描述性 niche 概念 | `hypotheses[].niche` |
 |---|---|
-| 新问题 / 新设定 | `N1` |
-| 移除假设 / 瓶颈突破 | `N2` |
-| 跨域理论迁移 | `N3` |
-| 现象发现与解释 | `N4` |
-| 统一框架 | `N5` |
-| 效率 / 可行性 | `N6` |
-| 鲁棒性 / 泛化 | `N7` |
-| 评测反转 / 基准改造 | `N8` |
-| 矛盾解决 | `N9` |
-| 不可能性 / 负结果 | `N10` |
+| 移除 / 反转一条被共享的假设 | `assumption-shift` |
+| 换问题表述 / 未知量 / 目标 / 成功判据 | `formulation-shift` |
+| 换数学表示 / 编码 / 抽象层 | `representation-shift` |
+| 换「为什么有效」的作用机制 | `mechanism-shift` |
+| 换一套数学语言并导出后果 | `theory-shift` |
+| 换度量 / 协议 / 观察量 | `evaluation-shift` |
+| 发现不可能性 / 反例 / 失效条件 | `boundary-shift` |
 
-> ⚠️ **任何英文描述性 niche 名（含旧名与新造名）都不得写进 `hypotheses[].niche`** ——
-> V6 只收 `N1`—`N10`，旧描述性名已登记在 [deprecated-terms.txt](deprecated-terms.txt)。
+> ⚠️ **任何描述性 niche 名（含旧名与新造名）都不得直接写进 `hypotheses[].niche`** ——
+> V6 只收上表七个英文轴值。**R12 的叙事 preset `N1`—`N10` 同样不得写进去**：
+> 两套枚举回答两个不同问题，且映射**有损**（例如 preset「效率 / 可行性」在七轴里没有对应项）。
+> 旧描述性名已登记在 [deprecated-terms.txt](deprecated-terms.txt)。
 > 本表左列刻意只用**中文概念**，就是为了不把废弃原文再写进正文。
-> 高风险范式类候选按**实际改写的对象**取 `N1`（改写 formulation）或 `N10`（改写 boundary）。
+> 高风险范式类候选按**实际改写的对象**取 `formulation-shift`（改写问题表述）或 `boundary-shift`（改写边界 / 反例）。

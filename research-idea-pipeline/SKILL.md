@@ -20,10 +20,10 @@ description: >-
   proposal review, mock review, reviewer critique, paradigm escape,
   research state, MICCAI, medical image analysis, clinical validation,
   proposal, narrative, review, 定位
-argument-hint: "phase=R0..R14 [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
+argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
-  version: "2.0.0"
+  version: "2.1.0"
   upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 
@@ -38,9 +38,27 @@ metadata:
 
 ---
 
-## 0. 入口：解析 phase 参数
+## 0. 入口：**语义入口优先**
 
-用户通过 `phase` 参数指定调用哪些 R 阶段。`$ARGUMENTS` 的第一项即 `phase`。
+**用户不需要知道 `R` 编号。** 常态入口是四个语义入口；`phase=` 是专家 / 调试用的**覆盖入口**。
+
+**解析顺序（固定，命中即停 —— 这是唯一顺序，不得自行调整）：**
+
+| 层 | 输入长什么样 | 处理 |
+|---|---|---|
+| **1. 语义入口**（常态） | `start-project` / `continue-research` / `explore` / `audit` | 按 [invocation-prompts.md](references/invocation-prompts.md) 的固定契约执行。用户只描述目标，不选阶段 |
+| **2. 自然语言意图** | 「多给我一些新方向」「攻击一下我现在的路线」 | **映射到第 1 层的四个入口之一**，并在输出开头**声明映射结果**（对应表见 [invocation-prompts.md](references/invocation-prompts.md)） |
+| **3. 显式 `phase=`**（**专家 / 调试覆盖**） | `phase=R8` / `phase=R3-R6` / `phase=R7,R10,R13` | 按该阶段的读写契约执行。**这是覆盖入口，不是常态入口** |
+| **4. 兜底** | 以上都无法解析 | **才**反问用户要跑哪些阶段；不得猜测 |
+
+**裁决规则（机器读者必须按这条走）：**
+
+- **不要同时给出语义入口与 `phase=`。** 两者同时出现时**按语义入口执行**，并在输出开头
+  **显式声明**这次裁决 —— 不得静默选一个。
+- **`phase=` 不因为"更具体"就自动赢。** 它的定位是专家 / 调试覆盖：只在前两层都没命中时才生效。
+- **旧 `mode=` 参数不再接受**（旧 A—E 阶段字母已退役）。收到时**必须报错**并给出映射
+  （A→R2/R5、B→R3/R4/R6、C→R8、D→R12、E→R7/R10/R13），
+  **不得**静默按旧模式执行，也不得猜测用户「其实想跑哪个」。
 
 **架构 = 以 Research State 为中心的双循环**（权威定义见
 [research-state-policy.md](references/research-state-policy.md)）：
@@ -65,11 +83,11 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` + 模板骨架（含 `state_version: 0`） |
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
-| **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**）。**`P3` 只产 typed intermediate，不产 candidate** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） |
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
-| **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
-| **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**首次占据一个当前为空的合法轴**；**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `assurance[].discriminating_test` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R10** | `metacognitive-repair` | **critical flaw ⇒ state 必须改变** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
@@ -99,16 +117,14 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 `claims[].status`** —— 改 claim 状态**默认只能经 R10**（例外见 §1.6：R8 的证据驱动单向升级），这是防"自己给自己判分"的结构性措施。
 **做得很扎实的复现仍是拒稿理由。**
 
-**解析规则：**
+**解析细则（配合上表四层）：**
 
-1. 若 `$ARGUMENTS` 含 `phase=R0|R1|…|R14`（大小写不敏感；逗号分隔或 `R3-R6` 区间均可），
+1. 第 3 层的 `phase=` 写法：`R0|R1|…|R14`（大小写不敏感；逗号分隔或 `R3-R6` 区间均可），
    按上述顺序依次执行这些阶段。
-2. **旧的 `mode=` 参数入口不再接受**（旧 A—E 阶段字母已退役）。收到时**必须报错**并给出映射提示
-   （A→R2/R5、B→R3/R4/R6、C→R8、D→R12、E→R7/R10/R13），
-   **不得**静默按旧模式执行，也不得猜测用户"其实想跑哪个"。
-3. 若未给出 phase，**先反问用户**要跑哪些阶段，不要猜测；只有意图极其明确时才可按
-   意图推断，并在输出开头声明所推断的阶段。
-4. phase 之外的参数按该阶段的输入约定解析（见下）。
+2. 第 1 / 2 层命中时**不得**再要求用户选阶段 —— 入口自己决定跑什么
+   （`start-project` 只跑 `B0`—`B6`；`explore` 跑 `R3`—`R6`；`audit` 跑 `R7`/`R10`/`R13`）。
+3. 第 4 层才反问；反向推断（从意图猜阶段序号）**不是**允许的捷径。
+4. 阶段之外的参数按该阶段的输入约定解析（见下）。
 5. **写回义务：** 每个阶段收尾**必须**更新 World Model 的对应字段（读/写列见上表），
    并跑 `python3 scripts/state_check.py <state.json>`，**硬违规须为 0**。
 6. **档位参数（可选）**：若 `$ARGUMENTS` 含 `writing=asd-ste100`，或用户在自然语言里
@@ -206,8 +222,8 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | R 阶段 | 锚点的作用 |
 |---|---|
 | **R2 / R5** | **检索边界：** 理论锚点必须查定理 / 反例 / 不可能性与负结果；性能锚点必须查 SOTA 与评测协议 |
-| **R3—R6** | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；QD archive 的 elite 集合 只收服务主锚点的 idea |
-| **R8** | **贡献类型与实验：** 理论锚点下 C4 必须含证明 / 反例；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
+| **R3—R6** | **推导与筛选：** 理论锚点优先「假设挑战」，性能锚点优先「问题重构 / 组合创新」；QD archive **收 `serving` 与 `challenging` 两类候选**（`orthogonal` 不进档案，见 §0.1 规则 3）。**不得**只收服务锚点的候选 —— 那会把 Paradigm Escape 的嘴堵住 |
+| **R8** | **贡献类型与契约：** 理论锚点下证据契约必须含证明 / 反例 / 边界条件；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
 | **R12** | **叙事资格（先于选 preset）：** 先做 **Anchor Eligibility Test**（[claim-first-policy.md](references/claim-first-policy.md) §6）——只有 `eligible` / `conditional` 的锚点才可用于组织叙事；与作者**目标锚点**冲突时**必须显式告知**。通过后再按 [narrative-patterns.md](references/narrative-patterns.md) §2 选 preset |
 | **R7 / R10 / R13** | **评审权重：** 理论锚点首查证明正确性；性能锚点首查公平比较、指标口径与统计方案 |
 
@@ -320,7 +336,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定**（能不能做、资源够不够、是否已有不可能性结果） | L2 强化 |
-| T4 | 新颖性判定（R8 的 C1、R12 的 S-Lit、R7 / R10 / R13 的 S-Lit/S-Nov） | **L3 穷尽**（**例外：R3—R6 的 B5 概念级快筛 = L2**，只有写进文档的「首次提出」声称才回到 L3，见 §4 R3—R6） |
+| T4 | 新颖性判定（**R7 / R12 的 `S-Lit`**、R7 / R10 / R13 的 `S-Nov`） | **L3 穷尽**（**例外：R3—R6 的 §R3.7 概念级快筛 = L2**，只有写进文档的「首次提出」声称才回到 L3，见 §4 R3—R6） |
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
@@ -613,7 +629,9 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 - **机制型 claim 必须做 regime shift 测试**：构造机制应成立的 `RS1` 与应失效的 `RS2`
   （**注意：`RS<n>` 是 regime-shift 条件，不是阶段号**）；两者结果近似 ⇒ 该机制 claim
   **降级为 `partially-supported`**。
-- **artifact 审计的时机：** R7 / R8 阶段没有 code / logs / failed runs，**只能审计划中的证据契约**；
+- **artifact 审计的时机：** **R7 首轮**（R8 之前）没有 artifact，也**没有** `claims[].contract`，
+  只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`；
+  **R7 第二轮起**才逐条核契约；**R8** 只能审自己刚建的契约与刚冻结的 `preregistration`（都是预测）。
   真正的 artifact-aware 审计绑在 **R9 之后 / R13**。**禁止在无 artifact 的阶段要求 artifact 审计。**
 
 > 权威定义与字段映射见
@@ -676,10 +694,10 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 离线测试 | [scripts/test_literature_search.py](scripts/test_literature_search.py) | stdlib unittest，全离线（环境发现 / 跨源合并 / 等级判定） |
 | PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3）、**`--migrate` 旧 schema 迁移（保留旧字段）** |
 | 索引迁移测试 | [scripts/test_refs_index.py](scripts/test_refs_index.py) | 离线测试：三种旧索引形状的迁移、「保留旧字段」、`--check` 退出码与提示 |
-| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、V1—V24 |
-| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 V1—V24** |
-| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V24 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
-| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V24 每条一个反例 + 退出码行为 |
+| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、**Shape Gate S1—S7** 与 **V1—V24** |
+| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 S1—S7 与 V1—V24** |
+| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **机械闸门**：**Shape Gate `S1—S7`**（在 V1—V24 之前跑）**+ 引用完整性 `V1—V24`**；`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规（含形状）/ 4 环境 |
+| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：S1—S7 与 V1—V24 各有反例 + 退出码行为 + 表格/契约键一致性 |
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | **调用契约（四个用户入口）** | [references/invocation-prompts.md](references/invocation-prompts.md) | `start-project` / `continue-research` / `explore` / `audit`：固定用户调用契约，**用户不需要知道 `R` 编号**；防止实际使用时绕过新哲学（一上手就发散、编造状态） |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
@@ -687,7 +705,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
-| 串联示例 | [examples/](examples/) | B→C→D→E 串联、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
+| 串联示例 | [examples/](examples/) | 主链路串联（`R3—R6 → R8 → R12 → R7`）、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
 
 ---
 
@@ -702,14 +720,14 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 |---|---|
 | **R2 / R5** | 无（执行者直接完成检索与归纳） |
 | **R3—R6** | **候选由隔离 Exploration Agents 按 island 生成**：`P1`—`P6` 各一个独立上下文（**互不可见**），另加 `local`；执行者只做编排、隔离、路由、汇总与写 state，**不得亲自补写候选**。generation 完成后才由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 做 concept 级 hygiene 快筛，`S-Devil` 出致命反驳。**不派 venue 角色**；**不派 S-Repro**。详见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6 |
-| **R8** | 由 `A-Author` / `A-Experimenter` 展开提案与实验计划；核实由 `S-Lit`、**`S-Nov`（按需）**、`S-Theory`、`S-Feas`；**venue 角色不派** |
+| **R8** | 证据契约与 `proposal.md` 由 `A-Author` / `A-Experimenter` 落盘；核实由 `R-Theory` / `S-Theory` / `S-Feas`（常规）+ **R7 的 `S-Lit` 结论（不重做 L3）**；`S-Nov` 按需。**venue 角色不派**，**不派 `S-Repro`**，**不派六个攻击面审稿人** |
 | **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **R12 / R13 的 venue calibration** 中以校准表出现 |
 | **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
 
-**职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；B5 的审核是
-**概念级快筛**，不要与 R7 / R10 / R13 的方案级深审重复。详见
-[phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §B0 与
-[phase-r7-r10-r13-assurance-repair-review.md](references/phase-r7-r10-r13-assurance-repair-review.md) §E0。
+**职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；**§R3.7 的审核是
+概念级快筛**，不要与 R7 / R10 / R13 的方案级深审重复。详见
+[phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3—R6.0 与
+[phase-r7-r10-r13-assurance-repair-review.md](references/phase-r7-r10-r13-assurance-repair-review.md) §R7.0。
 
 **派遣原则：** 子代理必须**独立产出**，不得互相抄袭结论；汇总时去重并保留来源标注。
 **R12 与 R7 / R10 / R13 都要求交叉质询**：每个子代理对其余子代理的评分提出至少一条质疑或补充。
@@ -771,19 +789,23 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **流程：** R3 双轨发现（`P1`—`P6` 由**隔离开的 Exploration Agents** 生成，`local` 另起一轨；
   **生成期互不可见**，见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6）→
   R4 隔离种群 → `structural_signature` 五维聚类 → **QD archive**（**只保多样性，不做总分排序**）→
+  **niche 是七个科学结构轴**（`assumption-` / `formulation-` / `representation-` / `mechanism-` /
+  `theory-` / `evaluation-` / `boundary-shift`），**不是** R12 的叙事 preset `N1`—`N10`；
+  **R4 elite = within-niche representative, not global winner** →
   R5 共演化检索（每轮至少一条 query 由最新候选生成）→
-  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction / new niche；
+  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction /
+  **new niche = 首次占据一个当前为空的合法轴**（七轴冻结，见 §R4.2.1）；
   **跨 island 融合只允许在这里发生**，并写 `operator` + `parents` 谱系）。
 - **边界三句话：** `R3: Diverge`（让不同世界出现）→ `R4: Preserve Diversity`（不让它们被总分压扁）
   → `R6: Recombine`（才允许互相借东西）。
-- **发散策略约束（`B4` 保留，映射到算子）：** 每个候选至少通过一种算子推导 ——
+- **发散策略约束（见 §R3.8）：** 每个候选至少通过一种算子推导 ——
   `P1` 问题重构 / `P2` 假设挑战 / `P3` 领域擦除 / `P4` 跨域结构类比 / `P5` 理论视角 / `P6` 反例与测量反转。
-- **快筛（`B5` 保留，降级为 concept 级 hygiene）：** **只**能因「自相矛盾 / 违反已知事实 /
+- **快筛（concept 级 hygiene，见 §R3.6 与 §R3.7）：** **只**能因「自相矛盾 / 违反已知事实 /
   同名重复 / 不可定义 / prior work 完全覆盖 / 与契约无关」六条杀掉；
   **不得**因工程风险高、暂无 theorem、不会实现、非主流、venue fit 不明、证据不足而杀。
   **进入 population 的门槛 = 完成 L2 检索**；要写进文档的「首次提出」类声称仍要求 L3 + 负检索记录。
   **不派遣 S-Repro。**`R3 screening ≠ R7 assurance`。
-- **交付物：** **population + QD archive**（每个出现过的 niche 至少一个 `elite`）+ 技术路线归纳表 +
+- **交付物：** **population + QD archive**（每个 **live niche** 至少一个 `elite`）+ 技术路线归纳表 +
   创新性边界界定 + **失败记忆**（被搁置的候选写 `failures[]`，不得删除）。
   **不再产出「QD archive 的 elite 集合（3—5 个）」——该概念在 Wave 2 起作废。**
 - **预算：** 默认 4 islands（`P1`—`P4`；`P5`/`P6` 按需启用）× 每岛 3—6 候选；进化 ≤2 轮。
@@ -793,20 +815,26 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   search heuristics，**不得硬排序**；否则 `P4`/`P5` 会因「跨域 / 理论」标签天然拿高 reward。
   质量压力从 R6 起才逐步引入。
 - **落盘：** `routes/<R>/docs/<R>NNN-discovery.md`，并更新该路线 `INDEX.md`
-  （被放弃的候选记入**已证伪**；未核实的无人区声称记 Warnings）。
+  （被放弃的候选 → **Most important negative findings**，**不是**「已证伪」——
+  被放弃是**搜索决策**，不是对世界的判决；未核实的无人区声称记 Warnings）。
 
 ### R8 — 证据契约
 
-- **输入：** 一个或多个 idea（来自 R3—R6 或用户直接提供）；关键参考文献（可选）；
-  资源约束（可选）。
-- **流程：** C1 创新性研究（**对 B5 的增量复核**：只深化 B5 判"边缘/不足"的项；
-  B5 判"足够"且期间无新文献的项直接引用 B5 结论，不重做 L3；四审稿人视角 + S-Lit 核实）
-  → C2 可行性研究
-  （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
-- **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
-  + 风险清单。
-- **落盘：** `routes/<R>/docs/<R>NNN-proposal.md` + `routes/<R>/docs/<R>NNN-experiment-plan.md`（各占独立序号），
-  并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
+- **输入：** `claims[]`（R3—R6 的 seed claim）+ `evidence[]` + `assurance[]`（R7 的攻击结论）；
+  一个或多个 idea（来自 R3—R6 或用户直接提供）；资源约束（可选）。
+- **流程：** ① 把 R7 的六攻击面**五元组**逐条转成契约的必答项（`Alternative` → `nearest_alternative`，
+  `Discriminating Test` → `minimal_discriminating_experiment`，`Kill Condition` → `kill_rule`）
+  → ② 每条 central claim 建一张证据契约（10 键，见
+  [references/phase-r8-evidence-contract.md](references/phase-r8-evidence-contract.md) §R8.2.2）
+  → ③ 从契约派生 `planned` 实验并**冻结 `preregistration`**
+  → ④ **证据驱动的单向 `status` 升级** → ⑤ 写 `proposal.md`。
+- **不做什么：** **不创建 claim**（claim 由 R3—R6 创建）；**不重做**新颖性检索（引用 R7 的
+  `S-Lit` 结论）；**不要求 artifact**（R8 无 code / logs / failed runs）；**不降级、不写 `killed`**。
+- **交付物：** 论文提案（1500—2000 字，含**证据契约摘要**节）+ `claims[].contract`
+  + `planned` 实验（含冻结的 `preregistration`）；`evidence.md` / `theory.md` 按需。
+- **落盘：** `routes/<R>/docs/<R>NNN-proposal.md`（`evidence.md` / `theory.md` 各占独立序号），
+  并更新该路线 `INDEX.md`。
+  **`experiment-plan.md` 不属于 R8** —— 实验规划文档由 **R9—R11** 落盘。
 
 ### R12 — 叙事（state 的视图）
 
@@ -830,8 +858,11 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
   **缺失证据清单与最小必要实验 / 定理**。
 - **落盘：** `routes/<R>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
-  （被覆盖的叙事方向 → **已证伪**；最佳叙事 → **已证实**；门禁 `fail`、或**六维中位 <3
+  （被覆盖的叙事方向 → **Most important negative findings**；最佳叙事 →
+  **Strongest supported findings** 的叙事表述；门禁 `fail`、或**六维中位 <3
   仅作 Warnings 标记**（**不是**综合评分、不进排序、不参与推荐）→ Warnings）。
+  > ⚠️ **叙事被淘汰 ≠ 科学被证伪**，最优叙事被选 ≠ 科学被证实 —— R12 是 state 的
+  > **视图**，不创造科学真理（见 §1.7）。`已证实` / `已证伪` **不得**用来描述修辞方案。
 
 ### R7 / R10 / R13 — 对抗保证 · 元认知修复 · artifact 审计
 
@@ -848,14 +879,17 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   1—5 分降为次要记录。**assurance 不得直接改 `claims[].status`** —— 只能经 R10（例外见 §1.6）。
 - **Integrity Gate（`S-Integrity`，R13 生效）：** leakage / cherry-picking / metric misuse /
   post-hoc selection bias —— **不通过即不得提交**，不是「记一条 warning」。
-- **流程：** E1 判断复核类型（首次 / 接续）→ E2 八子代理严格审查（含**防复现检查**）
-  → E3 交叉质询与共识形成（**先做极性归一化**，见
-  [scoring-policy.md](references/scoring-policy.md)）→ E4 复核结论 → E5 接续复核规则。
-- **交付物：** 八子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
-  + 横向对比表 +（接续复核时）变更追踪表。
+- **流程：** R7.2 判断复核类型（首次 / 接续）→ **R7.3 派遣六个攻击面 + `S-Lit` + `S-Devil`**
+  （含**防复现检查**）→ R7.4 交叉质询与共识形成（**先做极性归一化**，见
+  [scoring-policy.md](references/scoring-policy.md)）→ R7.5 复核结论 → R7.6 接续复核规则。
+- **交付物：** 六攻击面评审意见（含五元组）+ 交叉质询记录 + 审查结论卡片
+  （含**复现风险等级**）+ 横向对比表 +（接续复核时）变更追踪表。
 - **落盘：** `routes/<R>/docs/<被审ID>-review-r01.md`（接续复核用 `-r02.md`），
-  并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
-  待补 → TODO；未缓解的致命风险 / 复现风险高 → Warnings。
+  并把审阅结论翻译成 `STATUS.md` 条目：成立 → **Strongest supported findings**；
+  否定 → **Most important negative findings**；待补实验 / 文献 → **Next recommended actions**；
+  未缓解的致命风险或**复现风险 = 高** → **Critical uncertainties**。
+  写状态前先写回 `research-state.json`，再用 `scripts/render_status.py` 生成，
+  **不得手工编辑 `STATUS.md`**。
 
 ---
 
@@ -870,17 +904,22 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 ### R9 / R10 / R11 — 实验循环与修复门
 
 - **R9：** 实验树 `X1—X6`（`X2` 只做基线校准，**不得承担 claim 判别**）；
-  用 **EIG** 选下一个实验：`e* = argmax E[ΔU|e]/cost(e)`，必须写出「改变哪条 `U` / 方向 / 成本口径」。
+  用 **EIG** 选下一个实验：`e* = argmax E[ΔU|e]/cost(e)`，必须写出「改变哪条 `U` / 方向 / 成本口径」，
+  并把预测值写进 `scheduler.json` 的 `predicted_information_gain`。
 - **R10：** **critical flaw ⇒ state 必须改变**；处置五值 `REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
   关闭两值 `RESOLVED|ACCEPTED_LIMITATION`；落盘三元组 `flaw/disposition/state_delta/closure`。
-- **R11：** `result → claim update → uncertainty update → next experiment` 四步，缺一不可。
-- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）。
+- **R11：** `result → claim update → uncertainty update → EIG 回填 → next experiment` **五步**，缺一不可。
+  第 3 步的判据是「**有没有有意义的 state delta**」，不是「有没有关掉一条 `U`」：
+  `uncertainty` 可 `high → medium → low` 而 `status` 保持 `open`（两个维度独立，**不得**判不闭环）。
+- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
+  EIG 对照写同目录的 `scheduler.json`（telemetry，**无校验器**）。
 
 ### R13 / R14 — artifact 审计与决策
 
 - **R13：** 审 artifact 而非论文（code / logs / **failed runs** / dataset 与 metric 选择历史）；
   Integrity 检查（cherry-picking / leakage / metric misuse / post-hoc bias）是 **Gate**。
-  **R7/R8 无 artifact，只能审计划中的证据契约** —— 不得在无 artifact 阶段要求 artifact 审计。
+  **R7 首轮无 artifact 也无契约，只能审 seed claim / hypothesis / assumption** ——
+  不得在无 artifact 阶段要求 artifact 审计。
 - **R14：** `continue | pivot | archive | submit`，并回写 `decision`。
 
 ## 5. R 阶段衔接与状态回写
@@ -925,7 +964,10 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - [ ] **已解析 `arxiv.org` / `export.arxiv.org`；若解析到本地 IP，输出了「代理环境提示」段**
       （写明具体 IP 与判定类型），且**没有**据此判定"在线源不可用 / 无人在研究"。
 - [ ] arxiv 结果已写入缓存。
-- [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
+- [ ] **创新性 / 新颖性判定**依据 prior-work collision + structural novelty +
+      scientific non-triviality（**不是** venue 口味）；贡献标注了类型。
+- [ ] **只有 R12 / R13 的 venue calibration 与投稿评估**引用具体顶会标准；
+      **R3—R6 不得用顶会口味判断候选**（见 §4 R3—R6 的两阶段 fitness）。
 - [ ] **每个方法都标了「方法来源」**（`原创` / `部分原创` / `迁移`）且**可核验**；
       没有把「迁移」包装成「原创」；标为「迁移」的**已证明迁移本身带来新性质**，
       否则其复现风险按"高"处理。
@@ -936,9 +978,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       （**仅 venue calibration 表**）
       （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
       而非硬凑临床相关性。
-- [ ] **R3—R6：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
-      没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 QD archive 的 elite 集合 的 idea 已达 L2**，
-      含「首次提出」声称的已达 L3 并附负检索记录。
+- [ ] **R3—R6：每个 candidate 都完成 §R3.7 概念级审核**（新颖性判定 / 概念可行性 /
+      重叠度 / 致命反驳），没有「只给 idea 不给审核」；且未误派 S-Repro；
+      **进入 QD archive 的 elite 已达 L2**，含「首次提出」声称的已达 L3 并附负检索记录。
 - [ ] **assurance 五元组齐备**：每个攻击面都给了 `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`；**`Kill Condition` 可判定**；只有分数没有 Kill Condition 的评审**不合格**。
 - [ ] **Integrity Gate（R13）**：leakage / cherry-picking / metric misuse / post-hoc bias 已逐项过闸；**R7/R8 未要求 artifact 审计**。
 - [ ] **R12：先有证据台账与 claim graph，再有叙事**：`C0—C5` 完整，每个 `Ci` 都有
@@ -989,7 +1031,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       Milestones、Recent Research Changes）**与 `STATUS.md`**（当前状态，由 state 生成）。
 - [ ] 未达饱和的检索、未缓解的风险已记入 `STATUS.md` 的 Critical uncertainties；
       跨路线层面已同步到根 `INDEX.md` 的全局 Warnings。
-- [ ] 已附 `state.json` 片段与 `next_phase_suggestion`。
+- [ ] 已附 `state.json` 片段与 **`next_action_recommendation`**（**不是** `next_phase_suggestion`
+      —— `R0`—`R14` 是**能力**不是固定流水线；下一步由
+      [scheduler-policy.md](references/scheduler-policy.md) 的 `next_action_policy` 决定）。
 
 ---
 
@@ -1033,10 +1077,12 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
    就是多一个漂移源**：改了一处、漏了另一处，就会出现"同一条规则两个版本"。
    因此 [scoring-policy.md](references/scoring-policy.md) 与
    [evidence-policy.md](references/evidence-policy.md) 各自做**唯一权威定义**，
-   各 R 阶段 只保留自己特有的部分（如 D 的维度向量规模、E 的八子代理分工）并引用它们。
-10. **为什么 R7 / R10 / R13 也必须做极性归一化？** E 与 D 同样使用 S-Devil 的**反向**「新颖性
-   反驳」分（`5 = 完全无新颖性`）。不归一化就直接取中位数，会把**最没新颖性的方案
-   算成高分**——与 D 的极性错误同类。归一化（`稳健度 = 6 − 反驳分`）是聚合的前置条件。
+   各 R 阶段 只保留自己特有的部分（如 R12 的维度向量规模、R7 的攻击面分工）并引用它们。
+10. **为什么 R7 / R10 / R13 也必须做极性归一化？** R7 / R10 / R13 **仍在用** S-Devil 的
+   **反向**「新颖性反驳」分（`5 = 完全无新颖性`）。不归一化就直接取中位数，会把
+   **最没新颖性的方案算成高分**。归一化（`稳健度 = 6 − 反驳分`）是聚合的前置条件。
+   **R12 已不使用该反向分**（`S-Devil` 不打分、六维全部同向），因此 §2 的归一化
+   **对 R12 不适用** —— 与第 13 条一致。
 11. **为什么要给"形式"单独立一条政策（受控中文）？** 本流水线一次产出几千字：一份提案、
    多套叙事、六到八份评审意见。**没有人会逐句重读**，读不清就等于没写。
    而中文技术文本有一套和英文不同的机器味：**虚动词**（「进行分析」）、**套话**
@@ -1086,7 +1132,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     系统会稳定收敛到「安全、合理、容易做的小改动」。所以 R3—R6 只看
     `representation_distance` / `structural_novelty` / `cross_domain_surprise` / `deductive_yield`，
     `EIG` 也只作记录不作排序依据；venue 适配推迟到 **R12 / R13**。
-    配套机制是 **QD archive**（每个 niche 留一个 elite，**V15 机械强制**）——
+    配套机制是 **QD archive**（每个 **live niche** 留一个 elite，**V15 机械强制**）——
     **只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。**
 
 
@@ -1116,12 +1162,12 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 | # | 位置 | 为什么危险 | 必做动作 |
 |---|---|---|---|
 | A1 | **设计依据 / 理由段**（§7、各文件开头的"为什么"） | 它在**论证旧设计**，读起来像权威依据。改规则后最容易整条漏掉，且在有人质疑设计时被当成正确论点引用 | **逐条读一遍 §7 与各"为什么"，问："这条还在支持当前规则吗？"** |
-| A2 | **速查 / 汇总表**（§4 各 R 阶段 速查、`project-layout` §6 落盘职责表、`roles` §4.2 派遣矩阵、`mode-d` §D5.5 汇总表） | 汇总表是规则的**复制品**。改规则不改它 = 仓库里有两份互相矛盾的规则 | **所有"表格式汇总"逐个核对** |
+| A2 | **速查 / 汇总表**（§4 各 R 阶段 速查、`project-layout` §6 落盘职责表、`roles` §4.2 派遣矩阵、`phase-r12` §D5.5 汇总表） | 汇总表是规则的**复制品**。改规则不改它 = 仓库里有两份互相矛盾的规则 | **所有"表格式汇总"逐个核对** |
 | A3 | **示例与模板**（`examples/*`、`templates/*`） | 示例会**示范旧写法**，且比正文更容易被照抄 | **示例里的文件名、路径、计数、命令逐个核对** |
 | A4 | **语义字段与规则的一致性**（§0.1/§0.2 锚点体系、`project-layout` §2.1 类型枚举、§3 frontmatter schema、`research-state.template.json`、§4 INDEX 章节） | 规则写"**必须**有 X"，但 schema / 枚举里**没有 X 的槽位**，或强制项与枚举表脱节。这种漂移**不在计数上、在语义上**，比 A2 更难发现：执行者只能自创值或让 frontmatter 失真 | **规则 → 字段 → 枚举 → 模板 → 示例，五处同步。** 每条新规则都问两句：①「它要求落盘的东西，**字段表里有槽位吗**？」②「它要求存在的文档类型，**枚举里有值吗**？」 |
 | A5 | **跨层漂移：claim 层 / 叙事层 / 评审层三层的耦合**（`claim-first-policy` 的枚举与门禁 ↔ `narrative-patterns` 的槽位与 preset ↔ `scoring-policy` 的门禁表与排序维度 ↔ `roles` 的攻击面角色 ↔ `research-state.template.json` 的 `claims` / `assurance` 段 ↔ `examples/example-d-narrative.md`） | 三层是**同一套规则的三种呈现**。改一层而不改另两层，就会出现"claim 要求 `Ci ← Ej`，但叙事槽位里没有 `S5`"或"门禁叫 `G1—G5`，但评分政策还在算 11 维中位数"这类**跨文件互斥指令** | **改 claim 层或评审层的任何枚举 / 门禁 / 维度，必须同时扫这三层。** 机械做法：`grep -rn '<被改的枚举名>' --include=*.md .` 逐个确认；并在 `docs/claim-first-spec.md` §10 记一行 |
 
-> **A4 的现实教训（B1—B5 那一批）：** 规则要求"锚点必须落盘"，但 frontmatter 没有
+> **A4 的现实教训（计数与枚举类 B1—B5 那一批）：** 规则要求"锚点必须落盘"，但 frontmatter 没有
 > `anchor_role` / `serves` 的槽位；强制"锚点文档"，但类型枚举里没有 `anchor`；
 > 允许"主+次锚点"，但 `core_goal` 只有一个槽；实际路线必然产出枚举外的派生物，
 > 但除自创 slug 外无处安放。**全都是"规则有、载体无"** —— 只查计数与链接是查不出来的。
@@ -1130,7 +1176,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 | # | 对象 | 历史改动 | 分布位置 |
 |---|---|---|---|
-| B1 | **子代理数** | 会议审稿人 `3→4`；B3 头脑风暴 `6→7`；R12 `5→6`；R7 / R10 / R13 `7→8` | 标题、正文、汇总表、速查节、`roles` 矩阵 |
+| B1 | **子代理数** | 会议审稿人 `3→4`；R12 `5→6`；**R7 / R10 / R13 由「八子代理」改为「六个攻击面 + `S-Lit` + `S-Devil`」** | 标题、正文、汇总表、速查节、`roles` 矩阵 |
 | B2 | **规则条数** | §1 `四→五`；§1.4 布局规则 `四→五→六` | **标题里的"N 条"必须与该节实际条目数一致** |
 | B3 | **会议枚举** | `CVPR/ICML/NeurIPS` → `+MICCAI` | 约 13 处 |
 | B4 | **源枚举** | `local\|arxiv` → `+openalex\|crossref` | 约 15 处（注意 `index.json` 的 `source` 是**另一种含义**，不要改） |
@@ -1143,7 +1189,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 |---|---|---|
 | C1 | **落盘路径** | `docs/` → `routes/<R>/docs/`（**含 §4 速查节** —— 曾漏 5 处） |
 | C2 | **审阅命名** | `<ID>-review.md` → `<ID>-review-r01.md` |
-| C3 | **标题里的旧词** | 曾漏 `mode-a` 的 A2 标题（正文早已改为多源，标题仍写旧源名） |
+| C3 | **标题里的旧词** | 曾漏 `phase-r2-r5` 的 A2 标题（正文早已改为多源，标题仍写旧源名） |
 
 ### D. 机械校验（先跑，再人工）
 

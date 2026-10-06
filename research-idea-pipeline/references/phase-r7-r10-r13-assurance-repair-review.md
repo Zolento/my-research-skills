@@ -1,22 +1,31 @@
 # R7 / R10 / R13 — 对抗保证 · 元认知修复 · artifact 审计
 
-复核**已成型方案**的正确性与可行性，并守住创新性底线。**可接 R8，也可接上一次
-R7 / R10 / R13 继续复核。**
+**R7 / R10 / R13 审「已成型方案」的正确性与可行性，并守住新颖性底线。**
+可接 R8，也可接上一次 R7 / R10 / R13 继续复核。
 
+**R10 的权威定义在 [phase-r9-r11-experiment-loop.md](phase-r9-r11-experiment-loop.md)。**
+本文件只登记「R7 / R13 发现的问题必须交给 R10」，**不另立一套处置规则**。
 
-> ⚠️ **内部小节号 `§E0—§E8` 保留自旧命名**（本文档由旧 `mode-e` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
-> **迁移不得丢节** —— 本注被删掉时，`§E0—§E8` 会失去唯一解释，读者会误当退役字母残留。
+**首轮 R7 审什么（本文件最容易搞错的一处）：**
+`claims[].contract` 由 R8 建立，R8 排在 R7 **之后**，所以**首轮 R7 没有契约可审**。
+首轮的攻击对象是 R3—R6 已经落盘的三类对象：
 
+| 首轮攻击对象 | 攻击面读什么 |
+|---|---|
+| `claims[]`（seed，`status: ungrounded`） | `falsifier` / `nearest_alternative` / `scope` |
+| `hypotheses[]` | `falsifier` / `nearest_prior` / `structural_signature` / `expected_information_gain` |
+| `assumptions[]` | `statement` / `status`（**`tacit` 的假设是重点**） / `if_false` |
 
-> ⚠️ **作用域裁决（Wave 3）：** 本文件含两代内容 —— `E0`—`E8` 是**旧的方案复核流程**，
-> 下方的 **R7 / R13 节**是 Wave 3 起生效的正式规则。
-> **冲突时以 R7 / R13 节为准**；`E2` 的「八子代理」派遣名单已被八个**攻击面算子**取代，
-> 会议审稿人只在 **R12 / R13 的 venue calibration 表**里出现（不派子代理）。
-> **首轮 R7 审什么：** R8 的证据契约在 R7 **之后**才建立，因此**首轮** R7 审的是
-> R3—R6 的候选与其**计划中的**证据契约（写在 `hypotheses[]` / `assurance[]` 里）；
-> 从第二轮起才审 R8 正式建立的 `claims[].contract`。
+**产出落到 `assurance[]`**：`kill_condition` + `discriminating_test`（`verification_tier` 上限 `T0`）。
+**不得**要求首轮审一个还不存在的 `claims[].contract` —— 那会产出一条只能填「待补」的规则。
 
-## E0. 定位与边界（先读）
+**第二轮起**（R8 建成 `claims[].contract` 之后）才把契约本身加入攻击对象：逐条核
+`kill_rule` 是否可判定、`expected_outcomes` 的键是否与派生实验的
+`preregistration.outcomes[].id` 对应、`minimal_discriminating_experiment` 是否指向真实 `X`。
+
+---
+
+## R7.0 定位与边界（先读）
 
 > **R7 / R10 / R13 的对象是"已成型的方案"，核心问题是"这么做对不对、能不能做成"。
 > 同时必须强调创新性——目的是避免在不知情的情况下**复现别人的方案**。**
@@ -29,27 +38,30 @@ R7 / R10 / R13 继续复核。**
 | **正确性** | 前提是否自洽 | **方法正确性：推导、实现、指标选取、统计方案是否成立** |
 | **创新性** | 方向是否已被覆盖、是否非平凡 | **方案是否实质复现已有工作（增量性质是否成立）** |
 | **复现性** | 不涉及 | **必查（S-Repro）** |
-| **深度** | 快筛：双评分 + 致命反驳 | **深审：八子代理 + 交叉质询 + 中位数评分** |
+| **深度** | 快筛：**双判定** + 致命反驳 | **深审：六个攻击面 + 交叉质询 + 逐维中位数** |
 
-**一句话记法：B 管"值得做吗"，E 管"做对了吗"。**
+**一句话记法：R3—R6 管「值得做吗」，R7 / R10 / R13 管「做对了吗」。**
 
 **两条不可退让的原则：**
 
-1. **正确性优先：** E 的主战场是**方法本身的正确性**——推导是否成立、实现是否
+1. **正确性优先：** R7 的主战场是**方法本身的正确性**——推导是否成立、实现是否
    忠实于声称、指标是否测量了声称的东西、统计是否支持结论、实验是否真的能证伪假设。
 2. **创新性必须显式表态：** 即使方案在技术上是正确的，若它实质上是已发表工作的
-   **复现或微小实现变体**，E 必须明确指出，并给出**复现风险等级**（见 §E2.2）。
+   **复现或微小实现变体**，R7 必须明确指出，并给出**复现风险等级**（见 §R7.3.2）。
    一个"做得很扎实的复现"在 CVPR/ICML/NeurIPS 是**拒稿**理由，不是优点。
 
 **锚定点（核心目标）必须先确认**（见 [../SKILL.md](../SKILL.md) §0.1）。
-本 Mode 受锚点约束——**评审侧重按锚点调整，但派遣名单不变**：
+本阶段受锚点约束——**评审侧重按锚点调整，但派遣名单不变**：
 
 | 主锚点 | 首要核查项 |
 |---|---|
-| **理论** | 证明是否成立、假设是否必要、反例 / 紧性是否讨论（S-Theory、R-ICML） |
-| **性能** | 公平比较（同算力·同数据·同调参）、指标口径、显著性检验（R-CVPR、A-Experimenter 视角） |
-| **现象 / 基准** | 解释是否唯一、基准是否暴露真实失败模式（R-NeurIPS） |
-| **可行性 / 负结果** | 前提是否现实、结论是否被过度外推（S-Feas、S-Theory） |
+| **理论** | 证明是否成立、假设是否必要、反例 / 紧性是否讨论（`R-Theory`、`S-Theory`） |
+| **性能** | 公平比较（同算力·同数据·同调参）、指标口径、显著性检验（`R-Experimental`） |
+| **现象 / 基准** | 解释是否唯一、基准是否暴露真实失败模式（`R-Generalization`） |
+| **可行性 / 负结果** | 前提是否现实、结论是否被过度外推（`S-Feas`、`S-Theory`） |
+
+> **会议审稿人（`R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`）不参与科学发现。**
+> 它们只在 **R12 / R13 的 venue calibration 表**里出现（见 §R7.10）。
 
 **锚点与方案不一致时必须当场指出**（例如性能锚点却没做同算力比较），并计入结论卡片的
 致命风险或修改建议。
@@ -59,73 +71,82 @@ R7 / R10 / R13 继续复核。**
 
 ---
 
-## 输入
+## R7.1 输入
 
 | 输入 | 必填 | 说明 |
 |---|---|---|
-| 待复核方案 | ✅ | 来自 R8 的 `proposal` + `experiment_plan`，或用户提供 |
+| 待复核方案 | ✅ | 来自 R8 的 `proposal`，或用户提供 |
 | 上一次审阅内容 | ❌ | **有 → 接续复核；无 → 首次复核** |
 | 关键参考文献 | ❌ | 缺省时调用 R2 / R5 定向补充 |
 
 ---
 
-## E1. 判断复核类型
+## R7.2 判断复核类型
 
-### E1.1 E 的三个触发点（何时该调用 E）
+### R7.2.1 R7 的三个触发点（何时该调用 R7）
 
 | # | 触发点 | 说明 |
 |---|---|---|
-| ① | **R8 产出后首次复核** | 方案与实验计划刚成型，做首次完整八子代理审查 |
+| ① | **R8 产出后首次复核** | 方案与实验计划刚成型，做首次完整的六攻击面审查 |
 | ② | **实验完成、有实测结果后** | 此时"预期"变"实测"，**防复现检查必须重做**（新颖性/复现判定的证据基础已变） |
 | ③ | **投稿被拒 / 改投时** | 按新会议的审稿标准重审，并复核是否**出现了新的最接近工作**（判据是**有无新文献**，**不是**上次检索距今多久） |
 
-> ⚠️ **E 不是链条终点，而是反馈环。** E 的结论可以**回流到 R8**（按审阅意见重写
+> ⚠️ **R7 不是链条终点，而是反馈环。** R7 的结论可以**回流到 R8**（按审阅意见重写
 > 方案 / 补实验）或**回流到 R3—R6**（叙事或方案的根本缺陷指向 idea 本身不成立）。
 > 触发点 ② 之后**不得**直接沿用触发点 ① 的防复现结论。
 
-### E1.2 复核类型
+### R7.2.2 复核类型
 
 | 类型 | 触发条件 | 处理方式 |
 |---|---|---|
-| **首次复核** | 无上一次审阅内容 | 执行完整八子代理审查（E2 全量） |
+| **首次复核** | 无上一次审阅内容 | 执行完整六攻击面审查（§R7.3 全量） |
 | **接续复核** | 有上一次审阅内容 | 聚焦**上次未解决问题** + **新引入变更** |
 
-判断依据是输入中是否存在上一次的 `review_output`（含八子代理意见与评分）。
+判断依据是输入中是否存在上一次的 `review_output`（含六攻击面意见与评分）。
 **开头必须声明本次属于哪一类。**
 
 ---
 
-## E2. 派遣八子代理严格审查
+## R7.3 派遣：六个攻击面 + S-Lit + S-Devil
 
-### E2.1 八子代理分工
+### R7.3.1 派遣名单
 
-| 子代理 | 审查焦点 |
-|---|---|
-| R-CVPR | 方法落地、技术正确性、可复现性 |
-| R-ICML | 理论原创性、限制性假设移除 |
-| R-NeurIPS | 贡献类型判定、洞察深度 |
-| R-MICCAI | 临床相关性、验证严谨性（数据许可 / 伦理、按受试者分组、统计检验） |
-| S-Devil | 致命弱点、最接近先前工作、新颖性反驳（1—5，**5 = 完全无新颖性，低 = 好，反向维度**） |
-| S-Feas | 工程可行性、资源瓶颈 |
-| S-Lit | **文献核实、新颖性是否真实、复现风险判定** |
-| S-Repro | 可复现性、伦理风险 |
+| 角色 | 派遣 | 审查焦点 |
+|---|:--:|---|
+| `S-Lit` | ● | **文献核实、新颖性是否真实、复现风险判定**（恒派，见 §R7.3.2） |
+| `R-Novelty` | ● | 最近工作是否已做过、delta 是否非平凡 |
+| `R-Causal` | ● | 是否只是相关性 / 事后解释、有无更简替代解释 |
+| `R-Experimental` | ● | 基线公平性、confounder、统计功效、消融覆盖 |
+| `R-Theory` | ● | 假设是否必要、证明是否有缺口、结论是否 tight |
+| `R-Generalization` | ● | claim scope 是否超出证据、边界条件是否被写掉 |
+| `R-Utility` | ● | 即使全部正确，谁会在意、改变了什么 |
+| `S-Devil` | ● | 致命弱点清单 + 最简解释反例（**不打分**） |
+| `S-Repro` | ○ | 可复现性与伦理风险 |
+| `S-Nov` | ○ | `S-Lit` 判「边缘重叠」或方案涉及「首次提出」时追加，独立核验 |
+| `S-Theory` | ○ | 理论严谨性 |
+| `S-Feas` | ○ | 工程可行性、资源瓶颈 |
+| `R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI` | — | **不派**：会议审稿人只在 R12 / R13 的 venue calibration 表里出现 |
+| `A-Author` / `A-Experimenter` / `S-Integrity` | — | **不派**：`S-Integrity` 属 R13 |
 
-**按需追加：** 当 S-Lit 判定最接近工作"边缘重叠"，或方案涉及"首次提出"时，追加 **S-Nov** 做独立新颖性核验（避免与 S-Lit 同源偏差）。"八子代理"指常规八人，S-Nov 为按需增派的第九人。
+**派遣名单的权威副本是 [roles.md](roles.md) §4.2 派遣矩阵的 `R7` 列。** 本表必须与它逐行一致。
 
-> **四个会议审稿人一律按「两角度 + 会议特性」评审**（见 [roles.md](roles.md) §1.0、
-> [venue-standards.md](venue-standards.md) §0）：**理论角度**段 + **应用角度**段 +
-> **会议特性判定**（引用该会议标准条目）。只写一个角度 = 评审不合格。
-> R-MICCAI 对无临床属性的方案，会议特性判定写 **"不适用"** 并说明理由，两角度照常评。
+**硬规则：**
 
-### E2.2 防复现检查（Anti-Reproduction Check，强制）
+- **六个攻击面审稿人全部派遣、不得裁减。** 每个角色**只攻击一个面**，不写平衡意见，不写总体评价。
+- **`S-Devil` 不打分**：只出致命弱点清单与最简解释反例（1—5，**5 = 完全无新颖性，低 = 好，反向维度**）。
+- **写不出可判定 `Kill Condition` 的评审不合格** —— 只有分数不构成评审（见 §R7.10）。
+- **不得直接改 `claims[].status`** —— 只能经 R10（例外见 [../SKILL.md](../SKILL.md) §1.6）。
+- **会议审稿人不参与科学发现。** 不得要求「理论角度 / 应用角度 / 会议特性判定」三段式评审。
 
-**由 S-Lit 主责，S-Devil 与 R-NeurIPS 交叉验证。** 逐项作答：
+### R7.3.2 防复现检查（Anti-Reproduction Check，强制）
+
+**由 `S-Lit` 主责，`R-Novelty` 与 `S-Devil` 交叉验证。** 逐项作答：
 
 | # | 检查项 | 判定 |
 |---|---|---|
 | 1 | 是否存在**可一对一对应**的已有方案（问题、机制、结论三层都对应）？ | 有 / 部分 / 无 |
 | 2 | 本方案相对它的增量是**设计改变**，还是仅**实现优化/超参调整**？ | 设计改变 / 实现优化 / 无实质增量 |
-| 3 | 增量是否触及**新的结构性质或理论条件**？（对应 B2 的"没做到"） | 是 / 否 |
+| 3 | 增量是否触及**新的结构性质或理论条件**？（对应 §R3—R6.3 的"没做到"） | 是 / 否 |
 | 4 | 若把已有方案原样重跑，本方案的核心声称是否仍成立？ | 是（→ 复现风险高）/ 否 |
 | 5 | 是否只是把已有方法**换一个数据集/换一个 backbone**？ | 是（→ 复现风险高）/ 否 |
 | 6 | 最接近工作的作者会认为这是**独立贡献**还是**自己的后续工作**？ | 独立 / 后续 / 复现 |
@@ -149,7 +170,7 @@ R7 / R10 / R13 继续复核。**
 **S-Lit 的检索门禁：** 新颖性/复现判定属于 **T4 触发场景**，必须达到
 **L3 穷尽检索**（见 [literature-policy.md](literature-policy.md) §3.1），并附
 **负检索记录**。未达到时，结论只能写"据本次检索未见"，且**不得**给出"复现风险低"。
-**措辞等级统一见 [evidence-policy.md](evidence-policy.md)**（本 Mode 不另立措辞表）。
+**措辞等级统一见 [evidence-policy.md](evidence-policy.md)**（本文件不另立措辞表）。
 
 > **与方法来源的对应（见 [venue-standards.md](venue-standards.md) §5.1）：**
 > `原创` → 通常复现风险低；`部分原创` → 看改造是否触及**新的结构性质或理论条件**；
@@ -158,9 +179,10 @@ R7 / R10 / R13 继续复核。**
 
 **输出规格（强制）：**
 
-- 每个子代理输出 **1—5 分评分** + **文字评审意见**。
-- **四个会议审稿人的意见必须显式分三段**：`理论角度` / `应用角度` / `会议特性判定`
-  （见 [roles.md](roles.md) §1.0）。**缺任一段视为评审不合格。**
+- 每个攻击面**必须输出五元组**（`Attack` / `Target Claim` / `Alternative` /
+  `Discriminating Test` / `Kill Condition`），见 §R7.10。**五元组是 primary。**
+- **写不出可判定 `Kill Condition` 的评审不合格。** 只有分数不构成评审。
+- 每个子代理同时输出 **1—5 分评分**（次要记录）+ **文字评审意见**。
 - 字数下限：见 [roles.md](roles.md) §7 的**字数与规模下限总表**（R7 / R10 / R13 子代理意见
   ≥ 200 字，**S-Repro ≥ 150 字**）。
 - 评分必须有理由，且**引用具体证据**（具体实验缺失、具体引用、具体逻辑缺口）。
@@ -178,12 +200,12 @@ R7 / R10 / R13 继续复核。**
 
 ---
 
-## E3. 交叉质询与共识形成
+## R7.4 交叉质询与共识形成
 
-### E3.0 第 0 步：极性归一化（强制，先于汇总）
+### R7.4.1 第 0 步：极性归一化（强制，先于汇总）
 
-**与 R12 一样，E 的评分也必须先归一化再进中位数**（共用机制见
-[scoring-policy.md](scoring-policy.md)）。E 是**单个总分**而非维度向量，因此规则更简单：
+**与 R12 一样，R7 / R10 / R13 的评分也必须先归一化再进中位数**（共用机制见
+[scoring-policy.md](scoring-policy.md)）。R7 是**单个总分**而非维度向量，因此规则更简单：
 
 - **S-Devil 的「新颖性反驳」是反向维度**：`1—5，5 = 完全无新颖性`，**低 = 好**；
   归一化为 **新颖性稳健度 = 6 − 反驳分**。
@@ -207,22 +229,22 @@ R7 / R10 / R13 继续复核。**
 
 | 质询方 | 被质询方 | 原评分 | 质询内容 | 结果 |
 |---|---|---|---|---|
-| S-Devil | R-CVPR | 4 | 认为可复现性被高估：未披露随机种子 | 接受，R-CVPR 下调至 3 |
+| `S-Devil` | `R-Experimental` | 4 | 认为可复现性被高估：未披露随机种子 | 接受，`R-Experimental` 下调至 3 |
 
 **评分汇总模板：**
 
 | 子代理 | 原始分 | 方向 | 归一化分 | 中位数 | 分歧标记 |
 |---|---|---|---|---|---|
-| R-CVPR | 3 | 高 = 好 | 3 | | |
-| R-ICML | 4 | 高 = 好 | 4 | **3.5** | ⚠️ R-ICML 与 S-Devil 差 3 分 |
-| S-Devil | 2 | **低 = 好（反向）** | **4**（`6 − 2`） | | |
+| `R-Experimental` | 3 | 高 = 好 | 3 | | |
+| `R-Theory` | 4 | 高 = 好 | 4 | **3.5** | ⚠️ `R-Theory` 与 `S-Devil` 差 3 分 |
+| `S-Devil` | 2 | **低 = 好（反向）** | **4**（`6 − 2`） | | |
 | … | … | … | … | | |
 
 > **归一化分**才是进入中位数的值；S-Devil 的**原始分**与其归一化分方向相反，两列都必须给。
 
 ---
 
-## E4. 复核结论
+## R7.5 复核结论
 
 **审查结论卡片（核心交付物）：**
 
@@ -232,11 +254,11 @@ R7 / R10 / R13 继续复核。**
 **总体判定（推荐优先级）：** 高 / 中 / 低 / 建议放弃
 **最适合投稿的会议：** CVPR / ICML / NeurIPS / MICCAI（含理由）
 **综合评分（中位数）：** <x>/5
-**复现风险等级：** 低 / 中 / 高（来自 §E2.2 防复现检查）
-**方法正确性判定：** 成立 / 有缺口 / 不成立（来自 E2 正确性维度）
+**复现风险等级：** 低 / 中 / 高（来自 §R7.3.2 防复现检查）
+**方法正确性判定：** 成立 / 有缺口 / 不成立（来自 §R7.3 的正确性维度）
 
 **核心优势：**
-- …（**引用具体子代理意见**，如"R-NeurIPS 认为洞察超出工程组合"）
+- …（**引用具体子代理意见**，如「`R-Utility` 认为该洞察有复用价值」）
 
 **致命风险：**
 - …（每条标注**是否可缓解**；可缓解的写明缓解路径）
@@ -265,7 +287,7 @@ R7 / R10 / R13 继续复核。**
 
 ---
 
-## E5. 接续复核规则
+## R7.6 接续复核规则
 
 **如果输入包含上一次审阅内容**（`review_output` + `open_questions`）：
 
@@ -289,7 +311,7 @@ R7 / R10 / R13 继续复核。**
 
 | 子代理 | 上次评分 | 本次评分 | 变化 | 原因 |
 |---|---|---|---|---|
-| R-CVPR | 2 | 4 | ↑2 | 补全了消融矩阵与复现细节 |
+| `R-Experimental` | 2 | 4 | ↑2 | 补全了消融矩阵与复现细节 |
 | S-Devil | 2 | 3 | **↓1** | 归一化后稳健度 **4 → 3**（`6−反驳分`）；**原始分上升 = 新颖性风险上升**，不是改善 |
 
 > ⚠️ 上表 S-Devil 一行是**方向陷阱的示范**：若照抄原始分就会写成「↑1 改善」，那是错的。
@@ -298,7 +320,7 @@ R7 / R10 / R13 继续复核。**
 
 ---
 
-## E6. 文档落盘与状态更新（强制）
+## R7.7 文档落盘与状态更新（强制）
 
 1. **写审阅记录：** `routes/<R>/docs/<被审ID>-review-r01.md`；
    接续复核写 `-r02.md`、`-r03.md`（轮次零填充两位）（frontmatter 记 `review_round`）。
@@ -322,75 +344,58 @@ R7 / R10 / R13 继续复核。**
    未完成则结论只能写"据本次检索未见"，且**不得**给出"复现风险低"，并记入
    **Critical uncertainties**。
 
-## E7. 输出
+## R7.8 输出
 
 | 交付物 | 说明 |
 |---|---|
-| **八子代理评审意见** | 每条含评分 + 意见；字数下限见 [roles.md](roles.md) §7（R7 / R10 / R13 子代理 ≥200 字，S-Repro ≥150 字） |
+| **六攻击面评审意见** | 每条含评分 + 意见；字数下限见 [roles.md](roles.md) §7（R7 / R10 / R13 子代理 ≥200 字，S-Repro ≥150 字） |
+| **五元组记录** | 每个攻击面一条 `(Attack, Target, Alternative, Test, Kill Condition)` |
 | **交叉质询记录** | 每人至少一条质询 |
-| **审查结论卡片** | E4 模板 |
+| **审查结论卡片** | §R7.5 模板 |
 | **横向对比表** | 多方案时必需 |
 | **变更追踪表** | **仅接续复核时**输出 |
 
-## E8. 输出后
+## R7.9 回写 Research World Model
 
-附 `state.json` 片段。接续复核时 `next_phase_suggestion` 仍可为 `"R7 / R10 / R13"`（若仍有未解决项）。
+**R7 写 state 的对象只有 `assurance[]` / `failures[]` / `uncertainties[]` / `known_flaws`。**
+审查记录本身（评审意见、评分汇总、交叉质询、变更追踪）落**文档**（见 §R7.7），**不落 state**。
 
-```json
+```jsonc
 {
-  "phase": "R7 / R10 / R13",
-  "timestamp": "2025-01-01T00:00:00Z",
-  "route": "A",
-  "doc_id": "A003-review",
-  "review_type": "first | follow-up",
-  "proposal_ref": "state-C-<timestamp>.json",
-  "review_output": {
-    "R-CVPR": {"score": 3, "opinion": "…", "theory_angle": "…", "application_angle": "…", "venue_verdict": "…"},
-    "R-ICML": {"score": 4, "opinion": "…", "theory_angle": "…", "application_angle": "…", "venue_verdict": "…"},
-    "R-NeurIPS": {"score": 3, "opinion": "…", "theory_angle": "…", "application_angle": "…", "venue_verdict": "…"},
-    "R-MICCAI": {"score": 3, "opinion": "…", "theory_angle": "…", "application_angle": "…", "venue_verdict": "不适用（无临床属性）", "applicable": false},
-    "S-Devil": {"novelty_rebuttal": 2, "novelty_robustness": 4, "score": 2, "opinion": "…"},
-    "S-Feas": {"score": 4, "opinion": "…"},
-    "S-Lit": {"score": 3, "opinion": "…"},
-    "S-Repro": {"score": 3, "opinion": "…"}
-  },
-  "median_score": 3,
-  "correctness_verdict": "成立 | 有缺口 | 不成立",
-  "reproduction_risk": {
-    "level": "低 | 中 | 高",
-    "closest_prior_work": "[作者, 会议/年份]",
-    "increment_type": "设计改变 | 实现优化 | 无实质增量",
-    "search_level": "L3",
-    "checklist": {"one_to_one_match": "部分", "touches_new_property": true}
-  },
-  "cross_examination": [
-    {"from": "S-Devil", "to": "R-CVPR", "original_score": 4, "issue": "…", "resolved": true}
+  "assurance": [
+    {"kill_condition": "若 O2 出现则 C17 降级",
+     "discriminating_test": "X8",
+     "verification_tier": "T0"}
   ],
-  "disagreements": [
-    {"dimension": "理论严谨性", "agents": ["R-ICML", "S-Devil"], "scores": [4, 2], "unresolved": true}
+  "failures": [
+    {"id": "F1", "kind": "unsupported", "what": "…", "why": "…",
+     "referenced_by": ["C17"], "source_review": "REV1"}
   ],
-  "verdict": {
-    "priority": "中",
-    "best_venue": "ICML",
-    "core_strengths": ["…"],
-    "fatal_risks": [{"risk": "…", "mitigable": true, "path": "…"}],
-    "revision_suggestions": ["…"]
-  },
-  "change_tracking": [],
-  "score_delta": [
-    {"agent": "R-CVPR", "previous": 2, "current": 4, "delta": "↑2", "reason": "补全消融矩阵"}
-  ],
-  "open_questions": ["…"],
-  "next_phase_suggestion": "R7 / R10 / R13"
+  "uncertainties": [
+    {"id": "U3", "question": "…", "importance": "high", "uncertainty": "high",
+     "cheapest_discriminating_test": "TBD", "status": "open"}
+  ]
 }
 ```
 
+**硬规则：**
+
+- **R7 不写 `reviews`。** `reviews` 由 **R13** 写（[research-state-policy.md](research-state-policy.md) §3.11）。
+- **`assurance[].verification_tier` 的上限是 `T0`** —— LLM reviewer 的产物
+  **不得**据此升级任何 claim 状态（`V20`）。
+- **R7 不得改 `claims[].status`** —— 只能经 R10（例外见 [../SKILL.md](../SKILL.md) §1.6）。
+- **每条疑点必须落成 `assurance[]` 条目**，不得只写进 review 文档。
+- **`kill_condition` 非空且 `discriminating_test` 指向存在的 `X` 或 `TBD`**（`V9` 强制）。
+- **验收记录的结构以 `reviews[].id` 为关联键**：`repairs[].source_review` 与
+  `failures[].source_review` 用它建立逐条对应（`V23`）。**全局存在性不算闭环。**
+- 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
+  **硬违规须为 0**。
+
 ---
 
+## R7.10 assurance：输出**可执行对象**，不是分数
 
-## R7 assurance：输出**可执行对象**，不是分数
-
-**八个攻击面**（Wave 3 起正式，取代「按 venue 组织」）：
+**八个攻击面**（取代「按 venue 组织」）：
 
 | 攻击面 | 承担角色 | 专攻 |
 |---|---|---|
@@ -433,7 +438,7 @@ Kill Condition: If alternatives match MIND under equal compute,
 `contribution type → evidence contract → venue calibration` 是唯一入口
 （见 [venue-standards.md](venue-standards.md) §10）；**禁止**「venue 直接选 preset」。
 
-## R13 artifact-aware 审计（Wave 3 落地）
+## R13. artifact-aware 审计
 
 **审计对象不是论文**，而是：`paper` / `claim graph` / `experiment graph` / `code` /
 `logs` / **`failed runs`** / `dataset selection history` / `metric selection history`。
@@ -446,7 +451,9 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 
 | 阶段 | 有什么 artifact | 允许要求什么审计 |
 |---|---|---|
-| R7 / R8 | **没有** code / logs / failed runs | **只能审「计划中的证据契约」** |
+| **R7 首轮**（R8 之前） | 没有 code / logs / failed runs，也**没有** `claims[].contract` | **只能审 R3—R6 落盘的 seed `claims[]` / `hypotheses[]` / `assumptions[]`** |
+| **R7 第二轮起**（R8 之后） | 有 `claims[].contract`，仍无 artifact | 逐条核契约：`kill_rule` 是否可判定、`expected_outcomes` ↔ `preregistration.outcomes[].id`、`minimal_discriminating_experiment` 是否指向真实 `X` |
+| **R8** | 无 artifact | **只能审它自己刚建的 `claims[].contract` 与刚冻结的 `preregistration`** —— 两者都是**预测**，不是结果 |
 | R9 之后 / R13 | 完整 trace | artifact-aware 审计（含 Integrity Gate） |
 
 **禁止在无 artifact 的阶段要求 artifact 审计** —— 那会产出一条永远无法执行、只能填「待补」的规则。
@@ -457,7 +464,7 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
+| **R7** | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） |
 

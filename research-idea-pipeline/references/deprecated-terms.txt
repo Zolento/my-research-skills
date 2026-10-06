@@ -90,3 +90,4 @@ literature-survey
 
 idea-discovery
 -ideas\.md
+next_phase_suggestion

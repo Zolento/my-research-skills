@@ -49,7 +49,7 @@
 | `<路线字母>001` | `docs/<文件名>` | field-map | — | R2 | draft | 领域地图 |
 | `<路线字母>002` | `docs/<文件名>` | discovery | — | R3—R6 | draft | 含 I1..In |
 | `<路线字母>003` | `docs/<文件名>` | proposal | — | R8 | draft | 贡献 K1..Kn |
-| `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | R9—R11 | draft | 实验 E1..En |
+| `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | R9—R11 | draft | 实验 X1..Xn |
 | `<路线字母>005` | `docs/<文件名>` | narrative | — | R12 | draft | 一次调用：I1..In 的 claim graph + 六槽位叙事 |
 | `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | R7 / R10 / R13 | draft | 对 `003` 的第 1 轮审阅 |
 

@@ -78,11 +78,49 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 | `action` | 字符串 | 动作标识（可引用 `X<n>` / `H<n>` / `P<n>` / `R<n>`） |
 | `type` | `discriminating_experiment` \| `remote_analogy` \| `literature_collision` \| `repair` \| `propagate_invalidation` \| `narrative` | 动作类别 |
 | `target` | 字符串 | 作用对象（`U`/`C`/`H`/`AS` 的 id 或 `P<n>`） |
-| `eig` | `high` \| `medium` \| `low` \| `unknown` | **LLM 估计**的期望信息增益；**必须按 §6 校准** |
+| `eig` | `high` \| `medium` \| `low` \| `unknown` | **LLM 估计**的期望信息增益；**必须按 §6.1 校准**。排序时把它连同 ①改哪条 `U` / ②预期方向 / ③成本口径一起写进 `predicted_information_gain`（**生产者在 R9，消费者在 R11**） |
 | `cost` | `high` \| `medium` \| `low` | 成本档（口径见 `phase-r9-r11-experiment-loop.md` §R9） |
 
 **排序只用 `EIG ÷ cost`**，**不得**按「最容易涨指标」或「最容易发论文」排序
 （与 R9 的既有禁令一致）。
+
+---
+
+### 4.1 `operator_stats`（system-level Meta-Memory）
+
+**它记录「系统自己哪种算子有效」，不是领域的科学知识。** 因此它**出 state**，落
+`scheduler.json`；**不得**被 `evidence[].source_ref` 引用，也**不得**进叙事。
+
+```json
+{
+  "operator_stats": {
+    "by_operator": {
+      "P5": {"generations": 3, "viable": 0, "killed": 3, "dormant": true}
+    },
+    "recurring_failure_patterns": ["theory_lens 只产出 theory relabeling"]
+  }
+}
+```
+
+| 字段 | 取值 | 说明 |
+|---|---|---|
+| `by_operator[<算子>].generations` | 非负整数 | 该算子参与过的代数 |
+| `by_operator[<算子>].viable` | 非负整数 | 产出且**未被淘汰**的候选数 |
+| `by_operator[<算子>].killed` | 非负整数 | 产出后**被淘汰**的候选数 |
+| `by_operator[<算子>].dormant` | `true` / `false` | **全灭**（`viable == 0` 且 `killed > 0`）时为 `true` |
+| `recurring_failure_patterns` | 字符串数组 | 反复出现的失败模式，供 R6 / scheduler 复用 |
+
+**硬规则：**
+
+1. **island / operator 全灭写在这里，不写 `uncertainties[]`。**
+   「某算子本轮表现不好」描述的是**系统行为**；`research-state.json` 只描述**世界**。
+   **只有全灭暴露出一个独立的科学未知时**，才另立 `U<n>`。
+2. **`dormant` 不等于淘汰。** 保留 exploration floor —— **不得**因成功率低就永久停用某算子。
+   `dormant` 只表示「本轮没产出」；是否 reseed 由 `next_action_policy` 的
+   `paradigm_escape_if_stagnant` 决定。
+3. **项目级汇总：** `.research-idea-pipeline/meta/operator-stats.json` 是各路线
+   `scheduler.json` 的 `operator_stats` 的**只读汇总**（跨路线看哪种算子整体有效）。
+   它同样**不入 state**。
 
 ---
 
@@ -110,6 +148,63 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 
 ---
 
+### 6.1 EIG 的生产者 / 消费者（**不得只存一个主观评分**）
+
+**生产者与消费者必须分开，否则 `EIG ÷ cost` 会退化成「LLM 自己觉得这个实验挺有信息量」。**
+
+```text
+R9  scheduling        → scheduler.json : predicted_information_gain
+实验完成
+R11 state update      → scheduler.json : observed_delta + actual_information_gain
+Meta-Controller later → 用对照校准未来的 EIG 估计
+```
+
+**`actual_information_gain` 不得由 LLM 重新拍脑袋。** 它必须由**结构化事实**推出：
+
+```json
+{
+  "experiment": "X21",
+  "predicted_information_gain": "high",
+  "observed_delta": {
+    "claim_status_changes": [{"id": "C17", "from": "ungrounded", "to": "partially-supported"}],
+    "uncertainty_changes": [{"id": "U4", "level_from": "high", "level_to": "medium",
+                             "status_from": "open", "status_to": "open"}],
+    "hypothesis_status_changes": [],
+    "new_uncertainties": ["U9"],
+    "unexpected_observations": 1
+  },
+  "actual_information_gain": "medium"
+}
+```
+
+**`actual_information_gain` 四值（冻结）：** `high` | `medium` | `low` | `zero`
+
+| rating | 由什么 `observed_delta` 支撑（满足其一即可） |
+|---|---|
+| `high` | ① `claim_status_changes` 非空；② 某条 `U` 的 `status_to == "closed"`；③ 出现 claim 被 `contradicted` / `killed` 的判别证据 |
+| `medium` | ① 某条 `U` 的 `level_to` 比 `level_from` **降一级**（`high → medium` 或 `medium → low`）；② `hypothesis_status_changes` 非空；③ `new_uncertainties` 非空 |
+| `low` | ① 只有 `unexpected_observations ≥ 1`；② 只改了 `interpretation` / `scope`；③ 只做 `depends_on` 类账目修正 |
+| `zero` | `observed_delta` 五项全空且未登记 `unexpected` —— **必须同时写 `failures[]`（`kind: inconclusive`）** |
+
+**硬规则：**
+
+1. **`rating` 必须由 `observed_delta` 支撑。** 出现 `"actual_information_gain": "high"` 而
+   `observed_delta` 里没有任何支撑项 = **telemetry 自欺**，与「只存一个主观评分」等价。
+2. **写入时机：** R11 的第 3 步之后、第 5 步之前（此时 `observed_delta` 才齐）。
+3. **没做完的实验不写。** `experiments[].status != done` 的 `X` **不得**有 `actual_information_gain`。
+4. **`observed_delta` 只记「变了什么」，不记「为什么变」。** 归因留给评审（R7 / R13），
+   不要把因果解释塞进 telemetry。
+5. **校准不等于自动改分：** Meta-Controller 只能**记录**估计与实际的偏差分布，
+   **不得**自动改写历史 `predicted_information_gain`。
+6. **`observed_delta` 与 state 的关系：** 它必须与同一轮 `research-state.json` 的实际改动
+   **一致**。不一致时**以 state 为准**，并重算 `rating`。
+
+> ⚠️ **已知限制（不得假装已闭环）：** `scheduler.json` **没有机械校验器** ——
+> 上面这些是**契约**，不是闸门。`state_check.py` 只校验 `research-state.json`。
+> 因此 EIG 对照目前靠 R11 的自检与评审保证；把它变成机械闸门需要一份 scheduler schema（未实现）。
+
+---
+
 ## 7. 与既有机制的关系
 
 | 既有 | scheduler 的作用 |
@@ -127,4 +222,6 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 - [ ] `scheduler.json` **不在** `research-state.json` 内，且未被任何 `evidence[].source_ref` 引用。
 - [ ] 八级优先级**顺序未被重排**，且高优先级未清零时没有推进低优先级项。
 - [ ] `next_actions[]` 的排序依据是 `EIG ÷ cost`，**没有**出现 venue fit 或指标提升。
-- [ ] 每个 `done` 实验都有 `predicted_information_gain` 与 `actual_information_gain` 的对照记录。
+- [ ] 每个 `done` 实验都有 **三件套**：`predicted_information_gain` + `observed_delta` +
+      `actual_information_gain`，且 `rating` 由 `observed_delta` 支撑（§6.1）。
+- [ ] `observed_delta` 与同一轮 `research-state.json` 的实际改动一致。

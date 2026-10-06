@@ -8,12 +8,12 @@
 
 ```
 调用 research-idea-pipeline，phase=R7,R10,R13（接续）
-输入：proposal=上一步输出，review_output=上一次 E 的输出
+输入：proposal=上一步输出，review_output=上一次 R7 / R10 / R13 的输出
 ```
 
 ## 触发判定
 
-输入中存在上一次的 `review_output`（八子代理意见 + 评分），因此 E1 判定为
+输入中存在上一次的 `review_output`（六攻击面五元组 + 评分），因此 §R7.2 判定为
 **接续复核**，只做**聚焦复核**而非全量重审。
 
 > 常见触发点：③ 投稿被拒 / 改投时。或实验完成、有实测结果后（触发点 ②）——
@@ -57,4 +57,4 @@
 ## 结论要求
 
 即使大部分问题已解决，只要有**未收敛的分歧**或**未缓解的致命风险**，就必须在
-结论卡片中显式保留，并将 `next_phase_suggestion` 设为 `"R7 / R10 / R13"`。
+结论卡片中显式保留，并将 `next_action_recommendation` 设为 `"R7 / R10 / R13"`。

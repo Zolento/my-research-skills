@@ -3,7 +3,7 @@
 
 实现 references/literature-policy.md 的强制规范：
 
-  1. 先本地，后 arxiv —— **但本地命中不是终点**：默认同时查 arxiv，结果取并集。
+  1. 默认同时检索本地库与 arxiv，结果取并集。本地命中不是终点。
      仅在显式给出 --local-only 时才跳过 arxiv（该模式违反默认规则，会打印警告）。
   2. arxiv 429 限流 —— 指数退避 10s→20s→40s→80s→160s，最多 5 次；
      退避期间不发起任何新的 arxiv 请求。
@@ -17,7 +17,7 @@
   7. --limit 控制最终返回条数（--max 只控制每次 arxiv 查询的条数）。
 
 用法：
-    # 默认：本地 + arxiv 并集
+    # 默认：本地库与 arxiv 取并集
     python literature_search.py --query "diffusion model combinatorial optimization" --max 20
 
     # 创新性声明：L3 穷尽级 + 自动扩检 + 追加检索式
@@ -30,7 +30,7 @@
     python literature_search.py --query "..." --local-only
 
 退出码：
-    0  正常（本地 + arxiv 成功）
+    0  正常（本地库与 arxiv 均成功）
     1  硬错误（参数错误、本地库不可读、渲染失败等）
     2  arxiv 不可用，已回退到本地结果（检索未达饱和）
     4  环境不满足：当前解释器缺依赖，且找不到（或有多个）可用解释器

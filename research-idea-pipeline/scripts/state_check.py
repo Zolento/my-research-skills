@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""state_check.py — Research World Model（R1）机械闸门：V1—V24 引用完整性审计
+"""state_check.py — Research World Model（R1）机械闸门：Shape Gate S1—S7 + 引用完整性 V1—V24
 
 契约来源
 --------
+**安装态请查 `references/research-state-policy.md` §4.0 / §4.1 的规则表** ——
+下表逐字取自它，两者由 `scripts/test_state_check.py` 的 TestRuleTableParity 锁定。
+
+溯源（**这些 spec 不随 skill 安装**，只在开发仓库里）：
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
 与 §2.3（引用完整性规则 V1—V24）、§5（R10 处置 / 关闭枚举）；
 V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4；
@@ -18,8 +22,21 @@ V22—V24 为 clean-room 复验后的收尾（claim 真值可追溯 / Integrity 
     python3 state_check.py <state.json> --check    # 显式化「只校验不写」
     python3 state_check.py <state.json> --json     # 机器可读结果（stdout 只有 JSON）
     python3 state_check.py <state.json> --quiet    # 只打印汇总行
-    python3 state_check.py --selftest              # 内置自检（V1—V24 全覆盖）
+    python3 state_check.py --selftest              # 内置自检（S1—S7 与 V1—V24 全覆盖）
     python3 state_check.py --list-rules            # 列出规则号与判据
+
+执行顺序：顶层结构（退出码 4）→ **Shape Gate S1—S7** → **V1—V24**。
+形状失败时不执行 V 规则（V 的措辞假设输入形状成立）。
+
+Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为硬违规）：
+
+    S1  八类一等对象数组全部存在，且每个都是对象数组
+    S2  每条一等对象条目有非空字符串 id，且 id 在本数组内唯一
+    S3  冻结枚举字段必须存在且取值在枚举内（只查 V1—V24 未覆盖的枚举）
+    S4  每条 hypothesis 的 structural_signature 是对象，五键齐全，值为非负整数
+    S5  claims[].contract 存在时是对象，十个契约键齐全，类型正确
+    S6  reviews 存在时是对象数组，decision 存在时是对象；integrity_gate 取值在枚举内
+    S7  state_version 是非负整数
 
 规则（逐字取自 spec §2.3，全部为硬违规）：
 
@@ -28,16 +45,19 @@ V22—V24 为 clean-room 复验后的收尾（claim 真值可追溯 / Integrity 
     V3  无任何 E 引用的 C 必须 `status: ungrounded`；有 E 却标 `ungrounded` 也是违规
     V4  每条 F 必须被至少一个 `claims[].known_flaws` 或 `experiments[].known_flaws` 引用
     V5  `epistemic_status` ∈ 五值；`Hypothesized` / `Unknown` 的条目不得出现在 `supporting_evidence`
-    V6  每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）
+    V6  每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift /
+        representation-shift / mechanism-shift / theory-shift / evaluation-shift /
+        boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10`
     V7  `U.cheapest_discriminating_test` 必须指向存在的 X，或字面量 `TBD`
     V8  `X.parent` 必须是存在的 X 或 `null`；树不得成环
     V9  `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 X 或 `TBD`
     V10 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure`
     V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）
     V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用
-    V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）
+    V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 `P3` 不得出现
+        （`P3` 只产 typed intermediate，不产 candidate）
     V14 `hypotheses[].generation` 是非负整数
-    V15 每个出现过的 `niche` 至少一条 `status: elite`
+    V15 每个 **live niche** 至少一条 `status: elite`（候选全灭的 niche 合法为空）
     V16 hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应
     V17 hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）
     V18 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；
@@ -57,9 +77,11 @@ V22—V24 为 clean-room 复验后的收尾（claim 真值可追溯 / Integrity 
     * V7 / V9 的 `TBD` 为精确字面量（strip 后比对，不接受 `tbd` / `TBD 待定`）。
     * V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）；
     * V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用；
-    * V13 `hypotheses[].island` ∈ {P1..P6, local}；
+    * V13 `hypotheses[].island` ∈ {P1..P6, local}，但 **`P3` 不得出现**
+      （`P3` 只产 typed intermediate，不产 candidate）；
     * V14 `hypotheses[].generation` 是非负整数；
-    * V15 每个出现过的 `niche` 至少一条 `status: elite`；
+    * V15 每个 **live niche**（至少一个 `active` / `elite` 候选）至少一条 `status: elite`；
+      候选全部 `killed` / `archived` 的 niche 合法为空；
     * V16 `operator` 必须是十二算子之一（strip 后精确比对）；`generation == 0` 且 `island` 合法时，
       还要求 `operator` 与 `ISLAND_OPERATOR` 一一对应（`island` 本身非法由 V13 负责，不重复计）；
     * V17 `parents` 必须是数组；每个元素是存在的 `H` id、不得自指、且父候选 `generation`
@@ -81,9 +103,11 @@ V22—V24 为 clean-room 复验后的收尾（claim 真值可追溯 / Integrity 
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
-    * V1—V24 之外**不新增**硬规则（契约 = Wave 1 spec §2.3 + Wave 2 spec §4 +
-      Wave 4 的 V16/V17 + Wave 5 spec §1.4/§2.4/§3.3 的 V18—V21 +
-      本节新增的 V22（claim 真值须经 R10 覆盖）/ V23（Integrity Gate 必须闭环）/ V24（decision 枚举））。
+    * **Rule 与 Shape 两个命名空间。** V1—V24 的契约 = Wave 1 spec §2.3 +
+      Wave 2 spec §4 + Wave 4 的 V16/V17 + Wave 5 spec §1.4/§2.4/§3.3 的 V18—V21 +
+      V22（claim 真值须经 R10 覆盖）/ V23（Integrity Gate 必须闭环）/ V24（decision 枚举）。
+      **S1—S7 的契约 = references/research-state-policy.md §4.0。**
+      两个命名空间之外**不新增**硬规则。
 
 退出码（与仓库既有脚本一致）：
     0  全部通过
@@ -150,9 +174,19 @@ FAILURE_KINDS: Tuple[str, ...] = (
     "falsified", "unsupported", "inconclusive",
     "failed-to-reproduce", "engineering-failure", "deprioritized",
 )
-# Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
-NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
+# HIGH-1：QD niche 与 R12 的叙事 preset **是两套独立枚举**。
+# QD niche 回答「这个 candidate 主要在哪个**科学结构轴**上离开已有范式」；
+# R12 的 `N1`—`N10` 回答「这套叙事用哪种修辞实现」。把两者合并会让
+# Narrative ontology 泄漏进 Discovery，且映射本身是有损的（例如「效率 / 可行性」
+# 在七轴里根本没有对应项）。
+QD_NICHES: Tuple[str, ...] = (
+    "assumption-shift", "formulation-shift", "representation-shift",
+    "mechanism-shift", "theory-shift", "evaluation-shift", "boundary-shift",
+)
 ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
+# HIGH-2：`P3` 只产 typed intermediate（`abstract_skeleton`），**不产 candidate** ——
+# 它不得出现在 `hypotheses[].island` 上。因此候选可用的 island 少一个。
+CANDIDATE_ISLANDS: Tuple[str, ...] = tuple(name for name in ISLANDS if name != "P3")
 # Wave 2 / R6：候选谱系的十二算子（generation-0 七轨 + R6 进化五算子）
 OPERATORS: Tuple[str, ...] = (
     "reframe", "assumption_breaker", "abstraction", "remote_analogy",
@@ -177,6 +211,68 @@ PREREG_OPS: Tuple[str, ...] = ("strengthen", "weaken", "falsify", "kill", "retai
 UNGROUNDED = "ungrounded"
 TBD = "TBD"
 
+# ---------------------------------------------------------------------------
+# MAJOR-4：冻结枚举的**全量**登记（Shape Gate 用）
+#
+# 这些枚举此前只在 policy §3 的字段表里写着，`state_check.py` 里**没有常量、
+# 也没有任何规则检查** —— 非法值可以静默通过。这里登记它们，交给 S3 强制。
+# 已有 V 规则覆盖的枚举（epistemic_status / niche / island / operator /
+# generation / validity.status / verification_tier / disposition / closure /
+# failures.kind 的引用侧 / preregistration.outcomes.op）**不在这里重复**，
+# 否则同一次改动会同时报 S 与 V，掩盖真正的规则号。
+# ---------------------------------------------------------------------------
+
+CLAIM_STATUSES: Tuple[str, ...] = (
+    "ungrounded", "supported", "partially-supported", "contradicted", "killed",
+)
+EVIDENCE_KINDS: Tuple[str, ...] = ("experiment", "literature", "theory", "observation")
+EVIDENCE_STRENGTHS: Tuple[str, ...] = ("partial", "strong", "weak")
+ASSUMPTION_STATUSES: Tuple[str, ...] = ("explicit", "tacit")
+HYPOTHESIS_STATUSES: Tuple[str, ...] = ("active", "elite", "archived", "killed")
+EXPERIMENT_STAGES: Tuple[str, ...] = ("X1", "X2", "X3", "X4", "X5", "X6")
+EXPERIMENT_STATUSES: Tuple[str, ...] = ("planned", "running", "done", "failed")
+LITERATURE_RELATIONS: Tuple[str, ...] = (
+    "supports", "contradicts", "shares-assumption", "shares-structure",
+    "solves-analogous-problem", "uses-same-theory",
+)
+IMPORTANCE_LEVELS: Tuple[str, ...] = ("critical", "high", "medium", "low")
+UNCERTAINTY_LEVELS: Tuple[str, ...] = ("high", "medium", "low")
+UNCERTAINTY_STATUSES: Tuple[str, ...] = ("open", "closed")
+INTEGRITY_GATES: Tuple[str, ...] = ("pass", "fail")
+
+# S3 查的字段：(数组键, 字段名, 枚举)
+ENUM_FIELDS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    ("claims", "status", CLAIM_STATUSES),
+    ("evidence", "kind", EVIDENCE_KINDS),
+    ("evidence", "strength", EVIDENCE_STRENGTHS),
+    ("assumptions", "status", ASSUMPTION_STATUSES),
+    ("hypotheses", "status", HYPOTHESIS_STATUSES),
+    ("experiments", "stage", EXPERIMENT_STAGES),
+    ("experiments", "status", EXPERIMENT_STATUSES),
+    ("literature", "relation", LITERATURE_RELATIONS),
+    ("uncertainties", "importance", IMPORTANCE_LEVELS),
+    ("uncertainties", "uncertainty", UNCERTAINTY_LEVELS),
+    ("uncertainties", "status", UNCERTAINTY_STATUSES),
+)
+
+# S4：QD archive 的结构签名五键（policy §3.4）
+STRUCTURAL_SIGNATURE_KEYS: Tuple[str, ...] = (
+    "assumption_distance", "formulation_distance", "representation_distance",
+    "theory_lens_distance", "mechanism_distance",
+)
+
+# S5：证据契约十键（policy §3.11；与 templates/research-state.template.json 同序）
+CONTRACT_KEYS: Tuple[str, ...] = (
+    "statement", "scope", "critical_assumptions", "supporting_required",
+    "refuting", "nearest_alternative", "minimal_discriminating_experiment",
+    "expected_outcomes", "kill_rule", "expansion_rule",
+)
+CONTRACT_STRING_KEYS: Tuple[str, ...] = (
+    "statement", "scope", "refuting", "nearest_alternative",
+    "minimal_discriminating_experiment", "kill_rule", "expansion_rule",
+)
+CONTRACT_ARRAY_KEYS: Tuple[str, ...] = ("critical_assumptions", "supporting_required")
+
 VALUE_LIMIT = 60  # 违规行里「现值」的显示上限
 
 RULES: Dict[str, str] = {
@@ -185,16 +281,16 @@ RULES: Dict[str, str] = {
     "V3": "无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规",
     "V4": "每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用",
     "V5": "epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence",
-    "V6": "每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）",
+    "V6": "每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift / representation-shift / mechanism-shift / theory-shift / evaluation-shift / boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10`",
     "V7": "U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD",
     "V8": "X.parent 必须是存在的 X 或 null；树不得成环",
     "V9": "assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD",
     "V10": "每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure",
     "V11": "stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别",
     "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
-    "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）",
+    "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 **`P3` 不得出现**（P3 只产 typed intermediate，不产 candidate）",
     "V14": "hypotheses[].generation 是非负整数",
-    "V15": "每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性）",
+    "V15": "每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite",
     "V16": "hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应",
     "V17": "hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）",
     "V18": "每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数",
@@ -202,10 +298,34 @@ RULES: Dict[str, str] = {
     "V20": "claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2）",
     "V21": "status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version",
     "V22": "claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值）",
-    "V23": "reviews[].integrity_gate == \"fail\" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值）",
+    "V23": "reviews[].integrity_gate == \"fail\" 时必须存在以 source_review 关联该 review id 的 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值）",
     "V24": "decision.verdict 存在时必须是 continue / pivot / archive / submit 之一",
 }
 RULE_ORDER: List[str] = list(RULES)
+
+# ---------------------------------------------------------------------------
+# MAJOR-4：Schema / Shape Gate（S1—S7）
+#
+# **位置：在 V1—V24 之前跑。** 形状不成立时 V 规则会给出误导性的级联判定，
+# 因此形状失败时**不执行** V 规则（`check_state` 直接返回形状报告）。
+#
+# **命名空间与 V 分开**：`Report.rules()` 仍只返回 V 号，
+# 因此「V1—V24 全部通过」这句话的含义不变。形状违规走 `Report.shape` 与 `S` 号。
+#
+# 权威副本：references/research-state-policy.md §4.0。两者**必须逐字一致**
+# （由 scripts/test_state_check.py 的 TestShapeTableParity 强制）。
+# ---------------------------------------------------------------------------
+
+SHAPES: Dict[str, str] = {
+    "S1": "八类一等对象数组全部存在，且每个都是对象数组",
+    "S2": "每条一等对象条目有非空字符串 id，且 id 在本数组内唯一",
+    "S3": "冻结枚举字段必须存在且取值在枚举内（只查 V1—V24 未覆盖的枚举）",
+    "S4": "每条 hypothesis 的 structural_signature 是对象，五键齐全，值为非负整数",
+    "S5": "claims[].contract 存在时是对象，十个契约键齐全，类型正确",
+    "S6": "reviews 存在时是对象数组，decision 存在时是对象；integrity_gate 取值在枚举内",
+    "S7": "state_version 是非负整数",
+}
+SHAPE_ORDER: List[str] = list(SHAPES)
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +463,7 @@ class Report:
     exit_code: int
     source: str = ""
     violations: List[Violation] = field(default_factory=list)
+    shape: List[Violation] = field(default_factory=list)
     checked: Dict[str, int] = field(default_factory=dict)
     error: Optional[str] = None
     error_kind: Optional[str] = None
@@ -352,10 +473,23 @@ class Report:
         present = {violation.rule for violation in self.violations}
         return [rule for rule in RULE_ORDER if rule in present]
 
+    def shape_rules(self) -> List[str]:
+        present = {violation.rule for violation in self.shape}
+        return [rule for rule in SHAPE_ORDER if rule in present]
+
+    def all_violations(self) -> List[Violation]:
+        return list(self.shape) + list(self.violations)
+
     def rule_counts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {}
         for rule in self.rules():
             counts[rule] = sum(1 for v in self.violations if v.rule == rule)
+        return counts
+
+    def shape_counts(self) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for rule in self.shape_rules():
+            counts[rule] = sum(1 for v in self.shape if v.rule == rule)
         return counts
 
     def as_dict(self) -> Dict[str, Any]:
@@ -366,6 +500,8 @@ class Report:
             "exit_code": self.exit_code,
             "checked": dict(self.checked),
             "counts": self.rule_counts(),
+            "shape_counts": self.shape_counts(),
+            "shape": [violation.as_dict() for violation in self.shape],
             "violations": [violation.as_dict() for violation in self.violations],
         }
         if self.error is not None:
@@ -379,6 +515,10 @@ class Report:
         if self.error is not None:
             return f"[env] 环境不满足（退出码 {EXIT_ENV}）：{self.error}"
         counts = "、".join(f"{key}={self.checked.get(key, 0)}" for key in CHECKED_KEYS)
+        if self.shape:
+            breakdown = "、".join(f"{rule}×{count}" for rule, count in self.shape_counts().items())
+            return (f"[shape] 共 {len(self.shape)} 处形状错误（{breakdown}）；"
+                    f"V1—V24 未执行（先修形状）；{counts}")
         if not self.violations:
             return f"[ok] 0 处硬违规：V1—V{RULE_ORDER[-1][1:]} 全部通过；{counts}"
         breakdown = "、".join(f"{rule}×{count}" for rule, count in self.rule_counts().items())
@@ -400,6 +540,147 @@ def _unwrap(doc: Any) -> Tuple[Any, Optional[str]]:
         if isinstance(inner, dict) and any(name in inner for name, _ in OBJECT_KEYS):
             return inner, key
     return doc, None
+
+
+def checked_counts(doc: Any) -> Dict[str, int]:
+    """各一等/附加数组的条目数（形状失败时也要报，便于定位）。"""
+    if not isinstance(doc, dict):
+        return {key: 0 for key in CHECKED_KEYS}
+    return {
+        key: len(doc.get(key)) if isinstance(doc.get(key), list) else 0
+        for key in CHECKED_KEYS
+    }
+
+
+def shape_errors(doc: Any) -> List[Violation]:
+    """Schema / Shape Gate（S1—S7）。在 V1—V24 **之前**跑。
+
+    只检查「齐全 / 必填 / 类型 / 枚举 / 对象形状」；语义一致性由 V1—V24 负责。
+    已有 V 规则覆盖的枚举**不在这里重复**，否则一次改动会同时报 S 与 V，
+    掩盖真正的规则号（见 ENUM_FIELDS 的注释）。
+    """
+    out: List[Violation] = []
+
+    def add(rule: str, path: str, detail: str, value: Any = None, subject: str = "") -> None:
+        out.append(Violation(rule, path, detail, value, subject))
+
+    if not isinstance(doc, dict):
+        return out  # 根节点不是对象 → structure_error 按退出码 4 处理
+
+    # --- S1 八类一等对象数组全部存在 ---
+    missing = [key for key in FIRST_CLASS_KEYS if key not in doc]
+    if missing:
+        add("S1", "根节点", f"缺少一等对象数组：{'、'.join(missing)}", "、".join(missing))
+
+    # --- S2 id 非空 + 前缀正确 + 数组内唯一 ---
+    for key, prefix in OBJECT_KEYS:
+        entries = doc.get(key)
+        if not isinstance(entries, list):
+            continue
+        seen: Dict[str, int] = {}
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            base = f"{key}[{index}]"
+            raw = entry.get("id")
+            if not _text_ok(raw):
+                add("S2", f"{base}.id", "缺失或不是非空字符串", raw)
+                continue
+            if not raw.startswith(prefix):
+                add("S2", f"{base}.id", f"id 前缀必须是 `{prefix}`", raw, raw)
+            if raw in seen:
+                add("S2", f"{base}.id", f"与 {key}[{seen[raw]}] 的 id 重复", raw, raw)
+            else:
+                seen[raw] = index
+
+    # --- S3 冻结枚举：必填 + 取值 ---
+    for key, field, allowed in ENUM_FIELDS:
+        entries = doc.get(key)
+        if not isinstance(entries, list):
+            continue
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            base = f"{key}[{index}].{field}"
+            value = entry.get(field)
+            if field not in entry or not _text_ok(value):
+                add("S3", base, "必填枚举字段缺失或不是非空字符串", value)
+                continue
+            if value not in allowed:
+                add("S3", base, f"取值不在枚举内（{' | '.join(allowed)}）", value)
+
+    # --- S4 structural_signature 五键（QD archive 的前提） ---
+    for index, entry in enumerate(doc.get("hypotheses") or []):
+        if not isinstance(entry, dict):
+            continue
+        base = f"hypotheses[{index}].structural_signature"
+        signature = entry.get("structural_signature")
+        if not isinstance(signature, dict):
+            add("S4", base, "缺失或不是对象（五维结构签名）", signature)
+            continue
+        for name in STRUCTURAL_SIGNATURE_KEYS:
+            if name not in signature:
+                add("S4", f"{base}.{name}", "五键之一缺失", None)
+            elif not _nonneg_int(signature.get(name)):
+                add("S4", f"{base}.{name}", "必须是非负整数距离", signature.get(name))
+        extra = [name for name in signature if name not in STRUCTURAL_SIGNATURE_KEYS]
+        if extra:
+            add("S4", base, f"含五键之外的键：{'、'.join(extra)}", "、".join(extra))
+
+    # --- S5 claims[].contract（存在时才查） ---
+    for index, entry in enumerate(doc.get("claims") or []):
+        if not isinstance(entry, dict) or "contract" not in entry:
+            continue
+        base = f"claims[{index}].contract"
+        contract = entry.get("contract")
+        if not isinstance(contract, dict):
+            add("S5", base, "不是对象", contract)
+            continue
+        for name in CONTRACT_KEYS:
+            if name not in contract:
+                add("S5", f"{base}.{name}", "契约十键之一缺失", None)
+        extra = [name for name in contract if name not in CONTRACT_KEYS]
+        if extra:
+            add("S5", base, f"含十键之外的键：{'、'.join(extra)}", "、".join(extra))
+        for name in CONTRACT_STRING_KEYS:
+            if name in contract and not _text_ok(contract.get(name)):
+                add("S5", f"{base}.{name}", "必须是非空字符串", contract.get(name))
+        for name in CONTRACT_ARRAY_KEYS:
+            if name in contract and not isinstance(contract.get(name), list):
+                add("S5", f"{base}.{name}", "必须是数组", contract.get(name))
+        outcomes = contract.get("expected_outcomes")
+        if "expected_outcomes" in contract and not isinstance(outcomes, dict):
+            add("S5", f"{base}.expected_outcomes", "必须是对象（`O<k>` → 文本）", outcomes)
+
+    # --- S6 reviews / decision：附加槽位的类型与 integrity_gate 枚举 ---
+    # 注意：`reviews[].id` 的必填**不在这里** —— 「gate=fail 却无 id」是 V23 的判据，
+    # 在 S 里重复会让一次改动同时报 S 与 V。`decision.verdict` 的枚举同理属于 V24。
+    reviews = doc.get("reviews")
+    if reviews is not None and not isinstance(reviews, list):
+        add("S6", "reviews", "必须是数组", reviews)
+    elif isinstance(reviews, list):
+        for index, entry in enumerate(reviews):
+            base = f"reviews[{index}]"
+            if not isinstance(entry, dict):
+                add("S6", base, "必须是对象", entry)
+                continue
+            review_id = entry.get("id")
+            if "id" in entry and not _text_ok(review_id):
+                add("S6", f"{base}.id", "id 存在时必须是非空字符串", review_id)
+            gate = entry.get("integrity_gate")
+            if gate is not None and gate not in INTEGRITY_GATES:
+                add("S6", f"{base}.integrity_gate",
+                    f"取值不在枚举内（{' | '.join(INTEGRITY_GATES)}）", gate)
+
+    decision = doc.get("decision")
+    if decision is not None and not isinstance(decision, dict):
+        add("S6", "decision", "必须是对象", decision)
+
+    # --- S7 state_version ---
+    if "state_version" in doc and not _nonneg_int(doc.get("state_version")):
+        add("S7", "state_version", "必须是非负整数", doc.get("state_version"))
+
+    return out
 
 
 def structure_error(doc: Any) -> Tuple[Optional[str], Any, Optional[str]]:
@@ -512,7 +793,7 @@ class _Context:
 
 
 # ---------------------------------------------------------------------------
-# V1—V24
+# S1—S7
 # ---------------------------------------------------------------------------
 
 def _v1(ctx: _Context) -> List[Violation]:
@@ -637,7 +918,11 @@ def _v5(ctx: _Context) -> List[Violation]:
 
 
 def _v6(ctx: _Context) -> List[Violation]:
-    """V6：每条 H 的 niche 非空，且取值必须是 N1—N10 之一（QD archive 的前提）。"""
+    """V6：每条 H 的 niche 非空，且取值必须是七个 QD 科学结构轴之一。
+
+    **QD niche 与 R12 的叙事 preset `N1`—`N10` 是两套独立枚举。** 用 preset 名
+    当 QD niche 在这里会被判违规（HIGH-1）。
+    """
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("niche")
@@ -647,11 +932,12 @@ def _v6(ctx: _Context) -> List[Violation]:
                 "V6", f"hypotheses[{index}].niche", detail, value, _subject_of(hypothesis),
             ))
             continue
-        if value.strip() not in NICHES:
+        if value.strip() not in QD_NICHES:
             out.append(Violation(
                 "V6",
                 f"hypotheses[{index}].niche",
-                f"不是 N1—N10 之一（QD archive 的 niche 复用 preset 名，不引入第二套枚举）",
+                f"不是七个 QD 科学结构轴之一（{'|'.join(QD_NICHES)}）；"
+                "R12 的叙事 preset `N1`—`N10` 不得用在这里",
                 value,
                 _subject_of(hypothesis),
             ))
@@ -659,14 +945,24 @@ def _v6(ctx: _Context) -> List[Violation]:
 
 
 def _v13(ctx: _Context) -> List[Violation]:
-    """V13：island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）。"""
+    """V13：island ∈ {P1..P6, local}，但 **P3 不得出现**（只产 typed intermediate）。
+
+    `P3` 的骨架是 search artifact，不是 candidate。把它塞进 `hypotheses[]` 会把
+    「表示探索」提前变成「可证伪假设」（见 phase-r3-r6-discovery.md §R3.0.1）。
+    """
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("island")
-        if _text_ok(value) and value.strip() in ISLANDS:
+        text = _text(value)
+        if text in CANDIDATE_ISLANDS:
             continue
-        detail = ("为空（必须标明由哪条轨产生）" if _is_blank(value)
-                  else f"不是 {'|'.join(ISLANDS)} 之一")
+        if text == "P3":
+            detail = ("P3 只产 typed intermediate，不产 candidate"
+                      "（见 phase-r3-r6-discovery.md §R3.0.1）")
+        elif _is_blank(value):
+            detail = "为空（必须标明由哪条轨产生）"
+        else:
+            detail = f"不是 {'|'.join(CANDIDATE_ISLANDS)} 之一"
         out.append(Violation("V13", f"hypotheses[{index}].island", detail, value, _subject_of(hypothesis)))
     return out
 
@@ -688,24 +984,32 @@ def _v14(ctx: _Context) -> List[Violation]:
 
 
 def _v15(ctx: _Context) -> List[Violation]:
-    """V15：每个出现过的 niche 至少有一条 elite（QD archive 不塌成单点）。"""
+    """V15：每个 **live** niche 至少有一条 elite（全灭的 niche 合法为空）。"""
     if not ctx.hypotheses:
         return []
+    # 只对 **live niche** 要求 elite：包含 status ∈ {active, elite} 的候选。
+    # 一个 niche 的候选**全部被杀**（killed / archived）时，它合法为空 ——
+    # 否则「证据淘汰了错误解释」反而会让 state 永久非法。
     niches = {}
     for index, hypothesis in ctx.hypotheses:
         niche = hypothesis.get("niche")
-        if not (_text_ok(niche) and niche.strip() in NICHES):
+        if not (_text_ok(niche) and niche.strip() in QD_NICHES):
             continue
-        entry = niches.setdefault(niche.strip(), {"elite": None, "first": index})
-        if _text_ok(hypothesis.get("status")) and hypothesis["status"].strip() == "elite":
-            if entry["elite"] is None:
-                entry["elite"] = index
+        status = hypothesis.get("status")
+        status = status.strip() if _text_ok(status) else ""
+        entry = niches.setdefault(niche.strip(), {"elite": None, "first": index, "live": False})
+        if status in ("active", "elite"):
+            entry["live"] = True
+        if status == "elite" and entry["elite"] is None:
+            entry["elite"] = index
     out: List[Violation] = []
     for niche, entry in sorted(niches.items()):
+        if not entry["live"]:
+            continue  # 全灭的 niche 合法为空
         if entry["elite"] is None:
             out.append(Violation(
                 "V15", f"hypotheses[{entry['first']}].niche",
-                f"niche {niche} 没有任何 status: elite 的候选（QD archive 要求每 niche 留一个 elite）",
+                f"live niche {niche} 没有任何 status: elite 的候选（QD archive 要求每个 live niche 留一个 elite）",
                 niche, niche,
             ))
     return out
@@ -1308,7 +1612,7 @@ def _v22(ctx: _Context) -> List[Violation]:
 
     校验器只看最终 JSON，看不见"谁写的"。本条用**可机械核对的追溯性**补上：
     凡 status ∈ {killed, contradicted} 的 claim，必须有一条 `repairs[]` 覆盖它
-    （`disposition` ∈ 五值 **且** `state_delta` 里出现该 claim 的 id）。
+    （`disposition` ∈ 五值 **且** 该条 `targets` 含此 claim 的 id）。
     于是「R14 越权写 killed」的 state **无法通过校验**——除非同时伪造一条 repair，
     那已从"静默越权"变成"显式造假"，可审计。
     """
@@ -1343,25 +1647,42 @@ def _v23(ctx: _Context) -> List[Violation]:
               if _text(r.get("integrity_gate")) and r["integrity_gate"].strip() == "fail"]
     if not failed:
         return []
-    has_repair = any(
-        _text(r.get("disposition")) and r["disposition"].strip() in DISPOSITIONS
-        for _, r in ctx.repairs
-    )
-    has_failure = any(
-        _text(f.get("kind")) and f["kind"].strip() in FAILURE_KINDS
-        for _, f in ctx.failures
-    )
-    if has_repair or has_failure:
-        return []
-    return [
-        Violation(
-            "V23", f"reviews[{index}].integrity_gate",
-            "integrity_gate=fail 必须产生 repairs[]（disposition ∈ 五值）或 "
-            "failures[]（kind ∈ 六值）—— 它是 Gate，不是 warning",
-            r.get("integrity_gate"), _subject_of(r, "artifact"),
-        )
-        for index, r in failed
-    ]
+
+    # 关联表：**必须逐 review 对应**。全局 exists() 会让一条无关的旧 repair
+    # 替任何新的 integrity failure「闭环」—— 那就等于 Gate 无效。
+    closed_by: Dict[str, bool] = {}
+    for _, repair in ctx.repairs:
+        if not (_text(repair.get("disposition")) and repair["disposition"].strip() in DISPOSITIONS):
+            continue
+        src = _text(repair.get("source_review"))
+        if src:
+            closed_by[src] = True
+    for _, failure in ctx.failures:
+        if not (_text(failure.get("kind")) and failure["kind"].strip() in FAILURE_KINDS):
+            continue
+        src = _text(failure.get("source_review"))
+        if src:
+            closed_by[src] = True
+
+    out: List[Violation] = []
+    for index, review in failed:
+        rid = _text(review.get("id"))
+        if not rid:
+            out.append(Violation(
+                "V23", f"reviews[{index}].id",
+                "integrity_gate=fail 的 review 必须有 id，否则无法与 repairs/failures 建立关联",
+                review.get("id"), _subject_of(review, "artifact"),
+            ))
+            continue
+        if not closed_by.get(rid):
+            out.append(Violation(
+                "V23", f"reviews[{index}].integrity_gate",
+                f"integrity_gate=fail 必须有一条 source_review == {rid} 的 repairs[]"
+                "（disposition ∈ 五值）或 failures[]（kind ∈ 六值）——"
+                "无关的旧记录不能替它闭环",
+                review.get("integrity_gate"), _subject_of(review, "artifact"),
+            ))
+    return out
 
 
 def _v24(ctx: _Context) -> List[Violation]:
@@ -1404,10 +1725,26 @@ def _environment_report(source: str, message: str, kind: str) -> Report:
 
 
 def check_state(doc: Any, source: str = "<memory>") -> Report:
-    """校验一份已解析的 state（dict）。返回 Report（不抛异常、不写文件）。"""
+    """校验一份已解析的 state（dict）。返回 Report（不抛异常、不写文件）。
+
+    顺序：**结构**（退出码 4）→ **Shape Gate S1—S7** → **V1—V24**。
+    形状失败时**不执行** V 规则：V 规则的措辞假设输入形状成立，
+    在形状错误上跑会给出误导性的级联判定（例如把类型错误读成语义冲突）。
+    """
     error, effective, unwrapped_from = structure_error(doc)
     if error is not None:
         return _environment_report(source, error, "structure")
+
+    shape = shape_errors(effective)
+    if shape:
+        return Report(
+            ok=False,
+            exit_code=EXIT_HARD,
+            source=source,
+            shape=shape,
+            checked=checked_counts(effective),
+            unwrapped_from=unwrapped_from,
+        )
 
     ctx = _Context.build(effective)
     violations: List[Violation] = []
@@ -1475,8 +1812,8 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
-        description="Research World Model（R1）机械闸门：V1—V24 引用完整性审计"
-                    "（docs/r-architecture-wave1-spec.md §2.3）",
+        description="Research World Model（R1）机械闸门：Shape Gate S1—S7 + 引用完整性 V1—V24"
+                    "（权威规则表：references/research-state-policy.md §4.0 / §4.1）",
     )
     parser.add_argument("state", nargs="?", default=None,
                         help="state JSON 路径（如 templates/research-state.template.json）")
@@ -1484,8 +1821,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="只校验不写入（默认行为即如此；显式化以便与 refs_index.py 口径一致）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行，不逐条打印违规")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V24 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V24 与判据")
+    parser.add_argument("--selftest", action="store_true", help="跑内置自检（Shape Gate S1—S8 与 V1—V24 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 Shape Gate S1—S8 与 V1—V24 及判据")
     return parser
 
 
@@ -1498,12 +1835,18 @@ def emit(report: Report, as_json: bool, quiet: bool) -> None:
         print(report.summary(), file=sys.stderr)
         return
     if not quiet:
+        for violation in report.shape:
+            print(violation.render())
         for violation in report.violations:
             print(violation.render())
     print(report.summary())
-    if report.violations and not quiet:
+    if not quiet and report.shape:
+        print("[hint] 形状错误形如「S 号 硬违规 · JSON 路径 判据 · 现值」；"
+              "先修形状，V1—V24 尚未执行；规则定义见 "
+              "references/research-state-policy.md §4.0")
+    elif report.violations and not quiet:
         print("[hint] 每条违规形如「规则号 硬违规 · JSON 路径 判据 · 现值」；"
-              "规则定义见 docs/r-architecture-wave1-spec.md §2.3")
+              "规则定义见本 skill 的 references/research-state-policy.md §4.1")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -1512,6 +1855,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.selftest:
         return selftest()
     if args.list_rules:
+        for rule in SHAPE_ORDER:
+            print(f"{rule:4} 形状  {SHAPES[rule]}")
         for rule in RULE_ORDER:
             print(f"{rule:4} 硬  {RULES[rule]}")
         return EXIT_OK
@@ -1558,10 +1903,14 @@ def _selftest_state() -> Dict[str, Any]:
         }],
         "hypotheses": [{
             "id": "H1", "statement": "prior-parameter adaptation beats fine-tuning",
-            "structural_signature": {"assumption_distance": 2},
+            "structural_signature": {
+                "assumption_distance": 2, "formulation_distance": 3,
+                "representation_distance": 1, "theory_lens_distance": 3,
+                "mechanism_distance": 2,
+            },
             "novelty_source": "assumption-breaking", "theory_lens": "transfer",
             "nearest_prior": "LoRA", "falsifier": "R2 不降级",
-            "expected_information_gain": 0.4, "status": "elite", "niche": "N2", "island": "P2", "generation": 0,
+            "expected_information_gain": 0.4, "status": "elite", "niche": "assumption-shift", "island": "P2", "generation": 0,
             "operator": "assumption_breaker", "parents": [],
             "depends_on": ["AS1"],
             "validity": {"status": "valid", "reason": "尚无失效上游", "since_state_version": 0},
@@ -1726,6 +2075,14 @@ def selftest() -> int:
     check("V13 island 非法 → 3", v13.exit_code == EXIT_HARD and v13.rules() == ["V13"])
     v13ok = report_with(lambda d: d["hypotheses"][0].update(island="local", operator="local"))
     check("V13 合法反例：island=local → 0", v13ok.exit_code == EXIT_OK and v13ok.violations == [])
+    def _p3_hypothesis(d):
+        # 单点语义：把 island 与 operator 一起改，否则 V16 的 gen-0 映射也会响
+        d["hypotheses"][0].update(island="P3", operator="abstraction")
+
+    v13p3 = report_with(_p3_hypothesis)
+    check("V13 island=P3 → 3（P3 只产 typed intermediate，不产 candidate）",
+          v13p3.exit_code == EXIT_HARD and v13p3.rules() == ["V13"]
+          and "typed intermediate" in v13p3.violations[0].detail)
 
     v14 = report_with(lambda d: d["hypotheses"][0].update(generation="1"))
     check("V14 generation 是字符串 → 3", v14.exit_code == EXIT_HARD and v14.rules() == ["V14"])
@@ -1733,12 +2090,27 @@ def selftest() -> int:
     check("V14 generation 为负 → 3", v14b.exit_code == EXIT_HARD and v14b.rules() == ["V14"])
 
     v6b = report_with(lambda d: d["hypotheses"][0].update(niche="assumption-breaking"))
-    check("V6 niche 不在 N1—N10 → 3", v6b.exit_code == EXIT_HARD and v6b.rules() == ["V6"])
+    v6c = report_with(lambda d: d["hypotheses"][0].update(niche="N2"))
+    check("V6 用叙事 preset 当 QD niche → 3（HIGH-1）",
+          v6c.exit_code == EXIT_HARD and v6c.rules() == ["V6"]
+          and "叙事 preset" in v6c.violations[0].detail)
+    check("V6 niche 不是 QD 科学结构轴 → 3",
+          v6b.exit_code == EXIT_HARD and v6b.rules() == ["V6"])
 
     def _no_elite(d):
-        d["hypotheses"].append(dict(d["hypotheses"][0], id="H2", niche="N5", status="active", generation=0))
+        d["hypotheses"].append(dict(d["hypotheses"][0], id="H2",
+                                    niche="mechanism-shift", status="active", generation=0))
     v15 = report_with(_no_elite)
-    check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
+    check("V15 niche 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
+
+    def _all_killed_niche(d):
+        """V15 回归：一个 niche 的候选全被杀后，state 仍须合法。"""
+        for h in d["hypotheses"]:
+            h["status"] = "killed"
+
+    v15ok3 = report_with(_all_killed_niche)
+    check("V15 合法反例：niche 候选全被 killed → 不要求 elite → 0",
+          v15ok3.exit_code == EXIT_OK and v15ok3.violations == [])
 
     v16a = report_with(lambda d: d["hypotheses"][0].update(operator=""))
     check("V16 operator 为空 → 3", v16a.exit_code == EXIT_HARD and v16a.rules() == ["V16"])
@@ -1994,26 +2366,51 @@ def selftest() -> int:
     # ---- V23：Integrity Gate fail 必须闭环 ----
 
     def _gate_fail_no_closure(d):
-        d.pop("repairs", None)
-        d.pop("failures", None)
-        d["reviews"] = [{"stage": "R13", "artifact": "code",
+        d["repairs"] = []
+        d["failures"] = []
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
                          "integrity_gate": "fail", "findings": ["leakage"]}]
 
     v23a = report_with(_gate_fail_no_closure)
-    check("V23 integrity_gate=fail 且无 repairs/failures → 3",
+    check("V23 integrity_gate=fail 且无关联 repairs/failures → 3",
           v23a.exit_code == EXIT_HARD and v23a.rules() == ["V23"]
           and v23a.violations[0].path == "reviews[0].integrity_gate")
 
-    def _gate_fail_with_failure(d):
+    def _gate_fail_without_id(d):
+        d["repairs"] = []
+        d["failures"] = []
         d["reviews"] = [{"stage": "R13", "artifact": "code",
                          "integrity_gate": "fail", "findings": ["leakage"]}]
 
-    v23ok = report_with(_gate_fail_with_failure)
-    check("V23 合法反例：gate=fail 但已有 failures[] 闭环 → 0",
+    v23b = report_with(_gate_fail_without_id)
+    check("V23 gate=fail 的 review 无 id → 3（无法建立关联）",
+          v23b.exit_code == EXIT_HARD and v23b.rules() == ["V23"]
+          and v23b.violations[0].path == "reviews[0].id")
+
+    def _gate_fail_with_unrelated_repair(d):
+        """关键回归：state 里**存在**合法 repair，但它与这个 review 无关。"""
+        d["failures"] = []
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+        for repair in d.get("repairs", []):
+            repair.pop("source_review", None)
+
+    v23c = report_with(_gate_fail_with_unrelated_repair)
+    check("V23 回归：无关的旧 repair 不得替新的 gate=fail 闭环 → 3",
+          v23c.exit_code == EXIT_HARD and v23c.rules() == ["V23"])
+
+    def _gate_fail_with_linked_failure(d):
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+        for failure in d.get("failures", []):
+            failure["source_review"] = "REV9"
+
+    v23ok = report_with(_gate_fail_with_linked_failure)
+    check("V23 合法反例：有 source_review 关联的 failures[] 闭环 → 0",
           v23ok.exit_code == EXIT_OK and v23ok.violations == [])
 
     def _gate_pass(d):
-        d["reviews"] = [{"stage": "R13", "artifact": "code",
+        d["reviews"] = [{"id": "REV1", "stage": "R13", "artifact": "code",
                          "integrity_gate": "pass", "findings": []}]
 
     v23ok2 = report_with(_gate_pass)
@@ -2051,11 +2448,70 @@ def selftest() -> int:
     check(f"自检覆盖 V1—V{max(RULE_ORDER, key=lambda r: int(r[1:]))[1:]}", set(RULE_ORDER) - detected == set(),
           f"未覆盖 {sorted(set(RULE_ORDER) - detected)}")
 
+    # ---- Shape Gate S1—S7（在 V1—V24 之前跑） ----
+
+    detected_shapes: set = set()
+
+    def shape_with(mutate: Callable[[Dict[str, Any]], None]) -> Report:
+        doc = copy.deepcopy(base)
+        mutate(doc)
+        report = check_state(doc, source="<selftest>")
+        detected_shapes.update(report.shape_rules())
+        return report
+
+    check("Shape Gate 通过时 shape 为空且 V 规则照常执行",
+          clean.shape == [] and clean.shape_rules() == [])
+
+    s1 = shape_with(lambda d: d.pop("literature"))
+    check("S1 缺一等对象数组 → 形状违规",
+          s1.exit_code == EXIT_HARD and s1.shape_rules() == ["S1"] and s1.rules() == [])
+
+    s2 = shape_with(lambda d: d["claims"][0].update(id=""))
+    check("S2 id 为空 → 形状违规", s2.shape_rules() == ["S2"])
+    s2dup = shape_with(lambda d: d["claims"].append(dict(d["claims"][0])))
+    check("S2 id 重复 → 形状违规", s2dup.shape_rules() == ["S2"])
+    s2pfx = shape_with(lambda d: d["claims"][0].update(id="Q1"))
+    check("S2 id 前缀错 → 形状违规", s2pfx.shape_rules() == ["S2"])
+
+    s3 = shape_with(lambda d: d["experiments"][0].update(stage="X9"))
+    check("S3 stage 越界 → 形状违规", s3.shape_rules() == ["S3"])
+    s3miss = shape_with(lambda d: d["hypotheses"][0].pop("status"))
+    check("S3 必填枚举缺失 → 形状违规", s3miss.shape_rules() == ["S3"])
+    s3lit = shape_with(lambda d: d["literature"][0].update(relation="sounds-good"))
+    check("S3 relation 越界 → 形状违规", s3lit.shape_rules() == ["S3"])
+
+    s4 = shape_with(lambda d: d["hypotheses"][0]["structural_signature"].pop("mechanism_distance"))
+    check("S4 五键缺一 → 形状违规", s4.shape_rules() == ["S4"])
+    s4t = shape_with(lambda d: d["hypotheses"][0].update(structural_signature="flat"))
+    check("S4 不是对象 → 形状违规", s4t.shape_rules() == ["S4"])
+
+    s5 = shape_with(lambda d: d["claims"][0].update(contract={"statement": "x"}))
+    check("S5 契约缺键 → 形状违规", s5.shape_rules() == ["S5"])
+
+    s6 = shape_with(lambda d: d.update(reviews=[{"integrity_gate": "maybe"}]))
+    check("S6 integrity_gate 越界 → 形状违规", s6.shape_rules() == ["S6"])
+    s6t = shape_with(lambda d: d.update(decision="continue"))
+    check("S6 decision 不是对象 → 形状违规", s6t.shape_rules() == ["S6"])
+
+    s7 = shape_with(lambda d: d.update(state_version="0"))
+    check("S7 state_version 是字符串 → 形状违规", s7.shape_rules() == ["S7"])
+
+    check("自检覆盖 Shape Gate 全部规则", set(SHAPE_ORDER) - detected_shapes == set(),
+          f"未覆盖 {sorted(set(SHAPE_ORDER) - detected_shapes)}")
+
+    # 形状优先：形状错误时不得执行 V 规则（避免误导性的级联判定）
+    both = shape_with(lambda d: d["claims"][0].update(id="", falsifier=""))
+    check("形状失败时 V1 不执行（只报形状）",
+          both.shape_rules() == ["S2"] and both.rules() == [] and both.violations == [])
+
     check("缺八类数组 → 4", check_state({"foo": 1}).exit_code == EXIT_ENV)
     check("根节点非对象 → 4", check_state([1, 2, 3]).exit_code == EXIT_ENV)
     check("数组字段类型错 → 4", check_state({"claims": "nope"}).exit_code == EXIT_ENV)
-    check("缺 assurance/repairs = 空数组（0）",
-          check_state({"claims": []}).exit_code == EXIT_OK)
+    check("空 assurance/repairs + 八类齐全 = 0",
+          check_state({key: [] for key in FIRST_CLASS_KEYS}).exit_code == EXIT_OK)
+    _missing_arrays = check_state({"claims": []})
+    check("省略一等对象数组 → 形状违规 S1（退出码 3，不是 0）",
+          _missing_arrays.exit_code == EXIT_HARD and _missing_arrays.shape_rules() == ["S1"])
     check("包装键自动解包（0）", check_state({"world_model": base}).exit_code == EXIT_OK and
           check_state({"world_model": base}).unwrapped_from == "world_model")
 

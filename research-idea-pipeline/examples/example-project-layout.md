@@ -78,7 +78,7 @@ routes/B/docs/B002-discovery.md           ← routes/B 的文档在自己的 doc
 | 序号来源 | 扫描 `routes/<R>/docs/` 中匹配 `^<路线字母>\d{3}-` 的文件名，取**最大序号 +1** |
 | 递增范围 | **按路线独立**：routes/A 是 A001/A002/…，routes/B 是 B001/B002/… |
 | 复用 | **永不复用**，也不跳号 |
-| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验。引用写作 `<文档ID>/<子编号>` |
+| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`X<n>` 实验。引用写作 `<文档ID>/<子编号>` |
 | 审阅记录 | **不占新序号**，挂在被审文档 ID 上：`A003-review-r01.md` / `-r02.md`（轮次零填充） |
 | 接续复核 | 递增 `-r02`、`-r03`（**零填充两位**），frontmatter 的 `review_round` 同步 |
 
@@ -134,7 +134,7 @@ reviewers: []
 |---|---|---|---|---|---|---|
 | A002 | [A002-discovery.md](docs/A002-discovery.md) | discovery | — | R3—R6 | reviewed | 12 个 idea（含审核） |
 | A003 | [A003-proposal.md](docs/A003-proposal.md) | proposal | — | R8 | reviewed | 贡献 K1..Kn |
-| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | experiment-cards | R9—R11 | reviewed | 实验 E1..E7 |
+| A004 | [A004-experiment-plan.md](docs/A004-experiment-plan.md) | experiment-plan | experiment-cards | R9—R11 | reviewed | 实验 X1..X7 |
 | A005 | [A005-narrative.md](docs/A005-narrative.md) | narrative | — | R12 | reviewed | 最佳 N2 |
 | A003-review | [A003-review-r01.md](docs/A003-review-r01.md) | review | — | R7 / R10 / R13 | reviewed | 中位数 4 |
 
@@ -199,7 +199,7 @@ A001 → A002 → A003 → A004 / A005
 ## Active hypotheses
 | # | 假设 | 状态 | niche |
 |---|---|---|---|
-| H1 | 松弛后可保留可行性保证 | elite | N2 |
+| H1 | 松弛后可保留可行性保证 | elite | `assumption-shift` |
 
 ## Critical uncertainties
 - 待核实条数：2
@@ -223,8 +223,8 @@ A001 → A002 → A003 → A004 / A005
 ## Next recommended actions
 | # | 动作 | 优先级 | 依赖 |
 |---|---|---|---|
-| N1 | 补齐松弛方案的可行性证明 | P0 | — |
-| N2 | 跑消融矩阵 E4—E7 | P1 | N1 |
+| 1 | 补齐松弛方案的可行性证明 | P0 | — |
+| 2 | 跑消融矩阵 E4—E7 | P1 | 1 |
 
 ## Current decision
 - 决策：continue

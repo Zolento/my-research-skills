@@ -119,7 +119,7 @@ def render(state: Dict[str, Any], route: str) -> str:
         "> **本文件是 `research-state.json` 的投影，不是第二份真相。**",
         "> **禁止手改** —— 手改会在下一次 render 时被覆盖。",
         "> 重新生成：`python3 scripts/render_status.py --root <项目根> --route "
-        f"{route}`；校验是否过期：加 `--check`（不一致退出码 3）。",
+        f"{route}`。校验是否过期：加 `--check`（不一致退出码 3）。",
         "",
         "## State version",
         "",

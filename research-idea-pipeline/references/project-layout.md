@@ -126,6 +126,16 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
     └── runtime/{locks,tmp,tool-output}/
 ```
 
+> **`meta/operator-stats.json` 是只读汇总** —— 权威来源是各路线 `scheduler.json` 的
+> `operator_stats`（见 [scheduler-policy.md](scheduler-policy.md) §4.1）。
+> 它同样**不入 state**，只记录「系统自己哪种算子有效」。
+>
+> **`populations/` 收两类 search artifact（都不是 `state` object）：**
+> `populations/archive/` 存 QD archive 重排记录；
+> `populations/intermediates/` 存 `P3` 的 `abstract_skeleton`（typed intermediate，
+> 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）。
+> **两者都不得被当作结论引用**，也不分配 `H` / `C` / `X` ID。
+
 **与上一版的关键差异：**
 
 1. **`route_*` 集中进 `routes/`** —— 否则路线一多，根目录会同时混着代码、route、
@@ -263,16 +273,18 @@ routes/A/docs/
 |---|---|---|---|
 | `I<n>` | **idea**（由 R3—R6 产出，R8 / R12 引用） | `-discovery.md` | `I1`、`I3` |
 | `N<k>` | **叙事 preset**（全局固定 1—10，见 [narrative-patterns.md](narrative-patterns.md) §1；**非互斥**） | preset 库 | `N2`、`N9` |
-| `K<n>` | **贡献**（方案内；**不用 C**，避免与 R8 章节号 C1—C7 撞） | `-proposal.md` | `K1`、`K2` |
-| `E<n>` | **实验** | `-experiment-plan.md` | `E1`、`E4` |
+| `K<n>` | **贡献**（方案内；**不用 `C`**，避免与 state 的 claim `C<n>` 撞） | `-proposal.md` | `K1`、`K2` |
+| `X<n>` | **实验**（与 state 的 `experiments[].id` 同一套；**不用 `E`**，避免与 evidence `E<n>` 撞） | `-experiment-plan.md` | `X1`、`X4` |
 | `H<n>` | **假设** | `-experiment-plan.md` | `H1` |
 
 **跨文档引用写法：** `<文档ID>/<子编号>` ——
-如 `A002/I3`（A002 里的第 3 个 idea）、`A003/K1`、`A004/E2`、`A005/N2`。
+如 `A002/I3`（A002 里的第 3 个 idea）、`A003/K1`、`A004/X2`、`A005/N2`。
 
 > 子编号**只在所属路线内唯一**，不跨路线共享。
-> 正式实验另有一套全局追踪 ID `XID`（见 §6.3），与 `E<n>` 并存：
-> `E<n>` 是实验计划内的条目号，`XID` 是贯穿目录与 provenance 的注册号。
+> 正式实验另有一套全局追踪 ID `XID`（见 §6.3），与 `X<n>` 并存：
+> `X<n>` 是实验节点号（`research-state.json` 与实验计划书**共用同一套**），
+> `XID` 是贯穿 `experiments/` 与 `results/` 目录的注册号。
+> **`E<n>` 只表示 `evidence[]` 的证据编号** —— 不要用它编号实验。
 
 ### 2.3 审阅意见命名（R7 / R10 / R13 / R12 叙事审核）
 
@@ -438,7 +450,7 @@ anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum 
 `docs/` 是**给人看的**：
 
 - ✅ 用标题分层、用表格承载对比、用列表承载结论。
-- ✅ 每个结论标注证据来源（文献 `[作者, 会议/年份]` 或实验编号 `E3`）。
+- ✅ 每个结论标注证据来源（文献 `[作者, 会议/年份]` 或实验编号 `X3`）。
 - ✅ 关键数字给单位和口径。
 - ✅ **句子形式遵守受控中文**（[writing-policy.md](writing-policy.md)）：一句一动作、
   句长上限（指令 ≤25 字 / 说明 ≤40 字）、不用分号连接动作、一段一主题、≥3 项用列表。
@@ -581,6 +593,15 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 > **上述"固定节"与 `templates/STATUS.md`、`scripts/render_status.py` 的输出必须三者一致。**
 > 这条由 `scripts/test_render_status.py` 的 `TestStatusSectionParity` **机械核对**：
 > 生成物的 `## ` 节集合必须与模板声明逐项相等（名称与顺序都算）。
+>
+> **哪一份是权威：`scripts/render_status.py`。** STATUS 本质是机器投影，
+> 所以 **renderer 是 executable specification**，`templates/STATUS.md` 只是它的
+> canonical skeleton —— 模板与 renderer 冲突时**以 renderer 为准**，并改模板。
+> 否则模板会悄悄长成**第二份格式规范**。
+>
+> **同形的范围不止节名。** 每节的**块形态**（bullet / 表格 / 散文）也必须一致 ——
+> 只核节名会漏掉「模板用表格、renderer 全出 bullet」这种分叉。
+> 这条由 `TestStatusSectionParity` 的 **content-shape parity** 机械核对。
 
 ### 4.3 `README.md` 必须稳定（路线身份证）
 
@@ -622,7 +643,10 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
   null result / falsification / regime failure）才形成正式 route 文档。
 - **Bugs 必须可复现**（给出命令或脚本路径），登记在 `STATUS.md` 的
   Next recommended actions 或该 route 的工程记录里，**不占 `docs/` 正式文档序号**。
-- `最后更新` 字段每次改动都要刷新。
+- **`最后更新` 的范围（写死，避免歧义）：** 只有**带 frontmatter 的文档**与
+  **`INDEX.md`** 有该字段（`routes/<R>/docs/*.md`、路线 `INDEX.md`、根 `INDEX.md`）。
+  **`STATUS.md` 刻意没有该字段** —— 它是 `research-state.json` 的幂等投影（§4.2），
+  写入墙钟时间会破坏 DI-4。本桶（工程记录 / Bugs）里出现的 `最后更新` 同样只指前者。
 - **`.gitignore` 不得吞掉保留物：** `results/*/summary.*` 与
   `.research-idea-pipeline/**/research-state.json` 必须可进版本库（见 §9）。
 
@@ -673,7 +697,7 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 | R 阶段 | 产出文档（交付物） | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
 | **R2 / R5** | 领域地图（含负检索记录） | `routes/<R>/docs/<R>NNN-field-map.md` | `STATUS.md`（Critical uncertainties：未达饱和必须记） |
-| **R3—R6** | hypothesis 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + population + 淘汰清单 | `routes/<R>/docs/<R>NNN-discovery.md` | `STATUS.md`（Active hypotheses；**放弃的 idea → Most important negative findings**；未核实的无人区声称 → Critical uncertainties）；`INDEX.md` 文档表 |
+| **R3—R6** | hypothesis 候选清单（**含 idea 级创新性/可行性审核判定**，**不是 1—5 评分**）+ 技术路线归纳 + 创新性边界 + population + 淘汰清单 | `routes/<R>/docs/<R>NNN-discovery.md` | `STATUS.md`（Active hypotheses；**放弃的 idea → Most important negative findings**；未核实的无人区声称 → Critical uncertainties）；`INDEX.md` 文档表 |
 | **R8** | 论文提案 + 证据契约 | `routes/<R>/docs/<R>NNN-proposal.md` | `STATUS.md`、`INDEX.md` |
 | **R9—R11** | 实验规划 + 结果分析 | `routes/<R>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**）+ `routes/<R>/docs/<R>NNN-result-analysis.md` | `STATUS.md`（Next recommended actions、Active experiments）；`experiments/` 与 `results/` 的 XID 注册（§6.3） |
 | **R12** | 证据台账 + claim graph（`C0—C5`）+ **2—4 套六槽位叙事（`S1—S6`）** + 六攻击面审稿人评审（**全部派遣，S-Lit 恒派，S-Devil 不打分**）+ **门禁 `G1—G5` 判定** + 六维排序 + 最佳叙事推荐 + **缺失证据清单与最小必要实验 / 定理** | `routes/<R>/docs/<R>NNN-narrative.md` | `STATUS.md`（被覆盖的叙事方向 → **Most important negative findings**；最佳叙事 → **Strongest supported findings**；门禁 `fail` 或六维中位 <3 → **Critical uncertainties**） |
@@ -839,7 +863,8 @@ X021  ⟷  experiments/A/X021-identifiability/
 - **`STATUS.md` 可由 `render_status.py` 幂等重生成**（DI-4）；
 - **每条 route 恰好一份 canonical `research-state.json`**（DI-3）；
 - **`routes/*/src/` 为空或不存在**（DI-6）；
-- 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新；
+- 每份 `docs/` 文档都有完整 frontmatter，且 `最后更新` 已刷新（**范围见 §4.2：`STATUS.md`
+  刻意没有该字段**）；
 - **锚点体系完整**：根 `INDEX.md` 声明了**项目主锚点**；每条路线有 `<R>000-anchor.md`，
   frontmatter 含 `core_goal` / `anchor_role` / `serves` / `serves_evidence`
   （`supporting` 时后两者必填且可证伪）；路线锚点与本路线 INDEX 一致；

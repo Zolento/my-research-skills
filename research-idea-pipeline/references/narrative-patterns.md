@@ -9,7 +9,7 @@
 >    一个 idea 可以同时满足多个 preset；preset 编号高低不代表工作强弱。
 >    真正的科学分类是 `(O, T, R)` 三轴（见 [claim-first-policy.md](claim-first-policy.md) §5）。
 > 2. 下文与 [phase-r12-narrative.md](phase-r12-narrative.md) 中的 **「A 领域 / B 领域」是领域
->    占位符**（A = 要解决问题的目标领域，B = 提供理论工具的来源领域），**与 Mode 字母
+>    占位符**（A = 要解决问题的目标领域，B = 提供理论工具的来源领域），**与已退役的阶段字母
 >    A/B/C/D/E 无关**。
 
 **本文件服务的总纲（claim-first）：**
@@ -25,9 +25,17 @@
 ---
 
 
-> **双重身份（Wave 2）：** `N1`—`N10` 既是**叙事 preset**，也是 **R4 的 QD archive niche 取值**。
-> 两者共用同一套名字是**有意为之** —— 另设一套 niche 枚举就是第二个漂移源。
-> 因此 `state_check.py` V6 强制 `hypotheses[].niche ∈ N1—N10`，V15 强制每个 niche 留一个 elite。
+> **⚠️ 更正（HIGH-1）：`N1`—`N10` 只是叙事 preset，不是 QD archive 的 niche。**
+> 早期版本让两者共用一套名字以避免第二套枚举，代价是把 Narrative ontology 泄漏进
+> Discovery，而且映射本身**有损**（例如 preset「效率 / 可行性」在 QD 七轴里没有对应项）。
+>
+> **QD niche 现在是七个独立的科学结构轴**：`assumption-shift` / `formulation-shift` /
+> `representation-shift` / `mechanism-shift` / `theory-shift` / `evaluation-shift` /
+> `boundary-shift`（见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R4.2.1）。
+>
+> **`state_check.py` V6 只收那七轴** —— 把 preset 名写进 `hypotheses[].niche` 会被判违规。
+> V15 只对 **live niche**（至少存在一个 `status ∈ {active, elite}` 的候选）要求 elite；
+> 候选全部 `killed` / `archived` 的 niche **合法为空**。那是 **QD niche** 的规则，与 preset 无关。
 
 ## 1. 十套叙事 preset 表
 

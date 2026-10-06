@@ -22,7 +22,7 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：phase 分发（R0—R14）+ 全局不变量 + 首次运行编排
 ├── README.md                         # 本文件
 ├── references/
-│   ├── research-state-policy.md      # ★ R1 权威：八类一等对象、逐阶段读写、引用完整性 V1—V24
+│   ├── research-state-policy.md      # ★ R1 权威：八类一等对象、逐阶段读写、Shape Gate S1—S7 + 引用完整性 V1—V24
 │   ├── project-layout.md             # ★ 目录规范：八条 DI invariant、routes/、README/STATUS/INDEX、XID、DEC
 │   ├── scheduler-policy.md           # 跨阶段调度：R0—R14 是能力不是 workflow；八级 next_action_policy + EIG÷cost
 │   ├── invocation-prompts.md         # 四个用户入口调用契约（start-project / continue-research / explore / audit）
@@ -32,7 +32,7 @@ research-idea-pipeline/
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── scoring-policy.md             # 两层评分：硬门禁 G1—G5 + 排序六维；极性归一化/中位数/一票否决
 │   ├── roles.md                      # 共享角色：八攻击面审稿人 + 证据核验员；venue 角色仅作 R12/R13 校准
-│   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，兼 QD archive niche）+ (O,T,R) 选 preset + 六槽位 S1—S6
+│   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，**只用于 R12**；QD niche 是七个独立科学结构轴）+ (O,T,R) 选 preset + 六槽位 S1—S6
 │   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊 + contribution type
 │   ├── writing-policy.md             # 受控中文三档（asd-ste100 / Strict / 中文-顺）
 │   └── phase-r0-contract.md          # R0：研究契约（只写 contract）
@@ -43,14 +43,14 @@ research-idea-pipeline/
 │       phase-r12-narrative.md        # R12：claim-first 叙事（state 的视图）
 │       phase-r7-r10-r13-assurance-repair-review.md  # R7 / R10 / R13：对抗保证 / 元认知修复 / artifact 审计
 ├── scripts/
-│   ├── state_check.py                # ★ 机械闸门：V1—V24（退出码 0 / 3 硬违规 / 4 环境）
+│   ├── state_check.py                # ★ 机械闸门：Shape Gate S1—S7 + V1—V24（退出码 0 / 3 硬违规 / 4 环境）
 │   ├── render_status.py              # ★ 把 state 投影为 routes/<R>/STATUS.md（幂等；--check 校验过期）
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
 │   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
 │   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check / --migrate）
 │   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）
-│   ├── test_state_check.py           # 离线测试：V1—V24 反例 + 表格完整性 + Carrier 完整性 + 打包完整性
+│   ├── test_state_check.py           # 离线测试：S1—S7 与 V1—V24 反例 + 表格/契约键/Carrier/打包完整性
 │   ├── test_render_status.py         # 离线测试：STATUS 幂等 + 三方节集合一致
 │   ├── test_golden_path.py           # 集成测试：R0→R14 字面执行 + 5 条对抗路径
 │   ├── test_literature_search.py     # 离线测试（不联网）
@@ -65,8 +65,8 @@ research-idea-pipeline/
 ├── examples/
 │   ├── example-project-layout.md     # 多路线目录与文档管理（新目录规范的完整示例）
 │   ├── example-d-narrative.md        # claim-first 叙事与选型
-│   ├── example-b-to-c-d-e.md         # 主链路串联
-│   ├── example-a-standalone.md       # 单独文献调研
+│   ├── example-full-pipeline.md      # 主链路串联（R3—R6 → R8 → R12 → R7）
+│   ├── example-field-mapping-standalone.md  # 单独文献调研（R2 / R5）
 │   ├── example-followup-review.md    # 接续复核
 │   └── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
@@ -167,7 +167,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | 正确性 | 前提是否自洽 | 方法正确性：推导/实现/指标/统计是否成立 |
 | 创新性 | 方向是否已被覆盖、是否非平凡 | 方案是否**实质复现**已有工作 |
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
-| 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
+| 深度 | 快筛：双判定 + 致命反驳 | 深审：六攻击面 + 交叉质询 + 逐维中位数 |
 
 **R7 / R10 / R13：** 结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**；
 **R7 / R10 / R13 下 S-Devil 归一化后的新颖性稳健度 ≤ 2 时同样不得为"高"**（除非走「带条件的推荐」）。
@@ -214,7 +214,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定** | L2 强化 |
-| T4 | 新颖性判定（`phase-r12` §D5.3、`phase-r7` §E2.2） | **L3 穷尽**（**例外：R3—R6 的 B5 快筛 = L2**） |
+| T4 | 新颖性判定（`phase-r12` §D5.3、`phase-r7` §R7.3.2） | **L3 穷尽**（**例外：R3—R6 的 §R3.7 概念级快筛 = L2**） |
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
@@ -365,7 +365,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | slug 枚举 | **封闭**：`anchor` / `field-map` / `discovery` / `theory` / `evidence` / `proposal` / `experiment-plan` / `result-analysis` / `decision` / `narrative` / `review` |
 | 派生文档 | **禁止自创 slug**。枚举外的派生物（`paper-outline` / `experiment-cards` / `math-consolidation` …）归到最接近的枚举，原义写 frontmatter 的 **`subtype`**，并在路线 INDEX 文档表加 **`subtype` 列** |
 | 落盘三档 | **交付物** → `routes/<R>/docs/`；**中间产物**（子代理原始评审件、草稿） → `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/`；**机器状态** → `.research-idea-pipeline/routes/<R>/research-state.json`。**正式 review 必须自带摘要**，原始件不得被当作结论引用 |
-| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
+| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`X<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 锚点文档 | `<R>000-anchor.md`（`type: anchor`）是**冻结契约**，frontmatter 带 `anchor_version` + `anchor_hash`；改锚点走锚点变更单并升版本 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 R 阶段无关；阶段记在 frontmatter |
