@@ -1068,3 +1068,73 @@ class TestV20V21(_Wave5RuleTest):
                 exp["preregistration"]["frozen_at_state_version"] = 0
                 exp["result_at_state_version"] = 0
         self.assertNotIn("V21", self._rules(doc))
+
+
+# ---------------------------------------------------------------------------
+# Carrier Completeness：读写表授权写入的字段，必须在 schema/模板里真的有位置
+# ---------------------------------------------------------------------------
+
+class TestCarrierCompleteness(unittest.TestCase):
+    """Producer → Carrier → Consumer。
+
+    静态一致性检查只能保证"文档之间不打架"，抓不到**「文档授权写一个不存在的位置」**
+    —— 那会让执行者被迫违反 policy §3「未在本节出现的字段 = 未定义字段」。
+    本类把这条判据机械化：**读/写表里出现的每个 `X[].field`，模板必须有对应的键。**
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    OBJ = ("claims", "evidence", "assumptions", "hypotheses", "experiments",
+           "literature", "failures", "uncertainties", "assurance", "repairs")
+    PATTERN = re.compile(
+        r"`(" + "|".join(OBJ) + r")\[\]\."
+        r"([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)`"
+    )
+
+    def _template(self) -> Dict[str, Any]:
+        path = self.ROOT / "templates" / "research-state.template.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def _write_table_fields(self) -> Dict[str, set]:
+        files = [self.ROOT / "references" / "research-state-policy.md"]
+        files += sorted((self.ROOT / "references").glob("phase-*.md"))
+        found: Dict[str, set] = {}
+        for path in files:
+            for match in self.PATTERN.finditer(path.read_text(encoding="utf-8")):
+                found.setdefault(match.group(1), set()).add(match.group(2))
+        return found
+
+    def test_every_write_table_field_has_a_carrier(self):
+        template = self._template()
+        missing: List[str] = []
+        for obj, fields in sorted(self._write_table_fields().items()):
+            entries = template.get(obj)
+            if not isinstance(entries, list) or not entries:
+                missing.append(f"{obj}[]：模板没有样例条目，无法承载任何字段")
+                continue
+            sample = entries[0]
+            for field in sorted(fields):
+                head = field.split(".")[0]
+                if head not in sample:
+                    missing.append(f"{obj}[].{field}：写表要求它，模板条目却没有这个键")
+        self.assertEqual(
+            missing, [],
+            msg="Carrier 缺口（写表授权了一个不存在的位置）：\n  " + "\n  ".join(missing),
+        )
+
+    def test_check_is_not_vacuous(self):
+        """防空转：确认确实抽到了字段（否则上面的断言恒真）。"""
+        self.assertGreaterEqual(
+            sum(len(v) for v in self._write_table_fields().values()), 20,
+            "应从读写表抽出 ≥20 个字段引用；数量骤降说明正则或文档结构变了",
+        )
+
+    def test_template_top_level_keys_are_all_documented(self):
+        """模板的每个顶层键都要在 policy §3 里有定义（反向 carrier 检查）。"""
+        template = self._template()
+        policy = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        undocumented = [
+            key for key in template
+            if not key.startswith("_") and f"`{key}`" not in policy and f"`{key}[]`" not in policy
+        ]
+        self.assertEqual(undocumented, [], msg=f"模板有但 policy §3 未定义的顶层键：{undocumented}")
