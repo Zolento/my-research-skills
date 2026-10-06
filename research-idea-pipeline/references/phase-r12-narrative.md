@@ -29,8 +29,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 ---
 
 
-> ⚠️ **内部小节号 `§D0—§D9` 保留自旧命名**（本文档由旧 `mode-d` 迁移而来），语义已按本文件的「读 / 写」表重新映射；**全量重编号在 Wave 3 做**。
-> **迁移不得丢节** —— 本注被删掉时，`§D0—§D9` 会失去唯一解释，读者会误当退役字母残留。
+> **小节号 `§D0`—`§D9` 是 R12 自己的流程序号**（不是旧命名残留）。pre / post 归属见下。
 
 ## 定位与边界
 

@@ -167,7 +167,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | 正确性 | 前提是否自洽 | 方法正确性：推导/实现/指标/统计是否成立 |
 | 创新性 | 方向是否已被覆盖、是否非平凡 | 方案是否**实质复现**已有工作 |
 | 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现六项检查） |
-| 深度 | 快筛：双评分 + 致命反驳 | 深审：八子代理 + 交叉质询 + 中位数 |
+| 深度 | 快筛：双评分 + 致命反驳 | 深审：六攻击面 + 交叉质询 + 逐维中位数 |
 
 **R7 / R10 / R13：** 结论卡片**必须**给出复现风险等级；**复现风险 = 高时总体判定不得为"高"**；
 **R7 / R10 / R13 下 S-Devil 归一化后的新颖性稳健度 ≤ 2 时同样不得为"高"**（除非走「带条件的推荐」）。
@@ -214,7 +214,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定** | L2 强化 |
-| T4 | 新颖性判定（`phase-r12` §D5.3、`phase-r7` §E2.2） | **L3 穷尽**（**例外：R3—R6 的 B5 快筛 = L2**） |
+| T4 | 新颖性判定（`phase-r12` §D5.3、`phase-r7` §R7.3.2） | **L3 穷尽**（**例外：R3—R6 的 §R3.7 概念级快筛 = L2**） |
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
@@ -365,7 +365,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 | slug 枚举 | **封闭**：`anchor` / `field-map` / `discovery` / `theory` / `evidence` / `proposal` / `experiment-plan` / `result-analysis` / `decision` / `narrative` / `review` |
 | 派生文档 | **禁止自创 slug**。枚举外的派生物（`paper-outline` / `experiment-cards` / `math-consolidation` …）归到最接近的枚举，原义写 frontmatter 的 **`subtype`**，并在路线 INDEX 文档表加 **`subtype` 列** |
 | 落盘三档 | **交付物** → `routes/<R>/docs/`；**中间产物**（子代理原始评审件、草稿） → `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/`；**机器状态** → `.research-idea-pipeline/routes/<R>/research-state.json`。**正式 review 必须自带摘要**，原始件不得被当作结论引用 |
-| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
+| 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`X<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 锚点文档 | `<R>000-anchor.md`（`type: anchor`）是**冻结契约**，frontmatter 带 `anchor_version` + `anchor_hash`；改锚点走锚点变更单并升版本 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 R 阶段无关；阶段记在 frontmatter |

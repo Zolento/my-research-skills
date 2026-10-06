@@ -949,11 +949,19 @@ class TestPhaseDocNoLegacyFlow(unittest.TestCase):
 
     起因：迁移只加 precedence note，旧 `B/C/E` 小节仍原地可执行 ——
     注释不是隔离。对 LLM 读者，留着就等于两套流程并存。
+
+    已退役的内部小节号字母：`B`（旧 discovery 流程）、`C`（旧方案生成流程）、
+    `E`（旧方案复核流程）。`A`（R2 / R5）与 `D`（R12）是**当前**命名，不在禁止之列。
     """
 
     ROOT = pathlib.Path(__file__).resolve().parent.parent
     R8 = "references/phase-r8-evidence-contract.md"
     LEGACY_FLOW_WORDS = ("创新性研究", "可行性研究", "论文格式展开", "实验流程设计")
+    RETIRED_LETTERS = ("B", "C", "E")
+    VENUE_ROLES = ("R-CVPR", "R-ICML", "R-NeurIPS", "R-MICCAI")
+
+    def _phase_files(self):
+        return sorted((self.ROOT / "references").glob("phase-*.md"))
 
     def test_r8_has_no_legacy_letter_headings(self) -> None:
         text = (self.ROOT / self.R8).read_text(encoding="utf-8")
@@ -964,6 +972,29 @@ class TestPhaseDocNoLegacyFlow(unittest.TestCase):
         text = (self.ROOT / self.R8).read_text(encoding="utf-8")
         for word in self.LEGACY_FLOW_WORDS:
             self.assertNotIn(word, text, f"R8 文档仍含旧流程词：{word}")
+
+    def test_no_retired_letter_headings_in_any_phase_doc(self) -> None:
+        offenders = []
+        for path in self._phase_files():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                m = re.match(r"^#{1,3}\s+([A-Z])\d+[.．]", line)
+                if m and m.group(1) in self.RETIRED_LETTERS:
+                    offenders.append(f"{path.name}: {line.strip()}")
+        self.assertEqual(offenders, [], f"phase 文档仍含退役字母小节标题：{offenders}")
+
+    def test_no_retired_section_refs_in_skill(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        for ref in ("§B0", "§B1", "§B5", "§C1", "§C4", "§E0", "§E2", "§E8"):
+            self.assertNotIn(ref, text, f"SKILL.md 仍引用退役小节号 {ref}")
+
+    def test_no_venue_role_is_dispatched_in_phase_docs(self) -> None:
+        # 会议审稿人只在 R12 / R13 的 calibration 表里出现，不得成为任何阶段的派遣项。
+        offenders = []
+        for path in self._phase_files():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if any(role in line for role in self.VENUE_ROLES) and "●" in line:
+                    offenders.append(f"{path.name}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], f"phase 文档把会议审稿人列为派遣角色：{offenders}")
 
     def test_r8_deliverables_exclude_experiment_plan(self) -> None:
         # project-layout.md §2.2 把 experiment-plan.md 归 R9—R11。

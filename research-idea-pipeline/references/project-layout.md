@@ -264,15 +264,17 @@ routes/A/docs/
 | `I<n>` | **idea**（由 R3—R6 产出，R8 / R12 引用） | `-discovery.md` | `I1`、`I3` |
 | `N<k>` | **叙事 preset**（全局固定 1—10，见 [narrative-patterns.md](narrative-patterns.md) §1；**非互斥**） | preset 库 | `N2`、`N9` |
 | `K<n>` | **贡献**（方案内；**不用 `C`**，避免与 state 的 claim `C<n>` 撞） | `-proposal.md` | `K1`、`K2` |
-| `E<n>` | **实验** | `-experiment-plan.md` | `E1`、`E4` |
+| `X<n>` | **实验**（与 state 的 `experiments[].id` 同一套；**不用 `E`**，避免与 evidence `E<n>` 撞） | `-experiment-plan.md` | `X1`、`X4` |
 | `H<n>` | **假设** | `-experiment-plan.md` | `H1` |
 
 **跨文档引用写法：** `<文档ID>/<子编号>` ——
-如 `A002/I3`（A002 里的第 3 个 idea）、`A003/K1`、`A004/E2`、`A005/N2`。
+如 `A002/I3`（A002 里的第 3 个 idea）、`A003/K1`、`A004/X2`、`A005/N2`。
 
 > 子编号**只在所属路线内唯一**，不跨路线共享。
-> 正式实验另有一套全局追踪 ID `XID`（见 §6.3），与 `E<n>` 并存：
-> `E<n>` 是实验计划内的条目号，`XID` 是贯穿目录与 provenance 的注册号。
+> 正式实验另有一套全局追踪 ID `XID`（见 §6.3），与 `X<n>` 并存：
+> `X<n>` 是实验节点号（`research-state.json` 与实验计划书**共用同一套**），
+> `XID` 是贯穿 `experiments/` 与 `results/` 目录的注册号。
+> **`E<n>` 只表示 `evidence[]` 的证据编号** —— 不要用它编号实验。
 
 ### 2.3 审阅意见命名（R7 / R10 / R13 / R12 叙事审核）
 
@@ -438,7 +440,7 @@ anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum 
 `docs/` 是**给人看的**：
 
 - ✅ 用标题分层、用表格承载对比、用列表承载结论。
-- ✅ 每个结论标注证据来源（文献 `[作者, 会议/年份]` 或实验编号 `E3`）。
+- ✅ 每个结论标注证据来源（文献 `[作者, 会议/年份]` 或实验编号 `X3`）。
 - ✅ 关键数字给单位和口径。
 - ✅ **句子形式遵守受控中文**（[writing-policy.md](writing-policy.md)）：一句一动作、
   句长上限（指令 ≤25 字 / 说明 ≤40 字）、不用分号连接动作、一段一主题、≥3 项用列表。

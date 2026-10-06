@@ -12,7 +12,7 @@ R12（叙事审核）与 R7 / R10 / R13（方案复核）都要**多子代理审
 | Mode | 本文件之外，各自保留 |
 |---|---|
 | **R12** | 六槽位与 claim graph 的生成、攻击面审稿人的派遣与输出格式（见 [roles.md](roles.md) §1B、§6） |
-| **R7 / R10 / R13** | **八子代理分工**与审查焦点（见 [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) §E2.1） |
+| **R7 / R10 / R13** | **六攻击面 + `S-Lit` + `S-Devil`** 分工与审查焦点（见 [phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) §R7.3.1） |
 
 > **冲突时以本文件为准。** 若某 Mode 的写法与本文件不一致，属于规则漂移，应改该 Mode。
 
@@ -21,7 +21,7 @@ R12（叙事审核）与 R7 / R10 / R13（方案复核）都要**多子代理审
 
 ### 六个 reviewer 不是独立样本（硬约束）
 
-R12 的六个攻击面审稿人与 R7 / R10 / R13 的八子代理，都是**同一个基础模型换不同 prompt**。
+R12 的六个攻击面审稿人与 R7 / R10 / R13 的六个攻击面算子，都是**同一个基础模型换不同 prompt**。
 它们的判断**高度相关（`corr ≫ 0`）**，**不是独立样本**。因此：
 
 - **不得**用「6 个都同意」声称 **reviewer consensus**。一致只说明同一模型的同一种读法
