@@ -16,7 +16,7 @@
 | 项 | 规定 |
 |---|---|
 | 触发条件 | 用户所在的**项目根目录已经有代码 / 实验 / 文献 / 结论** |
-| 产出落点 | `.research-idea-pipeline/routeX/research-state.json` 的 `contract` + 首批八类对象条目 |
+| 产出落点 | `.research-idea-pipeline/routes/<R>/research-state.json` 的 `contract` + 首批八类对象条目 |
 | 是否新阶段 | 否。流程仍走 R0 之后的正常阶段序列，阶段一律用 **R0—R14** |
 | 是否改锚点 | 否。见 §4 硬规则 5 |
 | 疑问处理 | 见 §5。**一次问完**，且只问「缺失且会实质影响科研判断」的项 |
@@ -27,7 +27,7 @@
    替用户「定」锚点。
 2. **读根 `AGENTS.md`**（若存在）与根 `README.md` / `INDEX.md`，**并逐个校验其引用的路径是否存在**；
    悬空引用记入根 `INDEX.md` 的 Warnings。
-3. **确定路线**（`routeX`），读该路线的 `README.md` / `INDEX.md`（进度、已证实 / 已证伪、TODO、Warnings）。
+3. **确定路线**（`routes/<R>`），读该路线的 `README.md` / `INDEX.md`（进度、已证实 / 已证伪、TODO、Warnings）。
 4. **按 §2 的九个维度盘点**，每条都写清三件事：**看什么 → 落到哪个字段 → 缺失时怎么办**。
 5. **骨架缺失时先补齐**（目录 + 两层 `README.md` / `INDEX.md` + `docs/refs/index.json`，
    见 [project-layout.md](project-layout.md) §7），再落盘。

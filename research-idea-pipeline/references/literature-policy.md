@@ -434,7 +434,7 @@ python3 scripts/refs_index.py --check     # 迁移后确认一致
 | `--limit` | 不截断 | 最终返回条数上限（截断保留本地优先顺序） |
 
 > 参考文献属于**跨路线公用资源**，统一放项目根目录的 **`docs/refs/`** 下
-> （见 [project-layout.md](project-layout.md) §1）；不要散落到 `routeX/` 或项目根目录。
+> （见 [project-layout.md](project-layout.md) §1）；不要散落到 `routes/<R>/` 或项目根目录。
 > 脚本默认 `--local-dir ./docs/refs`，因此无需额外配置。
 
 ---

@@ -884,8 +884,8 @@ class TestTableIntegrity(unittest.TestCase):
 # V18—V21：状态失效传播 / 验证可信度层级 / 结果预注册
 # ---------------------------------------------------------------------------
 
-class TestV18V21(unittest.TestCase):
-    """Wave 5 的四条规则：单点变异 → 退出码 3 → 只报该规则。"""
+class _Wave5RuleTest(unittest.TestCase):
+    """Wave 5 四条规则的共同夹具：单点变异 → 退出码 3 → 只报该规则。"""
 
     OBJ8 = ("claims", "evidence", "assumptions", "hypotheses",
             "experiments", "literature", "failures", "uncertainties")
@@ -895,6 +895,10 @@ class TestV18V21(unittest.TestCase):
 
     def _status(self, doc: Dict[str, Any]) -> int:
         return sc.check_state(doc, source="<test>").exit_code
+
+
+class TestV18V19(_Wave5RuleTest):
+    """V18（validity 三键）/ V19（一跳失效传播）—— Wave 5 状态失效传播。"""
 
     # ---- V18：validity 四键 ----
 
@@ -979,6 +983,10 @@ class TestV18V21(unittest.TestCase):
                 exp["validity"]["status"] = "invalid"
         doc["claims"][0]["validity"]["status"] = "valid"
         self.assertIn("V19", self._rules(doc))
+
+
+class TestV20V21(_Wave5RuleTest):
+    """V20（验证可信度阈值）/ V21（结果预注册）—— Wave 5 升级权限与防事后解释。"""
 
     # ---- V20：升级权限 ----
 

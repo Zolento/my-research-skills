@@ -503,7 +503,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 > 「读 / 写 World Model」表**必须逐字相同**；下面保留各阶段的细节语义，供执行时理解，
 > **不得**把它当成第二套口径。
 >
-- **R0**：读 用户输入、`routeX/INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
+- **R0**：读 用户输入、`routes/<R>/INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
 - **R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（只读，用于定位缺口）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（缺口类主张先落 `U`，由 R3 转成 `C`）
 - **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）
 - **R4**：读 `hypotheses[]`；写 `hypotheses[].status`（**QD archive 精修：只能重排 elite 归属**）。**`niche` / `operator` / `parents` / `generation: 0` 由 R3 创建时写入，R4 不得新建 niche**（与上表逐字一致）
@@ -545,7 +545,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | [narrative-patterns.md](narrative-patterns.md) §4 | 迁移举证等级 `L1 / L2 / L3` | 与 `literature[].id` **无关**；该等级**不得**占用 `LIT` 之外的 `L` 前缀（§2.1） |
 | [literature-policy.md](literature-policy.md) §3.2 | 检索尽职调查等级 `L1 / L2 / L3` | 同上：检索等级写进项目文档与检索记录，**不写进** `literature[]` 的 ID |
 | [scoring-policy.md](scoring-policy.md) §3 / §4 | `G1—G5` 门禁、六维排序 | 门禁与排序**读** state：`claims[].supporting_evidence`（`G1`）、`literature[].relation` 与最近前作（`G2`）、`evidence[].epistemic_status`（`G4`）、`hypotheses[].niche` / `experiments[].stage`（实验设计质量）。**state 只存事实与状态，不存评分**；门禁 `fail` 的后果**必须**回写成 `repairs[]` / `claims[].status` / `failures[]`，**不得**只停留在评分表里 |
-| [project-layout.md](project-layout.md) §6（落盘三档）/ §3.1（正文禁令） | 落盘路径与「什么不得贴进正文」 | 机器状态 → `.research-idea-pipeline/<route>/research-state.json`（**常驻、就地覆盖**：每轮只保留一份当前 state；过程快照若需要，放 `.research-idea-pipeline/<route>/` 下的中间产物档）。交付物仍在 `<routeX>/docs/`；**不得**把 state / 原始 JSON 贴进正文（该文件 §3.1 的既有禁令） |
+| [project-layout.md](project-layout.md) §6（落盘三档）/ §3.1（正文禁令） | 落盘路径与「什么不得贴进正文」 | 机器状态 → `.research-idea-pipeline/routes/<R>/research-state.json`（**常驻、就地覆盖**：每轮只保留一份当前 state；过程快照若需要，放 `.research-idea-pipeline/routes/<R>/` 下的中间产物档）。交付物仍在 `routes/<R>/docs/`；**不得**把 state / 原始 JSON 贴进正文（该文件 §3.1 的既有禁令） |
 | [../SKILL.md](../SKILL.md) §1.6（本轮新增） | 「critical flaw ⇒ state change」不变量 | 本文件 §1 硬规则 2 与 §3.9 是它的执行细则；两处措辞**必须**一致 |
 | [../scripts/state_check.py](../scripts/state_check.py) | V1—V21 的机械强制 | §4 的规则表是该脚本的契约；命令、`--json`、退出码以脚本 `--help` 为准 |
 | [../templates/research-state.template.json](../templates/research-state.template.json) | state 骨架与示例条目 | 模板**必须**通过 V1—V21（spec §7 验收）；模板里的占位值**不得**被当作真实实验结论引用 |

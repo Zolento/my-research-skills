@@ -702,7 +702,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 
 ### D9.4 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `<routeX>/docs/<R>NNN-narrative.md`（一次调用一份）。
+1. **写文档：** `routes/<R>/docs/<R>NNN-narrative.md`（一次调用一份）。
    ID 按 [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1；
    落盘路径与命名规范见 [project-layout.md](project-layout.md) §2.1。
    内容 = 证据台账 + claim graph + typing + anchor eligibility + 2—4 套叙事
@@ -725,7 +725,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 {
   "phase": "R12",
   "timestamp": "2026-10-06T00:00:00Z",
-  "route": "routeA",
+  "route": "A",
   "core_goal": "performance",
   "doc_id": "A005",
   "target_venue": "ICML",
@@ -856,4 +856,4 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 | **R12** | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

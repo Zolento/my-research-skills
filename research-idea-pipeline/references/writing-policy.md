@@ -12,7 +12,7 @@
 
 | 表面 | 谁读 | 典型位置 |
 |---|---|---|
-| **落到文档** | 半年后的你、合作者、下游 agent | `<routeX>/docs/*.md`（含 **`<R>000-anchor.md` 冻结契约**）、路线 `INDEX.md`（含 **锚点变更单** 小节）、两层 `README.md` |
+| **落到文档** | 半年后的你、合作者、下游 agent | `routes/<R>/docs/*.md`（含 **`<R>000-anchor.md` 冻结契约**）、路线 `INDEX.md`（含 **锚点变更单** 小节）、两层 `README.md` |
 | **返回对话** | 用户 | 每次 Mode 的报告正文 |
 | **子代理意见** | Lead（机器间） | 评审意见、交叉质询记录、汇总表 |
 
@@ -237,7 +237,7 @@ linter 查不到的部分，用下面五条补。
    | frontmatter `core_goal` / `core_goal_secondary` | `theory` / `performance` / `phenomenon` / `benchmark` / `feasibility` / `negative` |
    | frontmatter `anchor_role` | `primary` / `supporting` / `orthogonal` |
    | 锚点变更单 `类型` | `增补` / `替换`（**不写**「新增」「修改」「变更」） |
-   | `type` 与文件名 `slug` | §2.1 的**封闭枚举**原样（`anchor` / `literature-survey` / …） |
+   | `type` 与文件名 `slug` | §2.1 的**封闭枚举**原样（`anchor` / `field-map` / …） |
    | `subtype` | **自由文本**，按原义写 —— 它是唯一允许自由命名的地方，且**不进文件名** |
    | `epistemic_status` | `Observed` / `Supported` / `Hypothesized` / `Planned` / `Unknown` |
    | 科学分类 `(O, T, R)` | 三轴的**英文枚举原样**（`Method` / `hidden-assumption` / `design-algorithm` …），**各取单值**，不写 `Method+Evaluation` |

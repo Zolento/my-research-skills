@@ -36,7 +36,7 @@
 | I1 | 假设挑战 | 用扩散过程的可逆性约束组合优化搜索空间 | 现有方法把扩散当采样器，未利用可逆性作可行性约束 | Concept & Feasibility | `R-Novelty`（原 R-ICML） | 4 | 3 | 足够 | 高 |
 | I7 | 组合创新 | 把 A 的注意力机制搬到 B 的图搜索 | 仅换模块，无新结构性质 | Use-Inspired | A-Author | 2 | 4 | 不足 | 建议放弃 |
 
-**落盘：** `routeA/docs/A002-ideas.md` + 更新 `routeA/INDEX.md`
+**落盘：** `routes/A/docs/A002-discovery.md` + 更新 `routes/A/INDEX.md`
 
 → `next_phase_suggestion: "R8"`
 
@@ -64,7 +64,7 @@
 
 > 贡献编号用 **K1/K2**（不用 C1），避免与 R8 的章节号 C1—C7 混淆。
 
-**落盘：** `routeA/docs/A003-proposal.md` + `routeA/docs/A004-experiment-plan.md` + 更新 INDEX
+**落盘：** `routes/A/docs/A003-proposal.md` + `routes/A/docs/A004-experiment-plan.md` + 更新 INDEX
 
 → `next_phase_suggestion: "R12"`
 
@@ -135,8 +135,10 @@
 | 包装后 | 现有离散扩散方法共享**「可逆性仅作采样技巧」**这一假设，导致在置换约束下**结构性失效**。我们移除该假设 | `C2 ← E1`、`C3 ← E4`、`C0 ← E3` |
 | 判定 | 只改参照系，未改事实 | 每句都能落回 `Ci ← Ej` |
 
-**落盘：** `routeA/docs/A005-narrative.md` + 更新 INDEX（门禁 `fail` 的候选 → §4 已证伪。
-缺失证据与 anchor 冲突 → §5 TODO 与 §7 Warnings）
+**落盘：** `routes/A/docs/A005-narrative.md` + 更新资产目录 `routes/A/INDEX.md`。
+状态回写 `research-state.json` 后重新生成 `routes/A/STATUS.md`（门禁 `fail` 的候选
+→ Most important negative findings。缺失证据与 anchor 冲突 → Critical uncertainties
+与 Next recommended actions）。
 
 → `next_phase_suggestion: "R8 | R7 / R10 / R13"`
 
@@ -173,26 +175,27 @@
    （S-Devil 反驳分 → `新颖性稳健度 = 6 − 反驳分`）后再汇总取**中位数**。
 5. **E4** 结论卡片（含**复现风险等级**与**方法正确性判定**）。
 
-**落盘：** `routeA/docs/A003-review-r01.md` + 更新 INDEX（结论翻译成进度条目）
+**落盘：** `routes/A/docs/A003-review-r01.md` + 状态回写 `research-state.json`
+后重新生成 `routes/A/STATUS.md`（结论翻译成状态条目）。
 
 ---
 
 ## 5. 全链路落盘结果
 
 ```
-routeA/
-├── INDEX.md                              # 文档索引 + 已证实/已证伪/TODO/Bugs/Warnings
-├── code/
-└── experiments/
-
-docs/
-├── A001-literature-survey.md             # R2 / R5（按需）
-├── A002-ideas.md                         # R3—R6（含 I1..In 与 B5 审核）
-├── A003-proposal.md                      # R8
-├── A004-experiment-plan.md               # R8
-├── A005-narrative.md                     # R12（一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 + 门禁 + 最佳推荐）
-└── A003-review-r01.md                        # R7 / R10 / R13（含复现风险等级）
+routes/A/
+├── README.md                             # 路线身份证
+├── STATUS.md                             # 当前状态（state 的投影）
+├── INDEX.md                              # 资产目录 + 时间线
+└── docs/
+    ├── A001-field-map.md             # R2 / R5（按需）
+    ├── A002-discovery.md             # R3—R6（含 I1..In 与审核结论）
+    ├── A003-proposal.md              # R8
+    ├── A004-experiment-plan.md       # R8
+    ├── A005-narrative.md             # R12（一次调用：I1 的 2—4 套 claim hierarchy + 六槽位 + 门禁 + 最佳推荐）
+    └── A003-review-r01.md            # R7 / R10 / R13（含复现风险等级）
 ```
 
-`.research-idea-pipeline/` 下另有 `state-B-*.json`、`state-C-*.json`、`state-D-*.json`、
-`state-E-*.json` —— 机器状态，**不进 docs**。
+`.research-idea-pipeline/routes/A/research-state.json` 是唯一的 canonical 机器状态
+（就地覆盖），**不进 docs**。中间产物在
+`.research-idea-pipeline/routes/A/<被审ID>-r<NN>/`。

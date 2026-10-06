@@ -108,7 +108,7 @@ C5 ← [待补]       跨数据集与更大规模的后果（E11 未跑）。
 
 > **作者目标 anchor 是 `理论`，与 `eligible` 集合冲突。** 必须显式告知：
 > 「你想定位成理论，但现有证据支持的是性能与现象。最强可辩护 anchor 是性能。」
-> 该条已落盘到本轮输出与 `routeA/INDEX.md` §7 Warnings。
+> 该条已落盘到本轮输出与 `routes/A/STATUS.md` 的 Critical uncertainties。
 > **不得**帮作者强化不被证据支持的故事。
 > `not-eligible` 的 anchor **不得**用于 D4 的 preset 选择与叙事组织。
 > 要真正更换主锚点，只能走 [SKILL.md](../SKILL.md) §0.2 的锚点变更单，
@@ -456,13 +456,14 @@ N2 的 claim 更强，且已过门禁。按 claim-first 总纲，它是最强可
 
 ---
 
-## 落盘与 INDEX 更新
+## 落盘与状态更新
 
-- 文档：`routeA/docs/A005-narrative.md`（一次调用一份，内含全部 idea 的小节）。
-- `routeA/INDEX.md` §2 文档索引：新增 A005 行。
-- §3 已证实：E1 与 E4 支撑的「在 `Y` 下结构性失效」与「结构必要性」。
-- §4 已证伪：N3 的迁移合法性方向（`G1 fail`）。N5 方向被 stress test 排除。
-- §5 TODO：补 E9、E11、E12，并检验 E10 的假设归因。按最佳叙事重写提案（回 R8）。
-- §7 Warnings：作者目标 anchor `理论` 与 `eligible` 集合冲突（需锚点变更单 + 用户授权）。
-  `S-Lit` 判「部分重叠」（delta 需在相关工作显式划界）。`N2` 的 `Soundness margin` 偏低。
+- 文档：`routes/A/docs/A005-narrative.md`（一次调用一份，内含全部 idea 的小节）。
+- `routes/A/INDEX.md` 的 Key Documents：新增 A005 行（资产目录）。
+- 状态回写 `research-state.json` 后重新生成 `routes/A/STATUS.md`：
+  - Strongest supported findings：E1 与 E4 支撑的「在 `Y` 下结构性失效」与「结构必要性」。
+  - Most important negative findings：N3 的迁移合法性方向（`G1 fail`）。N5 方向被 stress test 排除。
+  - Next recommended actions：补 E9、E11、E12，并检验 E10 的假设归因。按最佳叙事重写提案（回 R8）。
+  - Critical uncertainties：作者目标 anchor `理论` 与 `eligible` 集合冲突（需锚点变更单 + 用户授权）。
+    `S-Lit` 判「部分重叠」（delta 需在相关工作显式划界）。`N2` 的 `Soundness margin` 偏低。
 - `next_phase_suggestion: "R8 | R7 / R10 / R13"`：按最佳叙事重写提案，或直接送审。

@@ -126,11 +126,12 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 1. **读项目根目录的 `AGENTS.md`**（若存在）—— 其布局、命名、公用部分约定优先于本
    Skill 默认约定。**并校验它引用的文件是否都存在**：缺失项记入根 `INDEX.md` 的
    Warnings。**悬空引用会让后续所有"按 AGENTS.md 办"的动作失效**，所以发现即记。
-2. **确定路线**（`routeA` / `routeB` / …）。用户未指定时反问；若只有一条路线则用它。
-3. **读该路线的 `INDEX.md`**，了解进度、已证实/已证伪结论、TODO 与 Warnings。
-4. 若路线或 `INDEX.md` 不存在，按
+2. **确定路线**（`routes/A` / `routes/B` / …）。用户未指定时反问；若只有一条路线则用它。
+3. **读该路线的 `README.md` / `STATUS.md` / `INDEX.md`**：`README` 是路线身份证，
+   `STATUS` 是当前状态（state 投影），`INDEX` 是材料目录。
+4. 若路线或三件套不存在，按
    [references/project-layout.md](references/project-layout.md) §7 的检查清单手工建立
-   （目录 + `INDEX.md`）后再开工。
+   （目录 + `README.md` / `STATUS.md` / `INDEX.md`）后再开工。
 
 > **与 `AGENTS.md` 冲突时的裁决：** `AGENTS.md` 的**纪律性条款**（如"必须改进最终任务
 > 性能""禁止在证明性工作上停留"）**优先于任何既有路线的锚定契约**。冲突时按 **§0.2
@@ -249,8 +250,8 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
    「不参与主锚点成功判据」，且不得进入 R12、不得作为投稿主线。
    **路线本身不被销毁** —— 它仍可继续产出，只是不参与主锚点的成功判据。
 4. **append-only：** 不修改历史条目，后续变更追加新行。
-5. **受影响产物必须在同一轮内被重审**，结论写回各自路线 `INDEX.md` 的
-   已证实 / 已证伪 / Warnings。
+5. **受影响产物必须在同一轮内被重审**，结论先写回 `research-state.json`，
+   再投影到各自路线的 `STATUS.md`（状态）与 `INDEX.md`（材料）。
 
 ---
 
@@ -369,46 +370,60 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ### 1.4 项目组织与文档落盘（所有 R 阶段强制）
 
-**各路线产出的文档放该路线自己的 `routeX/docs/`（扁平）；根目录 `docs/` 是跨路线共享区，
-至少保证有 `refs/`。根目录与每条路线各自有 `README.md` 与 `INDEX.md`。**
+**各路线产出的文档放该路线自己的 `routes/<R>/docs/`（扁平）；根目录 `docs/` 是跨路线共享区，
+至少保证有 `refs/`。根目录有 `README.md` 与 `INDEX.md`；每条路线有 `README.md`、
+`STATUS.md`、`INDEX.md` 三件套。**
 
 ```
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
 ├── README.md              # ★ 根级：项目总览（研究问题、路线列表、怎么跑）
-├── INDEX.md               # ★ 根级：跨路线索引（各路线状态 + 全局 TODO/Warnings）
+├── INDEX.md               # ★ 根级：路线总表投影（Route | Goal | Status | Thesis | Blocker）
 ├── docs/                  # ★ 跨路线共享区（不放路线文档）
 │   ├── refs/              # ★ 必需：参考文献库 papers/ cache/<source>/ index.json
+│   ├── decisions/         # ★ 项目级重大决策 DEC<NNN>-<slug>.md
 │   ├── notes/             # 可选：跨路线共享笔记（按 AGENTS.md）
 │   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
-├── routeA/
-│   ├── README.md          # ★ 路线级：本路线说明
-│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度）
-│   ├── docs/              # ★ 本路线文档（扁平）
-│   │   ├── A001-literature-survey.md
-│   │   ├── A002-ideas.md
-│   │   ├── A003-proposal.md
-│   │   ├── A004-experiment-plan.md
-│   │   ├── A005-narrative.md          # R12：一次调用一份，内含各 idea 小节
-│   │   └── A003-review-r01.md         # 审阅挂被审 ID；零填充轮次
-│   └── code/
-├── shared/                # 跨路线公用代码/笔记
-└── .research-idea-pipeline/   # 机器状态（不入 docs）
+├── routes/                # ★ 所有科研路线集中于此（DI-2）
+│   └── A/
+│       ├── README.md      # ★ 路线身份证：这条路线是什么（低频变更）
+│       ├── STATUS.md      # ★ 当前状态人类摘要（research-state.json 的投影）
+│       ├── INDEX.md       # ★ 资产目录 + 时间线（不再承载当前状态）
+│       └── docs/          # ★ 本路线文档（扁平）
+│           ├── A001-field-map.md
+│           ├── A002-discovery.md
+│           ├── A003-proposal.md
+│           ├── A004-experiment-plan.md
+│           ├── A005-narrative.md      # R12：一次调用一份，内含各 idea 小节
+│           └── A003-review-r01.md     # 审阅挂被审 ID；零填充轮次
+├── src/                   # ★ canonical implementation（唯一；route 不复制代码，DI-6）
+├── configs/routes/A/      # route 之间的差异用 config 表达
+├── experiments/A/<XID>/   # ★ 实验注册表：想做什么（pre-registration）
+├── results/A/<XID>/       # ★ 观察到什么（observation）
+├── shared/                # 极小：无法归入 src/docs/configs 的多路线资产
+└── .research-idea-pipeline/routes/A/research-state.json   # 机器状态（不入 docs）
 ```
 
 **八条硬性规则：**
 
-1. **文档按路线分离、各自扁平：** 产出放 `routeX/docs/`，**该目录内不再按类型分子目录**。
+1. **文档按路线分离、各自扁平：** 产出放 `routes/<R>/docs/`，**该目录内不再按类型分子目录**。
    **根 `docs/` 是跨路线共享区**——本 Skill **只保证 `refs/` 存在**，`notes/`、`latex/`
    等由项目与 `AGENTS.md` 决定。**唯一硬约束：路线文档不得放根 `docs/`。**
-2. **两层 `README.md` + 两层 `INDEX.md`，分层管理：**
+2. **路线级三文件职责分离（根级两文件）：** 根目录必须有 `README.md` 与 `INDEX.md`；
+   每条路线必须有 `README.md` / `STATUS.md` / `INDEX.md`。三者回答不同问题、
+   更新频率不同：
 
-   | 层级 | `README.md` | `INDEX.md` |
+   | 文件 | 回答 | 更新频率 |
    |---|---|---|
-   | 根 | 项目总览 | **跨路线索引**（各路线状态、全局 TODO/Warnings） |
-   | `routeX/` | 本路线说明 | **本路线索引**（文档索引 + **关系图** + 进度） |
+   | `routes/<R>/README.md` | 这条路线**是什么**、为什么存在 | **很低** |
+   | `routes/<R>/STATUS.md` | **现在做到哪、下一步是什么** | **很高** |
+   | `routes/<R>/INDEX.md` | 这条路线**有哪些材料** | 中等 |
 
-   **每次产出后更新所在路线的 `INDEX.md`**；跨路线层面的变化同步更新根 `INDEX.md`。
+   **三者都是人类视图（DI-4），必须可从 `research-state.json` 投影。**
+   **`STATUS.md` 由 `scripts/research/render_status.py` 生成，禁止手改。**
+   **INDEX 不再承载 已证实 / 已证伪 / TODO / Bugs / Warnings；当前状态一律进 STATUS。**
+   每次产出后更新所在路线的 `INDEX.md`（资产）；状态变化先写回 state，
+   再重新生成 `STATUS.md`；跨路线层面的变化同步更新根 `INDEX.md`（路线总表投影）。
 3. **文件名前缀 = 文档 ID**（不再是路径隔离）：前缀仍**必需** —— 审阅要挂靠、跨路线
    引用要唯一。序号按路线独立递增、**永不复用**。
    **文件名只能由 `<R><NNN>-<slug>.md` 决定，`slug` 只取
@@ -431,12 +446,12 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
    | 档 | 落盘位置 | 例 |
    |---|---|---|
-   | **交付物** | `routeX/docs/`（扁平，不分子目录） | `anchor` / proposal / experiment-plan / narrative / review |
-   | **中间产物** | `.research-idea-pipeline/<route>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 |
-   | **机器状态** | `.research-idea-pipeline/<route>/research-state.json` | **R1 常驻状态**（就地覆盖，不按阶段切分） |
+   | **交付物** | `routes/<R>/docs/`（扁平，不分子目录） | `anchor` / proposal / experiment-plan / narrative / review |
+   | **中间产物** | `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 |
+   | **机器状态** | `.research-idea-pipeline/routes/<R>/research-state.json` | **R1 常驻状态**（就地覆盖，不按阶段切分） |
 
    - 子代理的**原始评审件**属于**中间产物**：**不进 `docs/`**，也**不得**为了塞进去而在
-     `routeX/docs/` 下建子目录（该目录内不分子目录）。
+     `routes/<R>/docs/` 下建子目录（该目录内不分子目录）。
    - **正式 review 必须自带摘要**（结论 + 评分 + 关键证据 + 交叉质询记录），放进 `docs/`。
    - **原始件不得被当作结论引用**——引用一律指向 review 正文（`<被审ID>-review-rNN.md`）。
    - 中间产物可随时删除；删掉不影响交付物的完整性（因为 review 自带摘要）。
@@ -448,9 +463,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    `python scripts/ste_lint_zh.py --max-chars 25 <文件>`，且**不得自行升档**）。
    **⚠️ 不得为了过 linter 而删情态**（「可能 / 初步」是内容）。
 
-> **slug 只能取：** `literature-survey` / `ideas` / `proposal` / `experiment-plan` /
-> `narrative`。**R12 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
-> 完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建骨架清单）。
+> **slug 只能取：** `anchor` / `field-map` / `discovery` / `theory` / `evidence` /
+> `proposal` / `experiment-plan` / `result-analysis` / `decision` / `narrative` / `review`。
+> **R12 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
+> 完整规范见 [references/project-layout.md](references/project-layout.md)
+> （含**八条 DI invariant**、三文件职责、`XID`、route fork 门槛、手工建骨架清单）。
 
 ---
 
@@ -607,7 +624,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 叙事 preset 库 | [references/narrative-patterns.md](references/narrative-patterns.md) | **十套叙事 preset（N1—N10，非互斥、非创新等级）**、**(O,T,R) + anchor 选 preset**、**六槽位 S1—S6**、跨域 **Transfer Legitimacy Argument（L1/L2/L3）**、禁用表述、叙事自检 |
 | **Claim-first 政策** | [references/claim-first-policy.md](references/claim-first-policy.md) | **R12 现行（P0）**：总纲公式（`Claim strength × Evidence alignment × Reviewer comprehensibility`）、**证据台账 `epistemic_status`**、**Claim Graph `C0—C5` + `Ci ← Ej`**、**可证伪 central proposition**、**`(O,T,R)` 三轴**、**Anchor Eligibility Test**。**R3—R6 / R8 / R7 / R10 / R13 的接入登记为 P1**（见 `docs/claim-first-spec.md` §9） |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
-| 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、**锚点变更单**、`INDEX.md` 章节、`AGENTS.md` 优先与可达性校验、并发写入 |
+| 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **Wave 6 目录规范**：**八条 DI invariant**、`routes/` 聚合、**`README`/`STATUS`/`INDEX` 三文件职责分离**、**`STATUS.md = f(research-state.json)` 投影**、`XID` 贯穿、`experiments/` 与 `results/` 分离、`docs/decisions/DEC`、**三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、锚点变更单、route fork 门槛、Git 边界、`AGENTS.md` 优先与可达性校验、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **两层**：**硬门禁 `G1—G5`（不聚合、不打分）** + **排序六维**（**R12 主用**）；1—5 标尺；极性归一化（**仅 R7 / R10 / R13 仍用**）；逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五类共享政策**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述；**§3 认知状态 ↔ 措辞等级映射**（各 R 阶段 不再各自定义） |
 | 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：三档 **asd-ste100（可选最强档，须用户显式声明）/ Strict / 中文-顺**、结构规则（硬）、词汇规则（方向；asd-ste100 档下升为执行）、中文六种机器味、**情态是内容** |
@@ -624,9 +641,10 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V21 每条一个反例 + 退出码行为 |
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
-| 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routeX/INDEX.md` 骨架（文档索引 + **关系图** + 已证实/已证伪/TODO/Bugs/Warnings） |
-| 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（跨路线索引 + 全局 TODO/Warnings） |
-| 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routeX/README.md` 骨架（本路线做什么、怎么跑、目录组织） |
+| 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routes/<R>/INDEX.md` 骨架（**资产目录 + 时间线**：Route Overview / Key Documents / Experiments / Decisions / Reviews / Milestones / Recent Research Changes / Archive；**不含已证实/已证伪/TODO/Bugs/Warnings**） |
+| 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
+| 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
+| 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
 | 串联示例 | [examples/](examples/) | B→C→D→E 串联、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
 
 ---
@@ -702,7 +720,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   A3 范围扩大策略 → A4 饱和判定与输出。
 - **交付物：** 文献列表（含来源标注）+ 检索过程记录（含 429 等待日志）+ 本地缓存
   更新记录 + 尽职调查等级达成情况。
-- **落盘：** `<routeX>/docs/<R>NNN-literature-survey.md`（含负检索记录），
+- **落盘：** `routes/<R>/docs/<R>NNN-field-map.md`（含负检索记录），
   并更新该路线 `INDEX.md`；**检索未达饱和必须记入 Warnings**。
 
 ### R3—R6 — 双轨发现与种群进化
@@ -732,7 +750,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   **`coverage before ranking`：** 上述四项在 `generation == 0` 只作 archive descriptors /
   search heuristics，**不得硬排序**；否则 `P4`/`P5` 会因「跨域 / 理论」标签天然拿高 reward。
   质量压力从 R6 起才逐步引入。
-- **落盘：** `<routeX>/docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
+- **落盘：** `routes/<R>/docs/<R>NNN-discovery.md`，并更新该路线 `INDEX.md`
   （被放弃的候选记入**已证伪**；未核实的无人区声称记 Warnings）。
 
 ### R8 — 证据契约
@@ -745,7 +763,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
 - **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
   + 风险清单。
-- **落盘：** `<routeX>/docs/<R>NNN-proposal.md` + `<routeX>/docs/<R>NNN-experiment-plan.md`（各占独立序号），
+- **落盘：** `routes/<R>/docs/<R>NNN-proposal.md` + `routes/<R>/docs/<R>NNN-experiment-plan.md`（各占独立序号），
   并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
 
 ### R12 — 叙事（state 的视图）
@@ -769,7 +787,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **交付物：** 证据台账 + claim graph + 每套候选的六槽位叙事 + 六攻击面审稿人意见 +
   S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
   **缺失证据清单与最小必要实验 / 定理**。
-- **落盘：** `<routeX>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
+- **落盘：** `routes/<R>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
   （被覆盖的叙事方向 → **已证伪**；最佳叙事 → **已证实**；门禁 `fail`、或**六维中位 <3
   仅作 Warnings 标记**（**不是**综合评分、不进排序、不参与推荐）→ Warnings）。
 
@@ -793,7 +811,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   [scoring-policy.md](references/scoring-policy.md)）→ E4 复核结论 → E5 接续复核规则。
 - **交付物：** 八子代理评审意见 + 交叉质询记录 + 审查结论卡片（含**复现风险等级**）
   + 横向对比表 +（接续复核时）变更追踪表。
-- **落盘：** `<routeX>/docs/<被审ID>-review-r01.md`（接续复核用 `-r02.md`），
+- **落盘：** `routes/<R>/docs/<被审ID>-review-r01.md`（接续复核用 `-r02.md`），
   并**把审阅结论翻译成 INDEX.md 进度**：成立 → 已证实；否定 → 已证伪；
   待补 → TODO；未缓解的致命风险 / 复现风险高 → Warnings。
 
@@ -814,7 +832,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **R10：** **critical flaw ⇒ state 必须改变**；处置五值 `REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
   关闭两值 `RESOLVED|ACCEPTED_LIMITATION`；落盘三元组 `flaw/disposition/state_delta/closure`。
 - **R11：** `result → claim update → uncertainty update → next experiment` 四步，缺一不可。
-- **落盘：** `.research-idea-pipeline/<route>/research-state.json`（就地覆盖，不按阶段切分）。
+- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）。
 
 ### R13 / R14 — artifact 审计与决策
 
@@ -827,7 +845,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 **衔接图见 §0 的双循环图。** 三条回写规则：
 
-1. **R1 是唯一状态载体**：`.research-idea-pipeline/<route>/research-state.json`，**就地覆盖**，
+1. **R1 是唯一状态载体**：`.research-idea-pipeline/routes/<R>/research-state.json`，**就地覆盖**，
    不按阶段切分快照（旧的 `state-<mode>-<ts>.json` 口径已作废）。
 2. **改 `claims[].status` 默认只能经 R10。** **唯一例外**：R8 挂证据时可做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`）；**降级与否决**（`contradicted` / `killed`）**仍只能经 R10**。
    Discovery（R3—R6）与 Assurance（R7）都不得直接改 ——
@@ -900,7 +918,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - [ ] 所有"首次提出"声称**已完成 L3 穷尽检索**、经 S-Lit 核实、附负检索记录，
       否则已降级为"据本次检索未见"或标注"待核实"；
       **全部措辞符合 [evidence-policy.md](references/evidence-policy.md) 的证据等级表**。
-- [ ] **INDEX 的 Warnings 已统计「待核实」条数**；若超过 5，已在本轮内收敛
+- [ ] **`STATUS.md` 的 Critical uncertainties 已统计「待核实」条数**；若超过 5，已在本轮内收敛
       （补检索 / 补实验 / 明确降级措辞）；**`needs_verification` 的条数也已计入根
       `INDEX.md` 的全局 Warnings**，超过 5 已开补元数据 TODO。
 - [ ] **正文形式已达受控中文**：落盘文件已跑
@@ -914,20 +932,21 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       [writing-policy.md](references/writing-policy.md) §5）。
 - [ ] 理论/可行性卡点已先检索（含负结果文献），未直接假设成立。
 - [ ] 无臆造引用；无法确认处标注"待核实"。
-- [ ] **方案/审阅记录已落盘到所在路线的 `<routeX>/docs/`**，命名符合
+- [ ] **方案/审阅记录已落盘到所在路线的 `routes/<R>/docs/`**，命名符合
       `<R><NNN>-<slug>.md` / `<ID>-review-r01.md`；且**文档前缀 = 路线字母**（不随阶段变化）。
       **`slug` 未越界**（只用 [project-layout.md](references/project-layout.md) §2.1 封闭枚举）；枚举外的派生物写的是 frontmatter 的
       `subtype`，且路线 `INDEX.md` 文档表**有 `subtype` 列**。
-- [ ] **落盘分档正确**：交付物在 `routeX/docs/`（**扁平，无子目录**）；
-      子代理**原始评审件**在 `.research-idea-pipeline/<route>/<被审ID>-r<NN>/`，
+- [ ] **落盘分档正确**：交付物在 `routes/<R>/docs/`（**扁平，无子目录**）；
+      子代理**原始评审件**在 `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/`，
       **没有**塞进 `docs/`；**正式 review 自带摘要**，且没有引用指向原始件。
 - [ ] **`docs/refs/` 下每个 PDF 都在 `docs/refs/index.json` 里有条目**
       （`python3 scripts/refs_index.py --check` 通过）；索引中无绝对路径；
       `needs_verification = true` 的条目**未**用于支撑创新性声明；
       遇到旧 schema 已用 `--migrate`（**不是**直接重建，避免丢旧字段）。
-- [ ] **已更新路线 `INDEX.md`**：文档索引、已证实、已证伪、TODO、Bugs、Warnings、
-      变更日志。
-- [ ] 未达饱和的检索、未缓解的风险已记入 `INDEX.md` 的 Warnings。
+- [ ] **已更新路线 `INDEX.md`**（资产目录：文档索引、Experiments、Decisions、Reviews、
+      Milestones、Recent Research Changes）**与 `STATUS.md`**（当前状态，由 state 生成）。
+- [ ] 未达饱和的检索、未缓解的风险已记入 `STATUS.md` 的 Critical uncertainties；
+      跨路线层面已同步到根 `INDEX.md` 的全局 Warnings。
 - [ ] 已附 `state.json` 片段与 `next_phase_suggestion`。
 
 ---
@@ -958,12 +977,16 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
    `docs/`，靠文件名前缀隔离路线。实际用起来有两个问题：① 每条路线都会持续产出
    （方案、叙事、多轮审阅），**文件数线性增长，"集中"很快变成"平摊"**；② 前缀成了
    唯一的隔离手段，一旦写错就无法补救。
-   改为**文档随路线走**（`routeX/docs/`，目录内仍保持扁平），根 `docs/` 退为**跨路线
+   改为**文档随路线走**（`routes/<R>/docs/`，目录内仍保持扁平），根 `docs/` 退为**跨路线
    共享区**（只保证有 `refs/`）。**前缀仍然保留，但身份变了**：它不再是隔离手段，
    而是**文档 ID** —— 审阅要挂靠（`A003-review-r01`）、跨路线引用要唯一（`A002/I3`）。
-   两层 `README.md` / `INDEX.md` 分别管住"项目级"与"路线级"，避免根索引膨胀成流水账。
-8. **为什么 INDEX.md 要区分"已证实"与"已证伪"？** 负结果常被丢弃，导致后人重复
-   踩坑。把证伪结论与 TODO/Bugs/Warnings 一起固化为项目资产，是最省算力的做法。
+   根 `README.md` / `INDEX.md` 管住"项目级"，避免根索引膨胀成流水账。
+   **Wave 6 进一步把全部路线集中到 `routes/`**，并把路线级人类视图拆成三件：
+   `README.md`（是什么）、`STATUS.md`（现在怎样）、`INDEX.md`（有哪些材料）。
+8. **为什么负结果要固化成资产？** 负结果常被丢弃，导致后人重复踩坑。
+   把证伪结论与 TODO/Bugs/Warnings 一起固化，是最省算力的做法。
+   **Wave 6 后它们归 `STATUS.md`**（即 `research-state.json` 的投影），
+   `INDEX.md` 只留资产目录 —— 状态与材料分开，才不会互相污染。
 9. **为什么把评分与证据措辞抽成共享文件？** 这两类机制被多个 R 阶段 复用，**复制一份
    就是多一个漂移源**：改了一处、漏了另一处，就会出现"同一条规则两个版本"。
    因此 [scoring-policy.md](references/scoring-policy.md) 与
@@ -1076,7 +1099,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 | # | 对象 | 历史改动 |
 |---|---|---|
-| C1 | **落盘路径** | `docs/` → `routeX/docs/`（**含 §4 速查节** —— 曾漏 5 处） |
+| C1 | **落盘路径** | `docs/` → `routes/<R>/docs/`（**含 §4 速查节** —— 曾漏 5 处） |
 | C2 | **审阅命名** | `<ID>-review.md` → `<ID>-review-r01.md` |
 | C3 | **标题里的旧词** | 曾漏 `mode-a` 的 A2 标题（正文早已改为多源，标题仍写旧源名） |
 
@@ -1095,10 +1118,11 @@ python3 -m unittest discover -s scripts -p "test_*.py"
 PAT=$(grep -vhE '^\s*(#|$)' references/deprecated-terms.txt | paste -sd'|')
 grep -rnE "$PAT" --include=*.md .          # 期望：0 命中（exit 1）
 
-# 5) 落盘路径必须带 routeX/ 前缀 —— 正确的写法以 `<routeX>/docs/ 开头，
-#    所以「反引号紧跟 docs/」就是缺前缀
+# 5) 落盘路径必须带 routes/<R>/ 前缀 —— 正确的写法以 `routes/<R>/docs/ 开头，
+#    所以「反引号紧跟 docs/」就是缺前缀（§1.4 规则 1）
 grep -rnE '`docs/<' --include=*.md . | grep -vE 'templates/INDEX\.md|grep -rnE'
-#    ↑ 排除 templates/INDEX.md：该模板本身就在 routeX/ 内，其 `docs/` 是相对路径，正确
+#    ↑ 排除 templates/INDEX.md：路线 INDEX 本身就在 routes/<R>/ 内，
+#      它的 `docs/<文件名>` 是相对本文件的正确写法，不算缺前缀
 
 # 6) 受控中文 linter —— 自检 + 受管文件必须全绿
 python3 scripts/ste_lint_zh.py --selftest

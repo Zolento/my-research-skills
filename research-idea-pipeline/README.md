@@ -27,7 +27,7 @@ research-idea-pipeline/
 │   ├── narrative-patterns.md         # 十套叙事 preset（非互斥）+ (O,T,R) 选 preset + 六槽位 S1—S6 + Transfer Legitimacy
 │   ├── claim-first-policy.md         # R12 现行（P0）：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
-│   ├── project-layout.md             # docs/ 命名、INDEX.md、AGENTS.md、shared/
+│   ├── project-layout.md             # Wave 6 目录规范：DI invariant、routes/、README/STATUS/INDEX、XID、DEC
 │   ├── scoring-policy.md             # 两层：硬门禁 G1—G5 + 排序六维（D）；极性归一化/中位数/一票否决（E）
 │   ├── evidence-policy.md            # 五类共享政策：证据等级 ↔ 允许/禁止表述（唯一定义）
 │   ├── project-intake.md             # 存量项目接管清单（9 维度；已有信息不得重复询问）
@@ -47,10 +47,11 @@ research-idea-pipeline/
 │   ├── test_literature_search.py     # 离线测试（stdlib unittest，不联网）
 │   └── test_refs_index.py            # 离线测试：索引旧 schema 迁移（保留旧字段）
 ├── templates/
-│   ├── INDEX.md                      # 路线级 INDEX.md 骨架（含文档关系图）
-│   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（跨路线索引）
-│   ├── README.route.md               # 路线级 README.md 骨架
-│   └── research-state.template.json           # state.json 片段模板（键 = A—E）
+│   ├── INDEX.md                      # 路线级 INDEX.md 骨架（资产目录 + 时间线）
+│   ├── INDEX.root.md                 # 根级 INDEX.md 骨架（路线总表投影）
+│   ├── README.route.md               # 路线级 README.md 骨架（路线身份证）
+│   ├── STATUS.md                     # 路线级 STATUS.md 骨架（state 的人类投影）
+│   └── research-state.template.json           # Research State 骨架
 ├── examples/
 │   ├── example-b-to-c-d-e.md         # 主链路串联
 │   ├── example-d-narrative.md        # claim-first 叙事与选型（D0—D9）
@@ -85,7 +86,7 @@ research-idea-pipeline/
 |---|---|---|
 | **项目主锚点** | 根 `INDEX.md`，**只声明一次** | （项目级） |
 | **路线锚点** | 路线 frontmatter | `core_goal` + `anchor_role` + `serves` + `serves_evidence` |
-| **次锚点** | 路线 `INDEX.md` 概要与 `state.json` | `core_goal_secondary`（**不进 `core_goal`**） |
+| **次锚点** | 路线 `README.md` 概要与 `state.json` | `core_goal_secondary`（**不进 `core_goal`**） |
 
 - **`core_goal` 只记主锚点**（单值）；写 `"theory+feasibility"` 会被下游脚本判为非法。
 - **`anchor_role`** 取 `primary` / `supporting` / `orthogonal`：
@@ -106,7 +107,7 @@ D 定**叙事资格与 preset**（先做 **Anchor Eligibility Test**，见 claim
 
 ### 锚点变更单（Anchor Change Order）
 
-对**项目主锚点**的变更记在根 `INDEX.md`，对**路线锚点**的变更记在该路线 `INDEX.md`。
+对**项目主锚点**的变更记在根 `INDEX.md`，对**路线锚点**的变更记在该路线 `README.md`。
 append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / **替换**）/ 依据 / 受影响产物。
 
 **两条硬约束：**
@@ -222,7 +223,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 `198.18.x.x` fake-IP），说明**可能存在代理环境**——DNS 已被 hosts 或本地代理接管。
 此时：① 报告中单列「代理环境提示」并写明**具体 IP**；② **不得**据此判定
 "在线源不可用"或"无人在研究"；③ 代理链路上的 429 **未必**是官方限流；
-④ 用于支撑创新性声明时记入 INDEX 的 Warnings。**只告警，不阻断。**
+④ 用于支撑创新性声明时记入 `STATUS.md` 的 Critical uncertainties。**只告警，不阻断。**
 
 ### 2. 顶会标准锚定
 
@@ -273,7 +274,7 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 "没做到"必须关联具体未建立的结构性质或未满足的理论条件。
 
 **形式：受控中文**（[writing-policy.md](references/writing-policy.md)）。这份政策管三个表面：
-**落到文档**（`<routeX>/docs/*.md`）、**返回对话**（每次阶段的报告正文）、**子代理意见**。
+**落到文档**（`routes/<R>/docs/*.md`）、**返回对话**（每次阶段的报告正文）、**子代理意见**。
 它只管形式，不管内容。
 
 | 抓手 | 做法 |
@@ -313,57 +314,65 @@ R-MICCAI）的每一次评价都必须给出 **① 理论角度**（命题 / 假
 <项目根目录>/
 ├── AGENTS.md              # 共享契约；存在则优先遵循
 ├── README.md              # ★ 根级：项目总览
-├── INDEX.md               # ★ 根级：跨路线索引（各路线状态 + 全局 TODO/Warnings）
+├── INDEX.md               # ★ 根级：路线总表投影（Route | Goal | Status | Thesis | Blocker）
 ├── docs/                  # ★ 跨路线共享区（不放路线文档）
 │   ├── refs/              # ★ 必需：参考文献库（= 本地文献库根目录）
 │   │   ├── papers/        # {paper_id}.pdf（不进版本库）+ .json sidecar + 可选 .md
 │   │   ├── cache/<source>/ # 查询缓存（按源分目录）
 │   │   └── index.json     # ★ 必需：PDF 索引，进版本库
+│   ├── decisions/         # ★ 项目级重大决策 DEC<NNN>-<slug>.md
 │   ├── notes/             # 可选：跨路线共享笔记（按 AGENTS.md）
 │   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
-├── routeA/
-│   ├── README.md          # ★ 路线级：本路线说明
-│   ├── INDEX.md           # ★ 路线级：本路线索引（文档索引 + 关系图 + 进度 + 锚点变更单）
+├── routes/A/
+│   ├── README.md          # ★ 路线身份证：这条路线是什么（低频变更）
+│   ├── STATUS.md          # ★ 当前状态人类摘要（research-state.json 的投影）
+│   ├── INDEX.md           # ★ 资产目录 + 时间线（不再承载当前状态）
 │   ├── docs/              # ★ 本路线文档（扁平；不建子目录）
 │   │   ├── A000-anchor.md # 冻结契约：路线锚点 + anchor_role + serves
-│   │   ├── A001-literature-survey.md
-│   │   ├── A002-ideas.md  # 含 I1..In 与 B5 审核
+│   │   ├── A001-field-map.md
+│   │   ├── A002-discovery.md  # 含 I1..In 与审核结论
 │   │   ├── A003-proposal.md
 │   │   ├── A004-experiment-plan.md
 │   │   ├── A005-narrative.md          # R12：一次调用一份
 │   │   └── A003-review-r01.md         # 审阅挂被审 ID，轮次零填充
-│   └── code/
-├── routeB/
+│   └── （无 src/）        # route 不复制代码；差异用 configs/routes/A/ 表达
+├── routes/B/
 │   ├── README.md
+│   ├── STATUS.md
 │   ├── INDEX.md
 │   └── docs/
+├── src/                   # ★ canonical implementation（唯一）
+├── experiments/A/<XID>/   # ★ 实验注册表：想做什么（pre-registration）
+├── results/A/<XID>/       # ★ 观察到什么（observation）
 ├── shared/                # 跨路线公用代码/笔记
-└── .research-idea-pipeline/   # 机器状态 + 中间产物（都不入 docs）
-    ├── research-state.json    # R1 常驻状态（就地覆盖，不按阶段切分）
-    └── routeA/A003-r01/       # 中间产物：子代理原始评审件（可删）
+└── .research-idea-pipeline/routes/A/research-state.json  # 机器状态（不入 docs）
 ```
 
 | 规则 | 说明 |
 |---|---|
-| 命名 | `<routeX>/docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review-r01.md`，接续 `-r02.md` |
-| 存放 | **路线文档放 `routeX/docs/`（扁平，不建子目录）**；**根 `docs/` 是跨路线共享区，只保证有 `refs/`**，路线文档不得放这里 |
-| slug 枚举 | **封闭**：`anchor` / `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative` |
+| 命名 | `routes/<R>/docs/<路线字母><NNN>-<slug>.md`；审阅为 `<ID>-review-r01.md`，接续 `-r02.md` |
+| 存放 | **路线文档放 `routes/<R>/docs/`（扁平，不建子目录）**；**根 `docs/` 是跨路线共享区，只保证有 `refs/` 与 `decisions/`**，路线文档不得放这里 |
+| slug 枚举 | **封闭**：`anchor` / `field-map` / `discovery` / `theory` / `evidence` / `proposal` / `experiment-plan` / `result-analysis` / `decision` / `narrative` / `review` |
 | 派生文档 | **禁止自创 slug**。枚举外的派生物（`paper-outline` / `experiment-cards` / `math-consolidation` …）归到最接近的枚举，原义写 frontmatter 的 **`subtype`**，并在路线 INDEX 文档表加 **`subtype` 列** |
-| 落盘三档 | **交付物** → `routeX/docs/`；**中间产物**（子代理原始评审件、草稿） → `.research-idea-pipeline/<route>/<被审ID>-r<NN>/`；**机器状态** → `.research-idea-pipeline/state-*.json`。**正式 review 必须自带摘要**，原始件不得被当作结论引用 |
+| 落盘三档 | **交付物** → `routes/<R>/docs/`；**中间产物**（子代理原始评审件、草稿） → `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/`；**机器状态** → `.research-idea-pipeline/routes/<R>/research-state.json`。**正式 review 必须自带摘要**，原始件不得被当作结论引用 |
 | 子编号 | `I<n>` idea、`N<k>` 叙事 preset、`K<n>` 贡献、`E<n>` 实验、`H<n>` 假设；引用写作 `<文档ID>/<子编号>` |
 | ID | 按路线独立递增、永不复用；审阅记录不占新序号 |
 | 锚点文档 | `<R>000-anchor.md`（`type: anchor`）是**冻结契约**，frontmatter 带 `anchor_version` + `anchor_hash`；改锚点走锚点变更单并升版本 |
 | 文档 ID 前缀 | `A`/`B` 是**路线编号**，与 R 阶段无关；阶段记在 frontmatter |
-| INDEX.md | 每条路线必需，每次产出后更新 |
-| 进度必须包含 | **已证实 / 已证伪 / TODO / Bugs / Warnings** + 文档索引 + 变更日志 |
-| 负结果 | 被证伪的假设**不得删除**，保留并注明处置 |
-| 机器状态 | 进 `.research-idea-pipeline/`，**不进 docs** |
+| 三文件分工 | 路线 `README.md` 答"是什么"（很低频）；`STATUS.md` 答"现在怎样"（很高频，由 `render_status.py` 从 state 生成）；`INDEX.md` 答"有哪些材料"（中等） |
+| INDEX.md | 只放**资产目录 + 时间线**（Key Documents / Experiments / Decisions / Reviews / Milestones / Recent Research Changes / Archive）；**不含当前状态** |
+| STATUS.md | **当前状态**（Current thesis / findings / hypotheses / uncertainties / attacks / experiments / negative findings / next actions / decision）；**是 state 的投影，禁止手改** |
+| 负结果 | 被证伪的假设**不得删除**，进 `STATUS.md` 的 Most important negative findings |
+| XID | 每个正式实验一个唯一 `XID`，贯穿 `experiments` / `configs` / `results` / `logs` / `checkpoints` / state |
+| 机器状态 | 进 `.research-idea-pipeline/routes/<R>/`，**不进 docs** |
 | **PDF 索引** | **`docs/refs/` 下每个 PDF 必须在 `docs/refs/index.json` 有记录**；索引进版本库、PDF 不进 |
 
-完整规范见 [references/project-layout.md](references/project-layout.md)（含手工建立
-骨架的检查清单）。骨架可参考 [templates/INDEX.md](templates/INDEX.md)（路线级）、
-[templates/INDEX.root.md](templates/INDEX.root.md)（根级跨路线）与
-[templates/README.route.md](templates/README.route.md)（路线级说明）。
+完整规范见 [references/project-layout.md](references/project-layout.md)（含八条 DI
+invariant 与手工建骨架的检查清单）。骨架可参考
+[templates/INDEX.md](templates/INDEX.md)（路线资产目录）、
+[templates/STATUS.md](templates/STATUS.md)（路线当前状态）、
+[templates/INDEX.root.md](templates/INDEX.root.md)（根级路线总表）与
+[templates/README.route.md](templates/README.route.md)（路线身份证）。
 
 ---
 
@@ -493,7 +502,9 @@ title / venue / year**，所以要用 `--migrate`（保留旧字段 + 写 `migra
 
 每个 R 阶段 输出附加 `state.json` 片段（模板见
 [templates/research-state.template.json](templates/research-state.template.json)，顶层直接是八类一等对象数组 + `contract`）。
-机器状态写入 `.research-idea-pipeline/`，人类可读产出写入**所在路线的 `routeX/docs/`**。
+机器状态写入 `.research-idea-pipeline/routes/<R>/research-state.json`，
+人类可读产出写入**所在路线的 `routes/<R>/docs/`**；
+当前状态由 `research-state.json` 投影成 `routes/<R>/STATUS.md`（**禁止手改**）。
 
 接续规则：
 

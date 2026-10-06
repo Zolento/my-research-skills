@@ -335,4 +335,4 @@
 - [ ] 「首次提出」已标「待核实」；要保留则三件事齐备：L3 穷尽检索 + S-Lit 核实 +
       负检索记录（见 [phase-r12-narrative.md](phase-r12-narrative.md) §D5.3）。
 - [ ] 已附「包装前后对照」，且每句声称都能落回 `Ci ← Ej`。
-- [ ] 落盘路径带 `routeX/` 前缀（`<routeX>/docs/<R>NNN-narrative.md`）。
+- [ ] 落盘路径带 `routes/<R>/` 前缀（`routes/<R>/docs/<R>NNN-narrative.md`）。

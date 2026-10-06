@@ -1,95 +1,81 @@
 <!--
-路线 INDEX.md 骨架。
-用法：复制到 routeX/INDEX.md，按项目实际内容填写（每条路线必需）。
-要求：每次产出、每次实验、每次发现 bug/风险后必须更新本文件。
-机器可读状态不放这里 —— 放 .research-idea-pipeline/。
+路线 INDEX.md 骨架（资产目录 + 时间线）。
+用法：复制到 routes/<R>/INDEX.md。
+职责：回答「这条路线有哪些材料」。
+      只登记资产，不登记当前状态。当前状态看 STATUS.md。
+      禁止出现 已证实 / 已证伪 / TODO / Bugs / Warnings 这类当前状态。
+      机器可读状态不放这里，放 .research-idea-pipeline/。
 -->
 
-# <routeX> — INDEX
+# routes/<R> — INDEX
 
-> **一句话状态：** <当前处于什么阶段、卡在哪>
-> **最后更新：** <YYYY-MM-DD>
+> 本文件是**资产目录**，回答「这条路线有哪些材料」。
+> 当前状态见 `STATUS.md`，路线说明见 `README.md`。
+> 最后更新：`<YYYY-MM-DD>`
 
 ---
 
-## 1. 路线概要
+## 1. Route Overview
 
 | 项 | 内容 |
 |---|---|
-| **路线锚点 `core_goal`** | theory / performance / phenomenon / benchmark / feasibility / negative（**只记主锚点**） |
-| **次锚点 `core_goal_secondary`** | 可空，如 feasibility（**只写这里，不写进 frontmatter 的 `core_goal`**） |
-| **`anchor_role`** | primary / supporting / orthogonal —— 与《根 INDEX.md》的**项目主锚点**的关系 |
-| **`serves`** | `supporting` **必填**：服务哪条主锚点、通过什么机制 |
-| **`serves_evidence`** | `supporting` **必填**：落到哪条贡献/实验，须可核验（如 `A003/K1`） |
-| 研究问题 | |
-| 核心假设 | |
+| 路线说明 | `README.md` |
+| 当前状态 | `STATUS.md` |
+| 路线锚点 `core_goal` | theory / performance / phenomenon / benchmark / feasibility / negative（只记主锚点） |
+| 次锚点 `core_goal_secondary` | 可空（只写这里，不写进 frontmatter 的 `core_goal`） |
+| `anchor_role` | primary / supporting / orthogonal |
+| `serves` / `serves_evidence` | `supporting` 必填，且必须可证伪 |
 | 目标会议 | CVPR / ICML / NeurIPS / MICCAI |
-| 当前阶段 | R2 / R5 / R3—R6 / R8 / R12 / R7 / R10 / R13 |
-| 推荐优先级 | 高 / 中 / 低 / 建议放弃 |
-| 负责范围 | 代码：`routeX/code/`。文档：`docs/` |
+| 本路线 config | `configs/routes/<R>/` |
 
-> **`anchor_role: orthogonal` 时**，这里必须写明「**不参与主锚点成功判据**」，
-> 且本路线**不得进入 R12、不得作为投稿主线**（见 `SKILL.md` §0.1 规则 3）。
-> **`supporting` 必须可证伪**：要说出一个会因它而改变的下游决策与对主锚点判据的
-> 可测影响。只写"有理论价值"不算 —— 答不出就标 `orthogonal`。
-
-> **锚点变更必须开「锚点变更单」（可放本节下方或 §9 变更日志）：** 记日期、旧方向 → 新方向、
-> 类型（**增补** / **替换**）、依据、以及**受影响产物清单**。
-> - **`类型: 替换` 的依据必须是「用户显式指令原话」** —— 证据只能作为**提请**材料，
->   **不能**作为变更依据。
-> - **`类型: 替换` 而没有受影响产物清单 = 变更单无效。**
-> - **只有用户能授权换方向。** agent **不得**以"主锚点不可达 / 另一个方向更有意思"为由
->   自行换方向、换主锚点或开新路线。它只能**提请**（记 Warnings + 问用户）与
->   **降级**（标 `orthogonal` 并公开标注）。见 `SKILL.md` §0.2 约束 1。
+> **锚点变更单记在根 `INDEX.md`。** 本路线锚点要与它保持一致。
+> `anchor_role: orthogonal` 时，这里必须写明「不参与主锚点成功判据」。
+> 本路线不得进入 R12，也不得作为投稿主线。
 
 ---
 
-## 2. 文档索引
+## 2. Key Documents
 
-> 链接相对本文件（即 `routeX/`）书写，格式为 `docs/<文件名>` ——
-> **本路线的文档都在 `routeX/docs/`（扁平）**。根目录 `docs/` 是跨路线共享区。
-> **slug 只能取下列封闭枚举**（详见本 Skill 的 `project-layout.md` §2.1）：
-> `anchor` / `literature-survey` / `ideas` / `proposal` / `experiment-plan` / `narrative`。
+> 链接相对本文件（即 `routes/<R>/`）书写，格式为 `docs/<文件名>`。
+> **本路线的文档都在 `routes/<R>/docs/`，保持扁平。** 根目录 `docs/` 是跨路线共享区。
+> **`subtype` 列必填**：枚举内写 `—`，枚举外写原义。
+> **`slug` 只取封闭枚举**（详见本 Skill 的 `project-layout.md` §2.1）。
+> **枚举外的派生物不要自创 slug**，归到最接近的枚举，原义写 `subtype`。
 > 审阅意见为 `docs/<被审ID>-review-r<NN>.md`，**不占新序号**。
-> **枚举外的派生物不要自创 slug** —— 归到最接近的枚举，原义写 `subtype` 列（见 §3.2）。
-> 下行是**格式示例**，填表时请替换为真实文件，不要保留占位行。
 
-| ID | 文件 | 类型 | **subtype** | 阶段 | 状态 | 说明 |
+| ID | 文件 | 类型 | subtype | 阶段 | 状态 | 说明 |
 |---|---|---|---|---|---|---|
 | `<路线字母>000` | `docs/<文件名>` | anchor | — | — | frozen | 冻结契约 · v<版本> · hash <前16位> |
-| `<路线字母>001` | `docs/<文件名>` | literature-survey | — | R2 | draft | |
-| `<路线字母>002` | `docs/<文件名>` | idea-discovery | — | R3—R6 | draft | 含 I1..In |
+| `<路线字母>001` | `docs/<文件名>` | field-map | — | R2 | draft | 领域地图 |
+| `<路线字母>002` | `docs/<文件名>` | discovery | — | R3—R6 | draft | 含 I1..In |
 | `<路线字母>003` | `docs/<文件名>` | proposal | — | R8 | draft | 贡献 K1..Kn |
 | `<路线字母>004` | `docs/<文件名>` | experiment-plan | experiment-cards | R9—R11 | draft | 实验 E1..En |
 | `<路线字母>005` | `docs/<文件名>` | narrative | — | R12 | draft | 一次调用：I1..In 的 claim graph + 六槽位叙事 |
 | `<路线字母>003-review-r01` | `docs/<文件名>` | review | — | R7 / R10 / R13 | draft | 对 `003` 的第 1 轮审阅 |
 
-> **`subtype` 列必填**：枚举内写 `—`，枚举外写原义（如 `paper-outline` /
-> `experiment-cards` / `math-consolidation`）。**文件名只由 `<slug>` 决定**，
-> 派生物的语义**只能靠这一列保住**。
-
-### 2.0 文档关系图
+### 2.1 文档关系图
 
 > **编号是"时间序"，关系图是"关系序"。** 每次产出后手工更新本节。
 
 ```text
-A001 文献调研
- └─▶ A002 ideas ─┬─▶ A003 方案 ─┬─▶ A004 实验计划
-                 │              ├─▶ A003-review-r01
-                 │              └─▶ A003-review-r02（接续复核）
-                 └─▶ A005 narrative（含 I1 / I3 / I5）
-                       └─▶ A005-review-r01
+A001 field-map
+ └─▶ A002 discovery ─┬─▶ A003 proposal ─┬─▶ A004 experiment-plan
+                     │                  ├─▶ A003-review-r01
+                     │                  └─▶ A003-review-r02（接续复核）
+                     └─▶ A005 narrative（含 I1 / I3 / I5）
+                           └─▶ A005-review-r01
 ```
 
-### 2.1 Idea 追踪
+### 2.2 Idea 追踪
 
-> 每个 idea 一行。**淘汰的 idea 不得删除**，标"已淘汰"并写理由（对应负面结论）。
+> 每个 idea 一行。**淘汰的 idea 不得删除**，标"已淘汰"并写理由。
+> 这是历史资产登记，不是当前状态。当前状态查 `STATUS.md`。
 
 | Idea | 状态 | 关联文档 | 最佳 preset | 备注 |
 |---|---|---|---|---|
 | `I1` | 进 population / 已进方案 / **已淘汰** | `<ID>/I1` … | `N2` | |
 
-### 2.2 叙事追踪
+### 2.3 叙事追踪
 
 > 每个 idea 的 claim 与叙事选型。**门禁未过的叙事**与**被否决的 preset** 都要留痕。
 
@@ -97,7 +83,32 @@ A001 文献调研
 |---|---|---|---|---|---|---|---|
 | `I1` | `<ID>` | `(Method, hidden-assumption, design-algorithm)` | `N2/N3/N5/N9` | `N2` | 全 pass / `G3 fail` | `5/4/3/4/3/4` | 是 / 否（哪套、为何） |
 
-### 2.3 审阅追踪
+---
+
+## 3. Experiments
+
+> **XID 是实验的唯一注册号。** 入口指向 `experiments/<R>/<XID>/README.md`。
+> 结果摘要指向 `results/<R>/<XID>/summary.md`。
+> 这里只登记资产，不写当前状态。
+
+| XID | Question | 状态 | 结果 | 入口 |
+|---|---|---|---|---|
+| `X021` | | | | `experiments/<R>/X021-<slug>/README.md` |
+
+---
+
+## 4. Decisions
+
+> 正式决策记录。项目级放 `docs/decisions/`，路线级放本路线 `docs/`。
+> 命名 `DEC<NNN>-<slug>.md`，**append-only**。
+
+| DEC | 主题 | 结论 | 日期 |
+|---|---|---|---|
+| `DEC001` | | | |
+
+---
+
+## 5. Reviews
 
 > **复现风险高**、**中位数 <3**、**存在评审分歧**都必须在此可见。
 
@@ -108,70 +119,30 @@ A001 文献调研
 
 ---
 
-## 3. 已证实（Confirmed）
+## 6. Milestones
 
-> 有明确证据支持的结论。每条必须有证据链接（文档章节 / 实验编号 / 文献引用）。
-> 引用写法：`<文档ID>/<子编号>`，如 `A002/I3`、`A003/K1`、`A004/E2`。
->
-> **行号说明：** 下列各表的 `#` / `ID` 列是**表内行号**（Confirmed 用 C、Falsified 用 F、TODO 用 T、Bugs 用 B、Warnings 用 W），
-> **与阶段章节号（如 R8 的 §C1）、触发条件 T1—T7 无关**。
-
-| # | 结论 | 证据 | 日期 |
-|---|---|---|---|
-| C1 | | | |
-
----
-
-## 4. 已证伪（Falsified）
-
-> 被实验或文献否定的假设。**负结果不删除**，保留并注明处置。
-
-| # | 假设 | 否定证据 | 处置 | 日期 |
-|---|---|---|---|---|
-| F1 | | | | |
-
----
-
-## 5. TODO
-
-| # | 任务 | 优先级 | 依赖 | 负责 | 状态 |
-|---|---|---|---|---|---|
-| T1 | | P0 | — | — | 待办 |
-
----
-
-## 6. Bugs
-
-> 必须可复现：给出命令或脚本路径。
-
-| # | 现象 | 影响 | 复现 | 状态 | 处置 |
-|---|---|---|---|---|---|
-| B1 | | | | 未解决 | |
-
----
-
-## 7. Warnings
-
-> 风险、待核实项、已知未知、**未达饱和的检索**、未缓解的致命风险。
-> **待核实条数：<N>**（超过 **5** 必须在本轮内收敛：补检索 / 补实验 / 明确降级措辞，
-> 不得继续累积。见 `project-layout.md` §4.2 与 `evidence-policy.md`）
-
-| # | 警告 | 类型 | 影响 | 处置 |
-|---|---|---|---|---|
-| W1 | | 新颖性 / 理论 / 检索 / 复现 / 资源 | | |
-
----
-
-## 8. 关键依赖与风险
-
-- **数据：** <数据集、许可、可得性>
-- **算力：** <GPU·小时、显存>
-- **外部依赖：** <库版本、接口、复现的关键外部代码>
-
----
-
-## 9. 变更日志
-
-| 日期 | 变更 | 文档 |
+| 日期 | 里程碑 | 关联文档 |
 |---|---|---|
 | | | |
+
+---
+
+## 7. Recent Research Changes
+
+> **这是 `history/` 的人类投影，不是变更日志的替代品。**
+> 每行一条，来源是 `research-state.json` 的 state 变更。
+> 完整变更日志可留在本节下方或 Archive。
+
+| 日期 | state_version | 变更摘要 | 触发阶段 |
+|---|---|---|---|
+| | `<N>` | | |
+
+---
+
+## 8. Archive
+
+> 已封存、已合并、已被取代的材料。**不删除，只归档。**
+
+| 日期 | 材料 | 归档原因 | 去向 |
+|---|---|---|---|
+| | | | |

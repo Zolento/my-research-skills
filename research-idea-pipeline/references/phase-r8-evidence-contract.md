@@ -159,8 +159,8 @@
 ## C6. 文档落盘与 INDEX 更新（强制）
 
 1. **写文档（两份，各占独立序号）：**
-   - 方案：`<routeX>/docs/<R>NNN-proposal.md`
-   - 实验计划：`<routeX>/docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
+   - 方案：`routes/<R>/docs/<R>NNN-proposal.md`
+   - 实验计划：`routes/<R>/docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
    每份文档都按 project-layout.md §2.6 扫描现有最大序号 +1，**序号永不复用**。
 2. **frontmatter：** `phase: R8 / type: proposal | experiment-plan / status / created`。
 3. **更新该路线 `INDEX.md`：**
@@ -185,7 +185,7 @@
 {
   "phase": "R8",
   "timestamp": "2025-01-01T00:00:00Z",
-  "route": "routeA",
+  "route": "A",
   "doc_id": "A003",
   "idea_id": "I3",
   "idea": "…",
@@ -235,4 +235,4 @@ Expansion rule
 | **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

@@ -129,11 +129,12 @@ python3 scripts/literature_search.py --query "..." --local-only
 ## 落盘
 
 ```
-routeA/docs/A001-literature-survey.md   ← 本报告（含负检索记录与饱和判定）
-routeA/INDEX.md                            ← 更新文档索引 / TODO / Warnings
+routes/A/docs/A001-field-map.md   ← 本报告（含负检索记录与饱和判定）
+routes/A/INDEX.md                 ← 更新资产目录（Key Documents / Experiments / Milestones）
+routes/A/STATUS.md                ← 更新当前状态（Critical uncertainties / Next actions）
 ```
 
-INDEX 的 Warnings 至少会出现一行：
+`STATUS.md` 的 Critical uncertainties 至少会出现一行：
 
 | # | 警告 | 类型 | 影响 | 处置 |
 |---|---|---|---|---|

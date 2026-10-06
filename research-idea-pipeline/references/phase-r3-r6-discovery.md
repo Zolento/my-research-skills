@@ -13,7 +13,7 @@
 
 
 > ⚠️ **作用域裁决（Wave 2）：** 本文件同时含两代内容 ——
-> **`B0`—`B8`** 是旧的 idea-discovery 流程，**`R3`—`R6`** 是 Wave 2 起生效的发现层正式规则。
+> **`B0`—`B8`** 是旧的 discovery 流程，**`R3`—`R6`** 是 Wave 2 起生效的发现层正式规则。
 > **冲突时一律以 `R3`—`R6` 为准**；`B2`（局限分析）、`B4`（发散策略）、`B5`（审核）
 > 作为 **R3 的输入约束**保留，不再单独驱动「一轮 brainstorm → population（QD archive 的候选池）」那条路径。
 > **被取代的节（点名）：** `B5.4`（按创新性/可行性/重叠度排名）、`B6`（推荐 shortlist 3—5 个）、
@@ -268,11 +268,11 @@
 
 ## B7. 文档落盘与 INDEX 更新（强制）
 
-1. **写文档：** `<routeX>/docs/<R>NNN-ideas.md`（ID 按
+1. **写文档：** `routes/<R>/docs/<R>NNN-discovery.md`（ID 按
    [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 population（QD archive 的候选池） + 淘汰清单 + 创新性边界界定。
-2. **frontmatter：** `id / route / phase: R3—R6 / type: idea-discovery / status / created`。
+2. **frontmatter：** `id / route / phase: R3—R6 / type: discovery / status / created`。
 3. **更新该路线 `INDEX.md`：**
    - §2 文档索引：新增本文件行；
    - §3 已证实：被 S-Lit 证实"重叠足够"的 idea 方向；
@@ -315,7 +315,7 @@
 ```
 
 > 完整骨架见 [research-state.template.json](../templates/research-state.template.json)；
-> 写回后**必须**跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，
+> 写回后**必须**跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
 > **硬违规须为 0**（exit 3 = 硬违规，exit 4 = 结构不符）。
 
 
@@ -587,4 +587,4 @@ R6: Recombine            才允许不同世界互相借东西
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

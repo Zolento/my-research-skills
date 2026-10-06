@@ -76,3 +76,15 @@ assumption-breaking
 new-formulation
 remote-theory-transfer
 benchmark-inversion
+
+# ── 目录规范（2026：路线平铺在根目录 → routes/<R>/ 聚合；人类入口 STATUS.md）──
+# 以下必须保持 `research-idea-pipeline/` 内 0 命中；追溯历史用「旧的平铺路线目录」这类说法。
+# 之所以登记：平铺写法一旦回流，人类导航会退化成「根目录混着代码/route/results/configs」。
+routeX/
+<routeX>
+\.research-idea-pipeline/<route>/
+
+# ── 文档命名（2026：流程类型 slug → 知识类型 slug）──
+# 旧 slug 绑定已退役的流程字母，且无法表达「同一份知识来自多个阶段」。
+literature-survey
+

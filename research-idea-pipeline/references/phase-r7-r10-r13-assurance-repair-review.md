@@ -300,7 +300,7 @@ R7 / R10 / R13 继续复核。**
 
 ## E6. 文档落盘与 INDEX 更新（强制）
 
-1. **写审阅记录：** `<routeX>/docs/<被审ID>-review-r01.md`；
+1. **写审阅记录：** `routes/<R>/docs/<被审ID>-review-r01.md`；
    接续复核写 `-r02.md`、`-r03.md`（轮次零填充两位）（frontmatter 记 `review_round`）。
    **审阅记录不占用新序号**，永远挂在被审文档 ID 上。
 2. **frontmatter：** `phase: R7 / R10 / R13 / type: review / review_of: <被审ID> / review_round / also_reviewed / status`。**跨文档复核**（如同时审方案 + 实验计划）挂在主文档 ID 上，其余写进 `also_reviewed`。
@@ -337,7 +337,7 @@ R7 / R10 / R13 继续复核。**
 {
   "phase": "R7 / R10 / R13",
   "timestamp": "2025-01-01T00:00:00Z",
-  "route": "routeA",
+  "route": "A",
   "doc_id": "A003-review",
   "review_type": "first | follow-up",
   "proposal_ref": "state-C-<timestamp>.json",
@@ -459,4 +459,4 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 | **R14** | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

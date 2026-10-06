@@ -179,7 +179,7 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
   `claims[].status` —— 这是防「自己给自己判分」的结构性措施。
 - 第 3 步**不允许只关不增**：一轮实验如果没有任何新不确定性，要么结论已足够强（走 R14），
   要么本次实验没有信息量（应记为 `failures[]` 的 `inconclusive`）。
-- 收尾跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，
+- 收尾跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
   **硬违规须为 0**。
 
 ---
@@ -209,4 +209,4 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 | **R11** | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

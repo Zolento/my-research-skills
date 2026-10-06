@@ -57,7 +57,7 @@
 
 | 产物 | 位置 |
 |---|---|
-| `contract` | `.research-idea-pipeline/<route>/research-state.json` |
+| `contract` | `.research-idea-pipeline/routes/<R>/research-state.json` |
 | 根 `INDEX.md` 的项目主锚点声明 | 项目根 |
 
 ---
@@ -83,4 +83,4 @@
 | **R0** | — | `contract` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
-> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。
+> 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

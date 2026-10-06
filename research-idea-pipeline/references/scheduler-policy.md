@@ -16,7 +16,7 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 
 | 项 | 值 |
 |---|---|
-| 路径 | `.research-idea-pipeline/<route>/scheduler.json` |
+| 路径 | `.research-idea-pipeline/routes/<R>/scheduler.json` |
 | 骨架 | [../templates/scheduler.template.json](../templates/scheduler.template.json) |
 
 **它不进 `research-state.json`，也不是第九类一等对象。**

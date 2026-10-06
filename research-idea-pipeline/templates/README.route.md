@@ -1,41 +1,56 @@
 <!--
-路线级 README.md 骨架（与 routeX/INDEX.md 配套）。
-用法：复制到 routeX/README.md。
-职责：**本路线的说明** —— 做什么、怎么跑、目录怎么组织。
-      进度与文档索引不要写在这里，写到 routeX/INDEX.md。
+路线级 README.md 骨架（路线身份证）。
+用法：复制到 routes/<R>/README.md。
+职责：这条路线是什么、为什么存在。更新频率很低。
+禁止：实验进展、今日 TODO、临时 hypothesis 一律不得写在这里。
+      进度看 STATUS.md，资产看 INDEX.md。
 -->
 
-# <routeX> — <一句话路线名>
+# routes/<R> — <一句话路线名>
 
-> **本路线说明。** 进度与文档索引见 `INDEX.md`。跨路线信息见根目录 `../INDEX.md`。
+> **路线身份证。** 本文件更新频率很低，只回答「这条路线是什么」。
+> 当前进度见 [STATUS.md](STATUS.md)，材料目录见 [INDEX.md](INDEX.md)。
 
-## 1. 本路线做什么
+---
 
-- **核心目标（锚点）：** theory / performance / phenomenon / benchmark / feasibility / negative
-- **研究问题：**
-- **关键假设：**
-- **目标会议：** CVPR / ICML / NeurIPS / MICCAI
+## 1. Research Question
 
-## 2. 目录组织
+- <这条路线要回答的那个问题>
 
-```text
-<routeX>/
-├── README.md     # 本文件：本路线说明
-├── INDEX.md      # 本路线索引：文档索引 + 关系图 + 进度
-├── docs/         # ★ 本路线文档（扁平，不按类型分子目录）
-│   ├── <R>001-literature-survey.md
-│   ├── <R>002-ideas.md
-│   ├── <R>003-proposal.md
-│   ├── <R>004-experiment-plan.md
-│   ├── <R>005-narrative.md
-│   └── <R>003-review-r01.md
-├── code/         # 本路线专属代码
-└── experiments/  # 实验脚本与产物
-```
+## 2. Why this route exists
 
-> 参考文献不放这里 —— 统一在根目录 `docs/refs/`。
+- <为什么值得做，与别的路线不重复>
 
-## 3. 怎么跑
+## 3. Relation to project goal
+
+- 项目主锚点：<见根 INDEX.md 的声明>
+- 本路线 `core_goal`：theory / performance / phenomenon / benchmark / feasibility / negative
+- `anchor_role`：primary / supporting / orthogonal
+- `serves` / `serves_evidence`（`supporting` 必填）：
+
+## 4. Current central thesis
+
+- <当前中心命题，一句话>
+- 可证伪条件：<什么观察会推翻它>
+
+## 5. Scope / non-goals
+
+- 做：<…>
+- 不做：<…>
+
+## 6. Route lineage
+
+- 来源：<从哪条路线分出，或从零开始>
+- 分叉 / 合并：<`forked_from` / `merged` 记录>
+- 关联路线：<…>
+
+## 7. Key resources
+
+- 数据：<数据集、许可、可得性>
+- 算力：<GPU·小时、显存>
+- 外部依赖：<库版本、接口>
+- 共享代码：`src/`。共享 config：`configs/base/`。
+- 本路线 config：`configs/routes/<R>/`。
 
 ```bash
 # 环境自检（确认解释器与依赖）
@@ -48,17 +63,15 @@ python3 <skill>/scripts/literature_search.py -q "<关键词>" --mailto you@examp
 python3 <skill>/scripts/refs_index.py --refs-dir docs/refs --check
 ```
 
-## 4. 关键约定
+## 8. Entry points
 
-- 文档命名与 ID 分配见本 Skill 的 `references/project-layout.md` §2。
-- **本路线文档一律放 `docs/`，扁平。编号 `^<R>\d{3}-` 独立递增、永不复用。**
-- 审阅命名 `<被审ID>-review-r01.md` / `-r02.md`（轮次零填充两位）。
-- 路线之间**不得互相 import**。需要复用的下沉到根目录 `shared/`。
-- 若项目根目录有 `AGENTS.md`，**以它为准**。
+| 想去哪 | 入口 |
+|---|---|
+| 当前状态 | [STATUS.md](STATUS.md) |
+| 材料目录 | [INDEX.md](INDEX.md) |
+| 机器状态 | `.research-idea-pipeline/routes/<R>/research-state.json` |
+| 项目总览 | `../README.md` |
+| 路线总表 | `../INDEX.md` |
 
-## 5. 当前状态
-
-> 一句话即可。详细进度在 [INDEX.md](INDEX.md)。
-
-- 当前阶段：
-- 阻塞项：
+> **禁止把实验进展、今日 TODO、临时 hypothesis 塞进 README。**
+> 几个月后它会变成历史垃圾场。进度写 `STATUS.md`，资产写 `INDEX.md`。
