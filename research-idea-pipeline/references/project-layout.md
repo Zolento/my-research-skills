@@ -126,6 +126,12 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
     └── runtime/{locks,tmp,tool-output}/
 ```
 
+> **`populations/` 收两类 search artifact（都不是 `state` object）：**
+> `populations/archive/` 存 QD archive 重排记录；
+> `populations/intermediates/` 存 `P3` 的 `abstract_skeleton`（typed intermediate，
+> 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）。
+> **两者都不得被当作结论引用**，也不分配 `H` / `C` / `X` ID。
+
 **与上一版的关键差异：**
 
 1. **`route_*` 集中进 `routes/`** —— 否则路线一多，根目录会同时混着代码、route、

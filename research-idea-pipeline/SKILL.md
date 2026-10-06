@@ -65,7 +65,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` + 模板骨架（含 `state_version: 0`） |
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
-| **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**）。**`P3` 只产 typed intermediate，不产 candidate** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） |
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
 | **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |

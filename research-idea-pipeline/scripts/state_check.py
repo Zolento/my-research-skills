@@ -48,7 +48,8 @@ Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为�
     V10 每条 `repairs[]` 记录必须齐备 `flaw / disposition / state_delta / closure`
     V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）
     V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用
-    V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）
+    V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 `P3` 不得出现
+        （`P3` 只产 typed intermediate，不产 candidate）
     V14 `hypotheses[].generation` 是非负整数
     V15 每个出现过的 `niche` 至少一条 `status: elite`
     V16 hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应
@@ -70,7 +71,8 @@ Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为�
     * V7 / V9 的 `TBD` 为精确字面量（strip 后比对，不接受 `tbd` / `TBD 待定`）。
     * V11 `stage == "X2"` ⇒ `claim_targeted` 必须为空数组（X2 只做基线校准）；
     * V12 `status == "failed"` ⇒ 必须被某条 `failures[].referenced_by` 引用；
-    * V13 `hypotheses[].island` ∈ {P1..P6, local}；
+    * V13 `hypotheses[].island` ∈ {P1..P6, local}，但 **`P3` 不得出现**
+      （`P3` 只产 typed intermediate，不产 candidate）；
     * V14 `hypotheses[].generation` 是非负整数；
     * V15 每个出现过的 `niche` 至少一条 `status: elite`；
     * V16 `operator` 必须是十二算子之一（strip 后精确比对）；`generation == 0` 且 `island` 合法时，
@@ -168,6 +170,9 @@ FAILURE_KINDS: Tuple[str, ...] = (
 # Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
 NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
 ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
+# HIGH-2：`P3` 只产 typed intermediate（`abstract_skeleton`），**不产 candidate** ——
+# 它不得出现在 `hypotheses[].island` 上。因此候选可用的 island 少一个。
+CANDIDATE_ISLANDS: Tuple[str, ...] = tuple(name for name in ISLANDS if name != "P3")
 # Wave 2 / R6：候选谱系的十二算子（generation-0 七轨 + R6 进化五算子）
 OPERATORS: Tuple[str, ...] = (
     "reframe", "assumption_breaker", "abstraction", "remote_analogy",
@@ -269,7 +274,7 @@ RULES: Dict[str, str] = {
     "V10": "每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure",
     "V11": "stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别",
     "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
-    "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）",
+    "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 **`P3` 不得出现**（P3 只产 typed intermediate，不产 candidate）",
     "V14": "hypotheses[].generation 是非负整数",
     "V15": "每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite",
     "V16": "hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应",
@@ -921,14 +926,24 @@ def _v6(ctx: _Context) -> List[Violation]:
 
 
 def _v13(ctx: _Context) -> List[Violation]:
-    """V13：island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）。"""
+    """V13：island ∈ {P1..P6, local}，但 **P3 不得出现**（只产 typed intermediate）。
+
+    `P3` 的骨架是 search artifact，不是 candidate。把它塞进 `hypotheses[]` 会把
+    「表示探索」提前变成「可证伪假设」（见 phase-r3-r6-discovery.md §R3.0.1）。
+    """
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("island")
-        if _text_ok(value) and value.strip() in ISLANDS:
+        text = _text(value)
+        if text in CANDIDATE_ISLANDS:
             continue
-        detail = ("为空（必须标明由哪条轨产生）" if _is_blank(value)
-                  else f"不是 {'|'.join(ISLANDS)} 之一")
+        if text == "P3":
+            detail = ("P3 只产 typed intermediate，不产 candidate"
+                      "（见 phase-r3-r6-discovery.md §R3.0.1）")
+        elif _is_blank(value):
+            detail = "为空（必须标明由哪条轨产生）"
+        else:
+            detail = f"不是 {'|'.join(CANDIDATE_ISLANDS)} 之一"
         out.append(Violation("V13", f"hypotheses[{index}].island", detail, value, _subject_of(hypothesis)))
     return out
 
@@ -2041,6 +2056,14 @@ def selftest() -> int:
     check("V13 island 非法 → 3", v13.exit_code == EXIT_HARD and v13.rules() == ["V13"])
     v13ok = report_with(lambda d: d["hypotheses"][0].update(island="local", operator="local"))
     check("V13 合法反例：island=local → 0", v13ok.exit_code == EXIT_OK and v13ok.violations == [])
+    def _p3_hypothesis(d):
+        # 单点语义：把 island 与 operator 一起改，否则 V16 的 gen-0 映射也会响
+        d["hypotheses"][0].update(island="P3", operator="abstraction")
+
+    v13p3 = report_with(_p3_hypothesis)
+    check("V13 island=P3 → 3（P3 只产 typed intermediate，不产 candidate）",
+          v13p3.exit_code == EXIT_HARD and v13p3.rules() == ["V13"]
+          and "typed intermediate" in v13p3.violations[0].detail)
 
     v14 = report_with(lambda d: d["hypotheses"][0].update(generation="1"))
     check("V14 generation 是字符串 → 3", v14.exit_code == EXIT_HARD and v14.rules() == ["V14"])

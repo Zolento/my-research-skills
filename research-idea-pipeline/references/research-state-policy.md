@@ -286,7 +286,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `expected_information_gain` | 数值（如 `0.0`） | ✅ | EIG 排序用（spec §4） |
 | `status` | `active` \| `elite` \| `archived` \| `killed` | ✅ | |
 | `niche` | `N1`—`N10` 之一（**V6 强制**；复用 preset 名，不引入第二套枚举） | ✅ | V6；QD archive 的前提 |
-| `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制** |
+| `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制**。**`P3` 不出现在这里** —— 它只产 typed intermediate（见 §5.0 规则 1） |
 | `operator` | 十二算子之一（见下表） | ✅ | 产生该候选的搜索算子；`generation == 0` 时**必须与 `island` 一一对应**；**V16 强制** |
 | `parents` | `H` id 数组，可为 `[]` | ✅ | 谱系：父候选；初始候选写 `[]`；**V17 强制**（必须存在、不得自指或成环、generation 严格大于每个 parent） |
 | `generation` | 整数 ≥ 0 | ✅ | `0` = 初始候选，每次 R6 进化 +1；**V14 强制** |
@@ -297,7 +297,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|
 | generation-0（island 算子） | `reframe` | `P1` | 问题重构：改 object / target variable / formulation / success criterion |
 | generation-0 | `assumption_breaker` | `P2` | 假设破坏：`AS_i → ¬AS_i →` 新 research world |
-| generation-0 | `abstraction` | `P3` | 领域擦除：出 `domain-free skeleton`，**不产完整方法** |
+| generation-0 | `abstraction` | `P3` | 领域擦除：出 `domain-free skeleton`，**不产完整方法**；**也不产出 `hypotheses[]` 条目**（该算子不会出现在任何 candidate 的 `operator` 上） |
 | generation-0 | `remote_analogy` | `P4` | 远域类比：`semantic distance high` + `structural correspondence high` |
 | generation-0 | `theory_lens` | `P5` | 理论视角：换 mathematical object 并导出 ≥2 类后果 |
 | generation-0 | `counterexample` | `P6` | 反例 / 不可能性 / 测量反转 |
@@ -477,7 +477,7 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 | V10 | 每条 repairs[] 记录必须齐备 flaw / disposition / state_delta / closure | 硬 | 只写 `flaw` 与 `disposition`——未闭环；`closure` 写 `后续再看` |
 | V11 | stage == X2（基线校准）时 claim_targeted 必须为空数组，不得承担 claim 判别 | 硬 | `{"stage":"X2","claim_targeted":["C0"]}` |
 | V12 | status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失） | 硬 | failed 实验没有对应 `F` |
-| V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需） | 硬 | `"island": "PX"` |
+| V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 **`P3` 不得出现**（P3 只产 typed intermediate，不产 candidate） | 硬 | `"island": "PX"`；`"island": "P3"` |
 | V14 | hypotheses[].generation 是非负整数 | 硬 | `"generation": "1"` / `-1` |
 | V15 | 每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite | 硬 | `N5` 下全是 `active` |
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
@@ -531,9 +531,11 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 
 ### 5.0 三条归属规则（总收官审计 M-1 / M-2）
 
-1. **`claims[]` 的创建归属 = R3。** 每个候选必须产出至少一条 `C`（其 central proposition，
-   `status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
+1. **`claims[]` 的创建归属 = R3。** 每个 **candidate** 必须产出至少一条 `C`（其 central
+   proposition，`status: ungrounded`）。**R7 攻击它、R8 建契约并更新 status、R12 只做视图（不创建）**。
    —— 否则 R7/R8 在读一个没人写的对象，V1/V2/V3 永不触发。
+   **candidate 的定义见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1：
+   `P3` 只产 typed intermediate，**不是** candidate，不产 `H` 也不产 `C`（`V13` 强制）。**
 2. **每个写 `failures[]` 的阶段（R6 / R7 / R9 / R13）同时负 `known_flaws` 义务**：
    把新 `F` 的 id 挂到对应 `claims[].known_flaws` 或 `experiments[].known_flaws`。
    —— 否则 V4 会在**这些阶段自己的收工检查**上报错，而写表又不授权它改 `known_flaws`。
@@ -559,7 +561,7 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 |---|---|---|---|
 | **R0** Research Contract | — | `contract` + 模板骨架（含 `state_version: 0`） | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
-| **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
+| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
 | **R4** Isolated Populations | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
@@ -576,9 +578,12 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 > 「读 / 写 World Model」表**必须逐字相同**；下面保留各阶段的细节语义，供执行时理解，
 > **不得**把它当成第二套口径。
 >
+> **`P3` 的骨架不进 state** —— 它写 `.research-idea-pipeline/routes/<R>/populations/intermediates/`
+> （search artifact；见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）。
+>
 - **R0**：读 用户输入、路线 `README.md` / `STATUS.md` / `INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
 - **R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（只读，用于定位缺口）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（缺口类主张先落 `U`，由 R3 转成 `C`）
-- **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）
+- **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**。**只给 candidate 建 `H` / `C`**；`P3` 的 typed intermediate 写 `.research-idea-pipeline/routes/<R>/populations/intermediates/`，**不进 state**（与上表逐字一致）
 - **R4**：读 `hypotheses[]`；写 `hypotheses[].status`（**QD archive 精修：只能重排 elite 归属**）。**`niche` / `operator` / `parents` / `generation: 0` 由 R3 创建时写入，R4 不得新建 niche**（与上表逐字一致）
 - **R5**：读 `hypotheses[]`；写 `literature[]` / `evidence[]`(kind=literature) —— **由当前候选反向决定下一轮 query**
 - **R6**：读 `hypotheses[]`、`uncertainties[]`、`failures[]`；写 `hypotheses[].status`（`active` / `elite` / `archived` / `killed`）、`expected_information_gain` 更新、`failures[]`（被搁置的假设记 `kind: deprioritized`）、`uncertainties[]`（收敛或新增）

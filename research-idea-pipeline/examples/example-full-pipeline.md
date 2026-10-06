@@ -21,6 +21,8 @@
 2. **`R3—R6.3`** 逐路线做深度局限性分析 —— 每条「没做到」必须指向**具体未建立的结构性质**。
 3. **`R3`** 按 island 分轨生成候选（`P1`—`P6` / `local`；**Wave A / Wave B 两波**，上下文隔离）。
    冻结的是 **operator 多样性**，不是 persona 多样性：**不派**会议审稿人，**不派**人格化头脑风暴子代理。
+   **`P3` 只产 typed intermediate**（`abstract_skeleton`），落 `populations/intermediates/`，
+   不进 `hypotheses[]`、不产 `C`；它给 `P4` 当原料（见 §R3.0.1）。
 4. **`R3.8`** 标注每个 idea 的推导策略。
 5. **`R3.7` idea 级审核（不可跳过）** —— 对每个候选派 `S-Lit`（重叠度）+ `R-Novelty`
    （非平凡性）+ `R-Causal`（更简解释）+ `S-Feas`（概念可行性），`S-Devil` 出致命反驳。

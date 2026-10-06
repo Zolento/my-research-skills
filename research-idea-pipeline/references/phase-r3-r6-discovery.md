@@ -135,7 +135,8 @@ problem ─────────┤                        （基线：把现
    若第一轮就共享答案，发散度会塌成一条。**隔离是机制，不是建议。**
    **隔离的对象是「候选内容」，不是「规范化中间表示」**（边界见 §R3.4）。
 2. **`P3` 必须先做 domain erasure**：删掉 `MRI / CT / flow / reconstruction` 这类领域词，
-   只留数学骨架（`domain-free skeleton`）；**`P3` 不产完整方法**。
+   只留数学骨架（`domain-free skeleton`）；**`P3` 不产完整方法，也不产 candidate**
+   —— 它的输出是 typed intermediate，落 `populations/intermediates/`（见 §R3.0.1）。
 3. **`P4` 的跨域联系必须逐维对应**：`object ↔ object`、`relation ↔ relation`、
    `constraint ↔ constraint`、`failure mode ↔ failure mode` **四维都要写出来**。
    只说「两边都有 distribution shift / optimization / uncertainty」**不算**结构同构。
@@ -146,10 +147,38 @@ problem ─────────┤                        （基线：把现
 6. 每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）、
    `operator`、`parents: []` 与 `generation: 0`（**V13 / V14 / V16 / V17 强制**）。
 
-### R3.0 `claims[]` 的创建归属（总收官审计 M-1）
+### R3.0 `claims[]` 的创建归属（总收官审计 M-1 / HIGH-2）
 
-**每个候选必须产出至少一条 `C`** —— 它的 central proposition，`status: ungrounded`。
+**每个 candidate 必须产出至少一条 `C`** —— 它的 central proposition，`status: ungrounded`。
 这是 claim graph 的**唯一起点**：
+
+#### R3.0.1 什么才算 candidate（HIGH-2 的落点）
+
+**candidate 的定义：能进入 population / QD archive、且可被证伪的候选。**
+
+| 算子 | 产出 |
+|---|---|
+| `P1` `reframe` | `H<n>` + seed `C<n>` |
+| `P2` `assumption_breaker` | `H<n>` + seed `C<n>` |
+| **`P3` `abstraction`** | **只产 typed intermediate（`abstract_skeleton`）。不进 `hypotheses[]`、不产 `C`、不进 QD archive、不分配 `H` / `C` ID。** |
+| `P4` `remote_analogy`（消费 `P3` 的骨架） | `H<n>` + seed `C<n>` |
+| `P5` `theory_lens`（可消费 `P1` 的 formulation） | `H<n>` + seed `C<n>` |
+| `P6` `counterexample` | `H<n>` + seed `C<n>` |
+| `local` | `H<n>` + seed `C<n>` |
+| R6 的五个进化算子 | `H<n>` + seed `C<n>` |
+
+**为什么 `P3` 是特例：** 它产出的是**表示空间里的一个骨架**，不是科学主张。
+强行把它包装成 `H`、再补一条 `C`，会把「表示探索」提前变成「可证伪假设」——
+于是候选数看起来达标，实际全落在同一个表示里。`P3` 的价值在于**给 `P4` 提供原料**，
+不在于它自己成为一个方向。
+
+**落盘位置：** `.research-idea-pipeline/routes/<R>/populations/intermediates/`
+（**search artifact，不是第九类 state object**；见 [project-layout.md](project-layout.md) §2.4）。
+
+**谱系纪律：** `P3 → H` 的来源关系**不进 state 谱系**。`P4` 仍写
+`{"island": "P4", "operator": "remote_analogy", "generation": 0, "parents": []}`，
+只在 population artifact 里记一处 `derived_from_intermediate`。
+**`parents` 永远只引用 `H`** —— 因此 `V16` / `V17` 不需要任何改动。
 
 | 阶段 | 对 `claims[]` 做什么 |
 |---|---|
@@ -169,7 +198,8 @@ V1 / V2 / V3 会**永不触发**，world model 变成没有 claim 的空壳。
 |---|---|
 | islands 数 | **默认 4**（`P1`—`P4`，各占独立预算）+ Local Search；`P5`（Theory Lens）与 `P6`（Counterexample & Measurement inversion）**按需启用**（枚举里合法，但不占默认预算；启用即上调，须说明理由） |
 | 生成主体 | **每个 island 一个独立 Exploration Agent**（各自上下文，互不可见；见 §R3.3 / §R3.4） |
-| 每 island 候选数 | **下限 3，上限 6**（超上限须显式说明为什么值得） |
+| 每 island 候选数 | **下限 3，上限 6**（超上限须显式说明为什么值得）。**`P3` 不计入候选数** —— 它只产 typed intermediate，见 §R3.0.1 |
+| `P3` 的产出 | **typed intermediate**（`abstract_skeleton`），落 `populations/intermediates/`；**不进 state、不进 QD archive** |
 | 进化轮数上限 | **2**（见 R6） |
 
 **可缩放：** 领域过窄或资源受限时，可在 R0 `contract.constraints` 写明并降到 **2 islands × ≥2 候选**；
@@ -193,7 +223,7 @@ Local Search 不是「对照组」——它负责**把现状做到更好**，其
 |---|---|---|
 | `P1` | `reframe` — 问题重构 | scientific object / target variable / formulation / success criterion |
 | `P2` | `assumption_breaker` — 假设破坏 | 从 Assumption Graph 出发：`AS_i → ¬AS_i →` 新的 research world |
-| `P3` | `abstraction` — 领域擦除 | 只产 `domain-free skeleton` / alternative abstractions；**不产完整方法** |
+| `P3` | `abstraction` — 领域擦除 | 只产 `domain-free skeleton` / alternative abstractions；**不产完整方法，也不产 candidate**（见 §R3.0.1） |
 | `P4` | `remote_analogy` — 远域类比 | 目标 `semantic distance high` + `structural correspondence high`（四维逐维对应，见硬规则 3） |
 | `P5` | `theory_lens` — 理论视角 | 强制换 mathematical object，并导出 ≥2 类后果 |
 | `P6` | `counterexample` — 反例 / 测量 | 从 impossibility / counterexample / evaluation inversion / observability failure **反向**生成 |
@@ -223,7 +253,7 @@ failure mode / core unknown 五类槽位），**不得**夹带候选领域名、
 |---|---|---|
 | **Wave A — Representation generation** | `P1` / `P2` / `P3` / `P6` / `local` | **只有共同 seed `S0`** |
 | **Wave B — Representation expansion** | `P4`（吃 `P3` 的 `abstract_skeleton`）/ `P5`（可选吃 `P1` 的 alternative formulations） | **只读规范化中间表示，不读完整 candidate pool** |
-| merge | 执行者汇总、结构化、分配 ID、写 state | — |
+| merge | 执行者汇总、结构化、**给 candidate 分配 `H` / `C` ID 并写 state**；`P3` 的骨架写入 `populations/intermediates/`，**不分配 ID、不写 state** | — |
 
 ### R3.6 生成后的 hygiene 快筛（**`R3 screening ≠ R7 assurance`**）
 
@@ -329,7 +359,7 @@ venue fit 不明确 / 当前证据不足。
 ### R4.1 聚类必须用结构性距离，**不得用文本 embedding**
 
 两个文字完全不同、本质都是「feature consistency loss」的候选，必须被识别为同一 cluster。
-因此用 `structural_signature` 的五维距离（V13/V14 之外，五键本身由 `state_check.py` 校验形状）：
+因此用 `structural_signature` 的五维距离（`S4` 校验五键形状；`V13` / `V14` 校验 `island` / `generation`）：
 
 | 维 | 问的是 |
 |---|---|
@@ -483,7 +513,7 @@ R6: Recombine            才允许不同世界互相借东西
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） |
 | **R4** |`hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 

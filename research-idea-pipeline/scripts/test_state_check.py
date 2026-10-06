@@ -494,6 +494,18 @@ class TestV13V15(unittest.TestCase):
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V13"])
 
+    def test_v13_island_p3_is_hard(self) -> None:
+        """`P3` 只产 typed intermediate，不是 candidate（HIGH-2）。"""
+        doc = valid_state()
+        doc["hypotheses"][0].update(island="P3", operator="abstraction")
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.rules(), ["V13"])
+        self.assertIn("typed intermediate", report.violations[0].detail)
+
+    def test_candidate_islands_exclude_p3(self) -> None:
+        self.assertEqual(sc.CANDIDATE_ISLANDS,
+                         ("P1", "P2", "P4", "P5", "P6", "local"))
+
     def test_v13_local_track_is_legal(self) -> None:
         doc = valid_state(); doc["hypotheses"][0]["island"] = "local"
         doc["hypotheses"][0]["operator"] = "local"  # V16：generation-0 必须与 island 对应
@@ -572,7 +584,11 @@ class TestV16V17(unittest.TestCase):
         self.assertIn("assumption_breaker", r.violations[0].render())
 
     def test_v16_every_generation0_island_operator_pair_is_clean(self) -> None:
+        # 只覆盖 candidate island：`P3` 不产 candidate（V13 拒绝），
+        # 其合法性由 TestV13V15.test_v13_island_p3_is_hard 单独锁住。
         for island, operator in sc.ISLAND_OPERATOR.items():
+            if island not in sc.CANDIDATE_ISLANDS:
+                continue
             doc = valid_state()
             doc["hypotheses"][0]["island"] = island
             doc["hypotheses"][0]["operator"] = operator
@@ -829,6 +845,11 @@ class TestTableIntegrity(unittest.TestCase):
         end = text.index(stop, begin) if stop else len(text)
         rows = []
         for line in text[begin:end].split("\n"):
+            # markdown 表格在空行处结束。**必须**在这里停：一条误插进表体中间的
+            # blockquote 会把表切成两半，而原来的 "\n\n>" 停止标记会被同一条 note 带偏，
+            # 于是列检查只覆盖前半张表却仍然全绿（Batch 8 就是这么漏的）。
+            if not line.strip():
+                break
             cells = line.split("|")
             if len(cells) < 3:
                 continue
@@ -840,6 +861,8 @@ class TestTableIntegrity(unittest.TestCase):
     def test_policy_readwrite_table_columns(self) -> None:
         rows = self._rows("references/research-state-policy.md", "| 阶段 | 读什么", "\n\n>")
         self.assertTrue(rows, "policy §5 读不到阶段行")
+        # 行数守卫：表体若被一行 blockquote 切开，列检查只会覆盖前半张表却仍然全绿
+        self.assertEqual(len(rows), 14, "policy §5 应恰好 14 个阶段行（表被切开了？）")
         for stage, cells in rows:
             # 4 列表格：| 阶段 | 读 | 写 | 文件 | → split("|") 得 6 段
             self.assertEqual(len(cells), 6, f"policy {stage} 列数 {len(cells)}")
@@ -847,6 +870,7 @@ class TestTableIntegrity(unittest.TestCase):
     def test_skill_stage_table_has_effect_column(self) -> None:
         rows = self._rows("SKILL.md", "| Phase | 名称 |", "\n\n")
         self.assertTrue(rows, "SKILL §0 读不到阶段行")
+        self.assertEqual(len(rows), 15, "SKILL §0 应恰好 15 个阶段行（表被切开了？）")
         for stage, cells in rows:
             self.assertEqual(len(cells), 7, f"SKILL {stage} 列数 {len(cells)}")
             name, effect, read = cells[2].strip(), cells[3].strip(), cells[4].strip()
@@ -1131,6 +1155,82 @@ class TestShapeGate(unittest.TestCase):
             self.assertIn(sc.SHAPES[rule], out)
 
 
+class TestReadWriteTableParity(unittest.TestCase):
+    """三处「读 / 写」表的**单元格内容**必须逐字一致。
+
+    三处 = SKILL §0、policy §5、各 `phase-*.md` 的「读 / 写 World Model」。
+    `TestTableIntegrity` 只查列数与列错位，**看不见内容漂移**。
+
+    起因：Batch 8 改了 R3 的写集，SKILL 与 policy 都改了，却漏了
+    `phase-r3-r6-discovery.md` 自己的那张表 —— 三方不一致，而所有表格检查全绿。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    @staticmethod
+    def _parse(text: str, anchor: str):
+        """返回 {R 阶段: (读格, 写格)}。
+
+        **必须给锚点**：文件里更早的表格也可能同时含「读」「写」两个字，
+        扫全文会解析到错的表 —— 那样这个检查会静默变成空集。
+        """
+        lines = text[text.index(anchor):].split("\n")
+        header_index = None
+        read_index = write_index = 0
+        for index, line in enumerate(lines):
+            if "读" in line and "写" in line and line.strip().startswith("|"):
+                cells = [cell.strip() for cell in line.split("|")]
+                read_index = next(j for j, cell in enumerate(cells) if "读" in cell)
+                write_index = next(j for j, cell in enumerate(cells) if "写" in cell)
+                header_index = index
+                break
+        if header_index is None:
+            return {}
+        rows = {}
+        for line in lines[header_index + 2:]:
+            cells = line.split("|")
+            if len(cells) <= max(read_index, write_index):
+                if line.strip().startswith("|"):
+                    continue
+                break
+            match = re.match(r"^\s*\*\*(R\d+(?:\s*/\s*R\d+)?)", cells[1].replace(" ", ""))
+            if match:
+                rows[match.group(1)] = (cells[read_index].strip(), cells[write_index].strip())
+        return rows
+
+    POLICY_ANCHOR = "| 阶段 | 读什么"
+    SKILL_ANCHOR = "| Phase | 名称 |"
+    PHASE_ANCHOR = "## 读 / 写 World Model"
+
+    def _policy(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return self._parse(text, self.POLICY_ANCHOR)
+
+    def test_skill_matches_policy(self) -> None:
+        skill = self._parse((self.ROOT / "SKILL.md").read_text(encoding="utf-8"),
+                            self.SKILL_ANCHOR)
+        policy = self._policy()
+        self.assertTrue(skill and policy, "读/写表解析失败（表头或阶段行找不到）")
+        for stage in sorted(set(skill) & set(policy)):
+            self.assertEqual(skill[stage], policy[stage], f"SKILL §0 的 {stage} 行与 policy §5 不一致")
+
+    def test_every_phase_table_matches_policy(self) -> None:
+        policy = self._policy()
+        checked = 0
+        for path in sorted((self.ROOT / "references").glob("phase-*.md")):
+            text = path.read_text(encoding="utf-8")
+            if "## 读 / 写 World Model" not in text:
+                continue
+            rows = self._parse(text, self.PHASE_ANCHOR)
+            for stage in sorted(set(rows) & set(policy)):
+                self.assertEqual(rows[stage], policy[stage],
+                                 f"{path.name} 的 {stage} 行与 policy §5 不一致")
+                checked += 1
+        self.assertGreaterEqual(checked, 6, "解析到的 phase 读/写行太少（解析器失效？）")
+        # 三道守卫：解析器一旦失效，检查必须变红，而不是静默通过
+        self.assertEqual(len(policy), 14, "policy §5 应解析到 14 个阶段")
+
+
 class TestContractKeyParity(unittest.TestCase):
     """`claims[].contract` 的十个键：validator ↔ 模板 ↔ R8 文档，三处必须一致。
 
@@ -1266,6 +1366,49 @@ class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
         for path in sorted((self.ROOT / "examples").glob("*.md")):
             self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
+
+
+class TestCandidateBoundary(unittest.TestCase):
+    """`P3` 只产 typed intermediate，不进 Research State（HIGH-2）。
+
+    起因：`policy §5.0` 写「每个候选必须产出至少一条 `C`」，而「候选」没有定义 ——
+    `P3` 的 `domain-free skeleton` 被默认当成候选，执行者于是被迫
+    「把骨架包成 `H` + 造一条 `C`」，把表示探索提前变成可证伪假设。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_r3_doc_defines_candidate_and_excludes_p3(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("R3.0.1 什么才算 candidate", text)
+        self.assertIn("不进 `hypotheses[]`、不产 `C`", text)
+        self.assertIn("populations/intermediates/", text)
+        self.assertIn("derived_from_intermediate", text)
+
+    def test_policy_rule1_references_the_definition(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("每个 **candidate** 必须产出至少一条 `C`", text)
+        self.assertIn("§R3.0.1", text)
+
+    def test_no_doc_keeps_the_undefined_wording(self) -> None:
+        for rel in ("SKILL.md", "references/research-state-policy.md",
+                    "references/phase-r3-r6-discovery.md"):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("每个候选必须产出至少一条", text,
+                             f"{rel} 仍在用未定义的「候选」")
+
+    def test_project_layout_registers_the_intermediates_dir(self) -> None:
+        text = (self.ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
+        self.assertIn("populations/intermediates/", text)
+
+    def test_skill_entry_states_the_p3_boundary(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`P3` 只产 typed intermediate，不产 candidate", text)
+
+    def test_genealogy_stays_within_hypotheses(self) -> None:
+        # `parents` 只引用 `H`：P3 的来源关系不得进 state 谱系
+        self.assertNotIn("intermediates", sc.FIRST_CLASS_KEYS)
+        self.assertNotIn("P3", sc.CANDIDATE_ISLANDS)
 
 
 class TestPhaseDocNoLegacyFlow(unittest.TestCase):
