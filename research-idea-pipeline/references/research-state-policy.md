@@ -138,7 +138,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|
 | `ungrounded` → `partially-supported` | ≥ `T1` | R8 |
 | `partially-supported` → `supported` | ≥ `T2` | R8 |
-| 任一 → `contradicted` | ≥ `T2` | R8 |
+| 检测到 ≥ `T2` 反驳证据 | ≥ `T2` | **R8 只登记 `refuting_evidence`，并必须转 R10**；`contradicted` 由 **R10** 执行（见 §5.0 规则 3） |
 | 任一 → `killed` | ≥ `T2` 或 `T3` | **仅 R10** |
 | `T0` 证据 | **不得触发任何状态迁移** | 只能记 `plausible`，留在 `assurance[]` |
 
@@ -548,6 +548,19 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 3. **`claims[].status` 的变更分两类：** **升级**（`ungrounded` → `partially-supported` / `supported`）
    由 **R8** 按证据驱动执行；**降级与否决**（`contradicted` / `killed`）**只能经 R10**。
    这条与 SKILL §1.6 的「默认只能经 R10」互为例外关系 —— 八处提及该禁令的地方都已回指本条。
+
+   **R8 检测到 ≥ `T2` 反驳证据时的唯一合法动作：**
+
+   ```text
+   R8 检测到 ≥ T2 反驳证据
+     → 写 claims[].refuting_evidence 与对应 evidence[] 条目
+     → 必须转 R10（disposition: RUN_TEST 或 REPAIR_CLAIM）
+     → 由 R10 执行 contradicted / killed
+   ```
+
+   **结构性表述：** **证据检测 ≠ 认识论状态突变。**
+   「我看到了反驳证据」是 R8 的职责；「这条 claim 是假的」是 R10 的判决。
+   负向状态变更必须经过 repair closure —— 否则 `V22` 会要求一条 R8 无权写的 `repairs[]`。
 
 > **终端产物（无显式读者，不是僵尸字段）：** `narrative_view`（R12 写、R13/R14 通过「全 state」隐含读）
 > 与 `decision`（R14 写、供人读与下一轮 R3/R9 的 `pivot`/`continue` 依据）。

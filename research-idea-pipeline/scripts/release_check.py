@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""release_check.py — 唯一的发布闸门。它只输出 PASS 或 FAIL。
+"""release_check.py — 唯一的发布闸门。
+
+**verdict 只看 exit code 与最后一行**（`PASS` / `FAIL`）。
+前面逐项的 `[ok] / [FAIL]` 输出**只用于诊断** —— 不要拿它当判定。
 
 为什么需要它
 ------------
@@ -8,7 +11,7 @@
 
 **人读闸门输出，本身就是一个未验证的步骤。** 因此把全部发布闸门收敛成一条命令：
 
-    python3 scripts/release_check.py        # 只输出 PASS 或 FAIL
+    python3 scripts/release_check.py        # verdict = 最后一行 / exit code
 
 它依次调用下面这些检查。**任一项不过，整体 FAIL。**
 

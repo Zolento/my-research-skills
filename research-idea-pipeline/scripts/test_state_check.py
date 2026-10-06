@@ -1422,6 +1422,112 @@ class TestDeprecatedTermScan(unittest.TestCase):
         self.assertEqual(offenders, [], "已退役措辞出现在正文：\n  " + "\n  ".join(offenders))
 
 
+class TestNegativeStatusAuthority(unittest.TestCase):
+    """R8 只能**升级**；`contradicted` / `killed` **只能经 R10**（MAJOR-1）。
+
+    起因：verification-tier 映射表（policy）与 phase-r8 §R8.2.5 都授权 R8 写
+    `contradicted`，与 SKILL §1.6 / policy §5.0 / phase-r8 §R8.0 / `V22` **四者冲突**：
+    `V22` 要求任何 `contradicted` / `killed` 的 claim 被一条 `repairs[].targets` 覆盖，
+    而 **R8 的写集不含 `repairs[]`**。R8 直接改就造出一个
+    「状态已变、无 repair 覆盖」的 state —— V22 报错，且**没有任何阶段能事后补**。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_no_table_authorizes_r8_for_a_negative_status(self) -> None:
+        for rel, anchor in (("references/research-state-policy.md",
+                             "| 目标迁移 | 最低需要 | 授权方 |"),
+                            ("references/phase-r8-evidence-contract.md",
+                             "| 迁移 | 门槛 | 归属 |")):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            block = text[text.index(anchor):]
+            block = block[:block.index("\n\n")]
+            for line in block.splitlines():
+                if "contradicted" not in line and "killed" not in line:
+                    continue
+                self.assertNotRegex(line, r"\|\s*\*{0,2}R8\*{0,2}\s*\|",
+                                    f"{rel} 仍把负向状态授权给 R8：{line.strip()[:70]}")
+
+    def test_detection_and_mutation_are_separated(self) -> None:
+        text = (self.ROOT / "references/phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        self.assertIn("**证据检测 ≠ 认识论状态突变。**", text)
+        self.assertIn("必须转 R10", text)
+
+    def test_policy_states_the_only_legal_action(self) -> None:
+        text = (self.ROOT / "references/research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("R8 检测到 ≥ `T2` 反驳证据时的唯一合法动作", text)
+
+    def test_v22_forces_negative_status_through_r10(self) -> None:
+        # 字面执行：绕过 R10 直接写 contradicted → V22 必须报
+        doc = valid_state()
+        doc["claims"][0]["status"] = "contradicted"
+        report = sc.check_state(doc, source="<test>")
+        self.assertIn("V22", report.rules(),
+                      "绕过 R10 的负向状态变更必须被 V22 拦住")
+
+    def test_r8_write_set_excludes_repairs(self) -> None:
+        # R8 的读/写表不得授权 repairs[]
+        text = (self.ROOT / "references" / "phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        block = text[text.rindex("## 读 / 写 World Model"):]
+        row = next(line for line in block.splitlines() if line.startswith("| **R8**"))
+        writes = row.split("|")[3]
+        self.assertNotIn("repairs", writes)
+
+
+class TestEvolutionOperatorSemantics(unittest.TestCase):
+    """R6 的进化算子：crossover 只用 `H`；未收敛走 telemetry（HIGH-1 + HIGH-2）。"""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _r61(self):
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        return text[text.index("### R6.1"):text.index("### R6.2")]
+
+    def test_crossover_parents_are_hypotheses_only(self) -> None:
+        section = self._r61()
+        row = next(line for line in section.splitlines() if line.startswith("| `cross-domain crossover`"))
+        self.assertIn("两个已有的 `H` candidate", row)
+        self.assertIn("`parents` **必须引用两个 `H`**", row)
+        self.assertIn("**`P3` 的骨架不是 candidate，不得当 `parents`**", row)
+
+    def test_p3_is_typed_context_not_a_crossover_parent(self) -> None:
+        section = self._r61()
+        self.assertIn("`H_P2 × H_P4 → H_new`", section)
+        self.assertIn("**不是** `P3 × H_P4`", section)
+        self.assertIn("derived_from_intermediate", section)
+
+    def test_stagnation_goes_to_telemetry(self) -> None:
+        section = self._r61()
+        self.assertIn("**只有能提炼成一个具体科学问题时**", section)
+        self.assertIn("operator_stats", section)
+        self.assertIn("stagnation", section)
+        # 旧行为不得回来
+        self.assertNotIn("落 `uncertainties[]` 并交 R7", section)
+
+    def test_stagnation_is_not_itself_an_uncertainty(self) -> None:
+        section = self._r61()
+        self.assertIn("**「两轮没收敛」本身不是科学未知。**", section)
+        self.assertIn("**不能进**", section)
+
+
+class TestReleaseGateWording(unittest.TestCase):
+    """`release_check.py` 的自我描述必须与实际行为一致（MINOR）。"""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_header_does_not_claim_to_print_only_the_verdict(self) -> None:
+        text = (self.ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
+        self.assertNotIn("唯一的发布闸门。它只输出 PASS 或 FAIL", text)
+        self.assertIn("**verdict 只看 exit code 与最后一行**", text)
+
+    def test_skill_design_note_does_not_claim_r12_uses_the_reverse_score(self) -> None:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        start = text.index("10. **为什么 R7 / R10 / R13 也必须做极性归一化？**")
+        note = text[start:text.index("11. **为什么要给", start)]
+        self.assertIn("**R12 已不使用该反向分**", note)
+        self.assertNotIn("R7 / R10 / R13 与 R12 同样使用", note)
+
+
 class TestResidualSemanticVocabulary(unittest.TestCase):
     """**词表 ≠ 语义。** 逐处判断「这个词还在不在表达旧语义」。
 

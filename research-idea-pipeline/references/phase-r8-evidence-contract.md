@@ -148,23 +148,41 @@ R8 **不执行**实验，只登记。
 - `status` 进入 `running` / `done` / `failed` 后，`frozen_at_state_version` **必须**是
   ≤ `result_at_state_version` 的非负整数（`V21`）。
 
-### R8.2.5 证据驱动的单向 `status` 升级
+### R8.2.5 证据驱动的**单向升级**（R8 不做任何降级）
 
-R8 是唯一除 R10 之外能改 `claims[].status` 的阶段（见 [../SKILL.md](../SKILL.md) §1.6）。
+**R8 只能让 `claims[].status` 向上走。** 除 R10 外，R8 是唯一能改它的阶段
+（见 [../SKILL.md](../SKILL.md) §1.6）—— 但**只限升级**。
 
 | 迁移 | 门槛 | 归属 |
 |---|---|---|
 | `ungrounded` → `partially-supported` | 支持证据达 `≥ T1` | **R8** |
 | `partially-supported` → `supported` | 支持证据达 `≥ T2` | **R8** |
-| 任一 → `contradicted` | 反驳证据达 `≥ T2` | **R8** |
-| `*` → `killed` | — | **只能经 R10** |
-| 任何**降级** | — | **只能经 R10** |
+| 任一 → `contradicted` | 反驳证据达 `≥ T2` | **仅 R10** —— R8 **只登记** `refuting_evidence` 并**必须转 R10** |
+| `*` → `killed` | — | **仅 R10** |
+| 任何**降级**（含 `supported` → `partially-supported`） | — | **仅 R10** |
 
 **硬规则：**
 
 - 无证据仍为 `ungrounded`；挂上证据却仍写 `ungrounded` 同样违规（`V3`）。
 - 状态升级必须由**证据**驱动，不得由 `scope` 收窄或措辞改写驱动。
 - 达不到门槛时**保持原状态**，并把缺口落进 `uncertainties[]`。
+
+#### R8.2.5.1 检测到 ≥ `T2` 反驳证据时：**登记，不改状态**
+
+```text
+R8 检测到 ≥ T2 反驳证据
+  → 写 claims[].refuting_evidence 与对应 evidence[] 条目
+  → 必须转 R10（disposition: RUN_TEST 或 REPAIR_CLAIM）
+  → 由 R10 执行 contradicted / killed
+```
+
+**为什么 R8 不能自己改：** `V22` 要求任何 `contradicted` / `killed` 的 claim 必须被一条
+`repairs[].targets` 覆盖，而 **R8 的写集不含 `repairs[]`**。R8 直接改就会造出一个
+「状态已变、但没有 repair 覆盖」的 state —— **`V22` 当场报错，且没有任何阶段能事后补**。
+
+**结构性表述：** **证据检测 ≠ 认识论状态突变。**
+「我看到了反驳证据」是 R8 的职责；「这条 claim 是假的」是 R10 的判决。
+负向状态变更必须经过 repair closure。
 
 ### R8.2.6 写 `proposal.md`
 

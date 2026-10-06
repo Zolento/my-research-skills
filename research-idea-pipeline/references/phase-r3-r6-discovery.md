@@ -491,12 +491,24 @@ R6: Recombine            才允许不同世界互相借东西
 | 算子 | 做什么 |
 |---|---|
 | `mutation` | 改一个 structural signature 维度 |
-| `cross-domain crossover` | **跨 island** 组合两个候选的表示与机制（`P3` 抽象骨架 × `P4` 远域类比最常配对）。**这是唯一允许跨 island 融合的阶段** —— R3 严禁早熟收敛，见 R6.0 |
+| `cross-domain crossover` | **跨 island** 组合**两个已有的 `H` candidate** 的表示与机制；`parents` **必须引用两个 `H`**。**这是唯一允许跨 island 融合的阶段** —— R3 严禁早熟收敛，见 R6.0。**`P3` 的骨架不是 candidate，不得当 `parents`** —— 它最多作为 typed context 使用，来源关系只记在 population artifact 的 `derived_from_intermediate`（见 §R3.0.1）。例：`H_P2 × H_P4 → H_new`，**不是** `P3 × H_P4` |
 | `simplification` | 删掉不必要假设 —— **删比加优先** |
 | `theory-induced deduction` | 从某个 theory lens 推出新命题 |
 | `new niche creation` | **让 population 首次占据一个当前尚为空的合法 niche** —— 即某个科学结构轴此前没有任何候选。**不是**动态发明第八个枚举值：七轴冻结（`V6`）。（须同时给出 elite，否则 V15 失败） |
 
-**每次进化 `generation + 1`**；到 **2 轮**仍未收敛 → 落 `uncertainties[]` 并交 R7，**不得无限进化**。
+**每次进化 `generation + 1`。** 到 **2 轮**仍未收敛时：
+
+1. **停止**继续 evolution —— 不得无限进化；
+2. 写 **telemetry**：`scheduler.json` 的 `operator_stats` 标 **stagnation**，
+   并计入 `recurring_failure_patterns`（见 [scheduler-policy.md](scheduler-policy.md) §4.1）；
+3. 由 **scheduler** 决定下一步（`next_action_policy` 的 `paradigm_escape_if_stagnant`：
+   reseed / 换算子 / 交 R7）；
+4. **只有能提炼成一个具体科学问题时**，才新增 `U<n>`。
+
+**「两轮没收敛」本身不是科学未知。** 它描述的是**搜索过程行为**。
+能进 `uncertainties[]` 的必须是**具体命题**，例如
+「当前结构映射是否保持 sufficient statistic？」；
+而「`P5` 想了两轮还是没好 idea」**不能进**。
 
 ### R6.2 保多样性：**live niche** 不许塌；`island` **允许全灭**
 
