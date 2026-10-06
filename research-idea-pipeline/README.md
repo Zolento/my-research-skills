@@ -22,7 +22,7 @@ research-idea-pipeline/
 ├── SKILL.md                          # 入口：phase 分发（R0—R14）+ 全局不变量 + 首次运行编排
 ├── README.md                         # 本文件
 ├── references/
-│   ├── research-state-policy.md      # ★ R1 权威：八类一等对象、逐阶段读写、引用完整性 V1—V24
+│   ├── research-state-policy.md      # ★ R1 权威：八类一等对象、逐阶段读写、Shape Gate S1—S7 + 引用完整性 V1—V24
 │   ├── project-layout.md             # ★ 目录规范：八条 DI invariant、routes/、README/STATUS/INDEX、XID、DEC
 │   ├── scheduler-policy.md           # 跨阶段调度：R0—R14 是能力不是 workflow；八级 next_action_policy + EIG÷cost
 │   ├── invocation-prompts.md         # 四个用户入口调用契约（start-project / continue-research / explore / audit）
@@ -43,14 +43,14 @@ research-idea-pipeline/
 │       phase-r12-narrative.md        # R12：claim-first 叙事（state 的视图）
 │       phase-r7-r10-r13-assurance-repair-review.md  # R7 / R10 / R13：对抗保证 / 元认知修复 / artifact 审计
 ├── scripts/
-│   ├── state_check.py                # ★ 机械闸门：V1—V24（退出码 0 / 3 硬违规 / 4 环境）
+│   ├── state_check.py                # ★ 机械闸门：Shape Gate S1—S7 + V1—V24（退出码 0 / 3 硬违规 / 4 环境）
 │   ├── render_status.py              # ★ 把 state 投影为 routes/<R>/STATUS.md（幂等；--check 校验过期）
 │   ├── env_probe.py                  # 工作解释器发现 + 依赖自检（退出码 4）
 │   ├── literature_sources.py         # 多源适配器 arxiv / openalex / crossref + 合并层
 │   ├── literature_search.py          # 可运行检索器（多源并集 / 每源状态 / 退避 / 缓存 / 代理检测）
 │   ├── refs_index.py                 # 为 docs/refs/ 下每个 PDF 建 index.json（--check / --migrate）
 │   ├── ste_lint_zh.py                # 受控中文 linter（vendored，MIT）
-│   ├── test_state_check.py           # 离线测试：V1—V24 反例 + 表格完整性 + Carrier 完整性 + 打包完整性
+│   ├── test_state_check.py           # 离线测试：S1—S7 与 V1—V24 反例 + 表格/契约键/Carrier/打包完整性
 │   ├── test_render_status.py         # 离线测试：STATUS 幂等 + 三方节集合一致
 │   ├── test_golden_path.py           # 集成测试：R0→R14 字面执行 + 5 条对抗路径
 │   ├── test_literature_search.py     # 离线测试（不联网）

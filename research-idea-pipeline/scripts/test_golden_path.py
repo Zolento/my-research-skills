@@ -167,8 +167,16 @@ def r7_adversarial_assurance(s: Dict[str, Any]) -> None:
 def r8_evidence_contract(s: Dict[str, Any]) -> None:
     """R8：建 contract；**创建 experiments 的 planned 条目并冻结 preregistration**；证据驱动升级。"""
     s["claims"][0]["contract"] = {
-        "statement": "解除 AS1 恢复能力", "scope": "target domain",
-        "kill_rule": "若 O2 出现则 C1 降级", "expansion_rule": "若 O1 出现且对照通过则扩到多中心",
+        "statement": "解除 AS1 恢复能力",
+        "scope": "target domain",
+        "critical_assumptions": ["AS1"],
+        "supporting_required": ["E1"],
+        "refuting": "等训练步数下增益消失",
+        "nearest_alternative": "增益来自更多的训练步数，而不是解除 AS1",
+        "minimal_discriminating_experiment": "X1",
+        "expected_outcomes": {"O1": "supports C1", "O2": "supports ALT-1", "O3": "inconclusive"},
+        "kill_rule": "若 O2 出现则 C1 降级",
+        "expansion_rule": "若 O1 出现且对照通过则扩到多中心",
     }
     s["experiments"].append({
         "id": "X1", "parent": None, "stage": "X3", "claim_targeted": ["C1"],

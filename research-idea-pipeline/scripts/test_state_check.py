@@ -910,6 +910,254 @@ class TestRuleTableParity(unittest.TestCase):
         for rule, expected in sc.RULES.items():
             self.assertEqual(rows[rule].strip(), expected.strip(), f"{rule} 文档与代码不一致")
 
+    def _policy_shape_rows(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return dict(re.findall(r"^\| (S\d+) \| (.+?) \| 形状 \|", text, re.M))
+
+    def test_policy_shape_table_is_parseable(self) -> None:
+        rows = self._policy_shape_rows()
+        self.assertEqual(len(rows), len(sc.SHAPES), "policy §4.0 解析到的形状规则数不等于 SHAPES")
+        self.assertIn("S1", rows)
+
+    def test_policy_shape_text_matches_validator(self) -> None:
+        rows = self._policy_shape_rows()
+        self.assertEqual(set(rows), set(sc.SHAPES), "policy §4.0 的编号集合与 SHAPES 不一致")
+        for rule, expected in sc.SHAPES.items():
+            self.assertEqual(rows[rule].strip(), expected.strip(), f"{rule} 文档与代码不一致")
+
+
+class TestShapeGate(unittest.TestCase):
+    """S1—S7：形状门。位置在 V1—V24 **之前**，且形状失败时不执行 V 规则。
+
+    起因（总收官审计 MAJOR-4）：`state_check.py` 只做「引用完整性」，
+    八类枚举、`structural_signature` 五键、`contract` 形状**零校验** ——
+    非法值可以静默通过，`--check` 仍是 exit 0。
+    """
+
+    def _shape(self, doc):
+        return sc.check_state(doc, source="<test>").shape_rules()
+
+    def test_valid_state_passes_shape_gate(self) -> None:
+        report = sc.check_state(valid_state(), source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.exit_code, sc.EXIT_OK)
+
+    # ---- S1 ----
+    def test_s1_missing_first_class_array(self) -> None:
+        doc = valid_state(); doc.pop("literature")
+        self.assertEqual(self._shape(doc), ["S1"])
+
+    def test_s1_all_eight_empty_is_clean(self) -> None:
+        doc = {key: [] for key in sc.FIRST_CLASS_KEYS}
+        self.assertEqual(self._shape(doc), [])
+
+    # ---- S2 ----
+    def test_s2_empty_id(self) -> None:
+        doc = valid_state(); doc["claims"][0]["id"] = ""
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_duplicate_id(self) -> None:
+        doc = valid_state()
+        doc["claims"].append(dict(doc["claims"][0]))
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_wrong_prefix(self) -> None:
+        doc = valid_state(); doc["claims"][0]["id"] = "Q17"
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    def test_s2_literature_must_use_lit_prefix(self) -> None:
+        # policy §3.6：`LIT<n>`；**不得**写成 `L<n>`
+        doc = valid_state(); doc["literature"][0]["id"] = "L1"
+        self.assertEqual(self._shape(doc), ["S2"])
+
+    # ---- S3 ----
+    def test_s3_stage_out_of_enum(self) -> None:
+        doc = valid_state(); doc["experiments"][0]["stage"] = "X9"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_missing_required_enum(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0].pop("status")
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_literature_relation_out_of_enum(self) -> None:
+        doc = valid_state(); doc["literature"][0]["relation"] = "sounds-good"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_claim_status_out_of_enum(self) -> None:
+        doc = valid_state(); doc["claims"][0]["status"] = "maybe-true"
+        self.assertEqual(self._shape(doc), ["S3"])
+
+    def test_s3_every_listed_enum_is_enforced(self) -> None:
+        # 防止有人往 ENUM_FIELDS 加字段却忘了它真的被查
+        for key, field, allowed in sc.ENUM_FIELDS:
+            doc = valid_state()
+            if not doc.get(key):
+                continue
+            doc[key][0][field] = "definitely-not-in-enum"
+            self.assertEqual(self._shape(doc), ["S3"], f"{key}[].{field} 未被 S3 强制")
+            self.assertNotIn("definitely-not-in-enum", allowed)
+
+    # ---- S4 ----
+    def test_s4_missing_one_of_five_keys(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"].pop("mechanism_distance")
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_signature_not_object(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["structural_signature"] = "flat"
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_distance_not_nonneg_int(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"]["mechanism_distance"] = -1
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    def test_s4_extra_key_rejected(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["structural_signature"]["vibes_distance"] = 1
+        self.assertEqual(self._shape(doc), ["S4"])
+
+    # ---- S5 ----
+    def test_s5_contract_missing_keys(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {"statement": "x", "scope": "y"}
+        self.assertEqual(self._shape(doc), ["S5"])
+
+    def test_s5_contract_full_ten_keys_is_clean(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {
+            "statement": "x", "scope": "y", "critical_assumptions": ["AS13"],
+            "supporting_required": ["E32"], "refuting": "z",
+            "nearest_alternative": "alt", "minimal_discriminating_experiment": "X7",
+            "expected_outcomes": {"O1": "supports C17"},
+            "kill_rule": "若 O1 不成立则降级", "expansion_rule": "若 O1 成立则扩范围",
+        }
+        self.assertEqual(self._shape(doc), [])
+
+    def test_s5_expected_outcomes_must_be_object(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["contract"] = {
+            "statement": "x", "scope": "y", "critical_assumptions": [],
+            "supporting_required": [], "refuting": "z",
+            "nearest_alternative": "alt", "minimal_discriminating_experiment": "X7",
+            "expected_outcomes": ["O1"], "kill_rule": "k", "expansion_rule": "e",
+        }
+        self.assertEqual(self._shape(doc), ["S5"])
+
+    def test_s5_absent_contract_is_legal(self) -> None:
+        # R1 骨架里未建契约的 claim 合法（模板 C0a / C1 就是这类）
+        doc = valid_state()
+        doc["claims"][1].pop("contract", None)
+        self.assertNotIn("S5", self._shape(doc))
+
+    # ---- S6 ----
+    def test_s6_integrity_gate_out_of_enum(self) -> None:
+        doc = valid_state(); doc["reviews"] = [{"id": "REV1", "integrity_gate": "maybe"}]
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_reviews_not_array(self) -> None:
+        doc = valid_state(); doc["reviews"] = {"id": "REV1"}
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_decision_not_object(self) -> None:
+        doc = valid_state(); doc["decision"] = "continue"
+        self.assertEqual(self._shape(doc), ["S6"])
+
+    def test_s6_reviews_id_absence_is_left_to_v23(self) -> None:
+        # gate=fail 却无 id 是 V23 的判据；S6 不得抢报，否则规则号被掩盖
+        doc = valid_state()
+        doc["reviews"] = [{"integrity_gate": "fail"}]
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V23"])
+
+    def test_s6_decision_verdict_enum_is_left_to_v24(self) -> None:
+        doc = valid_state()
+        doc["decision"] = {"verdict": "banana"}
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V24"])
+
+    # ---- S7 ----
+    def test_s7_state_version_must_be_nonneg_int(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        self.assertEqual(self._shape(doc), ["S7"])
+
+    def test_s7_negative_state_version(self) -> None:
+        doc = valid_state(); doc["state_version"] = -1
+        self.assertEqual(self._shape(doc), ["S7"])
+
+    # ---- 顺序与互斥 ----
+    def test_shape_runs_before_rules(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["id"] = ""          # S2
+        doc["claims"][0]["falsifier"] = ""   # V1
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape_rules(), ["S2"])
+        self.assertEqual(report.rules(), [], "形状失败时不得执行 V 规则")
+        self.assertEqual(report.violations, [])
+        self.assertEqual(report.exit_code, sc.EXIT_HARD)
+
+    def test_v19_depends_on_type_is_not_duplicated_in_shape(self) -> None:
+        # 去重契约：depends_on 的类型属 V19，S 不得重复报
+        doc = valid_state(); doc["claims"][0]["depends_on"] = "E32"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape, [])
+        self.assertEqual(report.rules(), ["V19"])
+
+    def test_shape_rules_are_reported_in_order(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["id"] = ""
+        doc["state_version"] = "0"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.shape_rules(), ["S2", "S7"])
+
+    def test_shape_violations_are_machine_readable(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        payload = sc.check_state(doc, source="<test>").as_dict()
+        self.assertEqual(payload["shape_counts"], {"S7": 1})
+        self.assertEqual(payload["violations"], [])
+        self.assertTrue(payload["shape"][0]["line"].startswith("S7"))
+
+    def test_summary_names_shape_gate(self) -> None:
+        doc = valid_state(); doc["state_version"] = "0"
+        self.assertIn("[shape]", sc.check_state(doc, source="<test>").summary())
+
+    def test_list_rules_includes_shape_gate(self) -> None:
+        code, out, _err = _run("--list-rules")
+        self.assertEqual(code, sc.EXIT_OK)
+        for rule in sc.SHAPE_ORDER:
+            self.assertIn(rule, out)
+            self.assertIn(sc.SHAPES[rule], out)
+
+
+class TestContractKeyParity(unittest.TestCase):
+    """`claims[].contract` 的十个键：validator ↔ 模板 ↔ R8 文档，三处必须一致。
+
+    起因：迁移后契约键只在模板里；golden path 只写了 4 键却仍然 exit 0。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def test_validator_keys_match_template(self) -> None:
+        tmpl = json.loads((self.ROOT / "templates" / "research-state.template.json")
+                          .read_text(encoding="utf-8"))
+        self.assertEqual(list(sc.CONTRACT_KEYS), list(tmpl["claims"][0]["contract"]))
+
+    def test_validator_keys_match_r8_doc_table(self) -> None:
+        text = (self.ROOT / "references" / "phase-r8-evidence-contract.md").read_text(encoding="utf-8")
+        begin = text.index("### R8.2.2")
+        end = text.index("### R8.2.3", begin)
+        self.assertEqual(list(sc.CONTRACT_KEYS),
+                         re.findall(r"^\| `([a-z_]+)` \|", text[begin:end], re.M))
+
+    def test_signature_keys_match_policy(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines()
+                   if line.startswith("| `structural_signature` |"))
+        for key in sc.STRUCTURAL_SIGNATURE_KEYS:
+            self.assertIn(f"`{key}`", row, f"policy §3.4 未登记结构签名键 {key}")
+
 
 class TestR8ContractParity(unittest.TestCase):
     """R8 的头号产物 `claims[].contract` —— spec、模板两处必须一致。
