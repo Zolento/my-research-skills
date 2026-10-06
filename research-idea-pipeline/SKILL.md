@@ -564,6 +564,40 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 
 ---
 
+### 1.7 认识论权限边界：**R14 能杀研究分支，不能杀真理主张**（硬 invariant）
+
+> **R14 can kill a research branch, but cannot kill a truth claim.**
+
+**`claims[].status` 只能由证据（R8）或元认知修复（R10）改变。**
+决策层（R14）**没有**认识论权限（epistemic authority）—— 这是本 Skill **绝不让步**的一条。
+
+| R14 可以 | R14 不可以 |
+|---|---|
+| `hypotheses[].status` → `archived` / `killed`（停一个**研究分支**） | `claims[].status` → `killed` / `contradicted` |
+| `decision` → `archive` / `pivot`（停一条**路线**） | 因为「不研究了」而让 `C5` 变成「假的」 |
+| 关闭 `repairs[].closure` | 用 `decision` 反推 claim 的真值 |
+
+**理由：** 研究者可以**决定不再研究**某个 claim，但「不再研究」是**资源决策**，不是**真值判决**。
+若 R14 能写 `claims[].status`，它就获得了认识论权限，整个「claim 状态只能证据驱动变化」
+的结构性防错**当场失效**。
+
+**正确写法：**
+
+```text
+H7.status  = archived      （分支停掉）
+decision   = archive       （路线停掉）
+C5.status  = Supported     ← 保持不动，不因"停研究"而降级
+```
+
+**机械体现：** R14 的写集合**不含** `claims[].status`（三方读写表逐字一致，
+[research-state-policy.md](references/research-state-policy.md) §5 与 §5.0）；
+`killed` 只能经 R10 的 `state_delta`。
+
+> 本条与 §1.6（critical flaw ⇒ state 必须改变）配对：**§1.6 要求该变的必须变，
+> §1.7 要求不该变的绝不许变。**
+
+---
+
 ## 2. 共享资源索引
 
 | 资源 | 位置 | 内容 |

@@ -4,7 +4,7 @@
 契约来源
 --------
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
-与 §2.3（引用完整性规则 V1—V15）、§5（R10 处置 / 关闭枚举）；
+与 §2.3（引用完整性规则 V1—V17）、§5（R10 处置 / 关闭枚举）；
 V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4。
 
 **为什么必须有这个脚本：**「八类一等对象」只写在 policy 里，执行者会写成散文。
@@ -60,7 +60,7 @@ V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 �
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
-    * V1—V15 之外**不新增**硬规则（Wave 1 spec §2.3 + Wave 2 spec §4 是唯一契约）。
+    * V1—V17 之外**不新增**硬规则（契约 = Wave 1 spec §2.3 + Wave 2 spec §4 + Wave 4 的 V16/V17）。
 
 退出码（与仓库既有脚本一致）：
     0  全部通过
@@ -1120,7 +1120,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 # ---------------------------------------------------------------------------
 
 def _selftest_state() -> Dict[str, Any]:
-    """自检用的最小合法 world model（覆盖 V1—V15 的通过侧）。"""
+    """自检用的最小合法 world model（覆盖 V1—V17 的通过侧）。"""
     return {
         "_schema": "research-idea-pipeline/research-state@1",
         "claims": [{

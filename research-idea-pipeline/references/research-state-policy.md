@@ -434,7 +434,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 - **R14**：读 全 state + `repairs[]` 未闭环项；写 `repairs[].closure`（`RESOLVED` / `ACCEPTED_LIMITATION`）、`uncertainties[].status`（`closed`）、`hypotheses[].status`；**不写 `claims[].status` —— `killed` 只能经 R10**；`ACCEPTED_LIMITATION` **必须**同时写进 `C.scope` 或 `C.known_flaws`。决策 `continue` / `pivot` / `archive` / `submit` 回 R3 / R9（与上表逐字一致）
 
 
-**读写的三条硬规则：**
+**读写的四条硬规则：**
 
 1. **写回是收工条件。** 任何阶段**不得**在未写回 state 的情况下宣告完成；「结果只在对话里」
    等于没有结果（与 [claim-first-policy.md](claim-first-policy.md) §6 规则 5 的落盘纪律一致）。
@@ -442,6 +442,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    ——那是 R10 / R14 的处置权限）。跨阶段修改**必须**走 `repairs[].state_delta`。
 3. **状态迁移只能取枚举值。** 任何「部分支持但还没定」的中间态**必须**落到枚举里最接近的一个
    （如 `partially-supported`），**不得**自造 `mostly-supported` 这类值。
+4. **认识论权限边界（硬 invariant）。** **R14 能杀研究分支，不能杀真理主张** ——
+   `claims[].status` **只能**经 R8（证据驱动）或 R10（`state_delta`）改变；
+   **R14 的写集合永不含 `claims[].status`**。停一个 hypothesis / 停一条路线是**资源决策**，
+   不是**真值判决**。完整定义见 [../SKILL.md](../SKILL.md) §1.7。
 
 ---
 
