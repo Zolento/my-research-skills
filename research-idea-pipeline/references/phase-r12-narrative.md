@@ -719,106 +719,84 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
    - **退回 R3—R6 / 换 claim hierarchy 重试 / 按最佳叙事重写提案 /
      补齐缺失证据清单** → **Next recommended actions**。
 
-### D9.5 输出后：`state.json` 片段
+### D9.5 输出后：写回 Research State
+
+**结论：R12 只写 `narrative_view`（+ 必要时新增 `uncertainties[]`）。叙事正文是**文档**，不是 state。**
+
+**载体划分（不得混淆）：**
+
+| 产物 | 落点 | 类型 |
+|---|---|---|
+| 叙事正文（六槽位、preset 选择理由、`G1—G5` 判定、六维读数与排序） | `routes/<R>/docs/<R><NNN>-narrative.md` | **文档**（人的读物） |
+| 叙事**视图描述符**（选了哪些 preset、渲染了哪些 claim、保留了哪些失败实验） | state 的 `narrative_view` | **state** |
+| 攻击面审稿人的五元组 | `assurance[]`（R7 写）／`reviews[]`（R13 写） | **state** |
+| 叙事暴露的新缺口 | `uncertainties[]`（`status: open`） | **state** |
+
+**`narrative_view` 四键（逐字，取自模板）：**
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `presets_selected` | 字符串数组 | 本次叙事选用的 preset（`N1`—`N10`） |
+| `rendered_claims` | `C` id 数组 | 被渲染进叙事的 claim |
+| `failed_experiments_kept` | `F` id 数组 | **失败实验必须保留**（不得从叙事消失） |
+| `note` | 字符串 | 视图说明 |
+
+**R12 收工要写的那部分（字段形状合法）：**
+
+> 已实测：把下列内容**并入一份完整 state** 后，`state_check.py --check` 退出码 **0**。
+> **片段本身不是完整 state**（缺八类数组），不能单独喂校验器。
 
 ```json
 {
-  "phase": "R12",
-  "timestamp": "2026-10-06T00:00:00Z",
-  "route": "A",
-  "core_goal": "performance",
-  "doc_id": "A005",
-  "target_venue": "ICML",
-  "evidence_ledger": [
-    {"id": "E1", "statement": "在条件 Y 下基线 A 失效（实测）", "source": "方案 §C4 / 实验 E2", "epistemic_status": "Observed", "in_evidence_contract": true},
-    {"id": "E2", "statement": "结构 S 在文献 [作者, 会议/年份] 中被刻画", "source": "文献", "epistemic_status": "Supported", "in_evidence_contract": true},
-    {"id": "E3", "statement": "解除假设 X 可恢复能力", "source": "方案 §C1", "epistemic_status": "Hypothesized", "in_evidence_contract": false},
-    {"id": "E4", "statement": "下游决策依赖该能力", "source": "文献", "epistemic_status": "Supported", "in_evidence_contract": true}
-  ],
-  "claim_graph": {
-    "C0": {"text": "在 Y 下现有方法因共享假设 X 而结构性失效；据此解除 X 是恢复能力的路径", "evidence": ["E1", "E2"]},
-    "C1": {"text": "该能力影响下游决策", "evidence": ["E4"]},
-    "C2": {"text": "现有方法共享假设 X，在 Y 下结构性失效", "evidence": ["E1"]},
-    "C3": {"text": "内部修补无法突破", "evidence": ["待补"]},
-    "C4": {"text": "新知识 K：两领域共享结构 S 且满足迁移条件 C", "evidence": ["E2"]},
-    "C5": {"text": "由此推出的后果", "evidence": ["待补"]}
+  "state_version": 3,
+  "narrative_view": {
+    "presets_selected": ["N5", "N2"],
+    "rendered_claims": ["C1", "C2", "C4"],
+    "failed_experiments_kept": ["F1"],
+    "note": "主线 N5（统一框架），N2 作辅助表述；G3 未过的候选不参与排序"
   },
-  "typing": {
-    "O": "Method",
-    "T": "hidden-assumption",
-    "R": "design-algorithm",
-    "contribution_type": "General",
-    "central_proposition": "某结构性限制导致现有方法在 Y 下失败，解除它可恢复能力"
-  },
-  "anchor_eligibility": [
-    {"anchor": "性能", "verdict": "eligible", "why": "E1 直接支持在 Y 下的失效与恢复", "missing_evidence": null},
-    {"anchor": "理论", "verdict": "conditional", "why": "迁移合法性尚未举证", "missing_evidence": "L2 级不变量或充分条件"}
-  ],
-  "presets": [
-    {"idea_id": "I1", "preset": "N5", "preset_name": "统一框架", "is_primary": true},
-    {"idea_id": "I1", "preset": "N2", "preset_name": "瓶颈突破/移除假设", "is_primary": false}
-  ],
-  "slots": [
+  "uncertainties": [
     {
-      "idea_id": "I1",
-      "preset": "N5",
-      "S1_Context": "……",
-      "S2_Tension": "条件 Y 与缺口 G：……",
-      "S3_Central_Proposition": "……（可证伪：……）",
-      "S4_Resolution": "……",
-      "S5_Evidence_Contract": {"C0": ["E1", "E2"], "C1": ["E4"], "C2": ["E1"], "C3": ["待补"], "C4": ["E2"], "C5": ["待补"]},
-      "S6_Consequence_Boundary": {"changes": "……", "does_not_hold_when": "……"}
+      "id": "U9",
+      "question": "迁移合法性只有 L1 级举证，是否充分？",
+      "importance": "high",
+      "uncertainty": "medium",
+      "cheapest_discriminating_test": "TBD",
+      "status": "open",
+      "depends_on": ["C4"],
+      "validity": {"status": "valid", "reason": "叙事阶段暴露的新缺口", "since_state_version": 3}
     }
-  ],
-  "attack_surfaces": [
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Novelty", "score": 4, "evidence": "最接近工作 [作者, 会议/年份]，delta 在结构层"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Causal", "score": 4, "evidence": "C3 的机制有对照实验设计支撑"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Experimental", "score": 3, "evidence": "缺同算力公平比较（进 Soundness margin 实验侧）"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Theory", "score": 3, "evidence": "迁移合法性按 L2 举证，紧性未证（进 Soundness margin 理论侧）"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Generalization", "score": 4, "evidence": "S6 边界与证据覆盖一致"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "R-Utility", "score": 4, "evidence": "改变下游重建流程的选型"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "S-Devil", "score": null, "fatal_weaknesses": ["……", "……", "……"], "simplest_counter_explanation": "……"},
-    {"idea_id": "I1", "preset": "N5", "reviewer": "S-Lit", "score": null, "verdict": "部分重叠", "closest_prior_work": ["[作者, 会议/年份]"], "level": "L3", "negative_search_record": "……"},
-    {"idea_id": "I1", "preset": "N2", "reviewer": "R-Causal", "score": 2, "evidence": "机制只是事后解释，无识别实验（触发 G3）"},
-    {"idea_id": "I1", "preset": "N2", "reviewer": "S-Devil", "score": null, "fatal_weaknesses": ["……"], "simplest_counter_explanation": "更简解释：差异来自调参预算不对等"}
-  ],
-  "gates": [
-    {"idea_id": "I1", "preset": "N5", "G1": "pass", "G2": "pass", "G3": "pass", "G4": "pass", "G5": "pass", "verdict": "pass"},
-    {"idea_id": "I1", "preset": "N2", "G1": "pass", "G2": "pass", "G3": "fail", "G4": "pass", "G5": "pass", "verdict": "not_submission_ready"}
-  ],
-  "ranking": [
-    {"idea_id": "I1", "preset": "N5", "Significance": 4, "Originality": 4, "Soundness_margin": 3, "Soundness_margin_readings": {"experimental": 3, "theory": 2}, "Explanatory_depth": 4, "Generality": 3, "Narrative_compression": 4, "win_dimension": "Explanatory_depth", "cost_dimension": "Soundness_margin", "reasons": {"Significance": "引用 R-Utility 的判定", "Originality": "引用 S-Lit 的 L3 结论", "Soundness_margin": "两个读数并存，不得平均"}}
-  ],
-  "best_narrative": [
-    {"idea_id": "I1", "preset": "N5", "best_venue": "ICML", "runner_up": "无（N2 因 G3 fail 不参与排序）", "why_per_dimension": {"Significance": "……", "Originality": "……"}, "fatal_risk": "……"}
-  ],
-  "missing_evidence": [
-    {"claim": "C3", "missing": "识别机制所需的对照实验", "affects": "G3", "current_wording_level": "待核实"},
-    {"claim": "C0 的恢复半支（台账 E3，Hypothesized）", "missing": "解除 X 后能力恢复的对照实验", "affects": "G1 / G3", "current_wording_level": "待核实"}
-  ],
-  "minimal_experiments_or_theorems": [
-    {"target_claim": "C3 与 C0 的恢复半支", "action": "补一组控制变量的消融实验", "data": "……", "baselines": "……", "success_criterion": "……"}
-  ],
-  "final_advice": {"most_mature": "I1", "unfixable": "I4", "repattern_candidate": "I3"},
-  "literature_used": [{"title": "……", "sources": ["arxiv"], "ref": "[作者, 会议/年份]"}],
-  "open_questions": ["I1 的迁移合法性待补 L2 级举证"],
-  "next_phase_suggestion": "R8 | R7 / R10 / R13"
+  ]
 }
 ```
 
-> **字段说明：** `evidence_ledger` / `claim_graph` / `typing` / `anchor_eligibility` /
-> `presets` / `slots` / `gates` / `ranking` 是本轮新增字段。
-> **评审结果落在 `attack_surfaces`（按攻击面命名）。**
-> 旧版按会议命名的 `scores` 键（`R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`）
-> **已删除** —— 会议只出现在 `D6` 的校准结论与 `best_narrative.best_venue` 里，
-> 不出现在 D 的派遣与评分里。
->
-> **注意 `E3`：** 它是 `Hypothesized`，所以 `claim_graph` 里**没有任何 `C_i` 引用它**，
-> 它只出现在 `missing_evidence` 里。这正是 `G4` 的机械判据 ——
-> 一旦 `C0` 挂上 `E3`，就属于证据夸大（[claim-first-policy.md](claim-first-policy.md) §3）。
+**硬规则：**
 
----
+1. **R12 不得新建 `claims[]` / `evidence[]` / `hypotheses[]`。** 叙事写作最容易发生「为了故事成立补一条未经验证的 claim」——
+   若叙事确需新 claim，**只能**产出 `uncertainties[]`（新缺口）或标 `narrative_gap`，**回 R1 / R8** 处理。
+2. **R12 不得提高任何既有条目的 `epistemic_status` 或 `claims[].status`。**
+3. **`narrative_view` 是唯一的 state 写入**（除新增 `uncertainties[]` 外）。
+4. **禁止**在 state 里出现下列槽位 —— 它们**在 schemas 中没有载体**，
+   写了即违反 [research-state-policy.md](research-state-policy.md) §3「未在本节出现的字段 = 未定义字段」：
 
+   `phase` / `route` / `timestamp` / `doc_id` / `target_venue` / `core_goal` /
+   `evidence_ledger` / `claim_graph` / `typing` / `anchor_eligibility` /
+   `presets` / `slots` / `attack_surfaces` / `gates` / `ranking`
+
+   **这些含义仍然存在**，但各有载体：
+
+   | 含义 | 真正的载体 |
+   |---|---|
+   | `phase` / `route` | route 目录与 `routes/<R>/README.md` |
+   | `doc_id` | 叙事文档的 frontmatter |
+   | `target_venue` / `gates` / `ranking` / `slots` / preset 选择理由 | **叙事文档正文** |
+   | `attack_surfaces` | `assurance[]`（R7）/ `reviews[]`（R13） |
+   | `core_goal` | `contract.primary_anchor` |
+   | `evidence_ledger` | `evidence[]` |
+   | `claim_graph` | `claims[]`（**数组**，不是按 `C0..C5` 做的字典） |
+
+5. **判据（Carrier Completeness）：** 任何规则要求「产出 / 记录 / 持久化 X」，
+   就必须同时存在 **`Producer(X)` + `Carrier(X)` + `Consumer(X)`**；三者缺一即为缺陷。
 
 ## 定位补充：Narrative 是 Research State 的视图
 
