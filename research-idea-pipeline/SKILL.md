@@ -65,10 +65,10 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` |
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
-| **R3** | `dual-discovery` | 双轨发现：local search ‖ paradigm escape（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
-| **R6** | `evolution` | mutation / crossover / simplification / 新 niche | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） |
@@ -117,6 +117,10 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
    **Agent 不得自行升档**，声明也**不跨轮继承**。
 
 **启动前置动作（每次调用都做）：**
+
+> **若是已有代码 / 实验 / 文献 / 结论的存量项目，先做接管摸底** ——
+> 按 [references/project-intake.md](references/project-intake.md) 的 9 个维度盘点，**不得从零开始**，
+> **项目里已有的信息不得重复询问用户**；只有「缺失且会实质影响科研判断」的信息才集中提问（一次问完）。
 
 0. **先确认锚定点（核心目标）** —— 见 §0.1。**项目主锚点未声明前不得开工。**
 1. **读项目根目录的 `AGENTS.md`**（若存在）—— 其布局、命名、公用部分约定优先于本
@@ -580,10 +584,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | 离线测试 | [scripts/test_literature_search.py](scripts/test_literature_search.py) | stdlib unittest，全离线（环境发现 / 跨源合并 / 等级判定） |
 | PDF 索引脚本 | [scripts/refs_index.py](scripts/refs_index.py) | 为 `docs/refs/` 下每个 PDF 建 `index.json` 条目；`--check` 校验（不一致退出码 3）、**`--migrate` 旧 schema 迁移（保留旧字段）** |
 | 索引迁移测试 | [scripts/test_refs_index.py](scripts/test_refs_index.py) | 离线测试：三种旧索引形状的迁移、「保留旧字段」、`--check` 退出码与提示 |
-| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、V1—V10 |
-| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 V1—V10** |
-| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V10 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
-| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V10 每条一个反例 + 退出码行为 |
+| **Research World Model 政策** | [references/research-state-policy.md](references/research-state-policy.md) | **R1 权威**：八类一等对象（`C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U`）+ `contract`、逐阶段读写时机、V1—V17 |
+| **World Model 模板** | [templates/research-state.template.json](templates/research-state.template.json) | R1 常驻骨架（顶层直接是各对象数组）；**模板自身必须通过 V1—V17** |
+| **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V17 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
+| 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V17 每条一个反例 + 退出码行为 |
+| **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routeX/INDEX.md` 骨架（文档索引 + **关系图** + 已证实/已证伪/TODO/Bugs/Warnings） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（跨路线索引 + 全局 TODO/Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routeX/README.md` 骨架（本路线做什么、怎么跑、目录组织） |
@@ -601,7 +606,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | R 阶段 | 派遣子代理 |
 |---|---|
 | **R2 / R5** | 无（执行者直接完成检索与归纳） |
-| **R3—R6** | **按 island 分轨生成**（`P1`—`P6` 各自独立、**上下文隔离**；**不派 venue 角色**）；concept 级快筛由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 承担，`S-Devil` 出致命反驳。**不派 S-Repro** |
+| **R3—R6** | **候选由隔离 Exploration Agents 按 island 生成**：`P1`—`P6` 各一个独立上下文（**互不可见**），另加 `local`；执行者只做编排、隔离、路由、汇总与写 state，**不得亲自补写候选**。generation 完成后才由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 做 concept 级 hygiene 快筛，`S-Devil` 出致命反驳。**不派 venue 角色**；**不派 S-Repro**。详见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6 |
 | **R8** | 由 `A-Author` / `A-Experimenter` 展开提案与实验计划；核实由 `S-Lit`、**`S-Nov`（按需）**、`S-Theory`、`S-Feas`；**venue 角色不派** |
 | **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **R12 / R13 的 venue calibration** 中以校准表出现 |
 | **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
@@ -668,21 +673,30 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 ### R3—R6 — 双轨发现与种群进化
 
 - **输入：** 研究领域关键词；已有参考文献（可选）；资源约束（可选）。
-- **流程：** R3 双轨发现（Local Search ‖ Paradigm Escape，**两轨在产生候选前不得互看**）→
-  R4 隔离种群 → `structural_signature` 五维聚类 → **QD archive** →
+- **流程：** R3 双轨发现（`P1`—`P6` 由**隔离开的 Exploration Agents** 生成，`local` 另起一轨；
+  **生成期互不可见**，见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6）→
+  R4 隔离种群 → `structural_signature` 五维聚类 → **QD archive**（**只保多样性，不做总分排序**）→
   R5 共演化检索（每轮至少一条 query 由最新候选生成）→
-  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction / new niche）。
-- **发散策略约束（`B4` 保留）：** 每个候选至少通过一种策略推导 ——
-  *问题重构 / 假设挑战 / 跨域迁移 / 反向思考 / 组合创新*。
-- **快筛（`B5` 保留，降级为 concept 级）：** 给出创新性 / 可行性 / 重叠度 / 致命反驳 / 优先级；
+  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction / new niche；
+  **跨 island 融合只允许在这里发生**，并写 `operator` + `parents` 谱系）。
+- **边界三句话：** `R3: Diverge`（让不同世界出现）→ `R4: Preserve Diversity`（不让它们被总分压扁）
+  → `R6: Recombine`（才允许互相借东西）。
+- **发散策略约束（`B4` 保留，映射到算子）：** 每个候选至少通过一种算子推导 ——
+  `P1` 问题重构 / `P2` 假设挑战 / `P3` 领域擦除 / `P4` 跨域结构类比 / `P5` 理论视角 / `P6` 反例与测量反转。
+- **快筛（`B5` 保留，降级为 concept 级 hygiene）：** **只**能因「自相矛盾 / 违反已知事实 /
+  同名重复 / 不可定义 / prior work 完全覆盖 / 与契约无关」六条杀掉；
+  **不得**因工程风险高、暂无 theorem、不会实现、非主流、venue fit 不明、证据不足而杀。
   **进入 population 的门槛 = 完成 L2 检索**；要写进文档的「首次提出」类声称仍要求 L3 + 负检索记录。
-  **不派遣 S-Repro。**
+  **不派遣 S-Repro。**`R3 screening ≠ R7 assurance`。
 - **交付物：** **population + QD archive**（每个出现过的 niche 至少一个 `elite`）+ 技术路线归纳表 +
   创新性边界界定 + **失败记忆**（被搁置的候选写 `failures[]`，不得删除）。
   **不再产出「QD archive 的 elite 集合（3—5 个）」——该概念在 Wave 2 起作废。**
 - **预算：** 默认 4 islands（`P1`—`P4`；`P5`/`P6` 按需启用）× 每岛 3—6 候选；进化 ≤2 轮。
 - **两阶段 fitness：** Search 期只看结构新颖度 / 跨域意外度 / 表示距离 / 演绎产出，
   **不看 venue fit** —— venue 适配在 R12 / R13 才生效。
+  **`coverage before ranking`：** 上述四项在 `generation == 0` 只作 archive descriptors /
+  search heuristics，**不得硬排序**；否则 `P4`/`P5` 会因「跨域 / 理论」标签天然拿高 reward。
+  质量压力从 R6 起才逐步引入。
 - **落盘：** `<routeX>/docs/<R>NNN-ideas.md`，并更新该路线 `INDEX.md`
   （被放弃的候选记入**已证伪**；未核实的无人区声称记 Warnings）。
 

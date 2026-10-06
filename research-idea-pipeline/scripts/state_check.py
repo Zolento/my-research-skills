@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""state_check.py — Research World Model（R1）机械闸门：V1—V15 引用完整性审计
+"""state_check.py — Research World Model（R1）机械闸门：V1—V17 引用完整性审计
 
 契约来源
 --------
@@ -16,7 +16,7 @@ V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 �
     python3 state_check.py <state.json> --check    # 显式化「只校验不写」
     python3 state_check.py <state.json> --json     # 机器可读结果（stdout 只有 JSON）
     python3 state_check.py <state.json> --quiet    # 只打印汇总行
-    python3 state_check.py --selftest              # 内置自检（V1—V15 全覆盖）
+    python3 state_check.py --selftest              # 内置自检（V1—V17 全覆盖）
     python3 state_check.py --list-rules            # 列出规则号与判据
 
 规则（逐字取自 spec §2.3，全部为硬违规）：
@@ -36,6 +36,8 @@ V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 �
     V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）
     V14 `hypotheses[].generation` 是非负整数
     V15 每个出现过的 `niche` 至少一条 `status: elite`
+    V16 hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应
+    V17 hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）
 
 判据补充（口径固定，避免各自解释）：
     * 「非空」= 字符串 strip 后非空；非字符串（数字 / 数组 / null）一律算违规。
@@ -49,6 +51,10 @@ V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 �
     * V13 `hypotheses[].island` ∈ {P1..P6, local}；
     * V14 `hypotheses[].generation` 是非负整数；
     * V15 每个出现过的 `niche` 至少一条 `status: elite`；
+    * V16 `operator` 必须是十二算子之一（strip 后精确比对）；`generation == 0` 且 `island` 合法时，
+      还要求 `operator` 与 `ISLAND_OPERATOR` 一一对应（`island` 本身非法由 V13 负责，不重复计）；
+    * V17 `parents` 必须是数组；每个元素是存在的 `H` id、不得自指、且父候选 `generation`
+      严格小于本候选（成环单独检测，父候选 generation 非法时跳过该边，交给 V14）；
     * V10 除四字段齐备外，另按 spec §5 强制两个枚举：
       `disposition ∈ REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
       `closure ∈ RESOLVED|ACCEPTED_LIMITATION`。（§7 验收要求枚举逐字一致。）
@@ -118,6 +124,18 @@ CLOSURES: Tuple[str, ...] = ("RESOLVED", "ACCEPTED_LIMITATION")
 # Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
 NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
 ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
+# Wave 2 / R6：候选谱系的十二算子（generation-0 七轨 + R6 进化五算子）
+OPERATORS: Tuple[str, ...] = (
+    "reframe", "assumption_breaker", "abstraction", "remote_analogy",
+    "theory_lens", "counterexample", "local",
+    "mutation", "crossover", "simplification", "theory_induced", "new_niche",
+)
+# generation-0 的 island ↔ operator 一一对应（初始七轨）
+ISLAND_OPERATOR: Dict[str, str] = {
+    "P1": "reframe", "P2": "assumption_breaker", "P3": "abstraction",
+    "P4": "remote_analogy", "P5": "theory_lens", "P6": "counterexample",
+    "local": "local",
+}
 
 UNGROUNDED = "ungrounded"
 TBD = "TBD"
@@ -140,6 +158,8 @@ RULES: Dict[str, str] = {
     "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）",
     "V14": "hypotheses[].generation 是非负整数",
     "V15": "每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性）",
+    "V16": "hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应",
+    "V17": "hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -406,7 +426,7 @@ class _Context:
 
 
 # ---------------------------------------------------------------------------
-# V1—V15
+# V1—V17
 # ---------------------------------------------------------------------------
 
 def _v1(ctx: _Context) -> List[Violation]:
@@ -605,6 +625,164 @@ def _v15(ctx: _Context) -> List[Violation]:
     return out
 
 
+def _v16(ctx: _Context) -> List[Violation]:
+    """V16：operator ∈ 十二算子；generation == 0 时必须与 island 一一对应。"""
+    out: List[Violation] = []
+    for index, hypothesis in ctx.hypotheses:
+        path = f"hypotheses[{index}].operator"
+        subject = _subject_of(hypothesis)
+        value = hypothesis.get("operator")
+        if not _text_ok(value):
+            detail = ("为空（必须标明由哪个算子产生）" if _is_blank(value)
+                      else "必须是非空字符串")
+            out.append(Violation("V16", path, detail, value, subject))
+            continue
+        operator = value.strip()
+        if operator not in OPERATORS:
+            out.append(Violation(
+                "V16", path,
+                f"不是十二算子之一（{'|'.join(OPERATORS)}）",
+                value, subject,
+            ))
+            continue
+        generation = hypothesis.get("generation")
+        gen_ok = isinstance(generation, int) and not isinstance(generation, bool) and generation >= 0
+        if not gen_ok or generation != 0:
+            continue  # 只有合法的 generation-0 初始候选才受 island 映射约束
+        island = hypothesis.get("island")
+        if not (_text_ok(island) and island.strip() in ISLAND_OPERATOR):
+            continue  # island 非法 / 为空由 V13 负责，这里不重复计
+        expected = ISLAND_OPERATOR[island.strip()]
+        if operator != expected:
+            out.append(Violation(
+                "V16", path,
+                f"generation == 0 且 island={island.strip()} 时 operator 必须是 {expected}（初始七轨一一对应）",
+                value, subject,
+            ))
+    return out
+
+
+def _cycle_components(edges: Dict[str, set]) -> List[List[str]]:
+    """返回每个环所在的强连通分量（只保留 len>1；自指由 V17 的单边检查负责）。"""
+    nodes = set(edges)
+    for targets in edges.values():
+        nodes.update(targets)
+
+    index_of: Dict[str, int] = {}
+    low: Dict[str, int] = {}
+    on_stack: set = set()
+    stack: List[str] = []
+    components: List[List[str]] = []
+    counter = 0
+
+    for root in sorted(nodes):
+        if root in index_of:
+            continue
+        work: List[Tuple[str, Any]] = [(root, iter(sorted(edges.get(root, ()))))]
+        index_of[root] = low[root] = counter
+        counter += 1
+        stack.append(root)
+        on_stack.add(root)
+        while work:
+            node, pending = work[-1]
+            descended = False
+            for target in pending:
+                if target not in index_of:
+                    index_of[target] = low[target] = counter
+                    counter += 1
+                    stack.append(target)
+                    on_stack.add(target)
+                    work.append((target, iter(sorted(edges.get(target, ())))))
+                    descended = True
+                    break
+                if target in on_stack:
+                    low[node] = min(low[node], index_of[target])
+            if descended:
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+            if low[node] == index_of[node]:
+                component: List[str] = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    component.append(member)
+                    if member == node:
+                        break
+                if len(component) > 1:
+                    components.append(sorted(component))
+    return components
+
+
+def _v17(ctx: _Context) -> List[Violation]:
+    """V17：parents 是数组；每个 id 存在、不得自指、generation 严格小于本候选、且不成环。"""
+    out: List[Violation] = []
+    by_id: Dict[str, Dict[str, Any]] = {}
+    index_of: Dict[str, int] = {}
+    for index, hypothesis in ctx.hypotheses:
+        identifier = _id_of(hypothesis)
+        if identifier and identifier not in by_id:
+            by_id[identifier] = hypothesis
+            index_of[identifier] = index
+
+    edges: Dict[str, set] = {}
+    for index, hypothesis in ctx.hypotheses:
+        base = f"hypotheses[{index}].parents"
+        subject = _subject_of(hypothesis)
+        parents = hypothesis.get("parents")
+        if not isinstance(parents, list):
+            detail = ("为空（必须写数组，初始候选写 []）" if _is_blank(parents)
+                      else "必须是数组（初始候选写 []；不得省略键）")
+            out.append(Violation("V17", base, detail, parents, subject))
+            continue
+
+        generation = hypothesis.get("generation")
+        gen_ok = isinstance(generation, int) and not isinstance(generation, bool) and generation >= 0
+        own_id = _id_of(hypothesis)
+        for position, parent in enumerate(parents):
+            path = f"{base}[{position}]"
+            if not _text_ok(parent):
+                out.append(Violation("V17", path, "不是非空 H id", parent, subject))
+                continue
+            target = parent.strip()
+            if own_id and target == own_id:
+                out.append(Violation(
+                    "V17", path, "不得自指（parent 不能是本候选自己的 id）", parent, subject,
+                ))
+                continue
+            parent_entry = by_id.get(target)
+            if parent_entry is None:
+                out.append(Violation("V17", path, "指向不存在的 H id", parent, subject))
+                continue
+            parent_generation = parent_entry.get("generation")
+            parent_ok = (isinstance(parent_generation, int)
+                         and not isinstance(parent_generation, bool)
+                         and parent_generation >= 0)
+            if not (gen_ok and parent_ok):
+                continue  # generation 非法由 V14 负责（跳过该边，不重复计）
+            if own_id:
+                edges.setdefault(own_id, set()).add(target)
+            if parent_generation >= generation:
+                out.append(Violation(
+                    "V17", path,
+                    f"parent 的 generation 必须严格小于本候选（{parent_generation} ≥ {generation}）",
+                    parent, subject,
+                ))
+
+    for component in _cycle_components(edges):
+        start = component[0]
+        out.append(Violation(
+            "V17",
+            f"hypotheses[{index_of.get(start, 0)}].parents",
+            "候选谱系成环（沿 parents 链回到自身）",
+            start,
+            start,
+        ))
+    return out
+
+
 def _test_reference(
     rule: str, path: str, value: Any, ctx: _Context, subject: str,
 ) -> Optional[Violation]:
@@ -797,6 +975,7 @@ CHECKS: Dict[str, Callable[[_Context], List[Violation]]] = {
     "V6": _v6, "V7": _v7, "V8": _v8, "V9": _v9, "V10": _v10,
     "V11": _v11, "V12": _v12,
     "V13": _v13, "V14": _v14, "V15": _v15,
+    "V16": _v16, "V17": _v17,
 }
 
 
@@ -888,7 +1067,7 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
-        description="Research World Model（R1）机械闸门：V1—V15 引用完整性审计"
+        description="Research World Model（R1）机械闸门：V1—V17 引用完整性审计"
                     "（docs/r-architecture-wave1-spec.md §2.3）",
     )
     parser.add_argument("state", nargs="?", default=None,
@@ -897,8 +1076,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="只校验不写入（默认行为即如此；显式化以便与 refs_index.py 口径一致）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行，不逐条打印违规")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V15 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V15 与判据")
+    parser.add_argument("--selftest", action="store_true", help="跑内置自检（V1—V17 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 V1—V17 与判据")
     return parser
 
 
@@ -967,6 +1146,7 @@ def _selftest_state() -> Dict[str, Any]:
             "novelty_source": "assumption-breaking", "theory_lens": "transfer",
             "nearest_prior": "LoRA", "falsifier": "R2 不降级",
             "expected_information_gain": 0.4, "status": "elite", "niche": "N2", "island": "P2", "generation": 0,
+            "operator": "assumption_breaker", "parents": [],
         }],
         "experiments": [{
             "id": "X1", "parent": None, "stage": "X1", "claim_targeted": ["C0"],
@@ -1106,7 +1286,7 @@ def selftest() -> int:
 
     v13 = report_with(lambda d: d["hypotheses"][0].update(island="PX"))
     check("V13 island 非法 → 3", v13.exit_code == EXIT_HARD and v13.rules() == ["V13"])
-    v13ok = report_with(lambda d: d["hypotheses"][0].update(island="local"))
+    v13ok = report_with(lambda d: d["hypotheses"][0].update(island="local", operator="local"))
     check("V13 合法反例：island=local → 0", v13ok.exit_code == EXIT_OK and v13ok.violations == [])
 
     v14 = report_with(lambda d: d["hypotheses"][0].update(generation="1"))
@@ -1121,6 +1301,50 @@ def selftest() -> int:
         d["hypotheses"].append(dict(d["hypotheses"][0], id="H2", niche="N5", status="active", generation=0))
     v15 = report_with(_no_elite)
     check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
+
+    v16a = report_with(lambda d: d["hypotheses"][0].update(operator=""))
+    check("V16 operator 为空 → 3", v16a.exit_code == EXIT_HARD and v16a.rules() == ["V16"])
+    v16b = report_with(lambda d: d["hypotheses"][0].update(operator="teleport"))
+    check("V16 operator 越界 → 3", v16b.exit_code == EXIT_HARD and v16b.rules() == ["V16"])
+    v16c = report_with(lambda d: d["hypotheses"][0].update(operator="reframe"))
+    check("V16 generation-0 与 island 不对应 → 3",
+          v16c.exit_code == EXIT_HARD and v16c.rules() == ["V16"]
+          and v16c.violations[0].path == "hypotheses[0].operator")
+    v16ok = report_with(lambda d: d["hypotheses"][0].update(operator="assumption_breaker"))
+    check("V16 合法反例：generation-0 与 island 对应 → 0",
+          v16ok.exit_code == EXIT_OK and v16ok.violations == [])
+
+    def _child(d):
+        child = copy.deepcopy(d["hypotheses"][0])
+        child.update(id="H2", generation=1, operator="mutation", parents=["H1"], status="active")
+        d["hypotheses"].append(child)
+
+    v17ok = report_with(_child)
+    check("V17 合法反例：generation-1 指向 generation-0 → 0",
+          v17ok.exit_code == EXIT_OK and v17ok.violations == [])
+    v17a = report_with(lambda d: d["hypotheses"][0].pop("parents"))
+    check("V17 parents 缺失 → 3", v17a.exit_code == EXIT_HARD and v17a.rules() == ["V17"])
+    v17b = report_with(lambda d: d["hypotheses"][0].update(parents=["H404"]))
+    check("V17 parents 悬空 id → 3", v17b.exit_code == EXIT_HARD and v17b.rules() == ["V17"])
+    v17c = report_with(lambda d: d["hypotheses"][0].update(parents=["H1"]))
+    check("V17 parents 自指 → 3", v17c.exit_code == EXIT_HARD and v17c.rules() == ["V17"])
+
+    def _cycle_parents(d):
+        _child(d)
+        d["hypotheses"][0].update(parents=["H2"])
+
+    v17d = report_with(_cycle_parents)
+    check("V17 parents 成环 → 3",
+          v17d.exit_code == EXIT_HARD and v17d.rules() == ["V17"]
+          and any("成环" in v.render() for v in v17d.violations))
+
+    def _flat_generation(d):
+        _child(d)
+        d["hypotheses"][0].update(generation=1)
+
+    v17e = report_with(_flat_generation)
+    check("V17 generation 未严格递减 → 3",
+          v17e.exit_code == EXIT_HARD and v17e.rules() == ["V17"])
 
     check(f"自检覆盖 V1—V{max(RULE_ORDER, key=lambda r: int(r[1:]))[1:]}", set(RULE_ORDER) - detected == set(),
           f"未覆盖 {sorted(set(RULE_ORDER) - detected)}")

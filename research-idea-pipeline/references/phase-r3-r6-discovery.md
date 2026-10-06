@@ -324,32 +324,59 @@
 
 ## R3. 双轨发现（**上下文隔离是硬规则**）
 
-> **谁生成候选（Wave 3 澄清）：** 候选由**执行者按 island 分轨生成**（`P1`—`P6`，各轨上下文隔离）。
-> **子代理不负责生成候选**，只用于：concept 级快筛（`S-Lit` / `R-Novelty` / `R-Causal` / `S-Feas`）
-> 与致命反驳（`S-Devil`）。因此 `B3` 里「派遣 7 个具名子代理各出 ≥3 idea」的**旧指示作废**。
+> **谁生成候选（Wave 4 裁决，取代 Wave 3 的「执行者分轨生成」）：**
+> **R3 的候选由隔离 Exploration Agents 按 island 独立生成。** 中央执行者只负责构造各 island
+> 的最小共享输入、实施上下文隔离、`typed intermediate` 路由、收集与结构化候选、分配 ID
+> 和写入 Research State，**不得跨 island 补写或融合候选**。R3 生成阶段结束后，才允许调用
+> 快筛 / 对抗代理做 concept-level collision check 与致命反驳。**生成代理不得自评 novelty
+> 或投稿价值。** `B3` 的「派遣 7 个具名子代理各出 ≥3 idea」**仍然作废**（那是 persona 多样性，
+> 见 §R3.3；本 Wave 冻结的是 **operator 多样性**）。
+
+```text
+Exploration Agents generate divergence;
+Assurance Agents   attack;
+Executor           orchestrates and records.
+```
+
+| 主体 | R3 职责 | **禁止** |
+|---|---|---|
+| `P1`—`P6` Exploration Agents | 在**各自受限算子空间**内独立生成 raw hypotheses / reframings / analogies / theory lenses | 不给自己打 novelty 分；不声称「首次」；**不看其他 island 的候选** |
+| `local` Exploration Agent | 在**已有范式内**生成稳健局部候选 | 不进入 paradigm islands |
+| 中央执行者 | 构造共同 seed `S0`、实施上下文隔离、`typed intermediate` 路由、汇总、结构化、分配 ID、写 state | **不补写「更聪明的候选」**；不把 island A 的结果喂给 island B |
+| 快筛 / `S-Devil` / `S-Lit` | **generation 完成后**做 concept-level collision check 与致命反驳 | **不参与第一轮生成** |
+
+**两条边界（互为护栏）：**
+
+1. **Exploration Agent 没有权力否决自己的 idea。**
+2. **Assurance Agent 没有权力偷偷生成一个完全不同的新主方案**（它的攻击可以触发 R6 `mutation`）。
 
 ```text
                  ┌── Local Search ─────── 已有 gap / 机制改进
 problem ─────────┤                        （基线：把现状做到更好）
                  └── Paradigm Escape ──── P1 Reframe            改问题 ontology
                                           P2 Assumption         摧毁 tacit assumption
-                                          P3 Remote Analogy     先做 domain erasure，再找结构同构
-                                          P4 Theory Lens        换一套数学语言重述
-                                          P5 Measurement        怀疑 metric / observable
-                                          P6 Counterexample     从反例与不可能性生成方向
+                                          P3 Abstraction        先做 domain erasure，出 domain-free skeleton
+                                          P4 Remote Analogy     吃 P3 骨架找结构同构（Wave B）
+                                          P5 Theory Lens        换一套数学语言并导出后果（Wave B）
+                                          P6 Counterexample     反例 / 不可能性 / 测量反转生成方向
 ```
 
 **硬规则：**
 
-1. **两轨在产生候选之前不得互相看到内容。** 理由：`early communication → idea convergence` ——
-   四轨若第一轮就共享答案，发散度会塌成一条。**隔离是机制，不是建议。**
-2. **P3 必须先做 domain erasure**：删掉 `MRI / CT / flow / reconstruction` 这类领域词，
-   只留数学骨架，再找 `high semantic distance + high structural similarity` 的对象。
-   直接说「领域 A 和 B 都在做类似的事」**不算**结构同构。
-3. **P4 每个 theory lens 必须产出 `explanation + prediction + algorithmic consequence`
-   三者中至少两个**，否则是理论包装，退 `failures[]`（`kind: unsupported`）。
-4. **P6 产出的方向必须写成可证伪命题**（否则它是抱怨，不是研究问题）。
-5. 每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）与 `generation: 0`（V13/V14 强制）。
+1. **各 island 在产生候选之前不得互相看到候选内容。** 理由：`early communication → idea convergence` ——
+   若第一轮就共享答案，发散度会塌成一条。**隔离是机制，不是建议。**
+   **隔离的对象是「候选内容」，不是「规范化中间表示」**（边界见 §R3.4）。
+2. **`P3` 必须先做 domain erasure**：删掉 `MRI / CT / flow / reconstruction` 这类领域词，
+   只留数学骨架（`domain-free skeleton`）；**`P3` 不产完整方法**。
+3. **`P4` 的跨域联系必须逐维对应**：`object ↔ object`、`relation ↔ relation`、
+   `constraint ↔ constraint`、`failure mode ↔ failure mode` **四维都要写出来**。
+   只说「两边都有 distribution shift / optimization / uncertainty」**不算**结构同构。
+4. **`P5` 每个 theory lens 必须产出下列五类后果中至少两个**：新 explanation / 新 boundary 或
+   impossibility / 新 prediction / 新 algorithmic design / 新 discriminating experiment。
+   做不到就是**理论包装**，退 `failures[]`（`kind: unsupported`）。
+5. **`P6` 产出的方向必须写成可证伪命题**（否则它是抱怨，不是研究问题）。
+6. 每轨的候选都写 `island`（`P1`—`P6` / `local`；**默认启用 `P1`—`P4`，`P5`/`P6` 按需**）、
+   `operator`、`parents: []` 与 `generation: 0`（**V13 / V14 / V16 / V17 强制**）。
 
 ### R3.0 `claims[]` 的创建归属（总收官审计 M-1）
 
@@ -372,7 +399,8 @@ V1 / V2 / V3 会**永不触发**，world model 变成没有 claim 的空壳。
 
 | 项 | 默认 |
 |---|---|
-| islands 数 | **默认 4**（`P1`—`P4`，各占独立预算）+ Local Search；`P5`（Measurement inversion）与 `P6`（Counterexample & impossibility）**按需启用**（枚举里合法，但不占默认预算；启用即上调，须说明理由） |
+| islands 数 | **默认 4**（`P1`—`P4`，各占独立预算）+ Local Search；`P5`（Theory Lens）与 `P6`（Counterexample & Measurement inversion）**按需启用**（枚举里合法，但不占默认预算；启用即上调，须说明理由） |
+| 生成主体 | **每个 island 一个独立 Exploration Agent**（各自上下文，互不可见；见 §R3.3 / §R3.4） |
 | 每 island 候选数 | **下限 3，上限 6**（超上限须显式说明为什么值得） |
 | 进化轮数上限 | **2**（见 R6） |
 
@@ -383,6 +411,72 @@ V1 / V2 / V3 会**永不触发**，world model 变成没有 claim 的空壳。
 
 Local Search 不是「对照组」——它负责**把现状做到更好**，其候选同样进 population 与 QD archive。
 **但两阶段 fitness 对它在 Search 期一视同仁**（见 R6.3）：不许因为它"更可行"就优先。
+
+### R3.3 是「算子多样性」，**不是**「人格多样性」
+
+| 模式 | 长什么样 | 裁决 |
+|---|---|---|
+| **persona diversity**（旧 `B3`） | `R-CVPR` 想三个 idea、`R-ICML` 想三个 idea、`R-NeurIPS` 想三个 idea | ❌ **不恢复** |
+| **operator diversity**（本 Wave） | 六个**不同搜索算子**在各自**受限空间**里产生候选 | ✅ **冻结** |
+
+**六个算子的受限空间（每个算子只允许改变括号里的东西）：**
+
+| island | 算子（`operator` 值） | 只允许改变 |
+|---|---|---|
+| `P1` | `reframe` — 问题重构 | scientific object / target variable / formulation / success criterion |
+| `P2` | `assumption_breaker` — 假设破坏 | 从 Assumption Graph 出发：`AS_i → ¬AS_i →` 新的 research world |
+| `P3` | `abstraction` — 领域擦除 | 只产 `domain-free skeleton` / alternative abstractions；**不产完整方法** |
+| `P4` | `remote_analogy` — 远域类比 | 目标 `semantic distance high` + `structural correspondence high`（四维逐维对应，见硬规则 3） |
+| `P5` | `theory_lens` — 理论视角 | 强制换 mathematical object，并导出 ≥2 类后果 |
+| `P6` | `counterexample` — 反例/测量 | 从 impossibility / counterexample / evaluation inversion / observability failure **反向**生成 |
+| `local` | `local` | **已有范式内**的稳健局部改进 |
+
+### R3.4 隔离边界：隔离**候选内容**，不隔离**规范化中间表示**
+
+**结论：`isolation applies to candidate content, not to typed intermediate representations.`**
+
+| | 内容 | 是否可跨 island 传递 |
+|---|---|---|
+| ❌ **禁止传递** | 其他 island 的候选、其候选领域名、「我们希望找到 causal inference」这类暗示、nearest literature 的 method details | 不得 |
+| ✅ **允许传递** | 经规范化的 `typed intermediate representation`，例如 `P3` 输出的 `abstract_skeleton` | 允许，**且必须已去领域词** |
+
+**为什么：** 若 `P4` 看到「`P1` 已经提出把它当 causal transport」，它只是**重新发现** causal transport ——
+跨域类比的价值归零。但 `P4` 本来就需要 `P3` 的骨架：把「完全不许传信息」写死，
+会退化成六个互不相干的孤岛。
+
+**硬规则：** 允许传递的中间表示**必须**类型化、已去领域词（object / relation / constraint /
+failure mode / core unknown 五类槽位），**不得**夹带候选领域名、方法名或结论。
+
+### R3.5 两波生成（**不是一次六代理齐发**）
+
+**结论：`P3 → P4` 存在天然的演绎依赖，所以 R3 分两波。**
+
+| 波 | 并行算子 | 输入 |
+|---|---|---|
+| **Wave A — Representation generation** | `P1` / `P2` / `P3` / `P6` / `local` | **只有共同 seed `S0`** |
+| **Wave B — Representation expansion** | `P4`（吃 `P3` 的 `abstract_skeleton`）/ `P5`（可选吃 `P1` 的 alternative formulations） | **只读规范化中间表示，不读完整 candidate pool** |
+| merge | 执行者汇总、结构化、分配 ID、写 state | — |
+
+### R3.6 生成后的 hygiene 快筛（**`R3 screening ≠ R7 assurance`**）
+
+**结论：快筛只做最低限度卫生检查；不能让 critic 在 idea 出生五分钟后就把它杀死。**
+
+**可以杀（仅此六条）：**
+
+1. 自相矛盾
+2. 明显违反已知事实
+3. 实际只是同一个候选改名字（结构簇重复）
+4. 明显不可定义
+5. 已知 prior work 完全覆盖
+6. 与研究契约根本无关
+
+**不得因为下列理由杀：**
+
+工程风险高 / 暂时没有 theorem / 暂时不知道怎么实现 / 不像当前领域主流 /
+venue fit 不明确 / 当前证据不足。
+
+> **否则 paradigm idea 会在出生五分钟后被「可行性审稿人」杀死。**
+> 完整的对抗保证保留到 R7；`P5` 所需的 theorem 与 `P3`/`P4` 的实现路径**不属于 R3 的判据**。
 
 ---
 
@@ -433,12 +527,25 @@ Niche N8（Benchmark/评测）           elite: H62
 
 ## R6. 进化与两阶段 fitness
 
+### R6.0 R3 / R4 / R6 的边界（三句话冻结）
+
+```text
+R3: Diverge              让不同世界出现
+R4: Preserve Diversity   不让这些世界被总分排序压扁
+R6: Recombine            才允许不同世界互相借东西
+```
+
+**谱系（genealogy）强制：** 每次 R6 进化必须在子候选上写 `operator`（五个进化算子之一）
+与 `parents`（父候选 `H` id 数组，**至少一个**），并让 `generation` 递增。**V16 / V17 强制。**
+
+> 没有谱系就无法回答「**哪种算子最容易产生有效的范式创新**」—— 而那正是本 Wave 想度量的东西。
+
 ### R6.1 进化算子（五种，按序优先使用前三种）
 
 | 算子 | 做什么 |
 |---|---|
 | `mutation` | 改一个 structural signature 维度 |
-| `cross-domain crossover` | **跨 island** 组合两个候选的表示与机制（P3 的产物最适合） |
+| `cross-domain crossover` | **跨 island** 组合两个候选的表示与机制（`P3` 抽象骨架 × `P4` 远域类比最常配对）。**这是唯一允许跨 island 融合的阶段** —— R3 严禁早熟收敛，见 R6.0 |
 | `simplification` | 删掉不必要假设 —— **删比加优先** |
 | `theory-induced deduction` | 从某个 theory lens 推出新命题 |
 | `new niche creation` | 现有 niche 都不合适时开新 niche（须同时给出 elite，否则 V15 失败） |
@@ -464,15 +571,20 @@ Niche N8（Benchmark/评测）           elite: H62
 
 **`expected_information_gain` 在 Search 期只作为记录**，不作为排序依据 —— 它属于 Selection 阶段。
 
+**`coverage before ranking`（Wave 4 加严）：`cross_domain_surprise` 与 `deductive_yield`
+在 generation-0 只作 archive descriptors / search heuristics，不得用于硬排序。**
+否则 `P4`（远域类比）与 `P5`（理论视角）会因为「跨域 / 理论」标签天然拿到更高 reward ——
+系统只是把一个偏置换成另一个偏置。**第一代的唯一目标是覆盖度；质量压力从 R6 起才逐步引入。**
+
 ---
 
 ## 读 / 写 World Model（强制）
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
+| **R3** |`literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
 | **R4** |`hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
-| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

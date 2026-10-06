@@ -1,6 +1,6 @@
 {
   "_schema": "research-idea-pipeline/research-state@1",
-  "_usage": "R1 Research World Model 骨架（Research State）。顶层直接是八类一等对象数组（claims / evidence / assumptions / hypotheses / experiments / literature / failures / uncertainties）+ V9/V10 强制的 assurance / repairs；不要把它们包在 world_model / state 之类的单键下。字段名与枚举逐字定义见 references/research-state-policy.md §3，引用完整性 V1—V10 见该文件 §4，位置读写时机见 §5。R1 是常驻对象：任何 R 阶段开工前先读本对象，收工前就地写回（同一份文件覆盖更新，不按阶段切分）。落盘路径：.research-idea-pipeline/<route>/research-state.json（机器状态档，不贴进 docs 正文）。写回后必须跑 python3 scripts/state_check.py --check <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 V1—V10。字面量 TBD 只有两个合法位置：uncertainties[].cheapest_discriminating_test 与 assurance[].discriminating_test；其它字段里的 TBD / 「示例占位」必须替换为真实值（尤其 experiments[].code_commit / result 与 evidence[].source_ref），否则模板条目不得被当作实验结论引用。空引用写 []，不使用 null 或省略键；ID 路线内唯一、永不复用。",
+  "_usage": "R1 Research World Model 骨架（Research State）。顶层直接是八类一等对象数组（claims / evidence / assumptions / hypotheses / experiments / literature / failures / uncertainties）+ V9/V10 强制的 assurance / repairs；不要把它们包在 world_model / state 之类的单键下。字段名与枚举逐字定义见 references/research-state-policy.md §3，引用完整性 V1—V17 见该文件 §4，位置读写时机见 §5。R1 是常驻对象：任何 R 阶段开工前先读本对象，收工前就地写回（同一份文件覆盖更新，不按阶段切分）。落盘路径：.research-idea-pipeline/<route>/research-state.json（机器状态档，不贴进 docs 正文）。写回后必须跑 python3 scripts/state_check.py --check <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 V1—V17。字面量 TBD 只有两个合法位置：uncertainties[].cheapest_discriminating_test 与 assurance[].discriminating_test；其它字段里的 TBD / 「示例占位」必须替换为真实值（尤其 experiments[].code_commit / result 与 evidence[].source_ref），否则模板条目不得被当作实验结论引用。空引用写 []，不使用 null 或省略键；ID 路线内唯一、永不复用。",
   "contract": {
     "goal": "（示例占位）研究目标，用户原话",
     "primary_anchor": "performance | theory | phenomenon | benchmark | feasibility | negative",
@@ -164,7 +164,9 @@
       "status": "elite",
       "niche": "N2",
       "island": "P2",
-      "generation": 0
+      "generation": 0,
+      "operator": "assumption_breaker",
+      "parents": []
     }
   ],
   "experiments": [

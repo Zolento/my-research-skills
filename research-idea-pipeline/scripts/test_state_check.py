@@ -15,7 +15,7 @@
 覆盖点
 ------
 1. 合法 state → 0；`--json` 的 `ok=true` 且可解析
-2. V1—V10 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
+2. V1—V17 每条至少一个反例（V2 另测 refuting；V5 两个子判定；V8 悬空 + 成环；
    V10 四字段齐备 + 处置/关闭两个枚举）
 3. 环境：缺文件 / 非法 JSON / 空文件 / 根非对象 / 缺八类数组 / 数组类型错 / 条目非对象 → 4
 4. `--json` 在 0 / 3 / 4 三种情况下都可解析；`--check` 与默认行为等价
@@ -111,6 +111,7 @@ def valid_state() -> Dict[str, Any]:
                 "nearest_prior": "LoRA", "falsifier": "R2 不降级",
                 "expected_information_gain": 0.4, "status": "active",
                 "niche": "N2", "island": "P2", "generation": 0, "status": "elite",
+                "operator": "assumption_breaker", "parents": [],
             },
         ],
         "experiments": [
@@ -458,6 +459,7 @@ class TestV13V15(unittest.TestCase):
 
     def test_v13_local_track_is_legal(self) -> None:
         doc = valid_state(); doc["hypotheses"][0]["island"] = "local"
+        doc["hypotheses"][0]["operator"] = "local"  # V16：generation-0 必须与 island 对应
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
     def test_v14_string_generation_is_hard(self) -> None:
@@ -490,6 +492,129 @@ class TestV13V15(unittest.TestCase):
         doc = valid_state(); doc["hypotheses"][0]["niche"] = "assumption-breaking"
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V6"])
+
+
+class TestV16V17(unittest.TestCase):
+    """V16（operator 十二算子 + generation-0 与 island 对应）/ V17（parents 谱系）—— R6 候选谱系。"""
+
+    def _with_child(self, doc, **overrides):
+        """在 base 上补一个 generation-1 的子候选（默认由 H42 繁衍）。"""
+        child = copy.deepcopy(doc["hypotheses"][0])
+        child.update(id="H2", generation=1, operator="mutation", parents=["H42"], status="active")
+        child.update(overrides)
+        doc["hypotheses"].append(child)
+        return doc
+
+    # --- V16 ---
+
+    def test_v16_empty_operator_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["operator"] = ""
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V16"])
+        self.assertEqual(r.violations[0].path, "hypotheses[0].operator")
+
+    def test_v16_missing_operator_is_hard(self) -> None:
+        doc = valid_state(); del doc["hypotheses"][0]["operator"]
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V16"])
+
+    def test_v16_unknown_operator_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["operator"] = "teleport"
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V16"])
+
+    def test_v16_non_string_operator_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["operator"] = 7
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V16"])
+
+    def test_v16_generation0_island_mismatch_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["operator"] = "reframe"  # island 是 P2
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V16"])
+        self.assertIn("assumption_breaker", r.violations[0].render())
+
+    def test_v16_every_generation0_island_operator_pair_is_clean(self) -> None:
+        for island, operator in sc.ISLAND_OPERATOR.items():
+            doc = valid_state()
+            doc["hypotheses"][0]["island"] = island
+            doc["hypotheses"][0]["operator"] = operator
+            self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK, msg=f"{island}/{operator}")
+
+    def test_v16_all_twelve_operators_legal_at_generation1(self) -> None:
+        for operator in sc.OPERATORS:
+            doc = self._with_child(valid_state(), operator=operator)
+            self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK, msg=operator)
+
+    def test_v16_illegal_island_is_left_to_v13(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["island"] = "PX"
+        doc["hypotheses"][0]["operator"] = "reframe"  # V16 不得重复报 island 本身非法
+        r = sc.check_state(doc)
+        self.assertEqual(r.rules(), ["V13"])
+
+    def test_v16_invalid_generation_does_not_trigger_mapping(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["operator"] = "reframe"  # 与 P2 不匹配，但 generation 非法 → 交给 V14
+        doc["hypotheses"][0]["generation"] = "0"
+        r = sc.check_state(doc)
+        self.assertEqual(r.rules(), ["V14"])
+
+    # --- V17 ---
+
+    def test_v17_missing_parents_is_hard(self) -> None:
+        doc = valid_state(); del doc["hypotheses"][0]["parents"]
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+        self.assertEqual(r.violations[0].path, "hypotheses[0].parents")
+
+    def test_v17_parents_not_array_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["parents"] = "H42"
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+
+    def test_v17_non_string_parent_id_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["parents"] = [7]
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+
+    def test_v17_dangling_parent_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["parents"] = ["H404"]
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+        self.assertEqual(r.violations[0].path, "hypotheses[0].parents[0]")
+
+    def test_v17_self_parent_is_hard(self) -> None:
+        doc = valid_state(); doc["hypotheses"][0]["parents"] = ["H42"]
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+        self.assertIn("自指", r.violations[0].render())
+
+    def test_v17_cycle_is_hard(self) -> None:
+        doc = self._with_child(valid_state())
+        doc["hypotheses"][0]["parents"] = ["H2"]  # H42 → H2 → H42
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+        self.assertTrue(any("成环" in v.render() for v in r.violations))
+
+    def test_v17_generation_not_strictly_decreasing_is_hard(self) -> None:
+        doc = self._with_child(valid_state())
+        doc["hypotheses"][0]["generation"] = 1  # H2(gen 1) 的 parent H42 也是 gen 1
+        r = sc.check_state(doc)
+        self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V17"])
+
+    def test_v17_gen1_child_of_gen0_is_clean(self) -> None:
+        doc = self._with_child(valid_state())
+        self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
+
+    def test_v17_initial_candidate_with_empty_parents_is_clean(self) -> None:
+        self.assertEqual(sc.check_state(valid_state()).exit_code, sc.EXIT_OK)
+
+    def test_v17_invalid_parent_generation_is_left_to_v14(self) -> None:
+        doc = self._with_child(valid_state())
+        doc["hypotheses"][0]["generation"] = "0"  # 父 generation 非法 → 跳过该边
+        r = sc.check_state(doc)
+        self.assertEqual(r.rules(), ["V14"])
 
 
 class TestEnvironment(unittest.TestCase):
