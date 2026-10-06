@@ -139,6 +139,12 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 > 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R4.4）。
 > **三者都不得被当作结论引用**，也不分配 `H` / `C` / `X` ID。
 >
+> `populations/near-neighbor-telemetry.json` 存 population 级 near-neighbor telemetry
+> （`StructuralCoverage` / `PairwiseStructuralDistance` / `CrossIslandRedundancy` /
+> `LocalCollapseRate` / `RemoteConversionRate`；见
+> [structural-equivalence-policy.md](structural-equivalence-policy.md) §28）。
+> **它不进 state，也不得作为任何 reward** —— 否则会诱导「为了距离而胡思乱想」。
+>
 > **`assurance/structural-equivalence/`** 存 Structural Equivalence 的完整审计 artifact
 > （`<H>.json` = SENA-1，`<H>.sena2.json` = SENA-2）——它是 **Control Plane artifact**，
 > **不是第九类 Research State 对象**；state 只保留 `assurance[].audit_ref` 这样的路径引用。

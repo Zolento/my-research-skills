@@ -506,6 +506,17 @@ fingerprint artifact 是它的**文本补充**，**不是**替代，**不得**�
 fingerprint 与 `populations/intermediates/` 一样是 **Control Plane artifact**：
 **不分配** `C` / `E` / `X` ID，**不进** `research-state.json`，**不得**被当作结论引用。
 
+### R4.5 near-neighbor 层的分工（**R3 不跑 gate**）
+
+**R3 只生成**（`generate first`），**不运行**正式 near-neighbor gate ——
+保护发散性是硬 invariant。R4 只做四件事：intra-population structural dedup、
+cheap fingerprint、clustering、标记 obvious duplicate candidate。
+
+**R4 不得**做 literature-level novelty kill，**不得**因为 verdict 是 neighbor 就淘汰候选。
+正式 near-neighbor audit 在 **R7** 做（见
+[phase-r7-r10-r13-assurance-repair-review.md](phase-r7-r10-r13-assurance-repair-review.md) §R7.11 与
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §25）。
+
 ---
 
 ## R6. 进化与两阶段 fitness

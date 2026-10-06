@@ -466,8 +466,17 @@ class TestAdversarialGoldenPaths(_Base):
         artifact["differentiating_consequences"] = []
         artifact["discriminating_tests"] = []
         rules = seq.check_artifact(artifact, source="<golden-path C>").rules()
-        self.assertEqual(rules, ["EQ13"],
-                         f"同构候选过度声称 paradigm 必须只由 EQ13 拦下，实际命中 {rules}")
+        self.assertEqual(set(rules), {"EQ13", "NN12"},
+                         f"同构候选过度声称 paradigm 必须被 claim-strength 闸门拦下，实际命中 {rules}")
+        # near-neighbor 层单独也拦得住：明确标成 duplicate-equivalent 后 NN12 仍然报警
+        artifact["near_neighbor_verdict"] = "duplicate-equivalent"
+        artifact["correspondence"] = {
+            facet: {"relation": "MATCH", "provenance": "EXPLICIT",
+                    "evidence_span": "span", "note": "note"} for facet in seq.FACETS}
+        artifact["load_bearing_facets"] = ["information_flow"]
+        nn_rules = seq.check_artifact(artifact, source="<golden-path C/nn>").rules()
+        self.assertIn("NN12", nn_rules,
+                      f"near-neighbor 层没能拦下同构候选的强声称：{nn_rules}")
 
     # ---- D decision ≠ truth ----
 

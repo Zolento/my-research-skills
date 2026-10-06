@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
-"""structural_equivalence_check.py — Structural Equivalence audit artifact 的机械闸门。
+"""structural_equivalence_check.py — Structural Equivalence / near-neighbor audit 的机械闸门。
 
 **它只验证「审计做没做完整」，不验证「idea 到底新不新」。**
 
-四项职责（与 `references/structural-equivalence-policy.md` §12 逐字对应）：
+四项职责（与 `references/structural-equivalence-policy.md` §12 与 §30 逐字对应）：
 
     1. 审计是否完整；
     2. 引用是否存在；
     3. schema 是否满足；
     4. claim 强度是否有对应审计。
 
+两层规则：
+
+    `EQ1`—`EQ13`   结构等价契约（policy §12.1）
+    `NN1`—`NN13`   near-neighbor 判断层（policy §30）
+
 **没有任何规则形如「idea must be novel」。** LLM 不是 scientific novelty 的 truth oracle，
 机械闸门也**不得**代替它宣判。本脚本只把「没有审计就主张强 novelty」这类**可判定的**缺口拦下。
+
+**`NN` 规则只验证审计纪律**：对应矩阵是否完整、枚举是否合法、`evidence_span` 是否存在、
+`UNRESOLVED` 是否被保留、stripping / mapping 是否按 operator 触发、claim 强度是否超过上限。
+它**不**决定「`H` 与 `P` 是否真的结构等价」。
 
 用法
 ----
@@ -45,7 +54,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-SCHEMA = "research-idea-pipeline/structural-equivalence-audit@1"
+SCHEMA = "research-idea-pipeline/structural-equivalence-audit@2"
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -164,6 +173,97 @@ def allowed_claims(verdict: str) -> Tuple[str, ...]:
     return _CLAIM_LADDER[: _CLAIM_LADDER.index(ceiling) + 1]
 
 
+# ---------------------------------------------------------------------------
+# Near-neighbor 判断层（权威定义见 policy §15—§24 与 §30 的 NN 表）
+# ---------------------------------------------------------------------------
+
+NEAR_NEIGHBOR_VERDICTS: Tuple[str, ...] = (
+    "duplicate-equivalent", "reframing-neighbor", "transfer-neighbor",
+    "component-neighbor", "mechanism-neighbor",
+    "structural-delta", "structural-delta-strong", "uncertain",
+)
+NEIGHBOR_FAMILY: Tuple[str, ...] = (
+    "duplicate-equivalent", "reframing-neighbor", "transfer-neighbor",
+    "component-neighbor", "mechanism-neighbor",
+)
+DELTA_FAMILY: Tuple[str, ...] = ("structural-delta", "structural-delta-strong")
+
+CORRESPONDENCE_RELATIONS: Tuple[str, ...] = ("MATCH", "DIFFERENT", "UNRESOLVED")
+PROVENANCE: Tuple[str, ...] = ("EXPLICIT", "DERIVED", "INFERRED", "UNKNOWN")
+STRONG_PROVENANCE: Tuple[str, ...] = ("EXPLICIT", "DERIVED")
+
+LOCAL_MODIFICATION_KINDS: Tuple[str, ...] = (
+    "loss-replacement", "module-replacement", "regularizer", "weighting", "optimizer",
+    "masking", "adapter", "schedule", "architectural-block", "hyperparameter",
+    "implementation-detail",
+)
+NOVEL_CONSEQUENCE_KINDS: Tuple[str, ...] = (
+    "prediction", "theorem", "boundary", "algorithm", "experiment",
+)
+THEORY_NEW_STRUCTURE_KINDS: Tuple[str, ...] = (
+    "new-assumption", "new-identifiable-object", "new-prediction", "new-impossibility",
+    "new-algorithmic-consequence", "new-discriminating-experiment",
+)
+THEORY_STRIPPING_CONCLUSIONS: Tuple[str, ...] = (
+    "theory-relabeling-risk", "reframing-only", "theory-substantive", "not-applicable",
+)
+REMOTE_ANALOGY_CONCLUSIONS: Tuple[str, ...] = (
+    "structural-novelty", "explanation-only", "transfer", "interpretation", "not-applicable",
+)
+REMOVAL_CONCLUSIONS: Tuple[str, ...] = ("component-local-delta", "load-bearing-delta", "unresolved")
+MAPPING_COMPLETENESS: Tuple[str, ...] = ("full", "partial", "failed")
+TRUST_BASES: Tuple[str, ...] = (
+    "source-span", "equation", "algorithm", "code", "literature",
+    "executable-counterfactual", "discriminating-experiment", "expert-validation",
+)
+# §22「反事实幻觉」：声称不坍缩必须有可执行证据，而不是 LLM 断言。
+EXECUTABLE_TRUST: Tuple[str, ...] = (
+    "equation", "algorithm", "code", "executable-counterfactual", "discriminating-experiment",
+)
+NULL_HYPOTHESIS_STATEMENT = "candidate is structurally subsumed by an existing prior"
+
+# §23.2 相容表：near_neighbor_verdict → 允许的 verdict。
+NN_ALLOWED_VERDICTS: Dict[str, Tuple[str, ...]] = {
+    "duplicate-equivalent": ("equivalent", "subsumed-by-prior"),
+    "reframing-neighbor": ("reframing-only",),
+    "transfer-neighbor": ("transfer-only",),
+    "component-neighbor": ("component-delta",),
+    "mechanism-neighbor": ("mechanism-delta",),
+    "structural-delta": ("formulation-delta", "boundary-delta"),
+    "structural-delta-strong": ("paradigm-candidate",),
+    "uncertain": ("uncertain",),
+}
+# §23.2 相容表：near_neighbor_verdict → claimed_novelty_level 上限。
+NN_CLAIM_CEILING: Dict[str, str] = {
+    "duplicate-equivalent": "none",
+    "reframing-neighbor": "none",
+    "transfer-neighbor": "transfer-only",
+    "component-neighbor": "component-delta",
+    "mechanism-neighbor": "mechanism-delta",
+    "structural-delta": "boundary-delta",
+    "structural-delta-strong": "paradigm-candidate",
+    "uncertain": "component-delta",
+}
+# §21.1 关键 facet：这三项出现大量 INFERRED / UNKNOWN 时不得给强 novelty verdict。
+KEY_FACETS_FOR_TRUST: Tuple[str, ...] = ("mechanism", "assumptions", "predictions_or_guarantees")
+# §29 禁止用 scalar 直接决定 novelty。
+SCALAR_DECISION_KEYS: Tuple[str, ...] = (
+    "structural_distance", "similarity", "cosine", "novelty_score", "scalar_distance",
+)
+RETRIEVAL_HEURISTIC_USE = "retrieval-clustering-only"
+# operator → 必做的 stripping / mapping（V16 的十二算子之一）
+THEORY_OPERATOR = "theory_lens"
+REMOTE_ANALOGY_OPERATOR = "remote_analogy"
+
+
+def nn_allowed_claims(near_verdict: str) -> Tuple[str, ...]:
+    """给定 near_neighbor_verdict，返回允许的 claimed_novelty_level。"""
+    ceiling = NN_CLAIM_CEILING.get(near_verdict)
+    if ceiling is None:
+        return ()
+    return _CLAIM_LADDER[: _CLAIM_LADDER.index(ceiling) + 1]
+
+
 # "changed_*" 被视为「没有真实改变」的字面量。
 UNCHANGED_LITERALS: Tuple[str, ...] = ("unchanged", "none", "n/a", "无", "不变", "未变")
 
@@ -204,6 +304,19 @@ RULES: Dict[str, str] = {
     "EQ11": "verdict 属于十个冻结值",
     "EQ12": "audit_ref 指向合法 Control Plane artifact 路径，且与磁盘 artifact 双向一致",
     "EQ13": "更强的 claimed_novelty_level 不得与更弱的 verdict 冲突",
+    "NN1": "correspondence 必须完整：十四个 facet 全在，且不含额外键",
+    "NN2": "correspondence 每项的 relation / provenance 必须在冻结枚举内，且 evidence_span 非空",
+    "NN3": "UNRESOLVED 必须被保留；load-bearing facet 出现 UNRESOLVED 时禁止 structural-delta 与 structural-delta-strong，出现 2 个及以上时必须为 uncertain",
+    "NN4": "load_bearing_facets 必须非空且是十四个 facet 的子集",
+    "NN5": "关键结论不得主要依赖 INFERRED；load-bearing facet 中 EXPLICIT / DERIVED 少于一半时禁止 structural-delta，且 trust_basis 必须非空、collapse_result 为 does-not-collapse 时另需 equation / algorithm / code / executable-counterfactual / discriminating-experiment 之一",
+    "NN6": "local_neighborhood_test 必须完整；neighbor_confirmed 为 true 时 near_neighbor_verdict 必须是 neighbor 家族",
+    "NN7": "removal_test 必须完整；结论为 component-local-delta 时 near_neighbor_verdict 必须是 neighbor 家族",
+    "NN8": "null_hypothesis 必须完整且 statement 逐字；mapping_completeness 为 full 时禁止 structural-delta",
+    "NN9": "minimal_delta_set 在 delta 家族下必须非空且 sufficient_alone 为 true；structural-delta-strong 另需至少两种不同的 novel_consequence_kinds 且含 experiment 或 boundary",
+    "NN10": "theory_stripping 必须按 operator 触发；结论为 theory-relabeling-risk 时 near_neighbor_verdict 只允许 reframing-neighbor / duplicate-equivalent / uncertain",
+    "NN11": "remote_analogy_mapping 必须按 operator 触发；added_structure 为 false 时结论不得是 structural-novelty",
+    "NN12": "near_neighbor_verdict 必须与 verdict 相容，且 claimed_novelty_level 不得超过其上限",
+    "NN13": "禁止任何 scalar 决定 novelty；retrieval_heuristic 的 use 必须逐字为 retrieval-clustering-only",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -548,7 +661,372 @@ def check_artifact(doc: Any, source: str = "<memory>") -> Report:
                            "、".join(missing_prior))
     report.checked += 1
 
+    _check_near_neighbor(report, doc)
     return report
+
+
+# ---------------------------------------------------------------------------
+# Near-neighbor 规则（NN1—NN13；policy §30）
+#
+# 这些规则只验证**审计纪律**：矩阵完整、枚举合法、span 存在、unresolved 被保留、
+# stripping / mapping 按 operator 触发、claim 强度不超过上限。
+# 它们**不**决定「H 与 P 是否真的结构等价」。
+# ---------------------------------------------------------------------------
+
+
+def _is_bool(value: Any) -> bool:
+    return isinstance(value, bool)
+
+
+def _enum_ok(value: Any, allowed: Tuple[str, ...]) -> bool:
+    return _text_ok(value) and value in allowed
+
+
+def _nn_correspondence(report: Report, doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """NN1 / NN2：矩阵完整 + 枚举合法 + evidence_span 非空。"""
+    value = doc.get("correspondence")
+    if not isinstance(value, dict):
+        report.add("NN1", "correspondence", "缺失或不是对象（必须是十四个 facet 的对应矩阵）", value)
+        return None
+    missing = [facet for facet in FACETS if facet not in value]
+    if missing:
+        report.add("NN1", "correspondence", f"缺少 facet：{'、'.join(missing)}", None)
+    extra = sorted(facet for facet in value if facet not in FACETS)
+    if extra:
+        report.add("NN1", "correspondence", f"含十四个 facet 之外的键：{'、'.join(extra)}",
+                   "、".join(extra))
+    for facet in FACETS:
+        entry = value.get(facet)
+        base = f"correspondence.{facet}"
+        if not isinstance(entry, dict):
+            report.add("NN2", base, "缺失或不是对象（relation / provenance / evidence_span / note）",
+                       entry)
+            continue
+        if not _enum_ok(entry.get("relation"), CORRESPONDENCE_RELATIONS):
+            report.add("NN2", f"{base}.relation",
+                       f"必须是 {' | '.join(CORRESPONDENCE_RELATIONS)} 之一（禁止二值强制）",
+                       entry.get("relation"))
+        if not _enum_ok(entry.get("provenance"), PROVENANCE):
+            report.add("NN2", f"{base}.provenance",
+                       f"必须是 {' | '.join(PROVENANCE)} 之一", entry.get("provenance"))
+        if _is_blank(entry.get("evidence_span")):
+            report.add("NN2", f"{base}.evidence_span",
+                       "必填（原文 span / equation / code 位置）；没有 span 的对应关系不是证据",
+                       entry.get("evidence_span"))
+        if _is_blank(entry.get("note")):
+            report.add("NN2", f"{base}.note", "必填（判断依据）", entry.get("note"))
+    return value
+
+
+def _nn_load_bearing(report: Report, doc: Dict[str, Any]) -> List[str]:
+    """NN4：load_bearing_facets 非空且 ⊆ FACETS。"""
+    value = doc.get("load_bearing_facets")
+    if not isinstance(value, list) or not value:
+        report.add("NN4", "load_bearing_facets", "必须是非空数组（承重 facet 清单）", value)
+        return []
+    bad = [item for item in value if not _text_ok(item) or item not in FACETS]
+    if bad:
+        report.add("NN4", "load_bearing_facets",
+                   f"元素必须是十四个 facet 之一：{'、'.join(map(str, bad))}",
+                   "、".join(map(str, bad)))
+        return [item for item in value if item in FACETS]
+    return list(value)
+
+
+def _nn_validate_object(report: Report, rule: str, key: str, doc: Dict[str, Any],
+                        spec: Tuple[Tuple[str, str, Tuple[str, ...]], ...],
+                        optional_when: Optional[Any] = None) -> Optional[Dict[str, Any]]:
+    """校验一个必填对象。
+
+    `spec` 每项 = (键名, 类型, 枚举)。类型 ∈ str / bool / list / enum / lit / lit_or_empty。
+    `optional_when(value)` 为真时只校验 `applicable` 与 `conclusion`（policy §24 的宽松分支）。
+    """
+    value = doc.get(key)
+    if not isinstance(value, dict):
+        report.add(rule, key, "缺失或不是对象", value)
+        return None
+    fields = spec
+    if optional_when is not None and optional_when(value):
+        fields = tuple(item for item in spec if item[0] in ("applicable", "conclusion"))
+    problems: List[str] = []
+    for field, kind, allowed in fields:
+        if field not in value:
+            problems.append(f"缺少键 {field}")
+            continue
+        item = value.get(field)
+        if kind == "str":
+            if _is_blank(item):
+                problems.append(f"{field} 必须是非空字符串")
+        elif kind == "bool":
+            if not _is_bool(item):
+                problems.append(f"{field} 必须是布尔")
+        elif kind == "list":
+            if not isinstance(item, list) or not all(_text_ok(part) for part in item):
+                problems.append(f"{field} 必须是字符串数组（可为 []）")
+        elif kind == "enum":
+            if not _enum_ok(item, allowed):
+                problems.append(f"{field} 必须是 {' | '.join(allowed)} 之一")
+        elif kind == "lit":
+            if not _text_ok(item) or not _ID_LIT.match(str(item)):
+                problems.append(f"{field} 必须是 `LIT<n>`")
+        elif kind == "lit_or_empty":
+            if item != "" and (not _text_ok(item) or not _ID_LIT.match(str(item))):
+                problems.append(f"{field} 必须是 `LIT<n>` 或空字符串")
+    for problem in problems:
+        report.add(rule, key, problem, None)
+    return value
+
+
+def _check_near_neighbor(report: Report, doc: Dict[str, Any],
+                         operator: Optional[str] = None) -> None:
+    """NN1—NN13：只验证审计纪律，不判断结构是否真的等价。
+
+    `operator` 只在 route 模式传入（来自 `hypotheses[].operator`），用于 `NN10` / `NN11` 的触发检查。
+    """
+    near = doc.get("near_neighbor_verdict")
+    if not _enum_ok(near, NEAR_NEIGHBOR_VERDICTS):
+        report.add("NN12", "near_neighbor_verdict",
+                   f"必须是八个冻结值之一（{' | '.join(NEAR_NEIGHBOR_VERDICTS)}）", near)
+        near = None
+    report.checked += 1
+
+    matrix = _nn_correspondence(report, doc)
+    bearings = _nn_load_bearing(report, doc)
+    report.checked += 1
+
+    # --- NN3 / NN5：UNRESOLVED 与 provenance 纪律 ---
+    if isinstance(matrix, dict) and bearings:
+        unresolved = [facet for facet in bearings
+                      if isinstance(matrix.get(facet), dict)
+                      and matrix[facet].get("relation") == "UNRESOLVED"]
+        if unresolved and near in DELTA_FAMILY:
+            report.add("NN3", "correspondence",
+                       f"load-bearing facet 上保留了 UNRESOLVED：{'、'.join(unresolved)}；"
+                       "此时禁止 structural-delta 与 structural-delta-strong",
+                       "、".join(unresolved))
+        if len(unresolved) >= 2 and near not in (None, "uncertain"):
+            report.add("NN3", "near_neighbor_verdict",
+                       f"{len(unresolved)} 个 load-bearing facet 为 UNRESOLVED，必须判 uncertain", near)
+        strong = [facet for facet in bearings
+                  if isinstance(matrix.get(facet), dict)
+                  and matrix[facet].get("provenance") in STRONG_PROVENANCE]
+        if len(strong) * 2 < len(bearings) and near in DELTA_FAMILY:
+            report.add("NN5", "load_bearing_facets",
+                       f"load-bearing facet 中 EXPLICIT / DERIVED 只有 {len(strong)}/{len(bearings)}；"
+                       "关键结论不得主要依赖 INFERRED",
+                       f"{len(strong)}/{len(bearings)}")
+        weak_key = [facet for facet in bearings if facet in KEY_FACETS_FOR_TRUST
+                    and isinstance(matrix.get(facet), dict)
+                    and matrix[facet].get("provenance") in ("INFERRED", "UNKNOWN")]
+        if weak_key and near in DELTA_FAMILY:
+            report.add("NN5", "correspondence",
+                       f"关键 facet 的对应关系依赖 INFERRED / UNKNOWN：{'、'.join(weak_key)}；"
+                       "不得据此给强 novelty verdict",
+                       "、".join(weak_key))
+
+    trust = doc.get("trust_basis")
+    if not isinstance(trust, list) or not trust:
+        report.add("NN5", "trust_basis", "必须是非空数组（§21.3 八值）", trust)
+    else:
+        bad_trust = [item for item in trust if not _enum_ok(item, TRUST_BASES)]
+        if bad_trust:
+            report.add("NN5", "trust_basis",
+                       f"元素必须是 {' | '.join(TRUST_BASES)} 之一：{'、'.join(map(str, bad_trust))}",
+                       "、".join(map(str, bad_trust)))
+    collapse = doc.get("counterfactual_collapse")
+    if isinstance(trust, list) and trust and isinstance(collapse, dict) \
+            and collapse.get("collapse_result") == "does-not-collapse" \
+            and not (set(trust) & set(EXECUTABLE_TRUST)):
+        report.add("NN5", "trust_basis",
+                   "collapse_result 为 does-not-collapse 时，trust_basis 必须含可执行证据之一："
+                   + " / ".join(EXECUTABLE_TRUST),
+                   "、".join(map(str, trust)))
+    report.checked += 1
+
+    # --- NN6 local_neighborhood_test ---
+    local = _nn_validate_object(report, "NN6", "local_neighborhood_test", doc, (
+        ("near_prior", "lit", ()),
+        ("local_modification_kinds", "list", ()),
+        ("neighbor_confirmed", "bool", ()),
+        ("rationale", "str", ()),
+    ))
+    if isinstance(local, dict):
+        kinds = local.get("local_modification_kinds")
+        if isinstance(kinds, list):
+            bad_kinds = [item for item in kinds if item not in LOCAL_MODIFICATION_KINDS]
+            if bad_kinds:
+                report.add("NN6", "local_neighborhood_test.local_modification_kinds",
+                           f"必须是 §16.3 十一类之一：{'、'.join(map(str, bad_kinds))}",
+                           "、".join(map(str, bad_kinds)))
+        if local.get("neighbor_confirmed") is True and near in DELTA_FAMILY:
+            report.add("NN6", "local_neighborhood_test.neighbor_confirmed",
+                       "为 true 时 near_neighbor_verdict 必须是 neighbor 家族", near)
+    report.checked += 1
+
+    # --- NN7 removal_test ---
+    removal = _nn_validate_object(report, "NN7", "removal_test", doc, (
+        ("removed_delta", "str", ()),
+        ("returns_to_prior", "lit_or_empty", ()),
+        ("unchanged_core", "list", ()),
+        ("conclusion", "enum", REMOVAL_CONCLUSIONS),
+    ))
+    if isinstance(removal, dict) and removal.get("conclusion") == "component-local-delta" \
+            and near in DELTA_FAMILY:
+        report.add("NN7", "removal_test.conclusion",
+                   "结论为 component-local-delta 时 near_neighbor_verdict 必须是 neighbor 家族", near)
+    report.checked += 1
+
+    # --- NN8 null_hypothesis ---
+    null = _nn_validate_object(report, "NN8", "null_hypothesis", doc, (
+        ("statement", "str", ()),
+        ("strongest_subsumption_prior", "lit", ()),
+        ("mapping_completeness", "enum", MAPPING_COMPLETENESS),
+        ("unmapped_load_bearing_elements", "list", ()),
+    ))
+    if isinstance(null, dict):
+        if _text_ok(null.get("statement")) and null.get("statement") != NULL_HYPOTHESIS_STATEMENT:
+            report.add("NN8", "null_hypothesis.statement",
+                       f"必须逐字为 `{NULL_HYPOTHESIS_STATEMENT}`", null.get("statement"))
+        if null.get("mapping_completeness") == "full" and near in DELTA_FAMILY:
+            report.add("NN8", "null_hypothesis.mapping_completeness",
+                       "为 full（最强 subsumption 映射成立）时禁止 delta 家族 verdict", near)
+    report.checked += 1
+
+    # --- NN9 minimal_delta_set ---
+    delta = _nn_validate_object(report, "NN9", "minimal_delta_set", doc, (
+        ("delta_set", "list", ()),
+        ("novel_consequence_kinds", "list", ()),
+        ("sufficient_alone", "bool", ()),
+    ))
+    if isinstance(delta, dict):
+        raw_kinds = delta.get("novel_consequence_kinds")
+        if isinstance(raw_kinds, list):
+            bad_consequences = [item for item in raw_kinds if item not in NOVEL_CONSEQUENCE_KINDS]
+            if bad_consequences:
+                report.add("NN9", "minimal_delta_set.novel_consequence_kinds",
+                           f"必须是 {' | '.join(NOVEL_CONSEQUENCE_KINDS)} 之一："
+                           f"{'、'.join(map(str, bad_consequences))}",
+                           "、".join(map(str, bad_consequences)))
+        if near in DELTA_FAMILY:
+            if not delta.get("delta_set"):
+                report.add("NN9", "minimal_delta_set.delta_set", "delta 家族下不得为空", "[]")
+            if delta.get("sufficient_alone") is not True:
+                report.add("NN9", "minimal_delta_set.sufficient_alone",
+                           "delta 家族下必须为 true（仅凭 Δ* 就能推出新后果）",
+                           delta.get("sufficient_alone"))
+        if near == "structural-delta-strong" and isinstance(raw_kinds, list):
+            kinds = list(dict.fromkeys(raw_kinds))
+            if len(kinds) < 2:
+                report.add("NN9", "minimal_delta_set.novel_consequence_kinds",
+                           "structural-delta-strong 需要至少两种不同的后果类别", "、".join(kinds))
+            if not ({"experiment", "boundary"} & set(kinds)):
+                report.add("NN9", "minimal_delta_set.novel_consequence_kinds",
+                           "structural-delta-strong 的后果必须包含 experiment 或 boundary",
+                           "、".join(kinds))
+    report.checked += 1
+
+    # --- NN10 theory_stripping ---
+    theory = _nn_validate_object(
+        report, "NN10", "theory_stripping", doc, (
+            ("applicable", "bool", ()),
+            ("stripped_terms", "list", ()),
+            ("residual_structure", "str", ()),
+            ("adds_new_structure", "bool", ()),
+            ("new_structure_kinds", "list", ()),
+            ("conclusion", "enum", THEORY_STRIPPING_CONCLUSIONS),
+        ), optional_when=lambda value: value.get("applicable") is False)
+    if isinstance(theory, dict):
+        raw_theory = theory.get("new_structure_kinds")
+        if isinstance(raw_theory, list):
+            bad_structure = [item for item in raw_theory
+                             if item not in THEORY_NEW_STRUCTURE_KINDS]
+            if bad_structure:
+                report.add("NN10", "theory_stripping.new_structure_kinds",
+                           f"必须是 §19 六类之一：{'、'.join(map(str, bad_structure))}",
+                           "、".join(map(str, bad_structure)))
+        if theory.get("applicable") is False and theory.get("conclusion") != "not-applicable":
+            report.add("NN10", "theory_stripping.conclusion",
+                       "applicable 为 false 时 conclusion 必须是 not-applicable",
+                       theory.get("conclusion"))
+        if theory.get("adds_new_structure") is True and not raw_theory:
+            report.add("NN10", "theory_stripping.new_structure_kinds",
+                       "adds_new_structure 为 true 时必须登记新结构类别", "[]")
+        if theory.get("conclusion") == "theory-relabeling-risk" and near not in (
+                "reframing-neighbor", "duplicate-equivalent", "uncertain", None):
+            report.add("NN10", "theory_stripping.conclusion",
+                       "theory-relabeling-risk 只允许 reframing-neighbor / duplicate-equivalent / uncertain",
+                       near)
+        if operator == THEORY_OPERATOR and theory.get("applicable") is not True:
+            report.add("NN10", "theory_stripping.applicable",
+                       f"operator 为 {THEORY_OPERATOR} 的候选必须做 theory stripping",
+                       theory.get("applicable"))
+    report.checked += 1
+
+    # --- NN11 remote_analogy_mapping ---
+    analogy = _nn_validate_object(
+        report, "NN11", "remote_analogy_mapping", doc, (
+            ("applicable", "bool", ()),
+            ("object_mapping", "str", ()),
+            ("relation_mapping", "str", ()),
+            ("constraint_mapping", "str", ()),
+            ("failure_mode_mapping", "str", ()),
+            ("added_structure", "bool", ()),
+            ("conclusion", "enum", REMOTE_ANALOGY_CONCLUSIONS),
+        ), optional_when=lambda value: value.get("applicable") is False)
+    if isinstance(analogy, dict):
+        if analogy.get("applicable") is False and analogy.get("conclusion") != "not-applicable":
+            report.add("NN11", "remote_analogy_mapping.conclusion",
+                       "applicable 为 false 时 conclusion 必须是 not-applicable",
+                       analogy.get("conclusion"))
+        if analogy.get("added_structure") is False \
+                and analogy.get("conclusion") == "structural-novelty":
+            report.add("NN11", "remote_analogy_mapping.conclusion",
+                       "added_structure 为 false 时结论不得是 structural-novelty",
+                       analogy.get("conclusion"))
+        if operator == REMOTE_ANALOGY_OPERATOR and analogy.get("applicable") is not True:
+            report.add("NN11", "remote_analogy_mapping.applicable",
+                       f"operator 为 {REMOTE_ANALOGY_OPERATOR} 的候选必须做四类映射",
+                       analogy.get("applicable"))
+    report.checked += 1
+
+    # --- NN12 near_neighbor_verdict ↔ verdict ↔ claimed 上限 ---
+    verdict = doc.get("verdict")
+    if near in NEAR_NEIGHBOR_VERDICTS and verdict in VERDICTS:
+        allowed_verdicts = NN_ALLOWED_VERDICTS[near]
+        if verdict not in allowed_verdicts:
+            report.add("NN12", "near_neighbor_verdict",
+                       f"与 verdict `{verdict}` 不相容；`{near}` 只允许 "
+                       f"{' | '.join(allowed_verdicts)}", near)
+    claimed = doc.get("claimed_novelty_level")
+    if near in NEAR_NEIGHBOR_VERDICTS and claimed in CLAIMED_LEVELS:
+        permitted = nn_allowed_claims(near)
+        if claimed not in permitted:
+            report.add("NN12", "claimed_novelty_level",
+                       f"`{claimed}` 超过 `{near}` 的上限；只允许 {' | '.join(permitted)}", claimed)
+    report.checked += 1
+
+    # --- NN13 禁止 scalar 决定 novelty ---
+    offenders = [key for key in SCALAR_DECISION_KEYS if key in doc]
+    if offenders:
+        report.add("NN13", "根节点",
+                   f"禁止 scalar 决定 novelty；标量只能放 retrieval_heuristic：{'、'.join(offenders)}",
+                   "、".join(offenders))
+    heuristic = doc.get("retrieval_heuristic")
+    if heuristic is not None:
+        if not isinstance(heuristic, dict):
+            report.add("NN13", "retrieval_heuristic", "存在时必须是对象", heuristic)
+        else:
+            extra = sorted(key for key in heuristic if key not in ("scalar_distance", "use"))
+            if extra:
+                report.add("NN13", "retrieval_heuristic",
+                           f"只允许 scalar_distance 与 use：{'、'.join(extra)}", "、".join(extra))
+            distance = heuristic.get("scalar_distance")
+            if _is_bool(distance) or not isinstance(distance, (int, float)):
+                report.add("NN13", "retrieval_heuristic.scalar_distance", "必须是数值", distance)
+            if heuristic.get("use") != RETRIEVAL_HEURISTIC_USE:
+                report.add("NN13", "retrieval_heuristic.use",
+                           f"必须逐字为 {RETRIEVAL_HEURISTIC_USE}", heuristic.get("use"))
+    report.checked += 1
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +1069,10 @@ def check_route(route_dir: pathlib.Path) -> Report:
         for entry in state.get(key) or []:
             if isinstance(entry, dict) and _text_ok(entry.get("id")):
                 existing_ids.add(entry["id"])
+
+    hypothesis_by_id = {entry.get("id"): entry
+                        for entry in state.get("hypotheses") or []
+                        if isinstance(entry, dict)}
 
     assurance = [entry for entry in state.get("assurance") or [] if isinstance(entry, dict)]
     sena_records = [entry for entry in assurance
@@ -651,6 +1133,15 @@ def check_route(route_dir: pathlib.Path) -> Report:
         report.violations.extend(sub.violations)
         report.checked += sub.checked
 
+        # NN10 / NN11 的 operator 触发检查只有 route 模式能做（需要 state 里的 operator）。
+        doc, err = _load_json(path)
+        if err is None and isinstance(doc, dict):
+            operator = (hypothesis_by_id.get(doc.get("candidate")) or {}).get("operator")
+            if operator in (THEORY_OPERATOR, REMOTE_ANALOGY_OPERATOR):
+                operator_report = Report(source=str(path))
+                _check_near_neighbor(operator_report, doc, operator=operator)
+                report.violations.extend(operator_report.violations)
+
     report.checked += len(sena_records)
     return report
 
@@ -689,16 +1180,18 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="structural_equivalence_check.py",
-        description="Structural Equivalence audit artifact 的机械闸门（只查审计完整性，不宣判 novelty）。"
-                    "规则定义见 references/structural-equivalence-policy.md §12。",
+        description="Structural Equivalence / near-neighbor audit 的机械闸门"
+                    "（只查审计完整性，不宣判 novelty）。"
+                    "规则定义见 references/structural-equivalence-policy.md §12 与 §30。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--artifact", metavar="FILE", help="校验单份 audit artifact")
     parser.add_argument("--route", metavar="DIR", help="校验一条路线：state ↔ artifact 交叉检查")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行")
-    parser.add_argument("--selftest", action="store_true", help="跑内置自检（EQ1—EQ13 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 EQ1—EQ13 及判据")
+    parser.add_argument("--selftest", action="store_true",
+                        help="跑内置自检（EQ1—EQ13 与 NN1—NN13 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 EQ1—EQ13 与 NN1—NN13 及判据")
     return parser
 
 
@@ -746,9 +1239,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 def _selftest_artifact(**overrides: Any) -> Dict[str, Any]:
-    """一份合法 artifact；`overrides` 用点号路径覆盖单个字段。"""
+    """一份合法 artifact（`structural-delta`）；`overrides` 用点号路径覆盖单个字段。"""
     aware = {facet: f"aware {facet}" for facet in FACETS}
     stripped = {facet: f"stripped {facet}" for facet in FACETS}
+    changed = ("target_or_latent_quantity", "information_flow")
+    correspondence = {
+        facet: {
+            "relation": "DIFFERENT" if facet in changed else "MATCH",
+            "provenance": "DERIVED" if facet in changed else "EXPLICIT",
+            "evidence_span": f"span://{facet}",
+            "note": f"依据 {facet} 的原文与 equation",
+        }
+        for facet in FACETS
+    }
     doc: Dict[str, Any] = {
         "schema": SCHEMA,
         "stage": "R7",
@@ -781,6 +1284,50 @@ def _selftest_artifact(**overrides: Any) -> Dict[str, Any]:
         "novelty_boundary": "against the retrieved literature, no structural equivalent was identified",
         "blind_spots": ["blind"],
         "evidence": ["LIT1"],
+        "near_neighbor_verdict": "structural-delta",
+        "correspondence": correspondence,
+        "load_bearing_facets": list(changed),
+        "local_neighborhood_test": {
+            "near_prior": "LIT1",
+            "local_modification_kinds": [],
+            "neighbor_confirmed": False,
+            "rationale": "local modification 无法解释目标量的改变",
+        },
+        "removal_test": {
+            "removed_delta": "移除目标量重定义",
+            "returns_to_prior": "LIT1",
+            "unchanged_core": ["problem", "observables"],
+            "conclusion": "load-bearing-delta",
+        },
+        "null_hypothesis": {
+            "statement": NULL_HYPOTHESIS_STATEMENT,
+            "strongest_subsumption_prior": "LIT1",
+            "mapping_completeness": "partial",
+            "unmapped_load_bearing_elements": ["target_or_latent_quantity"],
+        },
+        "minimal_delta_set": {
+            "delta_set": ["目标量改为算子参数后验"],
+            "novel_consequence_kinds": ["prediction"],
+            "sufficient_alone": True,
+        },
+        "theory_stripping": {
+            "applicable": False,
+            "stripped_terms": [],
+            "residual_structure": "not-applicable",
+            "adds_new_structure": False,
+            "new_structure_kinds": [],
+            "conclusion": "not-applicable",
+        },
+        "remote_analogy_mapping": {
+            "applicable": False,
+            "object_mapping": "not-applicable",
+            "relation_mapping": "not-applicable",
+            "constraint_mapping": "not-applicable",
+            "failure_mode_mapping": "not-applicable",
+            "added_structure": False,
+            "conclusion": "not-applicable",
+        },
+        "trust_basis": ["source-span", "equation"],
     }
     for path, value in overrides.items():
         node: Any = doc
@@ -826,6 +1373,69 @@ def selftest() -> int:
         ("EQ13", {"claimed_novelty_level": "paradigm-candidate", "verdict": "reframing-only",
                   "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
                                               "collapse_result": "collapses"}}),
+        # --- near-neighbor 层（NN1—NN13）---
+        ("NN1", {"correspondence": {f: {"relation": "MATCH", "provenance": "EXPLICIT",
+                                        "evidence_span": "s", "note": "n"}
+                                    for f in FACETS if f != "problem"}}),
+        ("NN2", {"correspondence.mechanism.relation": "MAYBE"}),
+        ("NN2", {"correspondence.mechanism.evidence_span": ""}),
+        ("NN2", {"correspondence.mechanism.note": ""}),
+        ("NN3", {"correspondence.target_or_latent_quantity.relation": "UNRESOLVED"}),
+        ("NN3", {"correspondence.target_or_latent_quantity.relation": "UNRESOLVED",
+                 "correspondence.information_flow.relation": "UNRESOLVED",
+                 "near_neighbor_verdict": "component-neighbor", "verdict": "component-delta",
+                 "claimed_novelty_level": "component-delta",
+                 "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                             "collapse_result": "collapses"},
+                 "minimal_structural_delta": [],
+                 "load_bearing_analysis": {k: "unchanged" for k in LOAD_BEARING_KEYS},
+                 "differentiating_consequences": [], "discriminating_tests": []}),
+        ("NN4", {"load_bearing_facets": []}),
+        ("NN4", {"load_bearing_facets": ["not_a_facet"]}),
+        ("NN5", {"trust_basis": []}),
+        ("NN5", {"trust_basis": ["vibes"]}),
+        ("NN5", {"trust_basis": ["literature"]}),
+        ("NN5", {"correspondence.target_or_latent_quantity.provenance": "INFERRED",
+                 "correspondence.information_flow.provenance": "INFERRED"}),
+        ("NN5", {"load_bearing_facets": ["target_or_latent_quantity", "mechanism"],
+                 "correspondence.mechanism.provenance": "INFERRED"}),
+        ("NN6", {"local_neighborhood_test.neighbor_confirmed": True}),
+        ("NN6", {"local_neighborhood_test.local_modification_kinds": ["banana"]}),
+        ("NN6", {"local_neighborhood_test.rationale": ""}),
+        ("NN7", {"removal_test.conclusion": "component-local-delta"}),
+        ("NN7", {"removal_test": {"returns_to_prior": "", "unchanged_core": [],
+                                  "conclusion": "unresolved"}}),
+        ("NN8", {"null_hypothesis.statement": "candidate is novel"}),
+        ("NN8", {"null_hypothesis.mapping_completeness": "full"}),
+        ("NN9", {"minimal_delta_set": {"delta_set": [], "novel_consequence_kinds": ["prediction"],
+                                       "sufficient_alone": True}}),
+        ("NN9", {"minimal_delta_set": {"delta_set": ["d"], "novel_consequence_kinds": ["prediction"],
+                                       "sufficient_alone": False}}),
+        ("NN9", {"minimal_delta_set": {"delta_set": ["d"], "novel_consequence_kinds": ["vibes"],
+                                       "sufficient_alone": True}}),
+        ("NN9", {"near_neighbor_verdict": "structural-delta-strong",
+                 "verdict": "paradigm-candidate", "claimed_novelty_level": "paradigm-candidate",
+                 "minimal_delta_set": {"delta_set": ["d"], "novel_consequence_kinds": ["prediction"],
+                                       "sufficient_alone": True}}),
+        ("NN10", {"theory_stripping.conclusion": "theory-relabeling-risk"}),
+        ("NN10", {"theory_stripping.conclusion": "theory-substantive"}),
+        ("NN10", {"theory_stripping.applicable": True, "theory_stripping.adds_new_structure": True}),
+        ("NN10", {"theory_stripping.new_structure_kinds": ["vibes"]}),
+        ("NN11", {"remote_analogy_mapping.conclusion": "transfer"}),
+        ("NN11", {"remote_analogy_mapping.applicable": True,
+                  "remote_analogy_mapping.added_structure": False,
+                  "remote_analogy_mapping.conclusion": "structural-novelty"}),
+        ("NN12", {"verdict": "reframing-only", "claimed_novelty_level": "none",
+                  "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "collapses"}}),
+        ("NN12", {"near_neighbor_verdict": "transfer-neighbor", "verdict": "transfer-only",
+                  "claimed_novelty_level": "paradigm-candidate",
+                  "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "collapses"}}),
+        ("NN13", {"structural_distance": 0.73}),
+        ("NN13", {"retrieval_heuristic": {"scalar_distance": 0.73, "use": "novelty-gate"}}),
+        ("NN13", {"retrieval_heuristic": {"scalar_distance": 0.73,
+                                          "use": RETRIEVAL_HEURISTIC_USE, "extra": 1}}),
     ]
     for expected, overrides in cases:
         probe = _selftest_artifact(**overrides)
@@ -846,6 +1456,30 @@ def selftest() -> int:
           str(allowed_claims("reframing-only")))
     check("allowed_claims 上限", allowed_claims("paradigm-candidate") == _CLAIM_LADDER,
           str(allowed_claims("paradigm-candidate")))
+
+    # near-neighbor 正向：合法 retrieval_heuristic 不报 NN13
+    probe = _selftest_artifact(retrieval_heuristic={"scalar_distance": 0.4,
+                                                    "use": RETRIEVAL_HEURISTIC_USE})
+    check("合法 retrieval_heuristic 通过", check_artifact(probe).exit_code() == EXIT_OK,
+          str(check_artifact(probe).rules()))
+
+    # operator 触发：theory_lens 必须做 stripping；remote_analogy 必须做四类映射
+    operator_report = Report(source="<selftest>")
+    _check_near_neighbor(operator_report, _selftest_artifact(), operator=THEORY_OPERATOR)
+    check("operator=theory_lens 触发 NN10", "NN10" in operator_report.rules(),
+          str(operator_report.rules()))
+    operator_report = Report(source="<selftest>")
+    _check_near_neighbor(operator_report, _selftest_artifact(), operator=REMOTE_ANALOGY_OPERATOR)
+    check("operator=remote_analogy 触发 NN11", "NN11" in operator_report.rules(),
+          str(operator_report.rules()))
+
+    # nn_allowed_claims 上限
+    check("nn_allowed_claims 上限", nn_allowed_claims("duplicate-equivalent") == ("none",),
+          str(nn_allowed_claims("duplicate-equivalent")))
+    check("nn_allowed_claims delta 上限",
+          nn_allowed_claims("structural-delta")
+          == _CLAIM_LADDER[: _CLAIM_LADDER.index("boundary-delta") + 1],
+          str(nn_allowed_claims("structural-delta")))
 
     print(f"selftest {'OK' if not failures else 'FAILED'}"
           + ("" if not failures else f"（{len(failures)} 项）"))

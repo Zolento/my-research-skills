@@ -276,9 +276,11 @@ QD niche 的七轴在 [research-state-policy.md](research-state-policy.md) §3.4
 
 ### 8.1 schema（逐字）
 
+**`@2` = 本节的键 + §24 的 near-neighbor 必填键。** 两者缺一，artifact 无效。
+
 ```json
 {
-  "schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@2",
   "stage": "R7",
   "candidate": "H17",
   "closest_priors": ["LIT42", "LIT81"],
@@ -348,7 +350,7 @@ QD niche 的七轴在 [research-state-policy.md](research-state-policy.md) §3.4
 
 | # | 规则 |
 |---|---|
-| 1 | `schema` 必须逐字等于 `research-idea-pipeline/structural-equivalence-audit@1` |
+| 1 | `schema` 必须逐字等于 `research-idea-pipeline/structural-equivalence-audit@2` |
 | 2 | `stage` ∈ `R7` \| `R13`（SENA-1 / SENA-2）|
 | 3 | `candidate` 必须是 `H<n>` |
 | 4 | `closest_priors` 不得为空，**除非** `retrieval_status == retrieval-insufficient` |
@@ -730,17 +732,556 @@ R14 **不得**直接改 `claims[].status`（既有硬 invariant 不变）。
 
 ---
 
-## 15. 维护规则
+> **§1—§14 是结构等价契约；§15 起是 near-neighbor 判断层。两层同属一个服务。**
+> near-neighbor 判断层只把「局部邻域」判得更准，**不改变** §1—§14 的任何硬约束。
 
-1. **本文件的枚举是权威。** `verdict` 十值、`claimed_novelty_level` 七值、十四个 facet、
-   十一个 relation、`collapse_result` 三值一旦改动，**必须**同轮扫四处：
+---
+
+## 15. Near-neighbor 定义（冻结）
+
+### 15.1 禁用的判据
+
+以下判据**不得**用于判断 near-neighbor：
+
+- embedding cosine similarity
+- keyword overlap
+- method name similarity
+- theory name similarity
+- domain similarity
+
+### 15.2 scientific structure
+
+candidate `H` 与 prior `P` 的 scientific structure 记为 `G(H)` 与 `G(P)`。
+至少包含 §3.1 的**十四个 node**与 §3.2 的**十一个 relation**。
+
+### 15.3 定义
+
+> **candidate 与 prior 在绝大多数 load-bearing node + relation 上保持一致，
+> 仅剩局部 component / terminology / implementation 差异，则该 prior 是 candidate 的
+> structural near-neighbor。**
+
+**语义距离远不等于结构距离远。** 一个 candidate 的 language、domain、theory framing、
+implementation 全都可以看起来不同，而 load-bearing structure 仍然被保留。
+
+---
+
+## 16. Preserved Core / Structural Delta / Local Neighborhood Test
+
+### 16.1 Preserved Core（复用 `matched_core`）
+
+**Preserved Core 就是 artifact 的 `matched_core`**（§8.1 已有键，不新增）。
+逐项列出 candidate 与 prior 之间**保持不变**的结构：
+
+information regime / assumptions / scientific target / objective / intervention object /
+mechanism path / prediction structure / evaluation target。
+
+### 16.2 Structural Delta（复用 `minimal_structural_delta`）
+
+**Structural Delta 就是 artifact 的 `minimal_structural_delta`**（§8.1 已有键，不新增）。
+
+只有 delta 改变以下**至少一项**时，才**可能**离开近邻：
+
+available information / admissible solution space / critical assumption /
+adaptation object / causal-mechanistic path / theoretical consequence /
+falsifiable prediction / boundary-failure regime / discriminating experiment。
+
+### 16.3 Local Neighborhood Test
+
+对 `H` 取若干 closest structural prior `P1 … Pk`，逐一检验：
+
+```text
+H = P + local modification
+```
+
+`local modification` **只允许**属于下表（冻结，逐字）：
+
+| local modification 类别 |
+|---|
+| `loss-replacement` |
+| `module-replacement` |
+| `regularizer` |
+| `weighting` |
+| `optimizer` |
+| `masking` |
+| `adapter` |
+| `schedule` |
+| `architectural-block` |
+| `hyperparameter` |
+| `implementation-detail` |
+
+若同时满足：`problem` 不变、`observables` 不变、`assumptions` 基本不变、`target` 不变、
+`mechanism` 主路径不变、`prediction` 不变、`boundary` 不变 —— 则**默认**判定 `near-neighbor`。
+
+**即使论文语言、理论解释、领域名称非常不同，也一样判 `near-neighbor`。**
+
+**落地键：** `local_neighborhood_test`（§24）。
+
+---
+
+## 17. Removal Test 与 Replacement-Collapse Test
+
+### 17.1 Removal Test
+
+对 candidate 声称的新元素 `Δ` 执行 `H - Δ`，问：去掉 `Δ` 后 candidate 是否基本退回某个 prior？
+
+若 **performance 可能变化**，但 scientific question / information structure / assumptions /
+mechanism 主路径 / prediction / failure regime **全都保持不变**，
+则 `Δ` 是 `component/local delta`，**不是** paradigm delta。
+
+**落地键：** `removal_test`（§24）。
+
+### 17.2 Replacement-Collapse Test（扩展 §6）
+
+执行 `H - Δ_candidate + Δ_prior`，检查 objective / algorithm / assumptions / mechanism /
+predictions / regime-shift behavior / discriminating experiment **是否仍无法区分**。
+
+若全部或绝大多数保持 —— **candidate collapses to prior neighborhood**。
+判 `structural near-neighbor`，或判 §23 的 neighbor 家族，**不得**声称 paradigm novelty。
+
+`counterfactual_collapse`（§8.1 已有键）就是本测试的落地键，**不新增键**。
+
+---
+
+## 18. 两套表示与 transfer 优先判据
+
+两套表示的定义见 §4（`domain_aware_alignment` / `domain_stripped_alignment`）。
+本层**不新增**表示，只加一条判据：
+
+> 若 `domain-aware distance = high` 且 `domain-stripped structural distance = low`，
+> **优先**判 `transfer-neighbor`（`transfer-only`），**不得**判 paradigm novelty。
+
+**domain-stripped 的机械判据仍是 `EQ6`**（值不得含 `domain_terms`）。
+`transfer-neighbor` 因此**必须**先有非空 `domain_terms` —— 这就是「做过 domain-stripped 比较」的机械落点。
+
+---
+
+## 19. Theory-Stripping Test（P5 必须做）
+
+对 P5 / theory-driven candidate，**必须**先写出原始描述，再做 theory stripping。
+
+**删除：** theory 名、theorem 名、专业术语、analogy language。
+
+**只保留：** assumptions、variables、observables、transformations、mechanism、predictions、boundary。
+
+| stripping 后的结果 | 结论 |
+|---|---|
+| `candidate ≈ prior` | `theory-relabeling-risk` 或 `reframing-only` |
+| 产生了下表任一新结构 | `theory-substantive` |
+
+**「新结构」的冻结类别**（逐字）：
+
+| 类别 |
+|---|
+| `new-assumption` |
+| `new-identifiable-object` |
+| `new-prediction` |
+| `new-impossibility` |
+| `new-algorithmic-consequence` |
+| `new-discriminating-experiment` |
+
+**除非** theory lens 真正产生上表至少一项，否则**不得**据此判强 novelty。
+
+**机械触发：** 当 `hypotheses[].operator` 为 `theory_lens`（`P5`）时，`applicable` **必须**为 true（`NN10`）。
+
+**落地键：** `theory_stripping`（§24）。
+
+---
+
+## 20. Structure-Preservation Test（P4 remote analogy 必须做）
+
+P4 **不得**因为「这个 idea 来自一个很远的领域」就获得高 novelty。
+
+对 remote analogy，**必须**显式列出四类映射：
+
+object mapping / relation mapping / constraint mapping / failure-mode mapping
+
+然后问：**这个 analogy 给当前问题增加了什么 prior 本来没有的 scientific structure？**
+
+若只发现「两个领域用不同术语描述同一个关系结构」，则：
+
+> **remote analogy != structural novelty**
+
+它**可以**作为 explanation / transfer / interpretation，**不得**自动升级成 paradigm novelty。
+
+**机械触发：** 当 `hypotheses[].operator` 为 `remote_analogy`（`P4`）时，`applicable` **必须**为 true（`NN11`）。
+
+**落地键：** `remote_analogy_mapping`（§24）。
+
+---
+
+## 21. Provenance、三值关系与可信度来源
+
+### 21.1 每个 facet 的 provenance（冻结四值）
+
+| 值 | 含义 |
+|---|---|
+| `EXPLICIT` | 原文明确陈述 |
+| `DERIVED` | 可由 equation / algorithm / code 明确推出 |
+| `INFERRED` | LLM 的解释性推断 |
+| `UNKNOWN` | 证据不足 |
+
+**near-neighbor 判断的关键结论不得主要依赖 `INFERRED`。**
+若关键 `mechanism` / `assumptions` / `predictions_or_guarantees` 的对应关系存在大量
+`INFERRED` / `UNKNOWN`，则 verdict **必须允许** `uncertain`。
+
+**另外硬要求：** 每个 facet 的 correspondence 必须带非空 `evidence_span`（原文 span / equation / code 位置）。
+没有 span 的对应关系不是证据，是猜测。
+
+### 21.2 三值 relation（禁止二值强制）
+
+| 值 | 含义 |
+|---|---|
+| `MATCH` | 有证据表明结构一致 |
+| `DIFFERENT` | 有证据表明结构不同 |
+| `UNRESOLVED` | 证据不足 |
+
+**禁止**模型在证据不足时强制选择 `MATCH` / `DIFFERENT`。`UNRESOLVED` **必须**被保留。
+
+**若关键 load-bearing facet 中 `UNRESOLVED` 过多，不得给强 novelty verdict**（阈值见 `NN3`）。
+
+### 21.3 可信度来源（禁止「多 LLM 同意 = 结构事实」）
+
+可以使用多个 pass —— `Extractor` / `Aligner` / `Adversarial Matcher` / `Delta Critic`。
+它们**只是任务分解**，**不是**独立证据。
+
+**禁止**声称：「4 个 Agent 都认为不是近邻，所以结论可靠。」
+同一个基础模型换 prompt 仍然高度相关。
+
+真正提升可信度的来源**必须**是下表之一（冻结，逐字）：
+
+| 可信度来源 |
+|---|
+| `source-span` |
+| `equation` |
+| `algorithm` |
+| `code` |
+| `literature` |
+| `executable-counterfactual` |
+| `discriminating-experiment` |
+| `expert-validation` |
+
+**落地键：** `trust_basis`（§24），必须非空。
+
+**`does-not-collapse` 必须有可执行证据：** 若 `collapse_result` 为 `does-not-collapse`，
+`trust_basis` **必须**至少含 `equation` / `algorithm` / `code` / `executable-counterfactual` /
+`discriminating-experiment` 之一。只有 LLM 断言、没有 equation / code / experiment 支持的「不坍缩」
+**不算**证据（见 §32 的反事实幻觉）。
+
+---
+
+## 22. Null Hypothesis 与 Minimal Delta Principle
+
+### 22.1 Null Hypothesis（默认先证明它是近邻）
+
+Structural Audit 的 adversarial pass **必须**从下式出发：
+
+```text
+H0: candidate is structurally subsumed by an existing prior
+```
+
+**不得**一上来就问「candidate 有什么创新」。
+
+系统**必须主动构造** `candidate → closest prior` 的**最大覆盖映射**。
+只有当该映射在某个 load-bearing structural element 上**无法成立**，才产生 structural delta candidate。
+
+```text
+Novelty = residual after the strongest prior subsumption attempt
+```
+
+**不是** `Novelty = LLM 能想到的差异列表`。
+
+**落地键：** `null_hypothesis`（§24）。`statement` 逐字为上式英文原文。
+
+### 22.2 Minimal Delta Principle
+
+**不接受**「candidate 和 prior 有 12 个不同点」。
+
+**必须**找出能解释 candidate scientific novelty 的**最小** delta set `Δ*`（例：`{observable-subspace restriction}`）。
+
+然后检查：**仅凭 `Δ*` 是否就能推出**下列至少一项？
+
+new prediction / new theorem / new boundary / new algorithm / new experiment
+
+若不能，则当前所谓 structural delta **不是 load-bearing**。
+
+**落地键：** `minimal_delta_set`（§24）。冻结的 `novel_consequence_kinds` 逐字为：
+`prediction` / `theorem` / `boundary` / `algorithm` / `experiment`。
+
+---
+
+## 23. `near_neighbor_verdict`（冻结八值）
+
+### 23.1 枚举（逐字）
+
+| verdict | 含义 |
+|---|---|
+| `duplicate-equivalent` | 几乎完全结构等价 |
+| `reframing-neighbor` | 主要变化是 narrative / theory / terminology |
+| `transfer-neighbor` | 领域变了，domain-stripped structure 基本不变 |
+| `component-neighbor` | 只发生局部组件改变 |
+| `mechanism-neighbor` | mechanism 有变化，但 problem / formulation / information structure 仍处于同一局部邻域 |
+| `structural-delta` | 至少一个 load-bearing structure 明显变化 |
+| `structural-delta-strong` | load-bearing delta 同时产生新的 prediction / boundary / discriminating experiment 等 |
+| `uncertain` | 检索覆盖、结构抽取或对应关系不足 |
+
+**neighbor 家族**（不得支撑强 novelty 声称）：
+`duplicate-equivalent` / `reframing-neighbor` / `transfer-neighbor` / `component-neighbor` / `mechanism-neighbor`
+
+**delta 家族**：`structural-delta` / `structural-delta-strong`
+
+> **`structural-delta-strong` 仍然不等于 `globally novel`。**
+> 它只代表：**against current retrieved priors，存在强结构差异。**
+
+### 23.2 与 `verdict` 的相容表（`NN12`）
+
+`near_neighbor_verdict` 是**claim 强度的决定项**；`verdict` 仍是 delta 类型记录。两者**必须**相容：
+
+| `near_neighbor_verdict` | 允许的 `verdict` | `claimed_novelty_level` 上限 |
+|---|---|---|
+| `duplicate-equivalent` | `equivalent` \| `subsumed-by-prior` | `none` |
+| `reframing-neighbor` | `reframing-only` | `none` |
+| `transfer-neighbor` | `transfer-only` | `transfer-only` |
+| `component-neighbor` | `component-delta` | `component-delta` |
+| `mechanism-neighbor` | `mechanism-delta` | `mechanism-delta` |
+| `structural-delta` | `formulation-delta` \| `boundary-delta` | `boundary-delta` |
+| `structural-delta-strong` | `paradigm-candidate` | `paradigm-candidate` |
+| `uncertain` | `uncertain` | `component-delta` |
+
+---
+
+## 24. artifact 契约（`@2`）：near-neighbor 必填键
+
+**schema 版本升为 `research-idea-pipeline/structural-equivalence-audit@2`。**
+`@2` = §8.1 的全部键 + 本节全部键。随后者为**必填**。
+
+| 键 | 取值 / 类型（逐字） | 说明 |
+|---|---|---|
+| `near_neighbor_verdict` | §23.1 八值之一 | **必填** |
+| `correspondence` | 对象，键恰为十四个 facet | 每项见下 |
+| `correspondence.<facet>.relation` | `MATCH` \| `DIFFERENT` \| `UNRESOLVED` | 三值，不得二值强制 |
+| `correspondence.<facet>.provenance` | `EXPLICIT` \| `DERIVED` \| `INFERRED` \| `UNKNOWN` | 四值 |
+| `correspondence.<facet>.evidence_span` | 非空字符串 | 原文 span / equation / code 位置 |
+| `correspondence.<facet>.note` | 非空字符串 | 判断依据 |
+| `load_bearing_facets` | facet 名数组，非空 | 承重 facet 清单 |
+| `local_neighborhood_test` | 对象 | 四键：`near_prior`（`LIT<n>`）/ `local_modification_kinds`（§16.3 枚举，可为 `[]`）/ `neighbor_confirmed`（bool）/ `rationale`（非空） |
+| `removal_test` | 对象 | 四键：`removed_delta` / `returns_to_prior`（`LIT<n>` 或 `""`）/ `unchanged_core`（数组）/ `conclusion` ∈ `component-local-delta` \| `load-bearing-delta` \| `unresolved` |
+| `null_hypothesis` | 对象 | 四键：`statement`（逐字英文原文）/ `strongest_subsumption_prior`（`LIT<n>`）/ `mapping_completeness` ∈ `full` \| `partial` \| `failed` / `unmapped_load_bearing_elements`（数组） |
+| `minimal_delta_set` | 对象 | 三键：`delta_set`（数组）/ `novel_consequence_kinds`（§22.2 枚举）/ `sufficient_alone`（bool） |
+| `theory_stripping` | 对象 | 六键：`applicable`（bool）/ `stripped_terms`（数组）/ `residual_structure`（字符串）/ `adds_new_structure`（bool）/ `new_structure_kinds`（§19 枚举）/ `conclusion` ∈ `theory-relabeling-risk` \| `reframing-only` \| `theory-substantive` \| `not-applicable` |
+| `remote_analogy_mapping` | 对象 | 七键：`applicable`（bool）/ `object_mapping` / `relation_mapping` / `constraint_mapping` / `failure_mode_mapping`（非空字符串）/ `added_structure`（bool）/ `conclusion` ∈ `structural-novelty` \| `explanation-only` \| `transfer` \| `interpretation` \| `not-applicable` |
+| `trust_basis` | §21.3 枚举数组，非空 | 可信度来源 |
+| `retrieval_heuristic` | 对象，**可选** | 仅两键：`scalar_distance`（数值）/ `use`（逐字 `retrieval-clustering-only`） |
+
+**`applicable == false` 时**：`theory_stripping` / `remote_analogy_mapping` 的其余内容键可省，
+但 `conclusion` **必须**是 `not-applicable`。
+
+---
+
+## 25. 阶段分工：R3 / R4 / R5 / R7
+
+**必须保护发散性。**
+
+| 阶段 | 做什么 | 不做什么 |
+|---|---|---|
+| **R3** | **只生成**，`generate first` | **不运行**正式 near-neighbor gate |
+| **R4** | intra-population structural dedup / cheap fingerprint / clustering / detect obvious duplicate candidates | **不得**做 literature-level novelty kill |
+| **R5** | 找 surface priors + facet priors + structure-stripped priors，构造 **closest structural prior set** | 不下最终 verdict |
+| **R7** | 正式 near-neighbor audit：strongest prior subsumption / theory stripping / domain stripping / collapse test / minimal delta / unresolved mapping，然后决定**当前最大 defensible novelty claim** | 不改 `claims[].status`（走 R10） |
+
+---
+
+## 26. Claim-strength gate（不是 idea-kill gate）—— 硬 invariant
+
+> **Near-neighbor verdict 约束的是「能声称什么」，不是「值不值得做」。**
+
+- `component-neighbor` **不表示** idea 不值得做 —— 它可能 performance 很强、utility 很高、efficiency 很好。
+  它只表示**不能声称 paradigm novelty**。
+- `transfer-neighbor` **可以**形成很好的 cross-domain paper。
+
+系统的动作是 **`constrain claim strength`**，**不是** `automatically kill candidate`。
+**任何实现若把 near-neighbor verdict 变成淘汰开关，视为设计回归。**
+
+---
+
+## 27. 发散性保护（不得破坏 anti-incremental 架构）
+
+本 feature **不得**破坏下列既有机制：
+
+Local Search ‖ Paradigm Escape；`P1`—`P6` isolated operators；`P3` domain erasure；
+`P4` remote analogy；`P5` theory lens；`P6` counterexample；coverage before ranking；
+QD archive；serving + challenging candidates；delayed R6 crossover；stagnation / reseeding。
+
+> Structural audit 是「检查生成的**远**是不是真的远」，**不是**「阻止系统生成远 idea」。
+
+---
+
+## 28. Population-level near-neighbor telemetry
+
+除 candidate-prior 判断外，还要检测**整个 generation 是否又掉回 local basin**。
+
+**落盘（telemetry，不进 Research State）：**
+
+```text
+.research-idea-pipeline/routes/<R>/populations/near-neighbor-telemetry.json
+```
+
+| 指标 | 含义 |
+|---|---|
+| `StructuralCoverage` | 七个 QD axis 有多少被覆盖 |
+| `PairwiseStructuralDistance` | population 内候选结构距离 |
+| `CrossIslandRedundancy` | `P1` / `P2` / `P4` / `P5` 是否最终都落在同一结构簇 |
+| `LocalCollapseRate` | 多少候选最终被判 `component` / `reframing` neighbor |
+| `RemoteConversionRate` | `P4` / `P5` 的候选有多少形成真正的 formulation / theory / boundary delta |
+
+**两条硬规则：**
+
+1. **这些指标不得进 `research-state.json`。**
+2. **不得用它们直接奖励模型** —— 否则会诱导「为了距离而胡思乱想」。
+
+---
+
+## 29. 禁止 scalar structural_distance 决定 novelty
+
+**禁止**下列写法：
+
+```text
+distance = 0.73
+if distance > 0.6:
+    novel = True
+```
+
+科学结构是**异质、多轴**的。正确形状是逐 facet 的 `MATCH` / `DIFFERENT` / `UNRESOLVED`，
+再结合 load-bearing 规则判断。
+
+**必要时可以把 scalar 用作 retrieval / clustering heuristic。**
+但 **scalar distance 不得直接决定 novelty claim**。
+落地方式：只在 `retrieval_heuristic` 里出现，且 `use` 逐字为 `retrieval-clustering-only`（`NN13`）。
+
+---
+
+## 30. 机械闸门：`NN1`—`NN13`
+
+检查器仍是 `scripts/structural_equivalence_check.py`。**它只验证审计纪律，不决定
+`H` 与 `P` 是否真的结构等价。**
+
+**下表是 `RULES` 的契约；「判据」列与代码常量逐字相同。**
+
+| 规则 | 判据 |
+|---|---|
+| `NN1` | correspondence 必须完整：十四个 facet 全在，且不含额外键 |
+| `NN2` | correspondence 每项的 relation / provenance 必须在冻结枚举内，且 evidence_span 非空 |
+| `NN3` | UNRESOLVED 必须被保留；load-bearing facet 出现 UNRESOLVED 时禁止 structural-delta 与 structural-delta-strong，出现 2 个及以上时必须为 uncertain |
+| `NN4` | load_bearing_facets 必须非空且是十四个 facet 的子集 |
+| `NN5` | 关键结论不得主要依赖 INFERRED；load-bearing facet 中 EXPLICIT / DERIVED 少于一半时禁止 structural-delta，且 trust_basis 必须非空、collapse_result 为 does-not-collapse 时另需 equation / algorithm / code / executable-counterfactual / discriminating-experiment 之一 |
+| `NN6` | local_neighborhood_test 必须完整；neighbor_confirmed 为 true 时 near_neighbor_verdict 必须是 neighbor 家族 |
+| `NN7` | removal_test 必须完整；结论为 component-local-delta 时 near_neighbor_verdict 必须是 neighbor 家族 |
+| `NN8` | null_hypothesis 必须完整且 statement 逐字；mapping_completeness 为 full 时禁止 structural-delta |
+| `NN9` | minimal_delta_set 在 delta 家族下必须非空且 sufficient_alone 为 true；structural-delta-strong 另需至少两种不同的 novel_consequence_kinds 且含 experiment 或 boundary |
+| `NN10` | theory_stripping 必须按 operator 触发；结论为 theory-relabeling-risk 时 near_neighbor_verdict 只允许 reframing-neighbor / duplicate-equivalent / uncertain |
+| `NN11` | remote_analogy_mapping 必须按 operator 触发；added_structure 为 false 时结论不得是 structural-novelty |
+| `NN12` | near_neighbor_verdict 必须与 verdict 相容，且 claimed_novelty_level 不得超过其上限 |
+| `NN13` | 禁止任何 scalar 决定 novelty；retrieval_heuristic 的 use 必须逐字为 retrieval-clustering-only |
+
+> **脚本不得决定「`H` 与 `P` 是否真的结构等价」。** LLM proposes correspondences；
+> evidence and constrained tests 决定这些对应关系可以被信任到什么程度。
+
+---
+
+## 31. Near-Neighbor metamorphic 套件（NN-1—NN-12）
+
+构造**人工已知关系**的 pair。期望值是 verdict，不是分数。
+
+| # | 变体 | 期望 `near_neighbor_verdict` |
+|---|---|---|
+| NN-1 | Rename（完全同方法，只改名称） | `duplicate-equivalent` |
+| NN-2 | Narrative rewrite（同结构重新讲故事） | `reframing-neighbor` |
+| NN-3 | Theory relabel（同算法、同 prediction，换 theory） | `reframing-neighbor` |
+| NN-4 | Cross-domain port（结构不变，应用领域不同） | `transfer-neighbor` |
+| NN-5 | New regularizer（同 formulation / mechanism，只加 regularizer） | `component-neighbor` |
+| NN-6 | New parameterization（表示不同，target / mechanism 不变） | 局部 neighbor，除非 consequence 改变 |
+| NN-7 | Mechanism change（information flow 真改变） | `mechanism-neighbor` 或 structural delta，取决于 consequences |
+| NN-8 | Assumption removal（删承重假设并改变 solution space） | `structural-delta` |
+| NN-9 | Observable change（可用信息变化） | `structural-delta` |
+| NN-10 | New impossibility boundary（发现旧 formulation 未知的 failure regime） | `structural-delta-strong` |
+| NN-11 | Semantic far / structural same（名词与领域完全不同，抽象结构相同） | near-neighbor |
+| NN-12 | Semantic close / structural different（术语很像，assumption / observable / prediction 真变化） | `structural-delta` |
+
+> **NN-11 与 NN-12 是最重要的两条。** 它们直接测「语义距离 ≠ 科学距离」。
+
+---
+
+## 32. 幻觉回归测试
+
+四条必测，全部落测试代码（AGENTS.md Rule 8）。
+
+| 构造 | 期望 |
+|---|---|
+| Extraction hallucination（prior 原文没有该 assumption） | 不能标 `EXPLICIT` |
+| Alignment hallucination（两个 object 名称类似但 relations 不同） | 不得 `MATCH` |
+| Missing prior（检索为空） | `uncertain` / `retrieval-insufficient`，**不是** `paradigm-candidate` |
+| Counterfactual hallucination（声称 replacement 会改 prediction，但无 equation / code / experiment 支持） | collapse test = `unresolved` |
+
+---
+
+## 33. 完成判据（12 问）
+
+系统面对一个 candidate，**必须**能回答：
+
+1. 它最近的 structural priors 是谁？
+2. candidate 与 prior 哪些承重结构保持不变？
+3. 哪些差异只是 wording / theory / domain？
+4. minimal structural delta 是什么？
+5. delta 是否 load-bearing？
+6. delta 删除后是否回到 prior？
+7. delta 替换成 prior 后是否 collapse？
+8. 哪个 prediction / boundary / experiment 因 delta 改变？
+9. 关键 mapping 的证据来源是什么？
+10. 哪些 mapping 仍然 unresolved？
+11. 当前最多 defensible 的 novelty claim 是什么？
+12. candidate 是 local neighbor / transfer neighbor / reframing neighbor / structural delta / uncertain？
+
+---
+
+## 34. 最高层原则（四句冻结）
+
+> **Semantic distance is not scientific distance.**
+
+> **A candidate is near-neighbor when its load-bearing scientific structure is preserved,
+> even if its language, domain, theory framing or implementation looks different.**
+
+> **A candidate escapes the local neighborhood only when a load-bearing structural change
+> produces a different scientific consequence.**
+
+> **The system must preserve divergence during generation, and audit whether that divergence
+> is real only after generation.**
+
+最终目标**不是**「把所有近邻 idea 杀掉」，而是：
+
+```text
+Generate broadly → Preserve diversity → Find strongest prior mapping
+→ Measure residual structural delta → Constrain novelty claim
+```
+
+---
+
+## 35. 维护规则
+
+1. **本文件的枚举是权威。** `verdict` 十值、`near_neighbor_verdict` 八值、
+   `claimed_novelty_level` 七值、十四个 facet、十一个 relation、`collapse_result` 三值、
+   `relation` 三值、`provenance` 四值、`local modification` 十一类、
+   `novel_consequence_kinds` 五值、`new_structure_kinds` 六值、`trust_basis` 八值
+   一旦改动，**必须**同轮扫四处：
    `scripts/structural_equivalence_check.py`（规则实现）、
    `templates/structural-equivalence-audit.template.json`（骨架）、
    `examples/structural-equivalence/`（fixture）、
    以及引用本文件的 `phase-*.md`（读写时机）。
-2. **新增 `assurance[]` 可选字段**时，**必须**同轮改：
-   本节 §9.2 表 + `templates/research-state.template.json` + 检查器。
-3. **引用本文件时**必须写 `structural-equivalence-policy.md §N`，**不得**只写「见等价政策」。
-4. **不得**为了通过闸门而放宽本文件的判据或删除 fixture。
-5. 已知缺口一律记为测试里的 `skipTest` 并写明理由，**不得**只在散文里承认
+2. **`EQ1`—`EQ13` 与 `NN1`—`NN13` 的判据文本**同时存在于本文件 §12.1 / §30 与检查器常量中。
+   两处**逐字相同**，由 `test_structural_equivalence.py` 机械比对；改一处必须同轮改另一处。
+3. **新增 `assurance[]` 可选字段**时，**必须**同轮改：
+   §9.2 表 + `templates/research-state.template.json` + 检查器。
+4. **引用本文件时**必须写 `structural-equivalence-policy.md §N`，**不得**只写「见等价政策」。
+5. **不得**为了通过闸门而放宽本文件的判据或删除 fixture。
+6. **不得**把 near-neighbor verdict 实现成淘汰开关（§26）。
+7. **不得**给 `state_check.py` 加 near-neighbor 语义规则 —— 归属仍是本服务自己的检查器。
+8. 已知缺口一律记为测试里的 `skipTest` 并写明理由，**不得**只在散文里承认
    （AGENTS.md Rule 8）。

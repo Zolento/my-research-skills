@@ -122,6 +122,10 @@ inverse problems / optimization / information theory / 其它 ML 领域 ——
 **脚本支持：** 三路 query 与通用扩检一样，用 `--also-query` 逐条显式传入；
 每路检索式与命中数记进 field-map 文档。**不得**只跑 `surface` 一路就声称已做结构检索。
 
+**R5 的产物 = closest structural prior set。** R5 **不下最终 verdict**（那是 R7 的）；
+它只负责把这个候选的最近结构前作集合交出去。R5 **不得**做 near-neighbor 淘汰。
+定义见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §25。
+
 ## A4. 饱和判定与输出
 
 ### A4.1 饱和判据

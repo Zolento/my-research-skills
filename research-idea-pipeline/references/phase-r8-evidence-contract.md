@@ -239,6 +239,19 @@ discriminating experiment、structural-equivalence audit（SENA-1）。
 | `mechanism-delta` / `formulation-delta` / `boundary-delta` / `paradigm-candidate` | 允许更强 claim，但**必须**在 Evidence Contract 写明其 load-bearing delta |
 | `uncertain` | **不得**支撑强于 `uncertain` 的 claim；先补检索或补结构抽取 |
 
+**near_neighbor_verdict 决定 claim 上限**（见
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §23.2；由 `NN12` 强制）：
+
+| `near_neighbor_verdict` | `claimed_novelty_level` 上限 |
+|---|---|
+| `duplicate-equivalent` / `reframing-neighbor` | `none` |
+| `transfer-neighbor` | `transfer-only` |
+| `component-neighbor` | `component-delta` |
+| `mechanism-neighbor` | `mechanism-delta` |
+| `structural-delta` | `boundary-delta` |
+| `structural-delta-strong` | `paradigm-candidate` |
+| `uncertain` | `component-delta` |
+
 **硬规则：**
 
 1. **强 novelty claim 必须能指回一份 SENA-1 artifact** —— 由

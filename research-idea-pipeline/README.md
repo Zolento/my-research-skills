@@ -70,7 +70,7 @@ research-idea-pipeline/
 │   ├── example-field-mapping-standalone.md  # 单独文献调研（R2 / R5）
 │   ├── example-followup-review.md    # 接续复核
 │   ├── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
-│   └── structural-equivalence/       # audit fixture 四件：equivalent.json / transfer-only.json / formulation-delta.json / paradigm-candidate.json
+│   └── structural-equivalence/       # near-neighbor audit fixture 七件：equivalent.json / reframing-neighbor.json / transfer-only.json / component-neighbor.json / mechanism-neighbor.json / formulation-delta.json / paradigm-candidate.json
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
 ```
 

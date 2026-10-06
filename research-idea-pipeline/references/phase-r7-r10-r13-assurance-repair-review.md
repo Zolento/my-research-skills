@@ -488,6 +488,26 @@ Kill Condition:  If replacing the claimed delta leaves assumptions, predictions
 6. **不做 venue 判断** —— venue fit 进 R7 是既有硬禁令，Structural Equivalence 同样不得引入。
 7. **不做数字 novelty 分**：verdict 是 category，不是 score。
 
+**near-neighbor audit 六步（R7 正式执行，缺一不可）：**
+
+| # | 步骤 | 落点键 |
+|---|---|---|
+| 1 | strongest prior subsumption（默认假设它仍是近邻） | `null_hypothesis` |
+| 2 | theory stripping（P5 必做） | `theory_stripping` |
+| 3 | domain stripping（两套表示） | `domain_stripped_alignment` / `domain_terms` |
+| 4 | collapse test（含 removal test） | `counterfactual_collapse` / `removal_test` |
+| 5 | minimal delta（Δ* 能否单独推出新后果） | `minimal_delta_set` |
+| 6 | unresolved mapping（证据不足必须保留） | `correspondence` |
+
+然后据此决定**当前最大 defensible novelty claim**，并给 `near_neighbor_verdict`
+（八值，见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §23）。
+写回后跑 `python3 scripts/structural_equivalence_check.py --route <routes/<R>>`
+（`EQ1`—`EQ13` + `NN1`—`NN13`，退出码 0）。
+
+**claim-strength gate，不是 idea-kill gate：** verdict 是 neighbor **不表示** idea 不值得做，
+只表示不能声称 paradigm novelty。**不得**把 verdict 实现成淘汰开关
+（见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §26）。
+
 **交给 R8 的绑定契约：** SENA-1 的 verdict 决定 R8 允许的 claim 强度
 （见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.5）。
 

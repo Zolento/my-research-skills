@@ -1,87 +1,226 @@
 {
-  "_schema": "research-idea-pipeline/structural-equivalence-audit@1",
-  "_usage": "Structural Equivalence audit artifact 骨架（Minimal Structural Delta Certificate）。落盘路径：.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json（SENA-1，R7 写）或 <H>.sena2.json（SENA-2，R13 写）。字段与枚举逐字定义见 references/structural-equivalence-policy.md §8；十四个 facet 与十一个 typed relation 见该文件 §3；verdict 十值见 §7；反事实坍缩与它的 verdict 相容表见 §6.2；`assurance[]` 可选扩展字段见 §9.2。写回后必须跑 python3 scripts/structural_equivalence_check.py --artifact <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）。本模板自身必须通过检查器。三条最容易违反的规则：① `domain_stripped_alignment` 的任一 facet 值不得包含 `domain_terms` 里的 token；② `counterfactual_collapse` 必填且 `collapse_result` 必须与 `verdict` 相容；③ `claimed_novelty_level` 不得强于 `verdict`。本文件是 Control Plane artifact，不是第九类 Research State 对象；`research-state.json` 只保留 `assurance[].audit_ref` 这样的路径引用。示例值与「示例占位」字样必须替换为真实值，否则不得被当作结论引用。",
-  "schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@2",
   "stage": "R7",
-  "candidate": "H2",
+  "candidate": "H3",
   "closest_priors": [
-    "LIT2",
+    "LIT3",
     "LIT7"
   ],
   "retrieval_status": "sufficient",
   "domain_terms": [
     "MRI",
     "k-space",
+    "source-free",
+    "Flow Matching",
     "跨中心",
-    "source-free"
+    "重建"
   ],
   "domain_aware_alignment": {
-    "problem": "同一重建问题下的两种正则化实现（示例占位）",
-    "setting": "多中心 MRI，源中心配对、目标中心无标注 k-space",
-    "observables": "欠采样 k-space 测量",
-    "available_information": "源中心配对 k-space 与图像；目标中心仅有欠采样测量",
-    "target_or_latent_quantity": "全采样图像",
-    "assumptions": "潜在图像分布由同一先验族生成",
-    "adaptation_or_intervention_object": "重建网络的正则化项权重",
-    "objective": "最小化有参考重建误差",
-    "mechanism": "用先验正则约束解空间，差异只体现在正则项写法",
-    "information_flow": "测量 → 重建 → 有参考误差",
-    "theory_object": "条件随机场分解",
-    "predictions_or_guarantees": "误差随正则权重呈单峰",
-    "evaluation_target": "有参考 PSNR / SSIM",
-    "boundary_or_failure_regime": "正则权重过大时过平滑"
+    "problem": "同一个科学问题在不同包装下的重述",
+    "setting": "多中心 MRI，源中心配对、目标中心只有无标注 k-space",
+    "observables": "同一族可观测量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "潜在图像分布",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "目标侧适配层",
+    "objective": "同一优化或证明目标",
+    "mechanism": "把远域的关系结构整体搬到本问题",
+    "information_flow": "间接观测 → 估计 → 无配对一致性",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "同一失败制度"
   },
   "domain_stripped_alignment": {
-    "problem": "同一估计问题下的两种正则化实现",
-    "setting": "单总体，训练与部署条件相同",
-    "observables": "经过算子族的间接观测",
-    "available_information": "源总体与目标总体均有配对监督",
-    "target_or_latent_quantity": "潜在目标量",
-    "assumptions": "潜在目标分布由同一先验族生成",
-    "adaptation_or_intervention_object": "估计器的正则项权重",
-    "objective": "最小化有配对目标的误差",
-    "mechanism": "用先验正则约束解空间，差异只体现在正则项写法",
-    "information_flow": "间接观测 → 估计 → 配对误差",
-    "theory_object": "带正则的变分目标",
-    "predictions_or_guarantees": "误差随正则权重呈单峰",
-    "evaluation_target": "有配对目标的误差指标",
-    "boundary_or_failure_regime": "正则权重过大时过平滑"
+    "problem": "同一个科学问题在不同包装下的重述",
+    "setting": "structural role: 多中心 领域，源中心配对、目标中心只有无标注 间接观测",
+    "observables": "同一族可观测量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "structural role: 潜在图像分布",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "structural role: 目标侧适配层",
+    "objective": "同一优化或证明目标",
+    "mechanism": "structural role: 把远域的关系结构整体搬到本问题",
+    "information_flow": "structural role: 间接观测 → 估计 → 无配对一致性",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "同一失败制度"
   },
   "matched_core": [
-    "domain-stripped 后十四个 facet 与 LIT2 逐项等价",
-    "信息流与失败边界完全一致"
+    "信息制度、承重假设、科学目标、干预对象与机制主路径均被保留",
+    "评价目标与失败制度未被改写"
   ],
   "candidate_only_elements": [
-    "把该框架用于新 modality（transfer 价值，不是结构差异）"
+    "表述与实现细节不同"
   ],
   "prior_only_elements": [
-    "prior 在另一个 modality 上验证"
+    "prior 的实现顺序不同"
   ],
-  "minimal_structural_delta": [
-    "domain-aware setting 改变：目标总体从有标注变为无标注"
-  ],
+  "minimal_structural_delta": [],
   "load_bearing_analysis": {
-    "changed_information": "目标总体的可用信息减少（无配对目标）",
+    "changed_information": "unchanged",
     "changed_assumptions": "unchanged",
     "changed_mechanism": "unchanged",
     "changed_predictions": "unchanged",
     "changed_boundary": "unchanged"
   },
   "counterfactual_collapse": {
-    "replacement": "把 modality 换回 prior 的领域，其余不动",
-    "predicted_consequence": "承重结构不变，只剩领域标签差异",
+    "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
+    "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
     "collapse_result": "collapses"
   },
   "differentiating_consequences": [],
   "discriminating_tests": [],
   "claimed_novelty_level": "transfer-only",
   "verdict": "transfer-only",
-  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（本件判 transfer-only：贡献是迁移与合法性论证，不是新范式）",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（据本次检索未见结构等价前作，检索式见附录 X）。本判定只覆盖三路检索返回的前作。",
   "blind_spots": [
-    "跨领域结构对应依赖 LLM 抽取，可能漏掉机制级差异"
+    "结构抽取由 LLM 辅助完成，facet 边界可能与人类判断不一致",
+    "检索未覆盖的相邻学科不构成反例也不构成支持"
   ],
   "evidence": [
-    "LIT2",
+    "LIT3",
     "LIT7"
+  ],
+  "near_neighbor_verdict": "transfer-neighbor",
+  "correspondence": {
+    "problem": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[problem] 原文 §2 / eq.(3) / code path",
+      "note": "problem 的对应关系依据 span 逐项判定"
+    },
+    "setting": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[setting] 原文 §2 / eq.(3) / code path",
+      "note": "setting 的对应关系依据 span 逐项判定"
+    },
+    "observables": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[observables] 原文 §2 / eq.(3) / code path",
+      "note": "observables 的对应关系依据 span 逐项判定"
+    },
+    "available_information": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[available_information] 原文 §2 / eq.(3) / code path",
+      "note": "available_information 的对应关系依据 span 逐项判定"
+    },
+    "target_or_latent_quantity": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[target_or_latent_quantity] 原文 §2 / eq.(3) / code path",
+      "note": "target_or_latent_quantity 的对应关系依据 span 逐项判定"
+    },
+    "assumptions": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[assumptions] 原文 §2 / eq.(3) / code path",
+      "note": "assumptions 的对应关系依据 span 逐项判定"
+    },
+    "adaptation_or_intervention_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[adaptation_or_intervention_object] 原文 §2 / eq.(3) / code path",
+      "note": "adaptation_or_intervention_object 的对应关系依据 span 逐项判定"
+    },
+    "objective": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[objective] 原文 §2 / eq.(3) / code path",
+      "note": "objective 的对应关系依据 span 逐项判定"
+    },
+    "mechanism": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[mechanism] 原文 §2 / eq.(3) / code path",
+      "note": "mechanism 的对应关系依据 span 逐项判定"
+    },
+    "information_flow": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[information_flow] 原文 §2 / eq.(3) / code path",
+      "note": "information_flow 的对应关系依据 span 逐项判定"
+    },
+    "theory_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[theory_object] 原文 §2 / eq.(3) / code path",
+      "note": "theory_object 的对应关系依据 span 逐项判定"
+    },
+    "predictions_or_guarantees": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[predictions_or_guarantees] 原文 §2 / eq.(3) / code path",
+      "note": "predictions_or_guarantees 的对应关系依据 span 逐项判定"
+    },
+    "evaluation_target": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[evaluation_target] 原文 §2 / eq.(3) / code path",
+      "note": "evaluation_target 的对应关系依据 span 逐项判定"
+    },
+    "boundary_or_failure_regime": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[boundary_or_failure_regime] 原文 §2 / eq.(3) / code path",
+      "note": "boundary_or_failure_regime 的对应关系依据 span 逐项判定"
+    }
+  },
+  "load_bearing_facets": [
+    "information_flow",
+    "mechanism"
+  ],
+  "local_neighborhood_test": {
+    "near_prior": "LIT3",
+    "local_modification_kinds": [],
+    "neighbor_confirmed": true,
+    "rationale": "按 §16.3 逐条核对 problem / observables / assumptions / target / mechanism / prediction / boundary"
+  },
+  "removal_test": {
+    "removed_delta": "移除 candidate 声称的 Δ",
+    "returns_to_prior": "LIT3",
+    "unchanged_core": [
+      "problem",
+      "observables",
+      "assumptions"
+    ],
+    "conclusion": "component-local-delta"
+  },
+  "null_hypothesis": {
+    "statement": "candidate is structurally subsumed by an existing prior",
+    "strongest_subsumption_prior": "LIT3",
+    "mapping_completeness": "full",
+    "unmapped_load_bearing_elements": []
+  },
+  "minimal_delta_set": {
+    "delta_set": [],
+    "novel_consequence_kinds": [],
+    "sufficient_alone": false
+  },
+  "theory_stripping": {
+    "applicable": false,
+    "stripped_terms": [],
+    "residual_structure": "not-applicable",
+    "adds_new_structure": false,
+    "new_structure_kinds": [],
+    "conclusion": "not-applicable"
+  },
+  "remote_analogy_mapping": {
+    "applicable": true,
+    "object_mapping": "源总体 ↔ 源中心",
+    "relation_mapping": "无配对目标 ↔ 目标中心无标注",
+    "constraint_mapping": "信息损失算子 ↔ 欠采样算子",
+    "failure_mode_mapping": "算子不可识别 ↔ 采集参数不可估计",
+    "added_structure": false,
+    "conclusion": "explanation-only"
+  },
+  "trust_basis": [
+    "source-span",
+    "literature"
   ]
 }

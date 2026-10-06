@@ -41,12 +41,15 @@ POLICY = ROOT / "references" / "structural-equivalence-policy.md"
 TEMPLATE = ROOT / "templates" / "structural-equivalence-audit.template.json"
 FIXTURES = ROOT / "examples" / "structural-equivalence"
 
-# fixture 名 → 期望 verdict（policy §14.2 的四个具名样例）
-FIXTURE_VERDICTS = {
-    "equivalent": "equivalent",
-    "transfer-only": "transfer-only",
-    "formulation-delta": "formulation-delta",
-    "paradigm-candidate": "paradigm-candidate",
+# fixture 名 → (期望 near_neighbor_verdict, 期望 verdict)（policy §23.2 相容表）
+FIXTURE_VERDICTS: Dict[str, Tuple[str, str]] = {
+    "equivalent": ("duplicate-equivalent", "equivalent"),
+    "reframing-neighbor": ("reframing-neighbor", "reframing-only"),
+    "transfer-only": ("transfer-neighbor", "transfer-only"),
+    "component-neighbor": ("component-neighbor", "component-delta"),
+    "mechanism-neighbor": ("mechanism-neighbor", "mechanism-delta"),
+    "formulation-delta": ("structural-delta", "formulation-delta"),
+    "paradigm-candidate": ("structural-delta-strong", "paradigm-candidate"),
 }
 
 
@@ -122,11 +125,68 @@ class TestPolicyCodeParity(unittest.TestCase):
             r"^\| `(EQ\d+)` \| (.+?) \|$",
             _section("### 12.1 规则表", "### 12.2"), re.M))
         self.assertEqual(len(rows), 13, f"policy §12.1 只解析出 {len(rows)} 条规则行")
-        self.assertEqual(rows, seq.RULES,
+        self.assertEqual(rows, {k: v for k, v in seq.RULES.items() if k.startswith("EQ")},
                          "policy §12.1 的 EQ1—EQ13 判据与检查器 RULES 不一致")
 
-    def test_rule_order_is_exactly_eq1_to_eq13(self) -> None:
-        self.assertEqual(seq.RULE_ORDER, [f"EQ{n}" for n in range(1, 14)])
+    def test_nn_rule_table_matches_policy(self) -> None:
+        rows = dict(re.findall(
+            r"^\| `(NN\d+)` \| (.+?) \|$",
+            _section("## 30. 机械闸门", "> **脚本不得决定"), re.M))
+        self.assertEqual(len(rows), 13, f"policy §30 只解析出 {len(rows)} 条规则行")
+        self.assertEqual(rows, {k: v for k, v in seq.RULES.items() if k.startswith("NN")},
+                         "policy §30 的 NN1—NN13 判据与检查器 RULES 不一致")
+
+    def test_near_neighbor_verdicts_match_policy(self) -> None:
+        rows = re.findall(r"^\| `([a-z-]+)` \|",
+                          _section("### 23.1 枚举", "### 23.2"), re.M)
+        self.assertEqual(tuple(rows), seq.NEAR_NEIGHBOR_VERDICTS,
+                         "policy §23.1 的八值与检查器 NEAR_NEIGHBOR_VERDICTS 不一致")
+
+    def test_correspondence_relation_and_provenance_match_policy(self) -> None:
+        relations = re.findall(r"^\| `([A-Z]+)` \|", _section("### 21.2 三值", "### 21.3"), re.M)
+        self.assertEqual(tuple(relations), seq.CORRESPONDENCE_RELATIONS)
+        provenance = re.findall(r"^\| `([A-Z]+)` \|", _section("### 21.1 每个 facet", "### 21.2"), re.M)
+        self.assertEqual(tuple(provenance), seq.PROVENANCE)
+
+    def test_local_modification_kinds_match_policy(self) -> None:
+        rows = re.findall(r"^\| `([a-z-]+)` \|$", _section("### 16.3 Local", "## 17."), re.M)
+        self.assertEqual(tuple(rows), seq.LOCAL_MODIFICATION_KINDS,
+                         "policy §16.3 的十一类与检查器不一致")
+
+    def test_theory_new_structure_kinds_match_policy(self) -> None:
+        rows = re.findall(r"^\| `([a-z-]+)` \|$", _section("## 19. Theory-Stripping", "**除非**"), re.M)
+        self.assertEqual(tuple(rows), seq.THEORY_NEW_STRUCTURE_KINDS,
+                         "policy §19 的六类与检查器不一致")
+
+    def test_trust_bases_match_policy(self) -> None:
+        rows = re.findall(r"^\| `([a-z-]+)` \|$",
+                          _section("### 21.3 可信度来源", "**落地键：**"), re.M)
+        self.assertEqual(tuple(rows), seq.TRUST_BASES,
+                         "policy §21.3 的八值与检查器 TRUST_BASES 不一致")
+
+    def test_novel_consequence_kinds_match_policy(self) -> None:
+        tail = _policy().split("`novel_consequence_kinds` 逐字为：", 1)[1][:120]
+        rows = re.findall(r"`([a-z]+)`", tail)
+        self.assertEqual(tuple(rows), seq.NOVEL_CONSEQUENCE_KINDS,
+                         "policy §22.2 的五值与检查器不一致")
+
+    def test_nn_compatibility_table_matches_policy(self) -> None:
+        table = _section("### 23.2 与", "## 24. artifact")
+        rows = {}
+        ceilings = {}
+        for line in table.splitlines():
+            match = re.match(r"^\| `([a-z-]+)` \| (.+?) \| `([a-z-]+)` \|$", line)
+            if match:
+                rows[match.group(1)] = tuple(re.findall(r"`([a-z-]+)`", match.group(2)))
+                ceilings[match.group(1)] = match.group(3)
+        self.assertEqual(rows, seq.NN_ALLOWED_VERDICTS,
+                         "policy §23.2 的 verdict 相容表与代码不一致")
+        self.assertEqual(ceilings, seq.NN_CLAIM_CEILING,
+                         "policy §23.2 的 claim 上限表与代码不一致")
+
+    def test_rule_order_is_eq1_to_eq13_then_nn1_to_nn13(self) -> None:
+        self.assertEqual(seq.RULE_ORDER,
+                         [f"EQ{n}" for n in range(1, 14)] + [f"NN{n}" for n in range(1, 14)])
 
     def test_strong_and_weak_verdicts_partition_the_positive_side(self) -> None:
         self.assertEqual(set(seq.STRONG_VERDICTS) | set(seq.WEAK_VERDICTS) | {"uncertain"},
@@ -150,16 +210,18 @@ class TestArtifactGate(unittest.TestCase):
                          f"fixture 目录内容与 policy §14.2 的四个具名样例不符：{names}")
 
     def test_each_fixture_passes_and_keeps_its_expected_verdict(self) -> None:
-        for name, verdict in FIXTURE_VERDICTS.items():
+        for name, (near, verdict) in FIXTURE_VERDICTS.items():
             doc = _load(FIXTURES / f"{name}.json")
             self.assertEqual(doc["verdict"], verdict, f"{name}.json 的 verdict 被改动")
+            self.assertEqual(doc["near_neighbor_verdict"], near,
+                             f"{name}.json 的 near_neighbor_verdict 被改动")
             report = seq.check_artifact(doc, source=name)
             self.assertEqual(report.rules(), [],
                              f"{name}.json：{[v.render() for v in report.violations]}")
 
     def test_schema_typo_is_an_environment_error(self) -> None:
         doc = _load(TEMPLATE)
-        doc["schema"] = "research-idea-pipeline/structural-equivalence-audit@2"
+        doc["schema"] = "research-idea-pipeline/structural-equivalence-audit@3"
         self.assertEqual(seq.check_artifact(doc).exit_code(), seq.EXIT_ENV)
 
     def test_strong_verdict_with_all_unchanged_is_rejected(self) -> None:
@@ -294,39 +356,35 @@ class TestRouteMode(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+# round-1 verdict → near_neighbor_verdict（policy §23.2 相容表）
+_NEAR_BY_VERDICT: Dict[str, str] = {
+    "equivalent": "duplicate-equivalent",
+    "subsumed-by-prior": "duplicate-equivalent",
+    "reframing-only": "reframing-neighbor",
+    "transfer-only": "transfer-neighbor",
+    "component-delta": "component-neighbor",
+    "mechanism-delta": "mechanism-neighbor",
+    "formulation-delta": "structural-delta",
+    "boundary-delta": "structural-delta",
+    "paradigm-candidate": "structural-delta-strong",
+    "uncertain": "uncertain",
+}
+
+
 def _variant(verdict: str, claimed: str) -> Dict[str, Any]:
-    """按 verdict 的强弱，构造一份结构自洽的 artifact。"""
-    doc = _load(TEMPLATE)
-    doc["verdict"] = verdict
-    doc["claimed_novelty_level"] = claimed
-    strong = verdict in seq.STRONG_VERDICTS
-    if strong:
-        doc["minimal_structural_delta"] = ["承重结构发生改变：目标量与信息流同时变化"]
-        doc["load_bearing_analysis"] = {
-            "changed_information": "目标量的可观测量改变",
-            "changed_assumptions": "新增一条承重假设",
-            "changed_mechanism": "信息流路径改变",
-            "changed_predictions": "新增可证伪预测",
-            "changed_boundary": "新增失败边界",
-        }
-        doc["counterfactual_collapse"] = {
-            "replacement": "把 delta 换回 prior 的对应结构",
-            "predicted_consequence": "承重后果消失，说明 delta 承重",
-            "collapse_result": "does-not-collapse",
-        }
-        doc["differentiating_consequences"] = ["一条可判定的新后果"]
-        doc["discriminating_tests"] = ["X1"]
-    else:
-        doc["minimal_structural_delta"] = []
-        doc["load_bearing_analysis"] = {key: "unchanged" for key in seq.LOAD_BEARING_KEYS}
-        doc["counterfactual_collapse"] = {
-            "replacement": "把 surface 术语换回 prior 的写法",
-            "predicted_consequence": "目标、假设、预测、失败边界均不变",
-            "collapse_result": "collapses",
-        }
-        doc["differentiating_consequences"] = []
-        doc["discriminating_tests"] = []
-    return doc
+    """按 verdict 的强弱，构造一份结构自洽的 artifact（含 near-neighbor 层）。"""
+    near = _NEAR_BY_VERDICT[verdict]
+    if verdict not in seq.STRONG_VERDICTS:
+        extra: Dict[str, Any] = {}
+        if verdict == "uncertain":
+            extra["collapse"] = "partially-collapses"
+        return nn_artifact(near, verdict, claimed, **extra)
+    extra = dict(_DELTA)
+    if near == "structural-delta-strong":
+        extra.update({"different": ("boundary_or_failure_regime",),
+                      "bearings": ("boundary_or_failure_regime",),
+                      "consequence_kinds": ("boundary", "experiment")})
+    return nn_artifact(near, verdict, claimed, **extra)
 
 
 # (编号, 变体名, 期望 verdict, 合理的 claimed level)
@@ -389,6 +447,227 @@ class TestMetamorphicStructure(unittest.TestCase):
     def test_uncertain_cannot_carry_a_paradigm_claim(self) -> None:
         doc = _variant("uncertain", "paradigm-candidate")
         self.assertIn("EQ13", seq.check_artifact(doc).rules())
+
+
+# ---------------------------------------------------------------------------
+# 4b. Near-neighbor metamorphic 套件 NN-1—NN-12（policy §31）
+# ---------------------------------------------------------------------------
+
+
+_NA = {"applicable": False, "stripped_terms": [], "residual_structure": "not-applicable",
+       "adds_new_structure": False, "new_structure_kinds": [], "conclusion": "not-applicable"}
+_ANALOGY_NA = {"applicable": False, "object_mapping": "n/a", "relation_mapping": "n/a",
+               "constraint_mapping": "n/a", "failure_mode_mapping": "n/a",
+               "added_structure": False, "conclusion": "not-applicable"}
+
+
+def nn_artifact(near, verdict, claimed, *, different=(), bearings=("information_flow", "mechanism"),
+                local_kinds=(), confirmed=True, removal="component-local-delta", nullmap="full",
+                unmapped=(), delta_set=(), consequence_kinds=(), consequences=(), tests=(),
+                collapse="collapses", theory=None, analogy=None, trust=("source-span", "equation"),
+                load=None):
+    """构造一份结构自洽的 near-neighbor artifact（测试用）。"""
+    if load is None:
+        load = {key: "unchanged" for key in seq.LOAD_BEARING_KEYS}
+        if verdict in seq.STRONG_VERDICTS:
+            load["changed_information"] = "真实承重改变"
+    return {
+        "schema": seq.SCHEMA, "stage": "R7", "candidate": "H1",
+        "closest_priors": ["LIT1"], "retrieval_status": "sufficient", "domain_terms": ["MRI"],
+        "domain_aware_alignment": {f: f"domain {f}" for f in seq.FACETS},
+        "domain_stripped_alignment": {f: f"role {f}" for f in seq.FACETS},
+        "matched_core": ["core"], "candidate_only_elements": [], "prior_only_elements": [],
+        "minimal_structural_delta": list(delta_set), "load_bearing_analysis": load,
+        "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                    "collapse_result": collapse},
+        "differentiating_consequences": list(consequences), "discriminating_tests": list(tests),
+        "claimed_novelty_level": claimed, "verdict": verdict,
+        "novelty_boundary": "against the retrieved literature, no structural equivalent was identified",
+        "blind_spots": ["blind"], "evidence": ["LIT1"],
+        "near_neighbor_verdict": near,
+        "correspondence": {f: {"relation": "DIFFERENT" if f in different else "MATCH",
+                               "provenance": "DERIVED" if f in different else "EXPLICIT",
+                               "evidence_span": "span", "note": "note"} for f in seq.FACETS},
+        "load_bearing_facets": list(bearings),
+        "local_neighborhood_test": {"near_prior": "LIT1",
+                                    "local_modification_kinds": list(local_kinds),
+                                    "neighbor_confirmed": confirmed, "rationale": "r"},
+        "removal_test": {"removed_delta": "d",
+                         "returns_to_prior": "LIT1" if removal == "component-local-delta" else "",
+                         "unchanged_core": [], "conclusion": removal},
+        "null_hypothesis": {"statement": seq.NULL_HYPOTHESIS_STATEMENT,
+                            "strongest_subsumption_prior": "LIT1",
+                            "mapping_completeness": nullmap,
+                            "unmapped_load_bearing_elements": list(unmapped)},
+        "minimal_delta_set": {"delta_set": list(delta_set),
+                              "novel_consequence_kinds": list(consequence_kinds),
+                              "sufficient_alone": bool(delta_set)},
+        "theory_stripping": theory or dict(_NA),
+        "remote_analogy_mapping": analogy or dict(_ANALOGY_NA),
+        "trust_basis": list(trust),
+    }
+
+
+_THEORY_RELABEL = {"applicable": True, "stripped_terms": ["theory brand"],
+                   "residual_structure": "stripping 后与 prior 逐项一致",
+                   "adds_new_structure": False, "new_structure_kinds": [],
+                   "conclusion": "theory-relabeling-risk"}
+_ANALOGY_EXPLANATION = {"applicable": True, "object_mapping": "o", "relation_mapping": "r",
+                        "constraint_mapping": "c", "failure_mode_mapping": "f",
+                        "added_structure": False, "conclusion": "explanation-only"}
+_DELTA = {"collapse": "does-not-collapse", "confirmed": False, "removal": "load-bearing-delta",
+          "nullmap": "failed", "delta_set": ("d",), "consequence_kinds": ("prediction",),
+          "consequences": ("c",), "tests": ("X1",)}
+_MECH = {"different": ("mechanism", "information_flow"), "collapse": "partially-collapses",
+         "delta_set": ("d",), "consequence_kinds": ("algorithm",), "consequences": ("c",),
+         "tests": ("X1",), "nullmap": "partial", "unmapped": ("mechanism",)}
+
+# (编号, 名称, near_neighbor_verdict, verdict, claimed, 额外参数, 允许的 near 集合)
+NN_CASES: Tuple[Tuple[str, str, str, str, str, Dict[str, Any], Tuple[str, ...]], ...] = (
+    ("NN-1", "Rename", "duplicate-equivalent", "equivalent", "none", {}, ("duplicate-equivalent",)),
+    ("NN-2", "Narrative rewrite", "reframing-neighbor", "reframing-only", "none", {},
+     ("reframing-neighbor",)),
+    ("NN-3", "Theory relabel", "reframing-neighbor", "reframing-only", "none",
+     {"theory": _THEORY_RELABEL}, ("reframing-neighbor",)),
+    ("NN-4", "Cross-domain port", "transfer-neighbor", "transfer-only", "transfer-only",
+     {"analogy": _ANALOGY_EXPLANATION}, ("transfer-neighbor",)),
+    ("NN-5", "New regularizer", "component-neighbor", "component-delta", "component-delta",
+     {"local_kinds": ("regularizer",)}, ("component-neighbor",)),
+    ("NN-6", "New parameterization", "component-neighbor", "component-delta", "component-delta",
+     {}, ("component-neighbor", "mechanism-neighbor")),
+    ("NN-7", "Mechanism change", "mechanism-neighbor", "mechanism-delta", "mechanism-delta",
+     _MECH, ("mechanism-neighbor", "structural-delta")),
+    ("NN-8", "Assumption removal", "structural-delta", "formulation-delta", "formulation-delta",
+     {**_DELTA, "different": ("assumptions",), "bearings": ("assumptions",)},
+     ("structural-delta",)),
+    ("NN-9", "Observable change", "structural-delta", "formulation-delta", "formulation-delta",
+     {**_DELTA, "different": ("observables",), "bearings": ("observables",)},
+     ("structural-delta",)),
+    ("NN-10", "New impossibility boundary", "structural-delta-strong", "paradigm-candidate",
+     "paradigm-candidate",
+     {**_DELTA, "different": ("boundary_or_failure_regime",),
+      "bearings": ("boundary_or_failure_regime",), "consequence_kinds": ("boundary", "experiment")},
+     ("structural-delta-strong",)),
+    ("NN-11", "Semantic far / structural same", "duplicate-equivalent", "equivalent", "none", {},
+     ("duplicate-equivalent",)),
+    ("NN-12", "Semantic close / structural different", "structural-delta", "formulation-delta",
+     "formulation-delta",
+     {**_DELTA, "different": ("assumptions", "observables", "predictions_or_guarantees"),
+      "bearings": ("assumptions", "observables", "predictions_or_guarantees")},
+     ("structural-delta",)),
+)
+
+
+class TestNearNeighborMetamorphic(unittest.TestCase):
+    """NN-1—NN-12：语义距离 ≠ 科学距离（policy §31）。"""
+
+    def test_policy_declares_exactly_these_twelve_variants(self) -> None:
+        table = _section("## 31. Near-Neighbor metamorphic", "> **NN-11 与 NN-12")
+        declared = re.findall(r"^\| (NN-\d+) \|", table, re.M)
+        self.assertEqual(declared, [tag for tag, *_ in NN_CASES],
+                         "policy §31 的 NN-1—NN-12 与测试表不一致")
+
+    def test_each_variant_keeps_its_expected_verdict(self) -> None:
+        for tag, name, near, verdict, claimed, extra, allowed in NN_CASES:
+            doc = nn_artifact(near, verdict, claimed, **extra)
+            report = seq.check_artifact(doc, source=f"{tag} {name}")
+            self.assertEqual(report.rules(), [],
+                             f"{tag} {name}：{[v.render() for v in report.violations]}")
+            self.assertEqual(doc["near_neighbor_verdict"], near)
+            self.assertIn(doc["near_neighbor_verdict"], allowed)
+
+    def test_override_binary_same_or_different_is_rejected(self) -> None:
+        for tag, name, near, verdict, claimed, extra, _allowed in NN_CASES:
+            doc = nn_artifact(near, verdict, claimed, **extra)
+            doc["correspondence"]["mechanism"]["relation"] = "SAME"
+            self.assertIn("NN2", seq.check_artifact(doc, source=f"{tag} {name}").rules(),
+                          f"{tag} {name}：强制二值 SAME 没被拦下")
+
+    def test_essential_unresolved_never_becomes_a_strong_verdict(self) -> None:
+        cases = (
+            ("structural-delta", "formulation-delta", "formulation-delta", _DELTA),
+            ("structural-delta-strong", "paradigm-candidate", "paradigm-candidate",
+             {**_DELTA, "different": ("boundary_or_failure_regime",),
+              "bearings": ("boundary_or_failure_regime",),
+              "consequence_kinds": ("boundary", "experiment")}),
+        )
+        for near, verdict, claimed, extra in cases:
+            doc = nn_artifact(near, verdict, claimed, **extra)
+            for facet in doc["load_bearing_facets"]:
+                doc["correspondence"][facet]["relation"] = "UNRESOLVED"
+            rules = seq.check_artifact(doc, source=f"{near}+UNRESOLVED").rules()
+            self.assertIn("NN3", rules,
+                          f"{near}：load-bearing facet 全 UNRESOLVED 时仍给了强 verdict")
+
+    def test_two_unresolved_forces_uncertain(self) -> None:
+        doc = nn_artifact("component-neighbor", "component-delta", "component-delta",
+                          bearings=("objective", "mechanism"))
+        doc["correspondence"]["objective"]["relation"] = "UNRESOLVED"
+        doc["correspondence"]["mechanism"]["relation"] = "UNRESOLVED"
+        self.assertIn("NN3", seq.check_artifact(doc).rules())
+
+    def test_nn11_and_nn12_are_the_semantic_distance_guard(self) -> None:
+        """NN-11（语义远 / 结构同）与 NN-12（语义近 / 结构异）必须都稳定。"""
+        far_same = nn_artifact("duplicate-equivalent", "equivalent", "none")
+        near_diff = nn_artifact("structural-delta", "formulation-delta", "formulation-delta",
+                                **_DELTA)
+        self.assertEqual(seq.check_artifact(far_same).rules(), [])
+        self.assertEqual(seq.check_artifact(near_diff).rules(), [])
+
+    def test_overclaiming_a_neighbor_is_rejected(self) -> None:
+        for tag, name, near, verdict, claimed, extra, _allowed in NN_CASES:
+            if near == "structural-delta-strong":
+                continue
+            doc = nn_artifact(near, verdict, claimed, **extra)
+            doc["claimed_novelty_level"] = "paradigm-candidate"
+            self.assertIn("NN12", seq.check_artifact(doc, source=f"{tag} {name}").rules(),
+                          f"{tag} {name}：把 neighbor 过度声称成 paradigm-candidate 没被拦下")
+
+
+class TestHallucinationRegression(unittest.TestCase):
+    """policy §32 的四条幻觉回归（只测可机械判定的部分）。"""
+
+    def test_extraction_hallucination_cannot_be_explicit_without_a_span(self) -> None:
+        doc = nn_artifact("duplicate-equivalent", "equivalent", "none")
+        doc["correspondence"]["assumptions"]["evidence_span"] = ""
+        self.assertIn("NN2", seq.check_artifact(doc).rules())
+
+    def test_alignment_hallucination_cannot_force_binary(self) -> None:
+        doc = nn_artifact("duplicate-equivalent", "equivalent", "none")
+        doc["correspondence"]["mechanism"]["relation"] = "MATCH_ISH"
+        self.assertIn("NN2", seq.check_artifact(doc).rules())
+
+    def test_unresolved_is_preserved_not_rejected(self) -> None:
+        doc = nn_artifact("component-neighbor", "component-delta", "component-delta")
+        doc["correspondence"]["setting"]["relation"] = "UNRESOLVED"
+        doc["correspondence"]["setting"]["provenance"] = "UNKNOWN"
+        self.assertEqual(seq.check_artifact(doc).rules(), [])
+
+    def test_missing_prior_cannot_claim_paradigm(self) -> None:
+        doc = nn_artifact("uncertain", "uncertain", "component-delta",
+                          collapse="partially-collapses")
+        doc["retrieval_status"] = "retrieval-insufficient"
+        doc["closest_priors"] = []
+        doc["novelty_boundary"] = "检索未完成，无法判断"
+        self.assertIn("EQ10", seq.check_artifact(doc).rules())
+        doc["novelty_boundary"] = ("against the retrieved literature, "
+                                   "no structural equivalent was identified")
+        self.assertNotIn("EQ10", seq.check_artifact(doc).rules())
+        doc["near_neighbor_verdict"] = "paradigm-candidate"
+        self.assertIn("NN12", seq.check_artifact(doc).rules())
+
+    def test_counterfactual_hallucination_requires_executable_trust(self) -> None:
+        doc = nn_artifact("structural-delta", "formulation-delta", "formulation-delta", **_DELTA)
+        doc["trust_basis"] = ["source-span", "literature"]
+        self.assertIn("NN5", seq.check_artifact(doc).rules())
+        doc["trust_basis"] = ["source-span", "equation"]
+        self.assertNotIn("NN5", seq.check_artifact(doc).rules())
+
+    def test_multiple_llm_passes_are_not_evidence(self) -> None:
+        """pass 名字当 trust_basis 必须被拒；它们只是任务分解（policy §21.3）。"""
+        doc = nn_artifact("structural-delta", "formulation-delta", "formulation-delta", **_DELTA)
+        doc["trust_basis"] = ["extractor", "aligner", "adversarial-matcher", "delta-critic"]
+        self.assertIn("NN5", seq.check_artifact(doc).rules())
 
 
 # ---------------------------------------------------------------------------
@@ -466,7 +745,7 @@ class TestRegistrationAndPackaging(unittest.TestCase):
     def test_list_rules_matches_the_rule_table(self) -> None:
         code, out, _ = _run("--list-rules")
         self.assertEqual(code, seq.EXIT_OK)
-        listed = dict(re.findall(r"^(EQ\d+)\s+硬\s{2}(.+)$", out, re.M))
+        listed = dict(re.findall(r"^((?:EQ|NN)\d+)\s+硬\s{2}(.+)$", out, re.M))
         self.assertEqual(listed, seq.RULES)
 
     def test_new_assets_are_registered_in_skill(self) -> None:
@@ -584,6 +863,32 @@ class TestFrozenBoundaries(unittest.TestCase):
         layout = (ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
         self.assertIn("populations/{archive/,intermediates/,fingerprints/}", layout)
         self.assertIn("assurance/{structural-equivalence/}", layout)
+        self.assertIn("populations/near-neighbor-telemetry.json", layout)
+        self.assertIn("populations/near-neighbor-telemetry.json", self._policy())
+
+    def test_divergence_protection_and_no_scalar_ban_are_frozen(self) -> None:
+        text = self._policy()
+        for token in ("Generate broadly", "generate first", "coverage before ranking",
+                      "不得直接决定 novelty claim", "idea-kill gate",
+                      "constrain claim strength", "不得用它们直接奖励模型"):
+            self.assertIn(token, text, f"policy 缺少发散性保护 / 禁 scalar 的冻结表述：{token}")
+
+    def test_r3_never_runs_the_formal_gate(self) -> None:
+        """policy §25 与 phase-r3-r6 §R4.5 必须同时说「R3 不跑正式 gate」。"""
+        text = self._policy()
+        section = _section("## 25. 阶段分工", "## 26.")
+        self.assertIn("不运行", section)
+        self.assertIn("R3", section)
+        discovery = (ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("**R3 只生成**", discovery)
+        self.assertIn("不运行", discovery)
+
+    def test_theory_and_remote_analogy_operators_are_wired(self) -> None:
+        """P5 / P4 的 operator 触发条件必须写进 policy，并与代码常量同名。"""
+        policy = self._policy()
+        for token in (seq.THEORY_OPERATOR, seq.REMOTE_ANALOGY_OPERATOR,
+                      "Theory-Stripping Test", "Structure-Preservation Test"):
+            self.assertIn(token, policy, f"policy 缺少 P5 / P4 触发条件：{token}")
 
 
 if __name__ == "__main__":
