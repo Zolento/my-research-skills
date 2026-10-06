@@ -1138,3 +1138,50 @@ class TestCarrierCompleteness(unittest.TestCase):
             if not key.startswith("_") and f"`{key}`" not in policy and f"`{key}[]`" not in policy
         ]
         self.assertEqual(undocumented, [], msg=f"模板有但 policy §3 未定义的顶层键：{undocumented}")
+
+
+# ---------------------------------------------------------------------------
+# 打包完整性：相对链接不得指向 skill 包之外
+# ---------------------------------------------------------------------------
+
+class TestPackagedLinks(unittest.TestCase):
+    """本 skill 会被整包拷到 `~/.agents/skills/` 等安装点使用。
+
+    因此**任何指向包外的相对链接，在安装态必然断** —— 而在开发树里它可能恰好可达
+    （`research-idea-pipeline-dev/docs/` 就在旁边），于是开发期的链接检查**是绿的**。
+    这类缺陷只在「装出去」那一刻暴露，必须机械化拦住。
+
+    规则：每个 `*.md` 里的相对链接，解析后必须 ① 存在，② 仍在 skill 根目录内。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    FENCE = re.compile(r"```.*?```", re.S)
+    LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
+
+    def _links(self):
+        for path in sorted(self.ROOT.rglob("*.md")):
+            text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
+            for match in self.LINK.finditer(text):
+                target = match.group(1).split("#")[0]
+                if not target or target.startswith(("http", "mailto:", "<", "{")):
+                    continue
+                yield path, target
+
+    def test_relative_links_stay_inside_the_package(self):
+        root = self.ROOT.resolve()
+        outside, missing = [], []
+        for path, target in self._links():
+            resolved = (path.parent / target).resolve()
+            if not resolved.exists():
+                missing.append(f"{path.relative_to(root)} -> {target}")
+            elif root not in resolved.parents and resolved != root:
+                outside.append(f"{path.relative_to(root)} -> {target}")
+        self.assertEqual(missing, [], msg="断链（相对链接目标不存在）：\n  " + "\n  ".join(missing))
+        self.assertEqual(
+            outside, [],
+            msg="链接指向 skill 包之外 —— 安装后必然断裂，请改为代码体或包内路径：\n  "
+                + "\n  ".join(outside),
+        )
+
+    def test_link_scan_is_not_vacuous(self):
+        self.assertGreaterEqual(len(list(self._links())), 200, "链接扫描数量骤降，正则或目录结构可能变了")

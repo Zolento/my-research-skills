@@ -4,8 +4,9 @@
 逐字字段、每个 R 阶段的读写时机、引用完整性 V1—V24 都写在这里。各 phase 文件只引用本文件，
 **不得**各自再定义一遍枚举——各写一遍就是新的漂移源。
 
-**权威顺序：** 仓库级 spec [r-architecture-wave1-spec.md](../../docs/r-architecture-wave1-spec.md)
-（唯一接口契约，不进安装副本）> 本文件（state 类）> [claim-first-policy.md](claim-first-policy.md)
+**权威顺序：** 仓库级 spec `docs/r-architecture-wave1-spec.md`
+（唯一接口契约；**不随本 skill 安装**，故此处**刻意不作链接**——
+指向包外的链接在安装态必然断）> 本文件（state 类）> [claim-first-policy.md](claim-first-policy.md)
 （claim 类）> [evidence-policy.md](evidence-policy.md)（措辞类）>
 [scoring-policy.md](scoring-policy.md)（评分类）> 各 phase 文件。
 本文件与 spec 冲突时**以 spec 为准**，**不得**自行解释或放宽。
