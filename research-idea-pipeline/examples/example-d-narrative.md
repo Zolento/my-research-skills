@@ -466,4 +466,4 @@ N2 的 claim 更强，且已过门禁。按 claim-first 总纲，它是最强可
   - Next recommended actions：补 E9、E11、E12，并检验 E10 的假设归因。按最佳叙事重写提案（回 R8）。
   - Critical uncertainties：作者目标 anchor `理论` 与 `eligible` 集合冲突（需锚点变更单 + 用户授权）。
     `S-Lit` 判「部分重叠」（delta 需在相关工作显式划界）。`N2` 的 `Soundness margin` 偏低。
-- `next_phase_suggestion: "R8 | R7 / R10 / R13"`：按最佳叙事重写提案，或直接送审。
+- `next_action_recommendation: "R8 | R7 / R10 / R13"`：按最佳叙事重写提案，或直接送审。

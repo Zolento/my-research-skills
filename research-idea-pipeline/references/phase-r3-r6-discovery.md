@@ -35,9 +35,34 @@
 **若关键词缺失或过泛**（如「深度学习」），先反问收敛，不要直接开跑。
 
 > **锚定点（核心目标）必须先确认**（见 [../SKILL.md](../SKILL.md) §0.1）。
-> 本阶段受锚点约束：**理论**锚点优先「假设挑战」类推导，**性能**锚点优先「问题重构 /
-> 组合创新」；**population 只收服务主锚点的 idea**，与锚点无关的候选即使新颖也降级。
+> **推导侧重：** **理论**锚点优先「假设挑战」类推导，**性能**锚点优先「问题重构 / 组合创新」。
+>
+> **锚点关系分三类，不得只留一类**（HIGH design debt 的落点）：
+>
+> | 关系 | 含义 | 能否进 population / QD archive |
+> |---|---|---|
+> | `serving` | 直接服务主锚点 | ✅ |
+> | `challenging` | 若成立，会**迫使重新审视锚点**（`P1` `reframe` / `P2` `assumption_breaker` / `P6` `counterexample` 最常产出这类） | ✅ **必须允许** |
+> | `orthogonal` | 与当前主目标无关 | ❌ 不进档案；可另开路线（见 [../SKILL.md](../SKILL.md) §0.2 变更单） |
+>
+> **为什么必须收 `challenging`：** R0 的锚点是 **provisional** —— 它本来就是等 discovery
+> 来挑战的。若候选一开始就必须服务锚点才能进入真正的 QD 竞争，系统就退化成
+> 「**搜索一些让人意外的方式去满足我们已经选好的答案**」，而不是
+> 「**搜索这个问题的更好表示**」。那会把 Paradigm Escape 的嘴堵住。
+>
+> **`challenging` 候选的路径：** 在 R3 / R4 与 `serving` **同权**进入 archive；
+> 到 Selection（R8 / R12）若其证据变强，**触发锚点重审**（§0.2 变更单，由用户裁决）；
+> 未变强的仍留在 population，**不退场**。
+>
+> **`orthogonal` 不是作废：** 它不参与主锚点成功判据、不进投稿主线，但**可以**保留为
+> 独立方向（见 [../SKILL.md](../SKILL.md) §0.1 规则 3 的公开降级）。
+>
 > 锚点与候选明显不匹配时，**在同一份输出里显式指出冲突**。
+>
+> ⚠️ **已知缺口：** 锚点关系目前**只写在文档里**，`hypotheses[]` **没有**对应字段，
+> 因此「QD archive 是否真的收了 `challenging` 候选」**没有机械闸门**。
+> 加字段等于给八类科学对象加属性，留待 dogfood 观察一次再定
+> （见 `scripts/test_state_check.py` 的 skipTest）。
 >
 > **派遣方式：** 环境有 Team 能力时**必须先询问用户**是否使用 Team；用户显式要求但
 > 环境不具备时须**显式回退**并告知（见 [../SKILL.md](../SKILL.md) §3.1）。
@@ -473,10 +498,26 @@ R6: Recombine            才允许不同世界互相借东西
 
 **每次进化 `generation + 1`**；到 **2 轮**仍未收敛 → 落 `uncertainties[]` 并交 R7，**不得无限进化**。
 
-### R6.2 保多样性：`island` 与 `niche` 都不许塌
+### R6.2 保多样性：**live niche** 不许塌；`island` **允许全灭**
 
-- 进化不得让某个 island 的候选全被 `killed`（全灭说明该轨的提问方式有问题，应作为
-  `uncertainties[]` 记下来，而不是静默消失）。
+**`island` 允许全灭。** 若某个 island 本轮的候选全部被淘汰，正确结论可能就是
+「本轮 `P5` 没产生 viable candidate」—— **没有理由强行保留一个**。
+
+- **不得**因为「该 island 需要有人」而保活候选。这与 niche 的处理一致：
+  科学证据可以把一轨清空。
+- **全灭是 operator outcome，不是科学未知。** 「某搜索算子本轮表现不好」描述的是
+  **系统自己的行为**，而 `research-state.json` 只描述**世界**。
+  因此全灭**写 telemetry**：`scheduler.json` 的 `operator_stats.by_operator[<算子>]`
+  （`viable == 0` 且 `killed > 0` ⇒ `dormant: true`）与 `recurring_failure_patterns`，
+  **不进 `uncertainties[]`**（见 [scheduler-policy.md](scheduler-policy.md) §4.1）。
+- **只有全灭暴露出一个独立的科学未知时，才新增 `U<n>`。** 例：淘汰过程发现
+  「我们不知道这一结构是否满足 identifiability 条件」—— 那是科学未知，
+  与「该算子本轮不灵」是两件事。
+- **需要继续覆盖该搜索方向时**，由 **scheduler** 决定 reseed
+  （`next_action_policy` 的 `paradigm_escape_if_stagnant`），**不靠强行留候选**。
+
+**`live niche` 仍然不许塌：**
+
 - 进化不得让某个 **live** niche 失去 elite（V15 会在下一轮校验时报出来）。
   候选全部 `killed` / `archived` 的 niche **合法为空**，V15 不再要求它。
 
@@ -488,8 +529,11 @@ R6: Recombine            才允许不同世界互相借东西
 | **Selection（进 R7 之后）** | novelty / validity / importance / testability / `EIG ÷ cost` | — |
 
 > **在搜索期优化 venue fit，正是杀死范式 idea 的机制。** R3—R6 的任何排序、
-> 任何「优先做哪个」的表述里**都不许出现会议适配**（**消歧：** 会议审稿人角色在 R3—R6 仍可用于 concept 级快筛，但**不得**用「会议适配度」
-排序候选；`venue-standards` 作为**排序依据**只在 R12/R13 生效）。
+> 任何「优先做哪个」的表述里**都不许出现会议适配**。
+>
+> **R3—R6 的 concept 级快筛只调攻击面角色**（`R-Novelty` / `R-Causal`，必要时 `R-Theory`，
+> 见 §R3.7）—— **会议 persona 在 R3—R6 不派遣，也不参与候选判断**。
+> `venue calibration` **只存在于 R12 / R13**（见 [roles.md](roles.md) §1）。
 
 **`expected_information_gain` 在 Search 期只作为记录**，不作为排序依据 —— 它属于 Selection 阶段。
 

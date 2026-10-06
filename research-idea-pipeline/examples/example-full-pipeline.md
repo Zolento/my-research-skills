@@ -41,7 +41,7 @@
 
 **落盘：** `routes/A/docs/A002-discovery.md` + 更新 `routes/A/INDEX.md`
 
-→ `next_phase_suggestion: "R8"`
+→ `next_action_recommendation: "R8"`
 
 ---
 
@@ -71,7 +71,7 @@
 **落盘：** `routes/A/docs/A003-proposal.md` + 更新 INDEX 与 STATUS
 （**实验计划文档由 `R9—R11` 落盘**，不属于 `R8`）
 
-→ `next_phase_suggestion: "R12"`
+→ `next_action_recommendation: "R12"`
 
 ---
 
@@ -145,7 +145,7 @@
 → Most important negative findings。缺失证据与 anchor 冲突 → Critical uncertainties
 与 Next recommended actions）。
 
-→ `next_phase_suggestion: "R8 | R7 / R10 / R13"`
+→ `next_action_recommendation: "R8 | R7 / R10 / R13"`
 
 ---
 

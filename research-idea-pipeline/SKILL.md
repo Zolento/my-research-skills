@@ -222,7 +222,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | R 阶段 | 锚点的作用 |
 |---|---|
 | **R2 / R5** | **检索边界：** 理论锚点必须查定理 / 反例 / 不可能性与负结果；性能锚点必须查 SOTA 与评测协议 |
-| **R3—R6** | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；QD archive 的 elite 集合 只收服务主锚点的 idea |
+| **R3—R6** | **推导与筛选：** 理论锚点优先「假设挑战」，性能锚点优先「问题重构 / 组合创新」；QD archive **收 `serving` 与 `challenging` 两类候选**（`orthogonal` 不进档案，见 §0.1 规则 3）。**不得**只收服务锚点的候选 —— 那会把 Paradigm Escape 的嘴堵住 |
 | **R8** | **贡献类型与契约：** 理论锚点下证据契约必须含证明 / 反例 / 边界条件；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
 | **R12** | **叙事资格（先于选 preset）：** 先做 **Anchor Eligibility Test**（[claim-first-policy.md](references/claim-first-policy.md) §6）——只有 `eligible` / `conditional` 的锚点才可用于组织叙事；与作者**目标锚点**冲突时**必须显式告知**。通过后再按 [narrative-patterns.md](references/narrative-patterns.md) §2 选 preset |
 | **R7 / R10 / R13** | **评审权重：** 理论锚点首查证明正确性；性能锚点首查公平比较、指标口径与统计方案 |
@@ -724,8 +724,8 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **R12 / R13 的 venue calibration** 中以校准表出现 |
 | **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
 
-**职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；B5 的审核是
-**概念级快筛**，不要与 R7 / R10 / R13 的方案级深审重复。详见
+**职责边界：** 不派遣 S-Repro 到 R3—R6（idea 阶段无代码可复现）；**§R3.7 的审核是
+概念级快筛**，不要与 R7 / R10 / R13 的方案级深审重复。详见
 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3—R6.0 与
 [phase-r7-r10-r13-assurance-repair-review.md](references/phase-r7-r10-r13-assurance-repair-review.md) §R7.0。
 
@@ -815,7 +815,8 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   search heuristics，**不得硬排序**；否则 `P4`/`P5` 会因「跨域 / 理论」标签天然拿高 reward。
   质量压力从 R6 起才逐步引入。
 - **落盘：** `routes/<R>/docs/<R>NNN-discovery.md`，并更新该路线 `INDEX.md`
-  （被放弃的候选记入**已证伪**；未核实的无人区声称记 Warnings）。
+  （被放弃的候选 → **Most important negative findings**，**不是**「已证伪」——
+  被放弃是**搜索决策**，不是对世界的判决；未核实的无人区声称记 Warnings）。
 
 ### R8 — 证据契约
 
@@ -857,8 +858,11 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
   **缺失证据清单与最小必要实验 / 定理**。
 - **落盘：** `routes/<R>/docs/<R>NNN-narrative.md`，并更新该路线 `INDEX.md`
-  （被覆盖的叙事方向 → **已证伪**；最佳叙事 → **已证实**；门禁 `fail`、或**六维中位 <3
+  （被覆盖的叙事方向 → **Most important negative findings**；最佳叙事 →
+  **Strongest supported findings** 的叙事表述；门禁 `fail`、或**六维中位 <3
   仅作 Warnings 标记**（**不是**综合评分、不进排序、不参与推荐）→ Warnings）。
+  > ⚠️ **叙事被淘汰 ≠ 科学被证伪**，最优叙事被选 ≠ 科学被证实 —— R12 是 state 的
+  > **视图**，不创造科学真理（见 §1.7）。`已证实` / `已证伪` **不得**用来描述修辞方案。
 
 ### R7 / R10 / R13 — 对抗保证 · 元认知修复 · artifact 审计
 
@@ -960,7 +964,10 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - [ ] **已解析 `arxiv.org` / `export.arxiv.org`；若解析到本地 IP，输出了「代理环境提示」段**
       （写明具体 IP 与判定类型），且**没有**据此判定"在线源不可用 / 无人在研究"。
 - [ ] arxiv 结果已写入缓存。
-- [ ] 创新性判定引用了具体顶会标准；贡献标注了类型。
+- [ ] **创新性 / 新颖性判定**依据 prior-work collision + structural novelty +
+      scientific non-triviality（**不是** venue 口味）；贡献标注了类型。
+- [ ] **只有 R12 / R13 的 venue calibration 与投稿评估**引用具体顶会标准；
+      **R3—R6 不得用顶会口味判断候选**（见 §4 R3—R6 的两阶段 fitness）。
 - [ ] **每个方法都标了「方法来源」**（`原创` / `部分原创` / `迁移`）且**可核验**；
       没有把「迁移」包装成「原创」；标为「迁移」的**已证明迁移本身带来新性质**，
       否则其复现风险按"高"处理。
@@ -971,9 +978,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       （**仅 venue calibration 表**）
       （见 [roles.md](references/roles.md) §1.0）；R-MICCAI 不适用时已标 **"不适用"**
       而非硬凑临床相关性。
-- [ ] **R3—R6：每个 idea 都带 B5 审核结论**（创新性/可行性/重叠度/致命反驳/优先级），
-      没有"只给 idea 不给审核"；且未误派 S-Repro；**进入 QD archive 的 elite 集合 的 idea 已达 L2**，
-      含「首次提出」声称的已达 L3 并附负检索记录。
+- [ ] **R3—R6：每个 candidate 都完成 §R3.7 概念级审核**（新颖性判定 / 概念可行性 /
+      重叠度 / 致命反驳），没有「只给 idea 不给审核」；且未误派 S-Repro；
+      **进入 QD archive 的 elite 已达 L2**，含「首次提出」声称的已达 L3 并附负检索记录。
 - [ ] **assurance 五元组齐备**：每个攻击面都给了 `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)`；**`Kill Condition` 可判定**；只有分数没有 Kill Condition 的评审**不合格**。
 - [ ] **Integrity Gate（R13）**：leakage / cherry-picking / metric misuse / post-hoc bias 已逐项过闸；**R7/R8 未要求 artifact 审计**。
 - [ ] **R12：先有证据台账与 claim graph，再有叙事**：`C0—C5` 完整，每个 `Ci` 都有
@@ -1024,7 +1031,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       Milestones、Recent Research Changes）**与 `STATUS.md`**（当前状态，由 state 生成）。
 - [ ] 未达饱和的检索、未缓解的风险已记入 `STATUS.md` 的 Critical uncertainties；
       跨路线层面已同步到根 `INDEX.md` 的全局 Warnings。
-- [ ] 已附 `state.json` 片段与 `next_phase_suggestion`。
+- [ ] 已附 `state.json` 片段与 **`next_action_recommendation`**（**不是** `next_phase_suggestion`
+      —— `R0`—`R14` 是**能力**不是固定流水线；下一步由
+      [scheduler-policy.md](references/scheduler-policy.md) 的 `next_action_policy` 决定）。
 
 ---
 

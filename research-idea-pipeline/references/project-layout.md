@@ -126,6 +126,10 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
     └── runtime/{locks,tmp,tool-output}/
 ```
 
+> **`meta/operator-stats.json` 是只读汇总** —— 权威来源是各路线 `scheduler.json` 的
+> `operator_stats`（见 [scheduler-policy.md](scheduler-policy.md) §4.1）。
+> 它同样**不入 state**，只记录「系统自己哪种算子有效」。
+>
 > **`populations/` 收两类 search artifact（都不是 `state` object）：**
 > `populations/archive/` 存 QD archive 重排记录；
 > `populations/intermediates/` 存 `P3` 的 `abstract_skeleton`（typed intermediate，

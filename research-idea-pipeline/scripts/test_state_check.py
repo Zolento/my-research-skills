@@ -1384,6 +1384,15 @@ class TestDeprecatedTermScan(unittest.TestCase):
     FENCE = re.compile(r"```.*?```", re.S)
     # 清单自己含被禁词；dev-only 的 docs/ 不随包发布
     EXEMPT = ("references/deprecated-terms.txt",)
+    # 逐个判断的**语境例外**：某个退役词在「不要用它」这类说明里有合法用途。
+    # 例外必须显式登记在这里，不能靠放宽正则。
+    CONTEXT_ALLOW = {
+        "next_phase_suggestion": ("不是",),
+    }
+
+    @staticmethod
+    def _plain(line: str) -> str:
+        return re.sub(r"^\s*>\s*", "", line).replace("**", "").replace("`", "")
 
     def _patterns(self):
         raw = (self.ROOT / "references" / "deprecated-terms.txt").read_text(encoding="utf-8")
@@ -1402,11 +1411,186 @@ class TestDeprecatedTermScan(unittest.TestCase):
                 continue
             text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
             for lineno, line in enumerate(text.splitlines(), 1):
+                plain = self._plain(line)
                 for raw, pattern in patterns:
-                    if pattern.search(line):
-                        offenders.append(f"{rel}:{lineno}: [{raw}]")
-                        break
+                    if not pattern.search(line):
+                        continue
+                    if any(ok in plain for ok in self.CONTEXT_ALLOW.get(raw, ())):
+                        continue
+                    offenders.append(f"{rel}:{lineno}: [{raw}]")
+                    break
         self.assertEqual(offenders, [], "已退役措辞出现在正文：\n  " + "\n  ".join(offenders))
+
+
+class TestResidualSemanticVocabulary(unittest.TestCase):
+    """**词表 ≠ 语义。** 逐处判断「这个词还在不在表达旧语义」。
+
+    起因（用户第三轮复核）：`deprecated-terms.txt` 只是我列进去的旧词，
+    而旧语义**不一定表现成旧标题**：
+    - `B5` 是显式旧编号 → 词表能抓；
+    - 「会议 persona 在 R3 快筛」没有旧编号，但行为是旧的；
+    - `next_phase_suggestion` 没写 A—E，但心智模型还是线性 pipeline；
+    - narrative 的「已证实 / 已证伪」没有 deprecated term，却违反 epistemic boundary。
+
+    因此本类做**上下文判定**，不做事后补词。每处允许的语境都显式列在这里。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    # 允许语境（逐个判断的结果，不是宽容）
+    B5_ALLOWED = ("Bootstrap", "Initial Uncertainty Map", "Recommend Next Action",
+                  "B1—B5", "slug 枚举")
+    EPISTEMIC_ALLOWED = ("不再承载", "不含", "禁止出现", "不得用来", "不是",
+                        "已证实 / 已证伪 / TODO")  # 最后一项是 INDEX 的禁用词清单
+    NPS_ALLOWED = ("不是",)                      # 只允许出现在「不要用它」的说明里
+
+    def _docs(self):
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            yield rel, path.read_text(encoding="utf-8")
+
+    def _lines(self):
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                yield rel, lineno, line
+
+    @staticmethod
+    def _plain(line):
+        """去掉 blockquote 前缀与强调符 —— 否则 allowlist 会被 `> ` 与 `**` 挡住。"""
+        return re.sub(r"^\s*>\s*", "", line).replace("**", "").replace("`", "")
+
+    def test_mode_word_is_gone(self) -> None:
+        offenders = [f"{rel}:{lineno}: {line.strip()[:70]}"
+                     for rel, lineno, line in self._lines()
+                     if re.search(r"\bMode\b", line)]
+        self.assertEqual(offenders, [], "旧 Mode 术语仍在（应为 R 阶段 / 本阶段）：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_b5_only_in_bootstrap_or_drift_registry(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if not re.search(r"\bB5\b", line):
+                continue
+            if any(ok in self._plain(line) for ok in self.B5_ALLOWED):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "B5 出现在非 Bootstrap / 非漂移类别的语境：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_next_phase_suggestion_is_gone(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if "next_phase_suggestion" not in line:
+                continue
+            if any(ok in line for ok in self.NPS_ALLOWED):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [],
+                         "`next_phase_suggestion` 仍在用（应为 `next_action_recommendation`）：\n  "
+                         + "\n  ".join(offenders))
+
+    def test_epistemic_words_are_not_applied_to_narratives(self) -> None:
+        for rel, lineno, line in self._lines():
+            for word in ("已证实", "已证伪"):
+                if word not in line:
+                    continue
+                if any(ok in self._plain(line) for ok in self.EPISTEMIC_ALLOWED):
+                    continue
+                self.fail(f"{rel}:{lineno} 用 epistemic 词描述修辞方案：{line.strip()[:80]}")
+
+    def test_venue_persona_never_joins_discovery(self) -> None:
+        offenders = []
+        for rel, lineno, line in self._lines():
+            if "会议审稿人" not in line:
+                continue
+            # R3—R6 出现，且不是否定句 → 说明会议 persona 又被放回 Discovery
+            if "R3—R6" not in line:
+                continue
+            if any(ok in line for ok in ("不派遣", "不参与", "不得", "不是", "只用于",
+                                         "只在", "不再", "仅 venue", "仅用于")):
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "会议 persona 被放回 R3—R6：\n  " + "\n  ".join(offenders))
+
+
+class TestSemanticInvariants(unittest.TestCase):
+    """行为层的语义不变量。**机器一致性 + 字面执行不能互相替代。**
+
+    本类只查「文档是否还在教旧行为」—— 它不查测试是否通过，
+    因为测试通过不代表执行规范已经改对（V15 就是反例）。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _read(self, rel):
+        return (self.ROOT / rel).read_text(encoding="utf-8")
+
+    def test_anchor_tri_state_exists(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        for token in ("`serving`", "`challenging`", "`orthogonal`"):
+            self.assertIn(token, text, f"锚点关系三分类缺 {token}")
+        self.assertIn("**必须允许**", text, "challenging 候选必须被明确允许")
+
+    def test_only_orthogonal_is_excluded_from_the_archive(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        section = text[text.index("锚点关系分三类"):]
+        section = section[:section.index("**为什么必须收")]
+        rows = [re.sub(r"^\s*>\s*", "", line)
+                for line in section.splitlines()
+                if re.sub(r"^\s*>\s*", "", line).startswith("| `")]
+        self.assertEqual(len(rows), 3, msg=f"锚点表应恰好 3 行，实际 {len(rows)}")
+        excluded = [row for row in rows if "❌" in row]
+        self.assertEqual(len(excluded), 1, "只允许一类不进档案")
+        self.assertIn("`orthogonal`", excluded[0])
+
+    def test_island_extinction_goes_to_telemetry_not_uncertainties(self) -> None:
+        text = self._read("references/phase-r3-r6-discovery.md")
+        section = text[text.index("### R6.2"):text.index("### R6.3")]
+        self.assertIn("island` **允许全灭**", section)
+        self.assertIn("不进 `uncertainties[]`", section)
+        self.assertIn("operator_stats", section)
+        # 旧行为（强制保活 + 把 system behavior 记成科学未知）不得回来
+        self.assertNotIn("进化不得让某个 island 的候选全被", section)
+
+    def test_operator_stats_has_a_documented_shape(self) -> None:
+        # carrier 有模板但没有 spec 就是 A4 类缺陷（有槽位、无规则）
+        text = self._read("references/scheduler-policy.md")
+        self.assertIn("### 4.1 `operator_stats`", text)
+        for field in ("generations", "viable", "killed", "dormant",
+                      "recurring_failure_patterns"):
+            self.assertIn(field, text, f"§4.1 未登记 operator_stats 字段 {field}")
+
+    def test_operator_stats_template_matches_the_policy(self) -> None:
+        """carrier 与 spec 必须同形 —— 有槽位无规则（或反过来）都是 A4 类缺陷。"""
+        tmpl = json.loads((self.ROOT / "templates" / "scheduler.template.json")
+                          .read_text(encoding="utf-8"))
+        self.assertEqual(set(tmpl["operator_stats"]),
+                         {"note", "by_operator", "recurring_failure_patterns"})
+        section = self._read("references/scheduler-policy.md")
+        section = section[section.index("### 4.1"):section.index("## 5. 运行时机")]
+        self.assertEqual({m.group(1) for m in re.finditer(r"`by_operator\[<算子>\]\.(\w+)`", section)},
+                         {"generations", "viable", "killed", "dormant"})
+
+    def test_r12_maps_narrative_outcomes_to_status_sections(self) -> None:
+        text = self._read("SKILL.md")
+        section = text[text.index("### R12 — 叙事"):text.index("### R7 / R10 / R13")]
+        self.assertIn("Most important negative findings", section)
+        self.assertIn("Strongest supported findings", section)
+
+    def test_global_checklist_scopes_venue_standards_to_r12_r13(self) -> None:
+        text = self._read("SKILL.md")
+        self.assertIn("只有 R12 / R13 的 venue calibration 与投稿评估**引用具体顶会标准", text)
+
+    def test_challenging_candidate_admission_has_no_mechanical_gate(self) -> None:
+        """已知缺口：锚点关系只写在文档里，`hypotheses[]` 没有对应字段。
+
+        「QD archive 是否真的收了 `challenging` 候选」因此**没有机械闸门**。
+        加字段等于给八类科学对象加属性 —— 按用户意见留待 dogfood 观察一次再定。
+        """
+        self.skipTest("已知缺口：锚点关系（serving/challenging/orthogonal）无 state 字段，"
+                      "QD archive 是否真的收了 challenging 候选无机械闸门")
 
 
 class TestShippedHintsStayInPackage(unittest.TestCase):

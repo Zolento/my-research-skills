@@ -9,7 +9,7 @@
 >    一个 idea 可以同时满足多个 preset；preset 编号高低不代表工作强弱。
 >    真正的科学分类是 `(O, T, R)` 三轴（见 [claim-first-policy.md](claim-first-policy.md) §5）。
 > 2. 下文与 [phase-r12-narrative.md](phase-r12-narrative.md) 中的 **「A 领域 / B 领域」是领域
->    占位符**（A = 要解决问题的目标领域，B = 提供理论工具的来源领域），**与 Mode 字母
+>    占位符**（A = 要解决问题的目标领域，B = 提供理论工具的来源领域），**与已退役的阶段字母
 >    A/B/C/D/E 无关**。
 
 **本文件服务的总纲（claim-first）：**

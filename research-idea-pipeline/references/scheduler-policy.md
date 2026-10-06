@@ -86,6 +86,44 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 
 ---
 
+### 4.1 `operator_stats`（system-level Meta-Memory）
+
+**它记录「系统自己哪种算子有效」，不是领域的科学知识。** 因此它**出 state**，落
+`scheduler.json`；**不得**被 `evidence[].source_ref` 引用，也**不得**进叙事。
+
+```json
+{
+  "operator_stats": {
+    "by_operator": {
+      "P5": {"generations": 3, "viable": 0, "killed": 3, "dormant": true}
+    },
+    "recurring_failure_patterns": ["theory_lens 只产出 theory relabeling"]
+  }
+}
+```
+
+| 字段 | 取值 | 说明 |
+|---|---|---|
+| `by_operator[<算子>].generations` | 非负整数 | 该算子参与过的代数 |
+| `by_operator[<算子>].viable` | 非负整数 | 产出且**未被淘汰**的候选数 |
+| `by_operator[<算子>].killed` | 非负整数 | 产出后**被淘汰**的候选数 |
+| `by_operator[<算子>].dormant` | `true` / `false` | **全灭**（`viable == 0` 且 `killed > 0`）时为 `true` |
+| `recurring_failure_patterns` | 字符串数组 | 反复出现的失败模式，供 R6 / scheduler 复用 |
+
+**硬规则：**
+
+1. **island / operator 全灭写在这里，不写 `uncertainties[]`。**
+   「某算子本轮表现不好」描述的是**系统行为**；`research-state.json` 只描述**世界**。
+   **只有全灭暴露出一个独立的科学未知时**，才另立 `U<n>`。
+2. **`dormant` 不等于淘汰。** 保留 exploration floor —— **不得**因成功率低就永久停用某算子。
+   `dormant` 只表示「本轮没产出」；是否 reseed 由 `next_action_policy` 的
+   `paradigm_escape_if_stagnant` 决定。
+3. **项目级汇总：** `.research-idea-pipeline/meta/operator-stats.json` 是各路线
+   `scheduler.json` 的 `operator_stats` 的**只读汇总**（跨路线看哪种算子整体有效）。
+   它同样**不入 state**。
+
+---
+
 ## 5. 运行时机
 
 | 时点 | 做什么 |

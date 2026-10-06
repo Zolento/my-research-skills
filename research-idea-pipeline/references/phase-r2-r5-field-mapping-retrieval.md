@@ -136,7 +136,7 @@
 
 ---
 
-## A5. 被其他 Mode 调用的接口
+## A5. 被其他阶段调用的接口
 
 | 调用方 | 传递内容 | 期望返回 |
 |---|---|---|
@@ -150,7 +150,7 @@
 或需要支撑**「首次提出」类声称**，必须按 **L3 穷尽级**执行；**R3—R6 的 population
 门槛为 L2**（仅「首次提出」声称要求 L3，见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.7.1）；
 **R8 只引用该结论，不重做检索**（R7 已派 `S-Lit`）；
-**B5 只达 L2 时不得把该结论升级为 L3 级证据**，见
+**§R3.7 快筛只达 L2 时不得把该结论升级为 L3 级证据**，见
 [phase-r8-evidence-contract.md](phase-r8-evidence-contract.md) §R8.3）。
 
 ---
@@ -203,7 +203,7 @@
   "cache_updates": ["docs/refs/cache/arxiv/ab12cd34ef56.json (12 条)"],
   "called_by": "standalone | B | C | D | E",
   "open_questions": ["arxiv 未命中的会议论文需人工补充"],
-  "next_phase_suggestion": null
+  "next_action_recommendation": null
 }
 ```
 

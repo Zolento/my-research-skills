@@ -1,11 +1,11 @@
 # R12 — 叙事（narrative）：Research State 的视图
 
-**本 Mode 的哲学：** **找到「在现有证据下最强但不过度」的科学主张，然后找到最短的故事
+**本阶段的哲学：** **找到「在现有证据下最强但不过度」的科学主张，然后找到最短的故事
 使审稿人正确理解该主张。**
 
 **定位一句话：claim-first, evidence-constrained, narrative-last** —— 先立证据，
 再立 claim，再算 claim 强度与可用锚点，**最后**才谈怎么讲。叙事是最后一层，
-不是第一层。旧的「找到最有说服力的故事」不再作为本 Mode 的目标。
+不是第一层。旧的「找到最有说服力的故事」不再作为本阶段的目标。
 
 **核心公式：**
 
@@ -24,7 +24,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 > 不是科学分类、不互斥、不是创新等级（见
 > [narrative-patterns.md](narrative-patterns.md) §1）；
 > ② 下文与 [narrative-patterns.md](narrative-patterns.md) 中的
-> **「A 领域 / B 领域」是领域占位符**，与 Mode 字母 A/B/C/D/E 无关。
+> **「A 领域 / B 领域」是领域占位符**，与已退役的 A/B/C/D/E 阶段字母无关。
 
 ---
 
@@ -34,7 +34,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 ## 定位与边界
 
 **角色：** 你是横跨多领域的**资深论文作者**，熟悉 CVPR / ICML / NeurIPS / MICCAI 的
-评审逻辑。本 Mode 由该角色主导 claim 与叙事生成，再由 §D5 的**攻击面审稿人**独立审查。
+评审逻辑。本阶段由该角色主导 claim 与叙事生成，再由 §D5 的**攻击面审稿人**独立审查。
 
 | 维度 | R3—R6（idea） | R8（方案） | **R12（叙事）** | R7 / R10 / R13（方案审查） |
 |---|---|---|---|---|
@@ -49,7 +49,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 D3 Anchor Eligibility → D4 Narrative Realization → D5 Adversarial Review →
 D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 **证据在 claim 之前，claim 在叙事之前** —— 任何一步不得跳序。
-本 Mode 的 claim 层枚举与判据**以 [claim-first-policy.md](claim-first-policy.md) §1—§6 为
+本阶段的 claim 层枚举与判据**以 [claim-first-policy.md](claim-first-policy.md) §1—§6 为
 唯一权威**（本文件只复述执行所需的枚举值，不构成新定义；冲突时以该文件为准）；
 评分与门禁机制以 [scoring-policy.md](scoring-policy.md) §3 / §4 为准。
 
@@ -139,7 +139,7 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 - 无证据的条目留 `[待补]`，**不得**用「预计」「预期会」补空。
 - 措辞等级按 [evidence-policy.md](evidence-policy.md) §3 的
   「认知状态 ↔ 措辞等级映射」执行：`Hypothesized` / `Unknown` → **待核实**。
-  本 Mode **不另立**措辞表。
+  本阶段 **不另立**措辞表。
 
 ---
 
@@ -305,7 +305,7 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 - **必须是不同的 claim hierarchy：** 每套的 `C0` 不同，或支撑 `C0` 的 `C4`（新知识 `K`）
   不同，或 claim 的**范围**不同。**同一 claim 换四种措辞不算一套候选。**
 - 每套必须写满六槽位，`S5` 必须给出 `Ci ← Ej` 对照 —— 否则该套不得进入 D5。
-- **篇幅下限见 [roles.md](roles.md) §7**（D4 每套详写候选 ≥300 字）。本 Mode 不另立数字。
+- **篇幅下限见 [roles.md](roles.md) §7**（D4 每套详写候选 ≥300 字）。本阶段不另立数字。
 - **跨域类不强制写满四套**，但**必须做一次 anti-application stress test**
   （§D4.3）。
 - **[../SKILL.md](../SKILL.md) §0.1 规则 3 不变：** `orthogonal` 路线仍不得进 R12。
@@ -562,7 +562,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - **按 contribution type 校准，不按 venue 选 preset。** 会议只影响「这份 claim 是否
   落在该会议范围内」，**不影响** D4 已经确定的 claim hierarchy。
 - **`clinical significance ≠ methodological innovation`**，两者**不得互相冒充**。
-- **本 Mode 不派遣会议审稿人。** `R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`
+- **本阶段不派遣会议审稿人。** `R-CVPR` / `R-ICML` / `R-NeurIPS` / `R-MICCAI`
   四个角色留给 R3—R6 / R8 / R7 / R10 / R13（见 [roles.md](roles.md) §4.2）；
   D6 只在**校准**意义上使用会议标准。**派遣名单仍以 §D5 的六个攻击面审稿人为准。**
 - 校准结论与 `G5 Venue scope` 联动：贡献对象与 venue 明显不匹配 → `G5` 记 `fail`。
@@ -624,7 +624,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 **硬约束：**
 
 - **六维全部同向（高 = 好）。R12 没有反向维度，因此不使用极性归一化。**
-  极性归一化仅适用于仍含反向维度的 Mode（当前为 R7 / R10 / R13），
+  极性归一化仅适用于仍含反向维度的阶段（当前为 R7 / R10 / R13），
   见 [scoring-policy.md](scoring-policy.md) §2 的适用范围限定。
 - **不做跨审稿人逐维中位数，不折算单一综合评分。** 六个审稿人不是独立样本
   （`corr ≫ 0`），聚合出的中位数或总分是伪精确。
@@ -690,7 +690,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - 所有「首次提出」声称**必须先标注「待核实」**；保留的前提是三件事齐备：
   ① 已完成 **L3 穷尽检索**（§D5.3 / [literature-policy.md](literature-policy.md) §3.1）、
   ② 经 `S-Lit` 核实、③ 附**负检索记录**。缺一只能写「据本次检索未见」。
-  **措辞等级统一见 [evidence-policy.md](evidence-policy.md)**（本 Mode 不另立措辞表）。
+  **措辞等级统一见 [evidence-policy.md](evidence-policy.md)**（本阶段不另立措辞表）。
 - 叙事必须回答**「为什么之前没人做」**。
 - **禁止**「显著提升」「有效解决」「泛化性不足」等无信息量表述
   （见 [narrative-patterns.md](narrative-patterns.md) §5）。
