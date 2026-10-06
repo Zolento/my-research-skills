@@ -1,0 +1,42 @@
+{
+  "_schema": "research-idea-pipeline/scheduler@1",
+  "_usage": "Scientific Meta-Controller 的 telemetry 骨架。它**不是** Research State 的一部分：不进 research-state.json，不是第九类一等对象，且其任何统计都不得被 evidence[].source_ref 引用或进入叙事。落盘路径 .research-idea-pipeline/<route>/scheduler.json。R0—R14 是能力而不是 workflow：下一步做什么由 next_action_policy 的八级优先级加 EIG÷cost 决定。高优先级未清零时不得推进低优先级项；叙事与 venue 校准固定在优先级 8。规则见 references/scheduler-policy.md，字段逐字定义见该文件 §3/§4。",
+  "state_version": 0,
+  "next_action_policy": {
+    "priority": [
+      "integrity_violation",
+      "unresolved_critical_attack",
+      "invalidated_dependency",
+      "high_information_gain_test",
+      "paradigm_escape_if_stagnant",
+      "literature_collision",
+      "local_optimization",
+      "narrative_or_venue_work"
+    ]
+  },
+  "next_actions": [
+    {
+      "action": "X1",
+      "type": "discriminating_experiment",
+      "target": "U1",
+      "eig": "high",
+      "cost": "low"
+    },
+    {
+      "action": "P4",
+      "type": "remote_analogy",
+      "target": "AS1",
+      "eig": "unknown",
+      "cost": "low"
+    }
+  ],
+  "eig_calibration": {
+    "note": "每个 done 实验必须回填 predicted_information_gain 与 actual_information_gain，用于长期校准 EIG 估计；未校准前 eig 只是主观估计，不得当作事实。",
+    "records": []
+  },
+  "operator_stats": {
+    "note": "system-level Meta-Memory：记录**系统自己**哪种算子有效（不是领域的科学知识）。保留 exploration floor —— 不得因成功率低而直接淘汰某个 operator。",
+    "by_operator": {},
+    "recurring_failure_patterns": []
+  }
+}

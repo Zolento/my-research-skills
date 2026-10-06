@@ -114,6 +114,40 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    claim-first 的编号（`C0—C5`、`E<n>`），**不得**改——改了上一轮冻结的 `Ci ← Ej` 语法与
    全部示例一起作废。
 
+### 2.5 验证可信度层级用 `T0`—`T5`，**不能用 `V0`—`V5`**
+
+**结论：证据与保证的「来源强度」字段 `verification_tier` 取 `T0`—`T5`。**
+
+**为什么不是 `V0`—`V5`：** `V1`—`V21` 已经是**引用完整性规则号**。若层级也用 `V`，
+则 `V2` 在同一份文档里既指「规则 2」又指「统计证据级」。这与 §2.1 拒绝 `L<n>` 是
+**同一条纪律**：一个前缀不能有两个含义。
+
+| 层级 | 含义 | 谁产出 |
+|---|---|---|
+| `T0` | speculative / model-only（**LLM 自评的上限**） | 任何 reviewer / 子代理 |
+| `T1` | literature-grounded | `S-Lit` + `literature[]` |
+| `T2` | computational / statistical evidence | 实验（含统计检验） |
+| `T3` | deterministic / artifact-verifiable | 可执行 artifact / unit test / 定理检查器 |
+| `T4` | independent replication / external validation | 外部复现 / 跨中心验证 |
+| `T5` | expert / human validated（按需） | 用户 / 领域专家 |
+
+**升级权限表（本节的真正内容：什么等级的 verifier，有权让什么 claim 升级）：**
+
+| 目标迁移 | 最低需要 | 授权方 |
+|---|---|---|
+| `ungrounded` → `partially-supported` | ≥ `T1` | R8 |
+| `partially-supported` → `supported` | ≥ `T2` | R8 |
+| 任一 → `contradicted` | ≥ `T2` | R8 |
+| 任一 → `killed` | ≥ `T2` 或 `T3` | **仅 R10** |
+| `T0` 证据 | **不得触发任何状态迁移** | 只能记 `plausible`，留在 `assurance[]` |
+
+**明令：八攻击面的任何一位（LLM reviewer）tier 上限是 `T0`。** 它的产物可以写进
+`assurance[]`、可以触发 R10 的 `RUN_TEST` / `FIX_IMPLEMENTATION`，但**无权**把任何 claim
+从 `Hypothesized` 升到 `Supported`。这直接切断「agent 自己审自己、然后自己宣布通过」的闭环污染。
+
+**与 V5 的关系：** `epistemic_status` 是**认知状态**，`verification_tier` 是**来源强度**，
+两者**正交**。`T3` 的证据可以因范围问题而 `Unknown`；`Observed` 的证据也可以是 `T0`。
+
 ---
 
 ## 3. 每类对象的必填字段（逐字）
@@ -129,6 +163,49 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 3. **未在本节出现的字段 = 未定义字段**，**不得**自行添加。确实需要新字段时，**必须**先报 Lead
    改 spec，**不得**在本轮自行扩大字段表。
 4. 所有跨对象引用**必须**用 §2 的 ID；空引用**必须**写 `[]`，**不得**写 `null`、`""` 或省略键。
+
+### 3.0 八类一等对象的公共字段（`depends_on` / `validity`）
+
+**结论：`claims` / `evidence` / `assumptions` / `hypotheses` / `experiments` / `literature` /
+`failures` / `uncertainties` 八类对象的**每一条**都**必须**带 `depends_on` 与 `validity`；
+`assurance` / `repairs` 不在此列。**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `depends_on` | id 数组，可为 `[]` | ✅ | 本对象**依赖**谁（方向：下游 → 上游）；跨类引用直接用 §2 的 ID |
+| `validity` | 对象，三键 | ✅ | 本对象现在**能不能被引用** |
+
+**`validity` 三键（逐字）：**
+
+| 键 | 取值 | 说明 |
+|---|---|---|
+| `status` | `valid` \| `stale` \| `invalid` \| `pending` | **V18** |
+| `reason` | 非空字符串 | 为什么是当前状态 |
+| `since_state_version` | 整数 ≥ 0 且 ≤ `state_version` | 状态变为当前值的那个版本；**V18** |
+
+**顶层新增 `state_version`：** 整数 ≥ 0；每次 R11 归并成功 **+1**。
+所有 `validity.since_state_version` 与它比较（V18）。
+
+**失效传播（V19，只查一跳）：** 若 `A.depends_on` 含 `B` 且 `B.validity.status == invalid`，
+则 `A.validity.status` **不得为 `valid`**（`stale` / `invalid` / `pending` 都可以）。
+
+**为什么放在八类对象上而不建一张边表：** 边表会变成**第九类一等对象**，
+违反 Wave 5 spec §0.5 的不扩张承诺。
+
+**与 `claims[].status` 的区别（不得混为一谈）：**
+
+| 轴 | 字段 | 回答 |
+|---|---|---|
+| **可引用性** | `validity.status` | 这个对象**现在能不能被引用** |
+| **支持度** | `claims[].status` | 这个主张**在证据上站不站得住** |
+
+**两条边界（不得扩大解释）：**
+
+1. **V19 不得自动改 `claims[].status`。** claim 状态迁移仍只能经 R8（证据驱动）或 R10（`state_delta`），
+   见 §5 硬规则 4。
+2. **`stale` 不传染** —— 只有 `invalid` 触发 V19。否则一次文献更新会把半个 state 标灰，系统立刻不可用。
+3. **多跳传播是 R11 的责任，不是校验器的。** R11 必须**迭代到不动点**后再跑校验器；
+   `state_check.py` 只查一跳（图算法无法逐条判错）。
 
 ### 3.1 `claims[]` — Claim Graph（`C<n>`）
 
@@ -162,6 +239,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `scope` | 字符串（例 `brain MRI / acceleration=4`） | ✅ | 证据自身的适用范围，不得越界 |
 | `epistemic_status` | `Observed` \| `Supported` \| `Hypothesized` \| `Planned` \| `Unknown` | ✅ | V5；↔ 措辞等级见 [evidence-policy.md](evidence-policy.md) §3 |
 | `source_ref` | 字符串 | ✅ | 具体位置（实验 id / 文献 / 定理 / 数据路径） |
+| `verification_tier` | `T0` \| `T1` \| `T2` \| `T3` \| `T4` \| `T5` | ✅ | 证据的**来源强度**（§2.5）；与 `epistemic_status` **正交**；**V20** |
 
 ### 3.3 `assumptions[]` — Assumption Graph（`AS<n>`）
 
@@ -234,6 +312,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `known_flaws` | `F` id 数组，可为 `[]` | ✅ | V4 的引用点之二 |
 | `next_branches` | `X` id 数组，可为 `[]` | ✅ | |
 | `status` | `planned` \| `running` \| `done` \| `failed` | ✅ | 失败实验**必须**保留（spec §4） |
+| `preregistration` | 对象 或 `null` | 见 V21 | **结果冻结前**写下的「观察 → state delta」映射；R8 冻结、R9 执行、R13 逐条核 |
+| `result_at_state_version` | 整数 ≥ 0 或 `null` | ✅ | 结果写入时的 `state_version`；未产生结果为 `null`；**V21** |
 
 **实验树六段（固定，`stage` 取值，逐字）：**
 
@@ -292,6 +372,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 |---|---|---|---|---|
 | `assurance[]` | `kill_condition` | 字符串，非空 | ✅ | V9；什么结果会杀死该 claim / 假设 |
 | `assurance[]` | `discriminating_test` | 存在的 `X` id 或字面量 `TBD` | ✅ | V9 |
+| `assurance[]` | `verification_tier` | `T0` \| `T1` \| `T2` \| `T3` \| `T4` \| `T5` | ✅ | §2.5；**LLM reviewer 产物的上限是 `T0`** —— 不得据此升级任何 claim 状态 |
 | `repairs[]` | `flaw` | 字符串 | ✅ | V10；发现的缺陷（含 critical flaw） |
 | `repairs[]` | `disposition` | `REPAIR_CLAIM` \| `RUN_TEST` \| `FIX_IMPLEMENTATION` \| `NARROW_SCOPE` \| `KILL_BRANCH` | ✅ | V10；五值封冻 |
 | `repairs[]` | `state_delta` | 字符串 | ✅ | V10；**实际改动了哪些字段**，必须可核对 |
@@ -333,6 +414,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V15 | 每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性） | 硬 | `N5` 下全是 `active` |
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
 | V17 | hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环） | 硬 | `"parents": ["H9"]` 但无 `H9`；`"parents": []` 而 `generation: 1`；`H3.parents: ["H4"]` 且 `H4.parents: ["H3"]` |
+| V18 | 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数 | 硬 | 缺 `validity`；`"status": "ok"`；`"reason": ""`；`since_state_version: 7` 而 `state_version: 3` |
+| V19 | 一跳传播：若 A.depends_on 含 B 且 B.validity.status == invalid，则 A.validity.status 不得为 valid | 硬 | `E3.validity.status: "invalid"`，而 `C2.depends_on: ["E3"]` 且 `C2.validity.status: "valid"` |
+| V20 | claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2） | 硬 | `C0.status: "supported"`，而其支持证据全是 `T0`（LLM 自评）；或证据缺 `verification_tier` |
+| V21 | status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version | 硬 | `X12` 已 `done` 却无 `preregistration`；或 `frozen_at_state_version: 5 > result_at_state_version: 4`；或 `op: "improve"` 越界 |
 
 **执行契约（spec §2.3）：**
 
@@ -406,10 +491,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
 | **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
-| **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` | `phase-r8-evidence-contract.md` |
+| **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） | `phase-r8-evidence-contract.md` |
 | **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
-| **R11** Update World Model | 全 state | 归并去重 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
+| **R11** Update World Model | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
 | **R12** Narrative | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） | `phase-r12-narrative.md` |
 | **R13** | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 | `phase-r7-r10-r13-assurance-repair-review.md` |
 | **R14** Decision | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） | `../SKILL.md` §4「R13 / R14」 |

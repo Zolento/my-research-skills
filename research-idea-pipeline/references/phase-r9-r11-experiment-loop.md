@@ -206,7 +206,7 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 |---|---|---|
 | **R9** |`uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R10** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
-| **R11** | 全 state | 归并去重 + 跑 `state_check.py` |
+| **R11** | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/<route>/research-state.json`，**硬违规须为 0**。

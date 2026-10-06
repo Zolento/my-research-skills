@@ -70,10 +70,10 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
 | **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
-| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` |
+| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R10** | `metacognitive-repair` | **critical flaw ⇒ state 必须改变** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
-| **R11** | `state-update` | result → claim / uncertainty → next experiment | 全 state | 归并去重 + 跑 `state_check.py` |
+| **R11** | `state-update` | result → claim / uncertainty → next experiment | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` |
 | **R12** | `narrative` | **state 的视图**：六槽位 + presets + 六维 | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |
 | **R13** | `artifact-review` | artifact-aware 审查（code / logs / failed runs） | 全 state + artifact | `reviews` / `failures` / `experiments[].unexpected` / `known_flaws`（把新 `F` 挂上）；缺口**必须**交 R10 |
 | **R14** | `decision` | continue / pivot / archive / submit | 全 state + 未闭环 `repairs` | `decision` / `repairs[].closure` / `uncertainties[].status` / `hypotheses[].status`（**不含 `claims[].status`** —— `killed` 只能经 R10） |
@@ -623,6 +623,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V17 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
 | 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V17 每条一个反例 + 退出码行为 |
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
+| **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routeX/INDEX.md` 骨架（文档索引 + **关系图** + 已证实/已证伪/TODO/Bugs/Warnings） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（跨路线索引 + 全局 TODO/Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routeX/README.md` 骨架（本路线做什么、怎么跑、目录组织） |
