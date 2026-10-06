@@ -194,7 +194,7 @@ RULES: Dict[str, str] = {
     "V12": "status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失）",
     "V13": "hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需）",
     "V14": "hypotheses[].generation 是非负整数",
-    "V15": "每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性）",
+    "V15": "每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite",
     "V16": "hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应",
     "V17": "hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）",
     "V18": "每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数",
@@ -202,7 +202,7 @@ RULES: Dict[str, str] = {
     "V20": "claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2）",
     "V21": "status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version",
     "V22": "claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值）",
-    "V23": "reviews[].integrity_gate == \"fail\" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值）",
+    "V23": "reviews[].integrity_gate == \"fail\" 时必须存在以 source_review 关联该 review id 的 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值）",
     "V24": "decision.verdict 存在时必须是 continue / pivot / archive / submit 之一",
 }
 RULE_ORDER: List[str] = list(RULES)
@@ -688,24 +688,32 @@ def _v14(ctx: _Context) -> List[Violation]:
 
 
 def _v15(ctx: _Context) -> List[Violation]:
-    """V15：每个出现过的 niche 至少有一条 elite（QD archive 不塌成单点）。"""
+    """V15：每个 **live** niche 至少有一条 elite（全灭的 niche 合法为空）。"""
     if not ctx.hypotheses:
         return []
+    # 只对 **live niche** 要求 elite：包含 status ∈ {active, elite} 的候选。
+    # 一个 niche 的候选**全部被杀**（killed / archived）时，它合法为空 ——
+    # 否则「证据淘汰了错误解释」反而会让 state 永久非法。
     niches = {}
     for index, hypothesis in ctx.hypotheses:
         niche = hypothesis.get("niche")
         if not (_text_ok(niche) and niche.strip() in NICHES):
             continue
-        entry = niches.setdefault(niche.strip(), {"elite": None, "first": index})
-        if _text_ok(hypothesis.get("status")) and hypothesis["status"].strip() == "elite":
-            if entry["elite"] is None:
-                entry["elite"] = index
+        status = hypothesis.get("status")
+        status = status.strip() if _text_ok(status) else ""
+        entry = niches.setdefault(niche.strip(), {"elite": None, "first": index, "live": False})
+        if status in ("active", "elite"):
+            entry["live"] = True
+        if status == "elite" and entry["elite"] is None:
+            entry["elite"] = index
     out: List[Violation] = []
     for niche, entry in sorted(niches.items()):
+        if not entry["live"]:
+            continue  # 全灭的 niche 合法为空
         if entry["elite"] is None:
             out.append(Violation(
                 "V15", f"hypotheses[{entry['first']}].niche",
-                f"niche {niche} 没有任何 status: elite 的候选（QD archive 要求每 niche 留一个 elite）",
+                f"live niche {niche} 没有任何 status: elite 的候选（QD archive 要求每个 live niche 留一个 elite）",
                 niche, niche,
             ))
     return out
@@ -1308,7 +1316,7 @@ def _v22(ctx: _Context) -> List[Violation]:
 
     校验器只看最终 JSON，看不见"谁写的"。本条用**可机械核对的追溯性**补上：
     凡 status ∈ {killed, contradicted} 的 claim，必须有一条 `repairs[]` 覆盖它
-    （`disposition` ∈ 五值 **且** `state_delta` 里出现该 claim 的 id）。
+    （`disposition` ∈ 五值 **且** 该条 `targets` 含此 claim 的 id）。
     于是「R14 越权写 killed」的 state **无法通过校验**——除非同时伪造一条 repair，
     那已从"静默越权"变成"显式造假"，可审计。
     """
@@ -1343,25 +1351,42 @@ def _v23(ctx: _Context) -> List[Violation]:
               if _text(r.get("integrity_gate")) and r["integrity_gate"].strip() == "fail"]
     if not failed:
         return []
-    has_repair = any(
-        _text(r.get("disposition")) and r["disposition"].strip() in DISPOSITIONS
-        for _, r in ctx.repairs
-    )
-    has_failure = any(
-        _text(f.get("kind")) and f["kind"].strip() in FAILURE_KINDS
-        for _, f in ctx.failures
-    )
-    if has_repair or has_failure:
-        return []
-    return [
-        Violation(
-            "V23", f"reviews[{index}].integrity_gate",
-            "integrity_gate=fail 必须产生 repairs[]（disposition ∈ 五值）或 "
-            "failures[]（kind ∈ 六值）—— 它是 Gate，不是 warning",
-            r.get("integrity_gate"), _subject_of(r, "artifact"),
-        )
-        for index, r in failed
-    ]
+
+    # 关联表：**必须逐 review 对应**。全局 exists() 会让一条无关的旧 repair
+    # 替任何新的 integrity failure「闭环」—— 那就等于 Gate 无效。
+    closed_by: Dict[str, bool] = {}
+    for _, repair in ctx.repairs:
+        if not (_text(repair.get("disposition")) and repair["disposition"].strip() in DISPOSITIONS):
+            continue
+        src = _text(repair.get("source_review"))
+        if src:
+            closed_by[src] = True
+    for _, failure in ctx.failures:
+        if not (_text(failure.get("kind")) and failure["kind"].strip() in FAILURE_KINDS):
+            continue
+        src = _text(failure.get("source_review"))
+        if src:
+            closed_by[src] = True
+
+    out: List[Violation] = []
+    for index, review in failed:
+        rid = _text(review.get("id"))
+        if not rid:
+            out.append(Violation(
+                "V23", f"reviews[{index}].id",
+                "integrity_gate=fail 的 review 必须有 id，否则无法与 repairs/failures 建立关联",
+                review.get("id"), _subject_of(review, "artifact"),
+            ))
+            continue
+        if not closed_by.get(rid):
+            out.append(Violation(
+                "V23", f"reviews[{index}].integrity_gate",
+                f"integrity_gate=fail 必须有一条 source_review == {rid} 的 repairs[]"
+                "（disposition ∈ 五值）或 failures[]（kind ∈ 六值）——"
+                "无关的旧记录不能替它闭环",
+                review.get("integrity_gate"), _subject_of(review, "artifact"),
+            ))
+    return out
 
 
 def _v24(ctx: _Context) -> List[Violation]:
@@ -1740,6 +1765,15 @@ def selftest() -> int:
     v15 = report_with(_no_elite)
     check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
 
+    def _all_killed_niche(d):
+        """V15 回归：一个 niche 的候选全被杀后，state 仍须合法。"""
+        for h in d["hypotheses"]:
+            h["status"] = "killed"
+
+    v15ok3 = report_with(_all_killed_niche)
+    check("V15 合法反例：niche 候选全被 killed → 不要求 elite → 0",
+          v15ok3.exit_code == EXIT_OK and v15ok3.violations == [])
+
     v16a = report_with(lambda d: d["hypotheses"][0].update(operator=""))
     check("V16 operator 为空 → 3", v16a.exit_code == EXIT_HARD and v16a.rules() == ["V16"])
     v16b = report_with(lambda d: d["hypotheses"][0].update(operator="teleport"))
@@ -1996,24 +2030,49 @@ def selftest() -> int:
     def _gate_fail_no_closure(d):
         d.pop("repairs", None)
         d.pop("failures", None)
-        d["reviews"] = [{"stage": "R13", "artifact": "code",
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
                          "integrity_gate": "fail", "findings": ["leakage"]}]
 
     v23a = report_with(_gate_fail_no_closure)
-    check("V23 integrity_gate=fail 且无 repairs/failures → 3",
+    check("V23 integrity_gate=fail 且无关联 repairs/failures → 3",
           v23a.exit_code == EXIT_HARD and v23a.rules() == ["V23"]
           and v23a.violations[0].path == "reviews[0].integrity_gate")
 
-    def _gate_fail_with_failure(d):
+    def _gate_fail_without_id(d):
+        d.pop("repairs", None)
+        d.pop("failures", None)
         d["reviews"] = [{"stage": "R13", "artifact": "code",
                          "integrity_gate": "fail", "findings": ["leakage"]}]
 
-    v23ok = report_with(_gate_fail_with_failure)
-    check("V23 合法反例：gate=fail 但已有 failures[] 闭环 → 0",
+    v23b = report_with(_gate_fail_without_id)
+    check("V23 gate=fail 的 review 无 id → 3（无法建立关联）",
+          v23b.exit_code == EXIT_HARD and v23b.rules() == ["V23"]
+          and v23b.violations[0].path == "reviews[0].id")
+
+    def _gate_fail_with_unrelated_repair(d):
+        """关键回归：state 里**存在**合法 repair，但它与这个 review 无关。"""
+        d.pop("failures", None)
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+        for repair in d.get("repairs", []):
+            repair.pop("source_review", None)
+
+    v23c = report_with(_gate_fail_with_unrelated_repair)
+    check("V23 回归：无关的旧 repair 不得替新的 gate=fail 闭环 → 3",
+          v23c.exit_code == EXIT_HARD and v23c.rules() == ["V23"])
+
+    def _gate_fail_with_linked_failure(d):
+        d["reviews"] = [{"id": "REV9", "stage": "R13", "artifact": "code",
+                         "integrity_gate": "fail", "findings": ["leakage"]}]
+        for failure in d.get("failures", []):
+            failure["source_review"] = "REV9"
+
+    v23ok = report_with(_gate_fail_with_linked_failure)
+    check("V23 合法反例：有 source_review 关联的 failures[] 闭环 → 0",
           v23ok.exit_code == EXIT_OK and v23ok.violations == [])
 
     def _gate_pass(d):
-        d["reviews"] = [{"stage": "R13", "artifact": "code",
+        d["reviews"] = [{"id": "REV1", "stage": "R13", "artifact": "code",
                          "integrity_gate": "pass", "findings": []}]
 
     v23ok2 = report_with(_gate_pass)

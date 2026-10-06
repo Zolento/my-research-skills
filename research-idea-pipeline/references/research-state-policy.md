@@ -395,6 +395,9 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `repairs[]` | `state_delta` | 字符串 | ✅ | V10；**实际改动了哪些字段**，必须可核对 |
 | `repairs[]` | `targets` | id 数组，可为 `[]` | ✅ | **V22**；该修复**直接作用**的对象 id —— 供「claim 被否决必须走 R10」做**精确**核对（不用易误判的子串匹配） |
 | `repairs[]` | `closure` | `RESOLVED` \| `ACCEPTED_LIMITATION` | ✅ | V10；两值封冻 |
+| `reviews[]` | `id` | 非空字符串（例 `REV7`） | **`integrity_gate == fail` 时必填** | **V23**；没有 id 就无法与 `repairs[]` / `failures[]` 建立关联 |
+| `repairs[]` | `source_review` | `reviews[]` 的 id 或 `null` | ✅ | **V23**；该修复**因哪一次审查**而产生。**必须逐条对应** —— 全局存在性不算闭环 |
+| `failures[]` | `source_review` | `reviews[]` 的 id 或 `null` | ✅ | **V23**；同上，供「记成失败」的闭环路径使用 |
 
 **修复门的硬规则（spec §5）：**
 
@@ -429,7 +432,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V12 | status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失） | 硬 | failed 实验没有对应 `F` |
 | V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需） | 硬 | `"island": "PX"` |
 | V14 | hypotheses[].generation 是非负整数 | 硬 | `"generation": "1"` / `-1` |
-| V15 | 每个出现过的 niche 至少有一条 status: elite（QD archive 保多样性） | 硬 | `N5` 下全是 `active` |
+| V15 | 每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite | 硬 | `N5` 下全是 `active` |
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
 | V17 | hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环） | 硬 | `"parents": ["H9"]` 但无 `H9`；`"parents": []` 而 `generation: 1`；`H3.parents: ["H4"]` 且 `H4.parents: ["H3"]` |
 | V18 | 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数 | 硬 | 缺 `validity`；`"status": "ok"`；`"reason": ""`；`since_state_version: 7` 而 `state_version: 3` |
@@ -437,7 +440,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | V20 | claims[].status ∈ {partially-supported, supported, contradicted} 时，需有 evidence[].verification_tier 达阈值（partially-supported ≥ T1，其余 ≥ T2） | 硬 | `C0.status: "supported"`，而其支持证据全是 `T0`（LLM 自评）；或证据缺 `verification_tier` |
 | V21 | status ∈ {running, done, failed} 的 experiments[] 必须存在 preregistration；done/failed 时 frozen_at_state_version ≤ result_at_state_version | 硬 | `X12` 已 `done` 却无 `preregistration`；或 `frozen_at_state_version: 5 > result_at_state_version: 4`；或 `op: "improve"` 越界 |
 | V22 | claims[].status ∈ {killed, contradicted} 时必须被至少一条 repairs[] 覆盖（该条 repairs[].targets 含此 claim 的 id，且 disposition ∈ 五值） | 硬 | `C5.status: "killed"` 而没有任何 `repairs[].targets` 含 `C5`——**决策层无权改 claim 真值**（SKILL §1.7） |
-| V23 | reviews[].integrity_gate == "fail" 时必须存在 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值） | 硬 | `integrity_gate: "fail"`，而 `repairs[]` 与 `failures[]` 都没有对应记录——**Gate 不是 warning** |
+| V23 | reviews[].integrity_gate == "fail" 时必须存在以 source_review 关联该 review id 的 repairs[]（disposition ∈ 五值）或 failures[]（kind ∈ 六值） | 硬 | `integrity_gate: "fail"`，而 `repairs[]` 与 `failures[]` 都没有对应记录——**Gate 不是 warning** |
 | V24 | decision.verdict 存在时必须是 continue / pivot / archive / submit 之一 | 硬 | `"verdict": "banana"`，或空串 |
 
 **执行契约（spec §2.3）：**

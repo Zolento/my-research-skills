@@ -378,7 +378,8 @@
         "status": "valid",
         "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
         "since_state_version": 0
-      }
+      },
+      "source_review": null
     }
   ],
   "uncertainties": [
@@ -443,14 +444,16 @@
       "disposition": "RUN_TEST",
       "state_delta": "C0.status: supported→partially-supported；新增 X8（stage=X3, claim_targeted=[C0], parent=X7）；U1.cheapest_discriminating_test→X8",
       "closure": "RESOLVED",
-      "targets": []
+      "targets": [],
+      "source_review": null
     },
     {
       "flaw": "C1（低场泛化）无证据且本轮无预算",
       "disposition": "NARROW_SCOPE",
       "state_delta": "C0.scope→'brain MRI / acceleration=4 / 1.5T—3T'；C1.status 保持 ungrounded；U2 保持 open",
       "closure": "ACCEPTED_LIMITATION",
-      "targets": []
+      "targets": [],
+      "source_review": null
     }
   ],
   "narrative_view": {
@@ -468,7 +471,8 @@
       "stage": "R13",
       "artifact": "code",
       "integrity_gate": "pass",
-      "findings": []
+      "findings": [],
+      "id": "REV1"
     }
   ],
   "decision": {
