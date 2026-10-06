@@ -119,3 +119,67 @@ class TestRenderStatus(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# 生成物 ↔ 模板 的节集合一致性（DI-4 的机械判据）
+# ---------------------------------------------------------------------------
+
+class TestStatusSectionParity(unittest.TestCase):
+    """`render_status.py` 产出的节，必须与 `templates/STATUS.md` 声明的节**完全一致**。
+
+    这是 DI-4 的另一半：幂等保证"同一份 state 两次生成一致"，
+    本类保证"生成器的结构与人类模板不脱钩"。二者缺一，
+    `STATUS.md` 就会慢慢漂成"生成器一份、文档一份"。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _sections(self, text: str):
+        return [line.strip() for line in text.splitlines() if line.startswith("## ")]
+
+    def test_render_sections_equal_template_sections(self):
+        template = (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8")
+        state = json.loads(
+            (self.ROOT / "templates" / "research-state.template.json").read_text(encoding="utf-8")
+        )
+        rendered = rs.render(state, "T")
+        self.assertEqual(
+            self._sections(rendered), self._sections(template),
+            msg="生成物的节与 STATUS 模板声明的节不一致（顺序与名称都算）",
+        )
+
+    def _spec_sections(self):
+        """从 `references/project-layout.md` §4.2 的「固定节」代码块里抽节名。"""
+        text = (self.ROOT / "references" / "project-layout.md").read_text(encoding="utf-8")
+        start = text.index("**固定节（顺序不得改）：**")
+        block = text[start:]
+        block = block[block.index("```") + 3:]
+        block = block[: block.index("```")]
+        return self._sections(block)
+
+    def test_three_way_section_parity(self):
+        """规格 / 模板 / 生成物**三方**的节集合必须逐项相等。
+
+        project-layout §4.2 明文声称"三者一致"—— 本用例就是那句话的机械落点。
+        缺了它，规格、模板、生成器会各自漂移，而没人发现。
+        """
+        spec = self._spec_sections()
+        template = self._sections(
+            (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8"))
+        state = json.loads(
+            (self.ROOT / "templates" / "research-state.template.json").read_text(encoding="utf-8"))
+        rendered = self._sections(rs.render(state, "T"))
+        self.assertEqual(spec, template, msg="规格 §4.2 与 templates/STATUS.md 节集合不一致")
+        self.assertEqual(spec, rendered, msg="规格 §4.2 与 render_status.py 输出节集合不一致")
+
+    def test_no_wall_clock_in_rendered_status(self):
+        """幂等的硬边界：投影里不得出现墙钟时间（否则两次生成必然不同）。"""
+        import datetime
+        state = json.loads(
+            (self.ROOT / "templates" / "research-state.template.json").read_text(encoding="utf-8")
+        )
+        rendered = rs.render(state, "T")
+        today = datetime.date.today().isoformat()
+        self.assertNotIn(today, rendered, "投影中不得含当天日期")
+        self.assertNotIn("最后更新", rendered, "投影中不得含'最后更新'字段")

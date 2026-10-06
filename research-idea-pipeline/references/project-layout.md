@@ -180,6 +180,23 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 ---
 
+## 1.3 骨架模板索引（本规范描述的每个物件，都要有可复制的骨架）
+
+| 物件 | 骨架 |
+|---|---|
+| 项目根 `README.md` / `INDEX.md` | [../templates/INDEX.root.md](../templates/INDEX.root.md) |
+| 路线 `README.md`（身份证） | [../templates/README.route.md](../templates/README.route.md) |
+| 路线 `INDEX.md`（资产目录 + 时间线） | [../templates/INDEX.md](../templates/INDEX.md) |
+| 路线 `STATUS.md`（state 的人类投影） | [../templates/STATUS.md](../templates/STATUS.md) |
+| 机器状态 `research-state.json` | [../templates/research-state.template.json](../templates/research-state.template.json) |
+| 调度 telemetry `scheduler.json` | [../templates/scheduler.template.json](../templates/scheduler.template.json) |
+
+> **为什么单列此表：** 规范里描述一个文件却指不到骨架，执行者只能自己发明结构 ——
+> 那是"规范与产物脱钩"的起点。**本节列出的每个骨架都必须真实存在**，
+> 由相对链接可达性检查（`SKILL.md` §8 D4）机械保证。
+
+---
+
 ## 2. 文档命名与 ID 分配
 
 > **记法：** `routes/<R>/` = 路线目录（`<R>` = 路线字母，如 `A` / `T`）；
@@ -541,8 +558,8 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 > 本文件是 `research-state.json` 的投影，不是第二份真相。
 > 应由 `scripts/render_status.py` 生成；手改无效。
 
-## Last updated + State version
-## Current thesis（含 status）
+## State version
+## Current thesis
 ## Strongest supported findings
 ## Active hypotheses
 ## Critical uncertainties
@@ -556,6 +573,14 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 > **这是研究者最常打开的页面。** 它必须在 30 秒内回答
 > 「现在做到哪、为什么这么做、下一步是什么」。
 > **骨架见 [../templates/STATUS.md](../templates/STATUS.md)。**
+
+**刻意不写「最后更新（墙钟时间）」。** 那会破坏上文的幂等硬要求（同一份 state 两次生成不一致），
+从而违反 DI-4。**时间线由 `routes/<R>/INDEX.md` 的「Recent Research Changes」承担** ——
+它才是允许出现日期的那一层投影。
+
+> **上述"固定节"与 `templates/STATUS.md`、`scripts/render_status.py` 的输出必须三者一致。**
+> 这条由 `scripts/test_render_status.py` 的 `TestStatusSectionParity` **机械核对**：
+> 生成物的 `## ` 节集合必须与模板声明逐项相等（名称与顺序都算）。
 
 ### 4.3 `README.md` 必须稳定（路线身份证）
 

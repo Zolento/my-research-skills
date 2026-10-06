@@ -121,7 +121,9 @@ def render(state: Dict[str, Any], route: str) -> str:
         "> 重新生成：`python3 scripts/render_status.py --root <项目根> --route "
         f"{route}`；校验是否过期：加 `--check`（不一致退出码 3）。",
         "",
-        f"State version: S{version:04d}" if isinstance(version, int) else "State version: ?",
+        "## State version",
+        "",
+        f"- State version：S{version:04d}" if isinstance(version, int) else "- State version：?",
         "",
         "## Current thesis",
         "",

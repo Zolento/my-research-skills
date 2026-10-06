@@ -15,12 +15,15 @@
 
 ---
 
-## Last updated + State version
+## State version
 
-- 最后更新：`<YYYY-MM-DD>`
 - State version：`<N>`
 
-## Current thesis（含 status）
+> **刻意不写"最后更新（墙钟时间）"** —— 那会破坏幂等（同一份 state 两次生成将不一致），
+> 从而违反 DI-4。**时间线由 `routes/<R>/INDEX.md` 的「Recent Research Changes」承担**，
+> 它才是允许出现日期的那个投影。
+
+## Current thesis
 
 - 中心命题：`<一句话>`
 - status：`ungrounded` / `partially-supported` / `supported`
