@@ -31,6 +31,7 @@ import copy
 import pathlib
 import re
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -1369,6 +1370,72 @@ class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
         for path in sorted((self.ROOT / "examples").glob("*.md")):
             self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
+
+
+class TestDeprecatedTermScan(unittest.TestCase):
+    """已退役措辞不得回到正文。`references/deprecated-terms.txt` 是权威清单。
+
+    起因：这份扫描一直是**手工**跑的，而手工扫描会漏 —— 本仓库已经漏过两层
+    （只扫 `*.md` 却排除了 `examples/`；也只扫 Markdown 却没扫 Python 的 docstring）。
+    做成测试后，清单与正文的比对不再依赖人记得跑。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    FENCE = re.compile(r"```.*?```", re.S)
+    # 清单自己含被禁词；dev-only 的 docs/ 不随包发布
+    EXEMPT = ("references/deprecated-terms.txt",)
+
+    def _patterns(self):
+        raw = (self.ROOT / "references" / "deprecated-terms.txt").read_text(encoding="utf-8")
+        return [line.strip() for line in raw.splitlines()
+                if line.strip() and not line.lstrip().startswith("#")]
+
+    def test_pattern_list_is_not_empty(self) -> None:
+        self.assertGreaterEqual(len(self._patterns()), 20, "退役词清单骤减，疑似被清空")
+
+    def test_no_deprecated_term_appears_in_shipped_docs(self) -> None:
+        patterns = [(raw, re.compile(raw)) for raw in self._patterns()]
+        offenders = []
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel in self.EXEMPT or rel.startswith("docs/"):
+                continue
+            text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
+            for lineno, line in enumerate(text.splitlines(), 1):
+                for raw, pattern in patterns:
+                    if pattern.search(line):
+                        offenders.append(f"{rel}:{lineno}: [{raw}]")
+                        break
+        self.assertEqual(offenders, [], "已退役措辞出现在正文：\n  " + "\n  ".join(offenders))
+
+
+class TestControlledLanguageGate(unittest.TestCase):
+    """受控中文 linter（默认档）在 `examples/` 与 `templates/` 上**硬违规必须为 0**。
+
+    起因：我在四个提交信息里写「linter 硬违规 0」，但读的是输出的**最后一行**
+    （「情态（可能 / 也许 / …）永不标记：置信度是内容。」），**不是**计数行。
+    于是 Batch 7 引入的 5 处分号连续四批没被发现 —— 闸门跑了，读数读错了。
+    把闸门做成测试，就不再依赖人肉看输出。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    LINTER = "scripts/ste_lint_zh.py"
+
+    def test_managed_files_have_zero_hard_violations(self) -> None:
+        targets = [str(path) for path in sorted((self.ROOT / "examples").glob("*.md"))]
+        targets += [str(path) for path in sorted((self.ROOT / "templates").glob("*.md"))]
+        self.assertTrue(targets, "examples/ 与 templates/ 下找不到受管文件")
+        proc = subprocess.run(
+            [sys.executable, str(self.ROOT / self.LINTER), "--disable", "synonym-rotation", *targets],
+            capture_output=True, text=True, cwd=str(self.ROOT),
+        )
+        self.assertIn("硬违规", proc.stdout, f"linter 没有输出计数行：{proc.stdout[-400:]}")
+        self.assertIn("硬违规 0，baseline 0", proc.stdout,
+                      "受控中文 linter 出现硬违规：\n" + proc.stdout[-1200:])
+
+    def test_linter_is_present(self) -> None:
+        # 守卫：linter 被删/改名时，上面的检查不得静默变成「通过」
+        self.assertTrue((self.ROOT / self.LINTER).is_file(), f"{self.LINTER} 不存在")
 
 
 class TestSemanticEntryFirst(unittest.TestCase):
