@@ -377,7 +377,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `id` | `U<n>` | ✅ | |
 | `question` | 字符串 | ✅ | 未知是什么 |
 | `importance` | `critical` \| `high` \| `medium` \| `low` | ✅ | R9 只对 `critical` / `high` 且 `uncertainty: high` 的项排序（spec §4） |
-| `uncertainty` | `high` \| `medium` \| `low` | ✅ | 当前不确定程度 |
+| `uncertainty` | `high` \| `medium` \| `low` | ✅ | 当前不确定程度。**与 `status` 独立**：`high → medium → low` 可以发生而 `status` 仍 `open` —— 部分下降是合法进展（R11 §硬规则） |
 | `cheapest_discriminating_test` | 存在的 `X` id 或字面量 `TBD` | ✅ | V7 |
 | `status` | `open` \| `closed` | ✅ | 关闭**必须**有对应实验证据，不得口关 |
 

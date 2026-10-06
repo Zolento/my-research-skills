@@ -1368,6 +1368,133 @@ class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
             self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
 
 
+class TestEigContract(unittest.TestCase):
+    """HIGH-4：EIG 的生产者 / 消费者必须分开，`actual` 由结构化 delta 支撑。
+
+    起因：`scheduler-policy` 的自检要求「每个 done 实验都有 predicted 与 actual 的对照」，
+    但既没有规定 actual 从什么事实算，也没有模板承载 —— `EIG ÷ cost` 于是能退化成
+    「LLM 自己觉得这个实验挺有信息量」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DELTA_KEYS = ("claim_status_changes", "uncertainty_changes",
+                  "hypothesis_status_changes", "new_uncertainties",
+                  "unexpected_observations")
+    RATINGS = ("high", "medium", "low", "zero")
+
+    def _policy(self):
+        return (self.ROOT / "references" / "scheduler-policy.md").read_text(encoding="utf-8")
+
+    def _template(self):
+        return json.loads((self.ROOT / "templates" / "scheduler.template.json")
+                          .read_text(encoding="utf-8"))
+
+    def _section_61(self):
+        text = self._policy()
+        return text[text.index("### 6.1"):text.index("## 7.")]
+
+    def test_producer_and_consumer_are_named(self) -> None:
+        section = self._section_61()
+        self.assertIn("R9  scheduling", section)
+        self.assertIn("R11 state update", section)
+        self.assertIn("predicted_information_gain", section)
+        self.assertIn("actual_information_gain", section)
+
+    def test_rating_enum_is_frozen_and_complete(self) -> None:
+        section = self._section_61()
+        for rating in self.RATINGS:
+            self.assertIn(f"`{rating}`", section, f"§6.1 未登记 rating 值 {rating}")
+
+    def test_template_record_has_every_required_key(self) -> None:
+        record = self._template()["eig_calibration"]["records"][0]
+        for key in ("experiment", "predicted_information_gain", "observed_delta",
+                    "actual_information_gain"):
+            self.assertIn(key, record)
+
+    def test_template_delta_shape_matches_the_doc(self) -> None:
+        delta = self._template()["eig_calibration"]["records"][0]["observed_delta"]
+        self.assertEqual(sorted(delta), sorted(self.DELTA_KEYS))
+        section = self._section_61()
+        for key in self.DELTA_KEYS:
+            self.assertIn(f'"{key}"', section, f"§6.1 未登记 observed_delta 键 {key}")
+
+    def test_template_rating_is_supported_by_its_delta(self) -> None:
+        record = self._template()["eig_calibration"]["records"][0]
+        delta = record["observed_delta"]
+        if record["actual_information_gain"] == "high":
+            supported = bool(delta["claim_status_changes"]) or any(
+                change.get("status_to") == "closed" for change in delta["uncertainty_changes"])
+            self.assertTrue(supported, "模板里的 high rating 没有 delta 支撑")
+
+    def test_the_bare_rating_contract_is_gone(self) -> None:
+        text = self._policy()
+        self.assertNotIn("`actual_information_gain` 的对照记录。", text)
+
+    def test_report_is_honest_about_the_missing_validator(self) -> None:
+        # 契约不是闸门。必须写明，否则读者会以为它已机械闭环。
+        self.assertIn("没有机械校验器", self._policy())
+
+    def test_actual_information_gain_has_a_mechanical_gate(self) -> None:
+        """已知缺口：`scheduler.json` 没有 schema，也没有校验器。
+
+        EIG 三件套目前只由 scheduler-policy §6.1 的**契约**与 R11 的自检保证。
+        把它变成闸门需要一份 scheduler schema（未实现）。**不要把契约说成闸门。**
+        """
+        self.skipTest("已知缺口：scheduler.json 无 schema/校验器；EIG 三件套只由 "
+                      "scheduler-policy §6.1 契约与 R11 自检保证，无机械闸门")
+
+    def test_r11_is_named_as_the_writer(self) -> None:
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        self.assertIn("eig_calibration.records", text)
+
+    def test_r9_is_named_as_the_producer(self) -> None:
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        self.assertIn("predicted_information_gain", text)
+
+
+class TestR11PartialUncertainty(unittest.TestCase):
+    """HIGH-3：R11 必须允许 `high → medium → low` 的部分下降。
+
+    起因：R11 曾写「第 3 步不允许只关不增」，把 `uncertainty` 与 `status` 混成一个维度 ——
+    而 state 明确允许 `uncertainty high→medium` 且 `status open`。合法科研状态被判「不闭环」。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DELTA_CODES = ("①", "②", "③", "④", "⑤", "⑥", "⑦")
+
+    def _r11(self):
+        text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")
+        return text[text.index("## R11"):text.index("## 自检")]
+
+    def test_the_banned_rule_is_gone(self) -> None:
+        self.assertNotIn("只关不增", self._r11())
+
+    def test_partial_reduction_is_explicitly_allowed(self) -> None:
+        text = self._r11()
+        self.assertIn("high → medium", text)
+        self.assertIn("可保持 `open`", text)
+
+    def test_seven_delta_conditions_are_listed(self) -> None:
+        text = self._r11()
+        for code in self.DELTA_CODES:
+            self.assertIn(f"| {code} |", text, f"R11 的 delta 表缺条件 {code}")
+
+    def test_policy_states_the_two_axes_are_independent(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| `uncertainty` |"))
+        self.assertIn("与 `status` 独立", row)
+
+    def test_no_doc_keeps_the_old_four_step_wording(self) -> None:
+        for rel in ("SKILL.md", "references/phase-r9-r11-experiment-loop.md"):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("四步，缺一不可", text, f"{rel} 仍把 R11 写成四步")
+
+    def test_no_rule_forbids_partial_reduction(self) -> None:
+        doc = valid_state()
+        doc["uncertainties"][0].update(uncertainty="medium", status="open")
+        self.assertEqual(sc.check_state(doc, source="<test>").exit_code, sc.EXIT_OK)
+
+
 class TestCandidateBoundary(unittest.TestCase):
     """`P3` 只产 typed intermediate，不进 Research State（HIGH-2）。
 

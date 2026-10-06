@@ -61,6 +61,9 @@ e* = argmax_e  E[ΔU | e] / cost(e)
 - **排序时必须写出三件事：** ① 这次实验改变哪条 `U`；② 预期改变方向；③ 成本口径
   （GPU 小时 / 数据 / 人力，写明单位）。
 - **禁止**用「预期能提升多少指标」当排序依据 —— 那是 benchmark 驱动的入口。
+- **同时写下预测值（生产者）：** 把 ①—③ 的结论写进 `scheduler.json` 的
+  `predicted_information_gain`（`high` / `medium` / `low`），供 R11 回填实际值对照。
+  **生产者在 R9，消费者在 R11** —— 见 [scheduler-policy.md](scheduler-policy.md) §6.1。
 
 **这是压掉 hyperparameter-tuning attractor 的主要机制：** 当选择标准是「最让我们知道
 自己是不是错了」，调参就不再是低风险高回报的选择。
@@ -219,21 +222,38 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 
 ## R11 状态回写（`result → claim → uncertainty → next experiment`）
 
-每个 `X` 收工后**按序**执行四步，缺一不可：
+每个 `X` 收工后**按序**执行五步，缺一不可：
 
 | 步 | 动作 | 写哪个字段 |
 |---|---|---|
 | 1 | 把结果登记为证据 | `evidence[]` 新增 `E<n>`（`epistemic_status` 按实际：跑了 = `Observed`，只是推导 = `Supported`） |
 | 2 | 把证据连到 claim | `claims[].supporting_evidence` / `refuting_evidence`；`status` 按 §R10 更新 |
-| 3 | 更新不确定性 | `uncertainties[]`：`status` 转 `closed`，或**新增**由本次 `unexpected` 引出的 `U<n>` |
-| 4 | 生成下一步 | `experiments[]` 新增 `planned` 节点，`parent` 指向本次；或在 `next_branches` 里登记 |
+| 3 | 更新不确定性（**允许部分下降**） | `uncertainties[]`：`uncertainty` 可 `high → medium → low`，`status` 可保持 `open`；只在**已有充分判别证据**时转 `closed`；由 `unexpected` 引出的 `U<n>` **必须新增** |
+| 4 | 回填 EIG 对照（telemetry） | `scheduler.json` 的 `eig_calibration.records`：`predicted_information_gain` + **`observed_delta`** + `actual_information_gain`（生产者 / 消费者见 [scheduler-policy.md](scheduler-policy.md) §6.1） |
+| 5 | 生成下一步 | `experiments[]` 新增 `planned` 节点，`parent` 指向本次；或在 `next_branches` 里登记 |
 
 **硬规则：**
 
 - **`status` 变更只能在这里（经 R10）** —— 例外：R8 的证据驱动**单向升级**（见 [../SKILL.md](../SKILL.md) §1.6）。 Discovery（R3—R6）与 Assurance（R7）**不得**直接改
   `claims[].status` —— 这是防「自己给自己判分」的结构性措施。
-- 第 3 步**不允许只关不增**：一轮实验如果没有任何新不确定性，要么结论已足够强（走 R14），
-  要么本次实验没有信息量（应记为 `failures[]` 的 `inconclusive`）。
+- **第 3 步的判据是「有没有有意义的 state delta」，不是「有没有关掉一条 `U`」。**
+  出现下列**任意一条**，即算本次实验产生了信息：
+
+  | # | 有意义的 delta |
+  |---|---|
+  | ① | `claims[].status` / `supporting_evidence` / `refuting_evidence` 变了 |
+  | ② | 某条 `U` 的 `uncertainty` **下降一级**（`high → medium` 或 `medium → low`） |
+  | ③ | 某条 `U` 的 `status` 转 `closed` |
+  | ④ | 某条 `hypotheses[].status` 变了 |
+  | ⑤ | 新增了由 `unexpected` 引出的 `U<n>` |
+  | ⑥ | 登记了 `unexpected` 观察 |
+  | ⑦ | 本次被判 `inconclusive` 并写进 `failures[]` |
+
+  **只有 ①—⑦ 全不成立时，才判本次实验没有信息量**，并写 `failures[]`（`kind: inconclusive`）。
+- **`uncertainty` 与 `status` 是两个独立维度。** `high → medium` 而 `status` 仍 `open`
+  是**完全合法**的科研状态 —— **不得**因为「没关掉」就判它不闭环（见
+  [research-state-policy.md](research-state-policy.md) §3.8）。`closed` 需要**充分判别证据**，
+  不允许为了凑闭环而关。
 - 收尾跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
   **硬违规须为 0**。
 
@@ -250,7 +270,8 @@ benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bia
 - [ ] `ACCEPTED_LIMITATION` 已同时写进 `C.scope` 或 `C.known_flaws`
 - [ ] 机制型 claim 做了 `RS1` / `RS2` 对比；结果近似时已降级
 - [ ] 未在无 artifact 的阶段要求 artifact 审计
-- [ ] R11 四步全做完，且新增了不确定性或已走 R14
+- [ ] R11 五步全做完；第 3 步有**至少一条**有意义的 delta（①—⑦，见 §R11 硬规则）
+- [ ] 每个 `done` 实验已回填 EIG 三件套，且 `actual_information_gain` 由 `observed_delta` 支撑
 - [ ] `state_check.py --check` 硬违规为 0
 
 ---

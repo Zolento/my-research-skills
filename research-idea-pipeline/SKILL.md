@@ -880,11 +880,15 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 ### R9 / R10 / R11 — 实验循环与修复门
 
 - **R9：** 实验树 `X1—X6`（`X2` 只做基线校准，**不得承担 claim 判别**）；
-  用 **EIG** 选下一个实验：`e* = argmax E[ΔU|e]/cost(e)`，必须写出「改变哪条 `U` / 方向 / 成本口径」。
+  用 **EIG** 选下一个实验：`e* = argmax E[ΔU|e]/cost(e)`，必须写出「改变哪条 `U` / 方向 / 成本口径」，
+  并把预测值写进 `scheduler.json` 的 `predicted_information_gain`。
 - **R10：** **critical flaw ⇒ state 必须改变**；处置五值 `REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
   关闭两值 `RESOLVED|ACCEPTED_LIMITATION`；落盘三元组 `flaw/disposition/state_delta/closure`。
-- **R11：** `result → claim update → uncertainty update → next experiment` 四步，缺一不可。
-- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）。
+- **R11：** `result → claim update → uncertainty update → EIG 回填 → next experiment` **五步**，缺一不可。
+  第 3 步的判据是「**有没有有意义的 state delta**」，不是「有没有关掉一条 `U`」：
+  `uncertainty` 可 `high → medium → low` 而 `status` 保持 `open`（两个维度独立，**不得**判不闭环）。
+- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
+  EIG 对照写同目录的 `scheduler.json`（telemetry，**无校验器**）。
 
 ### R13 / R14 — artifact 审计与决策
 
