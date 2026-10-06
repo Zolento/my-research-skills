@@ -397,7 +397,7 @@ human docs contain knowledge-worthy events.
 | 4 | DI-5 | 每个 XID 在 `configs/` / `results/` / `logs/` / `checkpoints/` / state 中**同时可查到** |
 | 5 | DI-6 | 任意 `routes/*/src/` 为空或不存在 |
 | 6 | DI-7 | `.research-idea-pipeline/{cache,runtime}` 不在 Git tracked 列表 |
-| 7 | DI-8 | 12 行概念映射表（§12）中每个「人类入口」都真实存在 |
+| 7 | DI-8 | 13 行概念映射表（§13）中每个「人类入口」都真实存在 |
 | 8 | §7 | `routes/*/docs/` 下无任何退役 slug（`literature-survey` / `ideas`） |
 
 **注意：本 Wave 有一项特有能力要求 —— `render_status.py` 必须幂等。**

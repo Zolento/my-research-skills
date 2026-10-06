@@ -128,7 +128,7 @@
   [venue-standards.md](venue-standards.md) §5.1；**迁移本身不算增量**）。
 - 汇总后**去重**（按"核心思路 + 差异"判定同质），保留来源子代理标注。
 - 去重后候选 **≥ 6 个**（原始候选 ≥ 10 个）；不足则让覆盖不足的视角补提；
-  **领域确实过窄时，可说明原因并减少**（须在输出与 INDEX Warnings 中写明理由）。
+  **领域确实过窄时，可说明原因并减少**（须在输出与 `STATUS.md` 的 Critical uncertainties 中写明理由）。
 
 ---
 
@@ -190,7 +190,7 @@
   [evidence-policy.md](evidence-policy.md)（措辞等级统一在该文件，本节不另立）。
 - **不可控例外：** 在线源因 429/不可用而无法达到对应等级（不可控因素）时，该 idea
   仍可进入 population（QD archive 的候选池），但必须：① 标注"据本次检索未见 · 待核实"；② **不得**使用
-  "首次提出"；③ 记入 `INDEX.md` 的 **Warnings**，并在源恢复后补做。
+  "首次提出"；③ 记入 `STATUS.md` 的 **Critical uncertainties**，并在源恢复后补做。
 - 无论哪种情况，未完成对应等级时都**不得**把新颖性判定标为"已核实"。
 
 ### B5.3 每个 idea 的审核输出
@@ -266,21 +266,20 @@
 
 ---
 
-## B7. 文档落盘与 INDEX 更新（强制）
+## B7. 文档落盘与状态更新（强制）
 
 1. **写文档：** `routes/<R>/docs/<R>NNN-discovery.md`（ID 按
    [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1）。
    内容 = B1 技术路线归纳表 + B2 局限性分析 + B6 idea 清单（**含 B5 审核评分**）
    + 推荐 population（QD archive 的候选池） + 淘汰清单 + 创新性边界界定。
 2. **frontmatter：** `id / route / phase: R3—R6 / type: discovery / status / created`。
-3. **更新该路线 `INDEX.md`：**
-   - §2 文档索引：新增本文件行；
-   - §3 已证实：被 S-Lit 证实"重叠足够"的 idea 方向；
-   - §4 已证伪：被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea；
-   - §5 TODO：进入 population（QD archive 的候选池） 的 idea → 转成"进入 R8"的任务；"待核实"的无人区
-     条目 → 检索任务；
-   - §7 Warnings：**未完成 L2 的"无人区"声称、未完成 L3 的"首次"声称必须记为 Warning**；
-   - §9 变更日志。
+3. **更新该路线 `INDEX.md`（资产目录）：** `Key Documents` 新增本文件行，
+   `Experiments`、`Recent Research Changes` 同步更新。
+4. **更新该路线 `STATUS.md`（当前状态）：** 先写回 `research-state.json`，再重新生成。
+   - 被 S-Lit 证实"重叠足够"的 idea 方向 → **Strongest supported findings**；
+   - 被判"重叠不足"或致命反驳不可缓解而**放弃**的 idea → **Most important negative findings**；
+   - 未完成 L2 的"无人区"声称、未完成 L3 的"首次"声称 → **Critical uncertainties**；
+   - 进入 R8 的 idea、待核实的无人区检索 → **Next recommended actions**。
 
 ## B8. 输出后
 

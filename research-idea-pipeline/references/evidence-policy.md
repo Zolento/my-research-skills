@@ -32,7 +32,7 @@
    - `needs_verification = true` 的条目**不得**用于支撑「首次提出 / 未见前作 / 复现风险低」
      类声明 —— 它的元数据来自文件名兜底，标题、作者、年份本身就可能错；
    - **其数量必须计入根 `INDEX.md` 的全局 Warnings**（见
-     [project-layout.md](project-layout.md) §4.2）；
+     [project-layout.md](project-layout.md) §4.4）；
    - 数量**超过 5** 时触发**补元数据的 TODO**（为对应 PDF 写 sidecar
      `docs/refs/papers/<paper_id>.json`，再重建索引），**不得**让它长期累积。
 8. **禁止臆造引用**；无法确认处一律标「待核实」。

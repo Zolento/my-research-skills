@@ -298,26 +298,29 @@ R7 / R10 / R13 继续复核。**
 
 ---
 
-## E6. 文档落盘与 INDEX 更新（强制）
+## E6. 文档落盘与状态更新（强制）
 
 1. **写审阅记录：** `routes/<R>/docs/<被审ID>-review-r01.md`；
    接续复核写 `-r02.md`、`-r03.md`（轮次零填充两位）（frontmatter 记 `review_round`）。
    **审阅记录不占用新序号**，永远挂在被审文档 ID 上。
 2. **frontmatter：** `phase: R7 / R10 / R13 / type: review / review_of: <被审ID> / review_round / also_reviewed / status`。**跨文档复核**（如同时审方案 + 实验计划）挂在主文档 ID 上，其余写进 `also_reviewed`。
-3. **把审阅结论翻译成 `INDEX.md` 进度**（这是本 Mode 最容易漏的一步）：
+3. **更新该路线 `INDEX.md`（资产目录）：** `Reviews` 新增本文件行。
+4. **把审阅结论翻译成 `STATUS.md` 状态**（这是本 R 阶段最容易漏的一步）：
 
-   | 审阅结论 | 写入 INDEX |
+   | 审阅结论 | 写入 STATUS |
    |---|---|
-   | 某机制成立 / 已被数据支持 | **§3 已证实** |
-   | 某假设被否定 / 不可行 | **§4 已证伪**（保留，不删） |
-   | 需要补实验 X / 补文献 Y | **§5 TODO** |
-   | 致命风险未缓解 | **§7 Warnings** |
-   | **复现风险 = 高** | **§7 Warnings**（类型：新颖性）+ 结论卡片致命风险 |
-   | 复现步骤本身有错 | **§6 Bugs** |
-   | 评分与上轮的变化 | **§9 变更日志** |
+   | 某机制成立 / 已被数据支持 | **Strongest supported findings** |
+   | 某假设被否定 / 不可行 | **Most important negative findings**（保留，不删） |
+   | 需要补实验 X / 补文献 Y | **Next recommended actions** |
+   | 致命风险未缓解 | **Critical uncertainties** |
+   | **复现风险 = 高** | **Critical uncertainties** + 结论卡片致命风险 |
+   | 复现步骤本身有错 | **Next recommended actions**（工程项，不新增正式文档） |
+   | 评分与上轮的变化 | `STATUS.md` 的 State version 变化与 `INDEX.md` 的 Recent Research Changes |
 
-4. **新颖性结论的门禁：** S-Lit/S-Nov 判定"新颖"前必须完成 T4 的 **L3 穷尽检索**；
-   未完成则结论只能写"据本次检索未见"，且**不得**给出"复现风险低"，并记入 Warnings。
+   > 写状态前先写回 `research-state.json`，再重新生成 `STATUS.md`；**不得手改**。
+5. **新颖性结论的门禁：** S-Lit/S-Nov 判定"新颖"前必须完成 T4 的 **L3 穷尽检索**；
+   未完成则结论只能写"据本次检索未见"，且**不得**给出"复现风险低"，并记入
+   **Critical uncertainties**。
 
 ## E7. 输出
 

@@ -1122,7 +1122,7 @@ grep -rnE "$PAT" --include=*.md .          # 期望：0 命中（exit 1）
 #    所以「反引号紧跟 docs/」就是缺前缀（§1.4 规则 1）
 grep -rnE '`docs/<' --include=*.md . | grep -vE 'templates/INDEX\.md|grep -rnE'
 #    ↑ 排除 templates/INDEX.md：路线 INDEX 本身就在 routes/<R>/ 内，
-#      它的 `docs/<文件名>` 是相对本文件的正确写法，不算缺前缀
+#      它的 `docs/` 相对链接是正确写法，不算缺前缀
 
 # 6) 受控中文 linter —— 自检 + 受管文件必须全绿
 python3 scripts/ste_lint_zh.py --selftest

@@ -503,7 +503,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 > 「读 / 写 World Model」表**必须逐字相同**；下面保留各阶段的细节语义，供执行时理解，
 > **不得**把它当成第二套口径。
 >
-- **R0**：读 用户输入、`routes/<R>/INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
+- **R0**：读 用户输入、路线 `README.md` / `STATUS.md` / `INDEX.md`、续跑时的既有 state；写 **只有 `contract`**：`goal` / `primary_anchor` / `constraints` / `resources` / `provisional_anchor_rationale` / `out_of_scope`。**R0 不产出 `claims[]`，也不写 `assurance[]`**（`assurance[]` 由 **R7** 写：kill condition 是对具体 attack 的回应，R0 期还没有 claim/attack，写了只能是空话）
 - **R2**：读 `literature[]`、`assumptions[]`、`uncertainties[]`、`claims[]`（只读，用于定位缺口）；写 `literature[]`、`evidence[]`(kind=literature)、`assumptions[]`、`uncertainties[]`（缺口类主张先落 `U`，由 R3 转成 `C`）
 - **R3**：读 `literature[]`、`assumptions[]`、`failures[]`、`contract.constraints`；写 `hypotheses[]`、**`claims[]`（创建 seed）**（与上表逐字一致）
 - **R4**：读 `hypotheses[]`；写 `hypotheses[].status`（**QD archive 精修：只能重排 elite 归属**）。**`niche` / `operator` / `parents` / `generation: 0` 由 R3 创建时写入，R4 不得新建 niche**（与上表逐字一致）

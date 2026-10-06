@@ -156,24 +156,23 @@
 
 ---
 
-## C6. 文档落盘与 INDEX 更新（强制）
+## C6. 文档落盘与状态更新（强制）
 
 1. **写文档（两份，各占独立序号）：**
    - 方案：`routes/<R>/docs/<R>NNN-proposal.md`
    - 实验计划：`routes/<R>/docs/<R>NNN-experiment-plan.md`（取下一个可用序号）
    每份文档都按 project-layout.md §2.6 扫描现有最大序号 +1，**序号永不复用**。
 2. **frontmatter：** `phase: R8 / type: proposal | experiment-plan / status / created`。
-3. **更新该路线 `INDEX.md`：**
-   - §2 文档索引：新增两行；
-   - §3 已证实：C1/S-Lit 已核实的结论；
-   - §4 已证伪：被 S-Lit/S-Theory 否定的假设；
-   - §5 TODO：实验优先级与依赖 → 转成 TODO 条目，标注 P0/P1 与依赖；
-   - §6 Bugs：已知的工程障碍（如基线跑不通）；
-   - §7 Warnings：**未缓解的风险、未完成 L3 的"首次提出"声称**；
-   - §8 关键依赖与风险：数据/算力/外部依赖；
-   - §9 变更日志。
-4. **创新性声明的门禁：** 若 C1 要用"首次提出"，必须已完成 T1 的 **L3 穷尽检索**
-   并附负检索记录；否则降级为"据本次检索未见"，或记入 Warnings。
+3. **更新该路线 `INDEX.md`（资产目录）：** `Key Documents` 新增两行，
+   `Recent Research Changes` 加一行。
+4. **更新该路线 `STATUS.md`（当前状态）：** 先写回 `research-state.json`，再重新生成。
+   - C1/S-Lit 已核实的结论 → **Strongest supported findings**；
+   - 被 S-Lit/S-Theory 否定的假设 → **Most important negative findings**；
+   - 实验优先级与依赖、已知工程障碍（如基线跑不通） → **Next recommended actions**；
+   - **未缓解的风险、未完成 L3 的"首次提出"声称** → **Critical uncertainties**；
+   - 数据/算力/外部依赖 → 路线 `README.md` 的 **Key resources**。
+5. **创新性声明的门禁：** 若 C1 要用"首次提出"，必须已完成 T1 的 **L3 穷尽检索**
+   并附负检索记录；否则降级为"据本次检索未见"，或记入 **Critical uncertainties**。
 
 ## C7. 输出后
 

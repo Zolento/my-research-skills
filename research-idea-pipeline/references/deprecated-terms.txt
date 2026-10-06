@@ -88,3 +88,5 @@ routeX/
 # 旧 slug 绑定已退役的流程字母，且无法表达「同一份知识来自多个阶段」。
 literature-survey
 
+idea-discovery
+-ideas\.md

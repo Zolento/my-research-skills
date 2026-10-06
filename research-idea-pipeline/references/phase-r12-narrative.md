@@ -681,7 +681,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 3. **哪个 idea 如果换一种 claim hierarchy，可能获得更高价值？**
 
 **退回规则：** 某 idea 的所有候选叙事均 `not_submission_ready`，或六维普遍 ≤ 2
-→ 建议**退回 R3—R6** 重新生成 idea（并在 `INDEX.md` 的 TODO 里留任务）。
+→ 建议**退回 R3—R6** 重新生成 idea（并在 `STATUS.md` 的 Next recommended actions 里留任务）。
 
 **合并规则：** 两个 idea 的**最佳叙事高度相似** → 考虑**合并或差异化定位**。
 
@@ -700,7 +700,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - 信息不足处明确标注 **`[待补]`**，**不得编造**。
 - **仅输出 claim、叙事分析与审核报告**，不添加前言、说明或评论。
 
-### D9.4 文档落盘与 INDEX 更新（强制）
+### D9.4 文档落盘与状态更新（强制）
 
 1. **写文档：** `routes/<R>/docs/<R>NNN-narrative.md`（一次调用一份）。
    ID 按 [project-layout.md](project-layout.md) §2.6 扫描现有最大序号 +1；
@@ -709,15 +709,15 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
    （每套 claim hierarchy + 六槽位）+ 攻击面评审意见 + 交叉质询记录 + 门禁表
    + 六维排序 + 最佳叙事推荐 + 缺失证据清单 + 最小必要实验 / 定理 + 最终建议。
 2. **frontmatter：** `id / route / phase: R12 / type: narrative / status / created`。
-3. **更新该路线 `INDEX.md`**（章节规范见 [project-layout.md](project-layout.md) §4.1）：
-   - §2 文档索引：新增本文件行；
-   - §3 已证实：`S-Lit` 确认新颖、且通过全部门禁的叙事方向；
-   - §4 已证伪：被 `S-Lit` 判「已被覆盖」、或因结构性缺陷无法成立的候选；
-   - §5 TODO：**退回 R3—R6 / 换 claim hierarchy 重试 / 按最佳叙事重写提案 /
-     补齐缺失证据清单**；
-   - §7 Warnings：**门禁 `fail` 的候选**、**存在评审分歧**的项、
-     **未完成 L3 的「首次提出」声称**、**未核验的新颖性结论**；
-   - §9 变更日志。
+3. **更新该路线 `INDEX.md`（资产目录）**（章节规范见
+   [project-layout.md](project-layout.md) §4.1）：`Key Documents` 与 `Reviews` 新增本文件行。
+4. **更新该路线 `STATUS.md`（当前状态）：** 先写回 `research-state.json`，再重新生成。
+   - `S-Lit` 确认新颖、且通过全部门禁的叙事方向 → **Strongest supported findings**；
+   - 被 `S-Lit` 判「已被覆盖」、或因结构性缺陷无法成立的候选 → **Most important negative findings**；
+   - **门禁 `fail` 的候选**、**存在评审分歧**的项、**未完成 L3 的「首次提出」声称**、
+     **未核验的新颖性结论** → **Critical uncertainties**；
+   - **退回 R3—R6 / 换 claim hierarchy 重试 / 按最佳叙事重写提案 /
+     补齐缺失证据清单** → **Next recommended actions**。
 
 ### D9.5 输出后：`state.json` 片段
 

@@ -49,7 +49,8 @@
 
 ### R0.3 路线与骨架检查
 
-按 [project-layout.md](project-layout.md) §7 的清单确认目录与 `INDEX.md` 存在；不存在则先建。
+按 [project-layout.md](project-layout.md) §7 的清单确认目录与路线三件套
+（`README.md` / `STATUS.md` / `INDEX.md`）存在；不存在则先建。
 
 ---
 

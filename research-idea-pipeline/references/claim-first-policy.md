@@ -298,7 +298,7 @@ R3—R6 / R8 为 P1。
 3. `conditional` **必须**写明补什么证据、以及补上后该 anchor 才成立。
    补什么写不清 = 降为 `not-eligible`。
 4. `not-eligible` 的 anchor **不得**用于组织叙事，也**不得**出现在贡献清单的定位句里。
-5. 「显式告知」**必须**落盘（当轮输出 + 路线 `INDEX.md` 的 Warnings）。
+5. 「显式告知」**必须**落盘（当轮输出 + 路线 `STATUS.md` 的 Critical uncertainties）。
    只写进对话不算，**不得**提示冲突后继续（[../SKILL.md](../SKILL.md) §0.1 规则 6）。
 6. 冲突的处置权限：agent 只能**提请**或**降级**。要真正更换主锚点，只能走
    [../SKILL.md](../SKILL.md) §0.2 锚点变更单，且**只有用户能授权**。

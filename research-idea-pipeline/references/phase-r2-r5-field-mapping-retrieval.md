@@ -73,7 +73,7 @@
 1. 先检索该问题本身（是否已有定理 / 反例 / 不可能性结果）。
 2. 再检索所用工具在其他领域的处理方式（同构问题往往已有答案）。
 3. 再检索**负结果**（`limits of X`、`X is impossible`、`negative results X`）。
-4. 仍无解 → 写入 `INDEX.md` 的 **Warnings**，标注"待核实"。
+4. 仍无解 → 写入 `STATUS.md` 的 **Critical uncertainties**，标注"待核实"。
 
 ## A3. 范围扩大策略
 
@@ -107,7 +107,7 @@
 3. 已覆盖该等级要求的最少检索式数与结果数，且新增趋于 0。
 
 **不满足饱和就停止属于违规。** 因在线源不可用被迫停止时，必须标注
-"检索未达饱和，原因：<哪些源>不可用"并写入 INDEX 的 Warnings。
+"检索未达饱和，原因：<哪些源>不可用"并写入 `STATUS.md` 的 Critical uncertainties。
 
 ### A4.2 交付物
 
@@ -156,19 +156,19 @@
 
 ---
 
-## A6. 文档落盘与 INDEX 更新（强制）
+## A6. 文档落盘与状态更新（强制）
 
 1. **写文档：** `routes/<R>/docs/<R>NNN-field-map.md`，内容 = 检索范围 +
    检索式与结果表 + 文献列表 + **负检索记录** + 429 日志 + 饱和判定。
 2. **frontmatter：** `phase: R2 / R5 / type: field-map / status / created`。
-3. **更新该路线 `INDEX.md`：**
-   - §2 文档索引：新增本文件行；
-   - §3 已证实：检索证实的结论（如"某机制已被 [作者] 提出"）；
-   - §4 已证伪：被文献否定的假设（如"该思路不可行，见 [作者]"）；
-   - §5 TODO：待核实的会议论文集条目；
-   - §7 Warnings：**检索未达饱和必须记入**；
-   - §9 变更日志。
-4. **下载了 PDF 就必须建索引：** 本次调研若把任何 PDF 存进 `docs/refs/papers/`，
+3. **更新该路线 `INDEX.md`（资产目录）：** `Key Documents` 新增本文件行，
+   `Recent Research Changes` 加一行。
+4. **更新该路线 `STATUS.md`（当前状态）：** 先写回 `research-state.json`，再重新生成。
+   - 检索证实的结论 → **Strongest supported findings**；
+   - 被文献否定的假设 → **Most important negative findings**；
+   - 待核实的会议论文集条目、**检索未达饱和** → **Critical uncertainties**；
+   - 下一步补检索任务 → **Next recommended actions**。
+5. **下载了 PDF 就必须建索引：** 本次调研若把任何 PDF 存进 `docs/refs/papers/`，
    必须在**同一步**写好 sidecar 元数据并重建索引：
 
    ```bash
