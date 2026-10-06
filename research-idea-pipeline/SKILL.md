@@ -689,7 +689,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
-| 串联示例 | [examples/](examples/) | B→C→D→E 串联、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
+| 串联示例 | [examples/](examples/) | 主链路串联（`R3—R6 → R8 → R12 → R7`）、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
 
 ---
 

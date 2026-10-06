@@ -65,8 +65,8 @@ research-idea-pipeline/
 ├── examples/
 │   ├── example-project-layout.md     # 多路线目录与文档管理（新目录规范的完整示例）
 │   ├── example-d-narrative.md        # claim-first 叙事与选型
-│   ├── example-b-to-c-d-e.md         # 主链路串联
-│   ├── example-a-standalone.md       # 单独文献调研
+│   ├── example-full-pipeline.md      # 主链路串联（R3—R6 → R8 → R12 → R7）
+│   ├── example-field-mapping-standalone.md  # 单独文献调研（R2 / R5）
 │   ├── example-followup-review.md    # 接续复核
 │   └── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）

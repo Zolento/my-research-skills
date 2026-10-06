@@ -1233,6 +1233,41 @@ class TestR7FirstPassAuditTarget(unittest.TestCase):
             self.assertIn("`assumptions`", row, f"{rel} 的 R7 读集缺 assumptions")
 
 
+class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
+    """`examples/` 是用户照抄的对象 —— 示例示范旧写法比正文陈旧更危险。
+
+    起因：正文改完后，`examples/` 仍在走 B→C→D→E 并派遣「八子代理」，
+    而且两个文件名本身编码了退役流水线（`example-b-to-c-d-e` / `example-a-standalone`）。
+    正文扫描当时把 `examples/` 排除了，所以这一层一直没被检查。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    RETIRED_WORDS = (
+        "B→C", "C→D", "D→E", "八子代理", "七个子代理",
+        "创新性研究", "可行性研究", "论文格式展开", "实验流程设计",
+    )
+    RETIRED_FILE_NAMES = ("example-b-to-c-d-e.md", "example-a-standalone.md")
+
+    def test_examples_have_no_retired_pipeline_wording(self) -> None:
+        offenders = []
+        for path in sorted((self.ROOT / "examples").glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            for word in self.RETIRED_WORDS:
+                if word in text:
+                    offenders.append(f"{path.name}: {word}")
+        self.assertEqual(offenders, [], f"示例仍在示范退役流程：{offenders}")
+
+    def test_no_example_file_name_encodes_retired_pipeline(self) -> None:
+        names = {path.name for path in (self.ROOT / "examples").glob("*.md")}
+        for bad in self.RETIRED_FILE_NAMES:
+            self.assertNotIn(bad, names, f"示例文件名仍在编码退役流水线：{bad}")
+
+    def test_every_example_is_registered_in_readme(self) -> None:
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        for path in sorted((self.ROOT / "examples").glob("*.md")):
+            self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
+
+
 class TestPhaseDocNoLegacyFlow(unittest.TestCase):
     """迁移后的 phase 文档不得再含旧字母流程的**活跃**小节。
 
