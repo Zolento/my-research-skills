@@ -64,6 +64,20 @@ npx skills remove research-idea-pipeline -g -y  # 卸载
 
 ---
 
+## 分支与开发产物
+
+`main` 的职责是**可安装的 skill 集合** —— 它的根目录只有本文件与各 skill 子目录。
+
+**根 `docs/` 属开发产物**（设计规格 `*-spec.md`、验证记录 `verify-*.md`、审查报告
+`review/*.md`），只与开发有关，**不在 `main` 上**；它保留在开发分支
+（如 `research-idea-pipeline-dev`），那是设计记录的家。
+
+> **维护提示：** 若在开发分支上**修改**根 `docs/`，再向 `main` 合并时会遇到
+> `modify/delete` 冲突 —— 因为 `main` 已删除该路径。**按「保留删除」处理**：
+> 开发文档不要进 `main`。新增开发文档请直接提交到开发分支。
+
+---
+
 ## 仓库结构
 
 ```
