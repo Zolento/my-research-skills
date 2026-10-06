@@ -31,6 +31,7 @@ research-idea-pipeline/
 │   ├── scoring-policy.md             # 两层：硬门禁 G1—G5 + 排序六维（D）；极性归一化/中位数/一票否决（E）
 │   ├── evidence-policy.md            # 五类共享政策：证据等级 ↔ 允许/禁止表述（唯一定义）
 │   ├── project-intake.md             # 存量项目接管清单（9 维度；已有信息不得重复询问）
+│   ├── invocation-prompts.md         # 四个用户入口调用契约（start / continue / explore / audit）
 │   ├── scheduler-policy.md           # 跨阶段调度：R0—R14 是能力不是 workflow；八级 next_action_policy + EIG÷cost
 │   ├── writing-policy.md             # 落盘文档/对话返回/子代理意见共用：受控中文三档（asd-ste100 / Strict / 中文-顺）
 │   ├── phase-r2-r5-field-mapping-retrieval.md   # R2 / R5：文献调研（A1—A7）

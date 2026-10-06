@@ -255,6 +255,47 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 
 ---
 
+### 0.3 首次运行：Bootstrap 编排（**只观察，不干预**）
+
+**结论：第一次在本项目调用本 Skill 时，只允许执行下面这一个 Bootstrap 序列；不得自动跑 `R3`—`R14`。**
+
+```text
+B0 Repo Intake              ─▶ 按 project-intake.md 盘点（已有信息不得重复询问）
+B1 Existing Asset Discovery ─▶ 从已有代码 / 实验 / 文献 / 笔记中提取**真实**状态
+B2 Minimal R0 Contract      ─▶ 只写 contract（+ 模板骨架，含 state_version: 0）
+B3 Bootstrap R1             ─▶ 建 World Model 骨架（**必须稀疏**）
+B4 R2 Field Snapshot        ─▶ 领域地图快照（**不做穷尽检索**）
+B5 Initial Uncertainty Map  ─▶ 只在**有依据**时写 uncertainties[]
+B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用户确认**
+```
+
+> **`first invocation = observe before intervene`。**
+> 首次运行的价值在于**看清现状**，不在于推进研究。
+> **B6 之后必须停** —— 由用户决定下一步跑哪些阶段（见 §0 的 `phase` 参数）。
+
+**B3 的稀疏纪律（本序最重要的一条）：**
+
+> **`State completeness is not a goal; grounded completeness is.`**
+> **稀疏的真实状态优于编造的完整状态。**
+
+| 类别 | 首次运行的态度 |
+|---|---|
+| `contract` / `literature` / 已观测的 `evidence` / 已知 `experiments` / 已知 `failures` | **积极填**（这些在项目里真实存在） |
+| `claims` / `assumptions` / `uncertainties` | **谨慎提取**（须有原文 / 代码 / 数据支撑） |
+| `hypotheses` / 未来 `experiments` | **不要为了完整而生成** —— 除非项目里**已经有**这些内容 |
+
+**判据：** 首次运行结束时，**每一条 state 条目都必须能指回一个真实来源**
+（文件、代码、数据、实验记录或用户原话）。**指不回去的条目 = 编造**，
+必须删除，或改记为 `uncertainties[]`（`importance: medium`，说明"尚需确认"）。
+
+> **反面模式（必须避免）：** 为了"看起来完整"而一口气生成 `claims 12 / evidence 30 /
+> assumptions 15 / hypotheses 10` —— 其中大半是猜的。**那会让整份 World Model 失去可信度。**
+
+**四个用户入口**（用户不需要知道 `R` 编号）：见
+[references/invocation-prompts.md](references/invocation-prompts.md)。
+
+---
+
 ## 1. 全局不变量（所有 R 阶段强制遵守）
 
 以下六条是硬约束，任何 R 阶段都不得违反。执行前先确认，输出时自检。
@@ -640,6 +681,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | **状态校验脚本** | [scripts/state_check.py](scripts/state_check.py) | **V1—V21 机械闸门**：`--check` / `--json` / `--selftest` / `--list-rules`；退出码 0 通过 / 3 硬违规 / 4 环境 |
 | 状态校验测试 | [scripts/test_state_check.py](scripts/test_state_check.py) | 离线测试：V1—V21 每条一个反例 + 退出码行为 |
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
+| **调用契约（四个用户入口）** | [references/invocation-prompts.md](references/invocation-prompts.md) | `start-project` / `continue-research` / `explore` / `audit`：固定用户调用契约，**用户不需要知道 `R` 编号**；防止实际使用时绕过新哲学（一上手就发散、编造状态） |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routes/<R>/INDEX.md` 骨架（**资产目录 + 时间线**：Route Overview / Key Documents / Experiments / Decisions / Reviews / Milestones / Recent Research Changes / Archive；**不含已证实/已证伪/TODO/Bugs/Warnings**） |
 | 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
