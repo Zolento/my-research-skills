@@ -1185,3 +1185,52 @@ class TestPackagedLinks(unittest.TestCase):
 
     def test_link_scan_is_not_vacuous(self):
         self.assertGreaterEqual(len(list(self._links())), 200, "链接扫描数量骤降，正则或目录结构可能变了")
+
+
+# ---------------------------------------------------------------------------
+# frontmatter 完整性：发现能力不得被静默削弱
+# ---------------------------------------------------------------------------
+
+class TestSkillFrontmatter(unittest.TestCase):
+    """`SKILL.md` 的 frontmatter 是 `npx skills` 的**发现入口**。
+
+    曾经发生过一次回归：架构迁移把 `argument-hint`、`metadata.version` 与
+    整串触发关键词一起弄丢了——**skill 仍然能跑，但被"找到"的概率大幅下降**，
+    而这在功能测试里完全看不出来。本类把该契约机械化。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _frontmatter(self) -> str:
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("---\n"), "SKILL.md 必须以 frontmatter 开头")
+        end = text.index("\n---\n", 3)
+        return text[3:end]
+
+    def test_required_keys_present(self):
+        fm = self._frontmatter()
+        for key in ("name:", "description:", "argument-hint:", "metadata:", "version:"):
+            self.assertIn(key, fm, msg=f"frontmatter 缺少 {key}")
+
+    def test_name_matches_directory(self):
+        fm = self._frontmatter()
+        self.assertIn(f"name: {self.ROOT.name}", fm, "name 必须与 skill 目录名一致")
+
+    def test_version_is_semver_quoted(self):
+        fm = self._frontmatter()
+        match = re.search(r'version:\s*"([0-9]+\.[0-9]+\.[0-9]+)"', fm)
+        self.assertIsNotNone(match, "metadata.version 必须是被引号包住的 X.Y.Z")
+
+    def test_argument_hint_points_at_phase_not_mode(self):
+        fm = self._frontmatter()
+        self.assertIn("phase=", fm, "argument-hint 必须用 phase= 入口")
+        self.assertNotIn("mode=", fm, "不得再出现已退役的 mode= 入口")
+
+    def test_trigger_keywords_are_retained(self):
+        """触发词是发现能力的实质；数量骤降说明有人把描述改瘦了。"""
+        fm = self._frontmatter()
+        match = re.search(r"Triggers:(.*?)\nargument-hint:", fm, re.S)
+        self.assertIsNotNone(match, "description 必须含 Triggers: 段落")
+        raw = match.group(1)
+        keywords = [x.strip() for x in re.split(r"[,\n]", raw) if x.strip()]
+        self.assertGreaterEqual(len(keywords), 40, f"触发词只有 {len(keywords)} 个，疑似被削减")

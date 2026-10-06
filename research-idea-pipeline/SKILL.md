@@ -2,17 +2,29 @@
 name: research-idea-pipeline
 description: >-
   以 Research State 为中心的科研搜索系统，面向 CVPR / ICML / NeurIPS / MICCAI 投稿：
-  双循环（Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复）共 15 个阶段
-  R0—R14，由 24 条硬规则机械强制。适合文献调研、寻找研究缺口、从 idea 走到可投稿方案、
-  多套路叙事与对抗审查、以及用证据淘汰错误解释。
-  首次进入已有代码项目走 Bootstrap（只观察不推进）；日常用四个入口
-  start-project / continue-research / explore / audit。
+  双循环（Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复）共 15 个阶段 R0—R14，
+  由 24 条硬规则机械强制。首次进入已有代码项目走 Bootstrap（只观察不推进）；
+  日常用四个入口 start-project / continue-research / explore / audit。
   End-to-end research search system centered on a Research State: a dual loop
   (Discovery expands and preserves diversity; Assurance attacks and repairs)
   across 15 stages R0-R14, with 24 machine-enforced hard rules. Use when the
   user wants to survey literature, find a research gap, turn an idea into a
   submittable proposal plus experiment plan, generate and adversarially review
   paper narratives, or let evidence eliminate wrong explanations.
+  Triggers: 找 idea, 头脑风暴, 研究创意, 文献调研, 相关工作, 研究缺口, 方案生成,
+  实验计划, 论文叙事, 叙事套路, 讲故事, 卖点, 叙事评审, 方案复核, 审阅方案,
+  投稿方案, 顶会投稿, 研究状态, 范式逃逸, 医学影像, 医学图像, 临床验证,
+  research idea, idea discovery, brainstorm ideas, find a gap, novel idea,
+  literature survey, related work, research proposal, experiment plan,
+  paper narrative, storytelling, framing, positioning, narrative review,
+  proposal review, mock review, reviewer critique, paradigm escape,
+  research state, MICCAI, medical image analysis, clinical validation,
+  proposal, narrative, review, 定位
+argument-hint: "phase=R0..R14 [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
+metadata:
+  author: research-idea-pipeline
+  version: "2.0.0"
+  upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 
 # Research Idea Pipeline（顶会研究创意流水线）
