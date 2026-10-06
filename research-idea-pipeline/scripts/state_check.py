@@ -6,7 +6,8 @@
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
 与 §2.3（引用完整性规则 V1—V24）、§5（R10 处置 / 关闭枚举）；
 V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4；
-V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5 跨阶段机制）。
+V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5 跨阶段机制）；
+V22—V24 为 clean-room 复验后的收尾（claim 真值可追溯 / Integrity Gate 闭环 / decision 枚举）。
 
 **为什么必须有这个脚本：**「八类一等对象」只写在 policy 里，执行者会写成散文。
 没有 validator，"一等对象"是宣言，不是机制。本脚本把 spec 的规则变成可执行判定，
@@ -81,7 +82,8 @@ V18—V21 见 `docs/r-architecture-wave5-spec.md` §1.4 / §2.4 / §3.3（Wave 5
     * `X.parent` 键缺失或为 `null` = 根节点；缺失 `assurance` / `repairs` 顶层键 = 空数组。
     * 顶层允许把 world model 包在 `world_model` / `research_state` / `state` 单键下（自动解包）。
     * V1—V24 之外**不新增**硬规则（契约 = Wave 1 spec §2.3 + Wave 2 spec §4 +
-      Wave 4 的 V16/V17 + Wave 5 spec §1.4/§2.4/§3.3 的 V18—V21）。
+      Wave 4 的 V16/V17 + Wave 5 spec §1.4/§2.4/§3.3 的 V18—V21 +
+      本节新增的 V22（claim 真值须经 R10 覆盖）/ V23（Integrity Gate 必须闭环）/ V24（decision 枚举））。
 
 退出码（与仓库既有脚本一致）：
     0  全部通过
