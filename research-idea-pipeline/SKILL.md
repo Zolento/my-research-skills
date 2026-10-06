@@ -207,7 +207,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 |---|---|
 | **R2 / R5** | **检索边界：** 理论锚点必须查定理 / 反例 / 不可能性与负结果；性能锚点必须查 SOTA 与评测协议 |
 | **R3—R6** | **推导与筛选：** 理论锚点优先"假设挑战"，性能锚点优先"问题重构 / 组合创新"；QD archive 的 elite 集合 只收服务主锚点的 idea |
-| **R8** | **贡献类型与实验：** 理论锚点下 C4 必须含证明 / 反例；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
+| **R8** | **贡献类型与契约：** 理论锚点下证据契约必须含证明 / 反例 / 边界条件；性能锚点下必须含同算力·同数据·同调参的公平比较与显著性检验 |
 | **R12** | **叙事资格（先于选 preset）：** 先做 **Anchor Eligibility Test**（[claim-first-policy.md](references/claim-first-policy.md) §6）——只有 `eligible` / `conditional` 的锚点才可用于组织叙事；与作者**目标锚点**冲突时**必须显式告知**。通过后再按 [narrative-patterns.md](references/narrative-patterns.md) §2 选 preset |
 | **R7 / R10 / R13** | **评审权重：** 理论锚点首查证明正确性；性能锚点首查公平比较、指标口径与统计方案 |
 
@@ -320,7 +320,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
 | T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
 | T3 | **可行性不确定**（能不能做、资源够不够、是否已有不可能性结果） | L2 强化 |
-| T4 | 新颖性判定（R8 的 C1、R12 的 S-Lit、R7 / R10 / R13 的 S-Lit/S-Nov） | **L3 穷尽**（**例外：R3—R6 的 B5 概念级快筛 = L2**，只有写进文档的「首次提出」声称才回到 L3，见 §4 R3—R6） |
+| T4 | 新颖性判定（**R7 / R12 的 `S-Lit`**、R7 / R10 / R13 的 `S-Nov`） | **L3 穷尽**（**例外：R3—R6 的 B5 概念级快筛 = L2**，只有写进文档的「首次提出」声称才回到 L3，见 §4 R3—R6） |
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
@@ -702,7 +702,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 |---|---|
 | **R2 / R5** | 无（执行者直接完成检索与归纳） |
 | **R3—R6** | **候选由隔离 Exploration Agents 按 island 生成**：`P1`—`P6` 各一个独立上下文（**互不可见**），另加 `local`；执行者只做编排、隔离、路由、汇总与写 state，**不得亲自补写候选**。generation 完成后才由 `S-Lit` + `R-Novelty` + `R-Causal` + `S-Feas` 做 concept 级 hygiene 快筛，`S-Devil` 出致命反驳。**不派 venue 角色**；**不派 S-Repro**。详见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6 |
-| **R8** | 由 `A-Author` / `A-Experimenter` 展开提案与实验计划；核实由 `S-Lit`、**`S-Nov`（按需）**、`S-Theory`、`S-Feas`；**venue 角色不派** |
+| **R8** | 证据契约与 `proposal.md` 由 `A-Author` / `A-Experimenter` 落盘；核实由 `R-Theory` / `S-Theory` / `S-Feas`（常规）+ **R7 的 `S-Lit` 结论（不重做 L3）**；`S-Nov` 按需。**venue 角色不派**，**不派 `S-Repro`**，**不派六个攻击面审稿人** |
 | **R12** | **攻击面审核（六人全部派遣、不得裁减）**：R-Novelty、R-Causal、R-Experimental、R-Theory、R-Generalization、R-Utility；**S-Lit 恒派**（L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例，喂 `G3`/`G4`）；按需 **S-Nov / S-Feas / S-Repro**。会议审稿人**不派**，只在 **R12 / R13 的 venue calibration** 中以校准表出现 |
 | **R7 / R10 / R13** | **R7 按八个攻击面派遣算子**：`S-Lit`（最近工作碰撞）+ `R-Novelty`、`R-Causal`（更简单解释）、`R-Experimental`（识别 + 统计两读数）、`R-Theory`、`R-Generalization`（scope）、`S-Repro`（实现与可复现）、**`S-Integrity`（完整性，R13 生效）**；`S-Feas` 按需。**venue 角色**（见 [roles.md](references/roles.md) §1）**不参与科学发现**，只在 R12/R13 的校准表里出现。 |
 
@@ -797,16 +797,21 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 ### R8 — 证据契约
 
-- **输入：** 一个或多个 idea（来自 R3—R6 或用户直接提供）；关键参考文献（可选）；
-  资源约束（可选）。
-- **流程：** C1 创新性研究（**对 B5 的增量复核**：只深化 B5 判"边缘/不足"的项；
-  B5 判"足够"且期间无新文献的项直接引用 B5 结论，不重做 L3；四审稿人视角 + S-Lit 核实）
-  → C2 可行性研究
-  （S-Feas + S-Theory）→ C3 论文格式展开 → C4 实验流程设计（0—13 共 14 节）→ C5 输出。
-- **交付物：** 论文提案（1500—2000 字）+ 实验流程计划书 + 创新性判定 + 可行性评分
-  + 风险清单。
-- **落盘：** `routes/<R>/docs/<R>NNN-proposal.md` + `routes/<R>/docs/<R>NNN-experiment-plan.md`（各占独立序号），
-  并更新该路线 `INDEX.md`（方案索引、TODO、依赖与风险）。
+- **输入：** `claims[]`（R3—R6 的 seed claim）+ `evidence[]` + `assurance[]`（R7 的攻击结论）；
+  一个或多个 idea（来自 R3—R6 或用户直接提供）；资源约束（可选）。
+- **流程：** ① 把 R7 的六攻击面**五元组**逐条转成契约的必答项（`Alternative` → `nearest_alternative`，
+  `Discriminating Test` → `minimal_discriminating_experiment`，`Kill Condition` → `kill_rule`）
+  → ② 每条 central claim 建一张证据契约（10 键，见
+  [references/phase-r8-evidence-contract.md](references/phase-r8-evidence-contract.md) §R8.2.2）
+  → ③ 从契约派生 `planned` 实验并**冻结 `preregistration`**
+  → ④ **证据驱动的单向 `status` 升级** → ⑤ 写 `proposal.md`。
+- **不做什么：** **不创建 claim**（claim 由 R3—R6 创建）；**不重做**新颖性检索（引用 R7 的
+  `S-Lit` 结论）；**不要求 artifact**（R8 无 code / logs / failed runs）；**不降级、不写 `killed`**。
+- **交付物：** 论文提案（1500—2000 字，含**证据契约摘要**节）+ `claims[].contract`
+  + `planned` 实验（含冻结的 `preregistration`）；`evidence.md` / `theory.md` 按需。
+- **落盘：** `routes/<R>/docs/<R>NNN-proposal.md`（`evidence.md` / `theory.md` 各占独立序号），
+  并更新该路线 `INDEX.md`。
+  **`experiment-plan.md` 不属于 R8** —— 实验规划文档由 **R9—R11** 落盘。
 
 ### R12 — 叙事（state 的视图）
 

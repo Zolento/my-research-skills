@@ -263,7 +263,7 @@ routes/A/docs/
 |---|---|---|---|
 | `I<n>` | **idea**（由 R3—R6 产出，R8 / R12 引用） | `-discovery.md` | `I1`、`I3` |
 | `N<k>` | **叙事 preset**（全局固定 1—10，见 [narrative-patterns.md](narrative-patterns.md) §1；**非互斥**） | preset 库 | `N2`、`N9` |
-| `K<n>` | **贡献**（方案内；**不用 C**，避免与 R8 章节号 C1—C7 撞） | `-proposal.md` | `K1`、`K2` |
+| `K<n>` | **贡献**（方案内；**不用 `C`**，避免与 state 的 claim `C<n>` 撞） | `-proposal.md` | `K1`、`K2` |
 | `E<n>` | **实验** | `-experiment-plan.md` | `E1`、`E4` |
 | `H<n>` | **假设** | `-experiment-plan.md` | `H1` |
 

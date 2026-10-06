@@ -881,6 +881,107 @@ class TestTableIntegrity(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# 规则副本比对 / R8 契约三方一致 / phase 文档不得残留旧字母流程
+# ---------------------------------------------------------------------------
+
+class TestRuleTableParity(unittest.TestCase):
+    """一条规则有多个副本 → 必须有检查比对副本。
+
+    规则正文的权威副本是 policy §4 的规则表；`state_check.py` 的 `RULES` 是执行副本。
+    两者逐字不一致时，文档与代码各自「正确」，合起来是错的。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _policy_rows(self):
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        return dict(re.findall(r"^\| (V\d+) \| (.+?) \| 硬 \|", text, re.M))
+
+    def test_policy_rule_table_is_parseable(self) -> None:
+        # 正则静默失配时，下面的比对会「全绿」——先锁住解析结果本身。
+        rows = self._policy_rows()
+        self.assertEqual(len(rows), len(sc.RULES), "policy §4 解析到的规则数不等于 RULES")
+        self.assertIn("V1", rows)
+        self.assertIn("V24", rows)
+
+    def test_policy_rule_text_matches_validator(self) -> None:
+        rows = self._policy_rows()
+        self.assertEqual(set(rows), set(sc.RULES), "policy §4 的规则号集合与 RULES 不一致")
+        for rule, expected in sc.RULES.items():
+            self.assertEqual(rows[rule].strip(), expected.strip(), f"{rule} 文档与代码不一致")
+
+
+class TestR8ContractParity(unittest.TestCase):
+    """R8 的头号产物 `claims[].contract` —— spec、模板两处必须一致。
+
+    起因：R8 迁移后 `contract` 只在模板里存在，spec 侧没有字段表，
+    `state_check.py` 零校验。本组同时锁住键集合与键顺序。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    SPEC = "references/phase-r8-evidence-contract.md"
+
+    def _spec_keys(self):
+        text = (self.ROOT / self.SPEC).read_text(encoding="utf-8")
+        begin = text.index("### R8.2.2")
+        end = text.index("### R8.2.3", begin)
+        return re.findall(r"^\| `([a-z_]+)` \|", text[begin:end], re.M)
+
+    def test_spec_contract_table_has_ten_keys(self) -> None:
+        keys = self._spec_keys()
+        self.assertEqual(len(keys), 10, f"§R8.2.2 契约键数不是 10：{keys}")
+
+    def test_spec_keys_match_template_contract(self) -> None:
+        tmpl = json.loads((self.ROOT / "templates" / "research-state.template.json")
+                          .read_text(encoding="utf-8"))
+        contract = tmpl["claims"][0]["contract"]
+        self.assertEqual(self._spec_keys(), list(contract),
+                         "§R8.2.2 的契约键与模板 claims[].contract 不一致（含顺序）")
+
+    def test_preregistration_op_seven_values_documented(self) -> None:
+        text = (self.ROOT / self.SPEC).read_text(encoding="utf-8")
+        for op in sc.PREREG_OPS:
+            self.assertIn(op, text, f"R8 文档未登记 preregistration op：{op}")
+
+
+class TestPhaseDocNoLegacyFlow(unittest.TestCase):
+    """迁移后的 phase 文档不得再含旧字母流程的**活跃**小节。
+
+    起因：迁移只加 precedence note，旧 `B/C/E` 小节仍原地可执行 ——
+    注释不是隔离。对 LLM 读者，留着就等于两套流程并存。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    R8 = "references/phase-r8-evidence-contract.md"
+    LEGACY_FLOW_WORDS = ("创新性研究", "可行性研究", "论文格式展开", "实验流程设计")
+
+    def test_r8_has_no_legacy_letter_headings(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        offenders = re.findall(r"^#{1,3}\s+C\d+[.．]", text, re.M)
+        self.assertEqual(offenders, [], f"R8 文档仍含旧 C 级小节标题：{offenders}")
+
+    def test_r8_has_no_legacy_flow_words(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        for word in self.LEGACY_FLOW_WORDS:
+            self.assertNotIn(word, text, f"R8 文档仍含旧流程词：{word}")
+
+    def test_r8_deliverables_exclude_experiment_plan(self) -> None:
+        # project-layout.md §2.2 把 experiment-plan.md 归 R9—R11。
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        begin = text.index("## R8.4 交付物与落盘")
+        end = text.index("## 读 / 写 World Model", begin)
+        for line in text[begin:end].splitlines():
+            if line.startswith("| **"):
+                self.assertNotIn("NNN-experiment-plan.md", line,
+                                 "experiment-plan.md 属于 R9—R11，不得出现在 R8 交付物表")
+
+    def test_r8_states_contract_ownership_boundary(self) -> None:
+        text = (self.ROOT / self.R8).read_text(encoding="utf-8")
+        for phrase in ("不创建 claim", "不重做", "不要求 artifact"):
+            self.assertIn(phrase, text, f"R8 文档缺少边界声明：{phrase}")
+
+
+# ---------------------------------------------------------------------------
 # V18—V21：状态失效传播 / 验证可信度层级 / 结果预注册
 # ---------------------------------------------------------------------------
 
