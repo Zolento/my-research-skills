@@ -32,7 +32,7 @@ research-idea-pipeline/
 │   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
 │   ├── scoring-policy.md             # 两层评分：硬门禁 G1—G5 + 排序六维；极性归一化/中位数/一票否决
 │   ├── roles.md                      # 共享角色：八攻击面审稿人 + 证据核验员；venue 角色仅作 R12/R13 校准
-│   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，兼 QD archive niche）+ (O,T,R) 选 preset + 六槽位 S1—S6
+│   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，**只用于 R12**；QD niche 是七个独立科学结构轴）+ (O,T,R) 选 preset + 六槽位 S1—S6
 │   ├── venue-standards.md            # CVPR / ICML / NeurIPS / MICCAI 2026 标准（逐条附 URL）+ 顶刊 + contribution type
 │   ├── writing-policy.md             # 受控中文三档（asd-ste100 / Strict / 中文-顺）
 │   └── phase-r0-contract.md          # R0：研究契约（只写 contract）

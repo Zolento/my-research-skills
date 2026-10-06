@@ -376,18 +376,62 @@ venue fit 不明确 / 当前证据不足。
 **禁止** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为每个 niche 留一个 elite：
 
 ```text
-Niche N2（瓶颈突破/移除假设）        elite: H12
-Niche N5（统一框架）                 elite: H31
-Niche N3（跨域理论迁移）             elite: H44
-Niche N10（不可能性/负结果）         elite: H59
-Niche N8（Benchmark/评测）           elite: H62
+Niche assumption-shift（改了一条被共享的假设）      elite: H12
+Niche mechanism-shift（换了「为什么有效」的机制）    elite: H31
+Niche theory-shift（换了一套数学语言）               elite: H44
+Niche boundary-shift（给出不可能性 / 反例）          elite: H59
+Niche evaluation-shift（改了度量 / 协议 / 观察量）    elite: H62
 ```
 
-- **niche 取值就是 `N1—N10` preset 名** —— 复用已冻结的 10 套，**不引入第二套枚举**（V6 强制）。
-- **`state_check.py` V15 强制**：每个出现过的 niche 至少有一条 `status: elite`。
-  没有 elite 的 niche 要嘛补一条 elite，要嘛就不要开这个 niche。
+#### R4.2.1 QD niche 的七个科学结构轴（**冻结，逐字**）
+
+**niche 回答的是：这个 candidate 主要在哪个科学结构轴上离开已有范式。**
+
+| `niche` | 改了什么 |
+|---|---|
+| `assumption-shift` | **假设**：移除 / 反转一条被共享的假设 |
+| `formulation-shift` | **问题**：换 scientific object / 未知量 / 目标 / 成功判据 |
+| `representation-shift` | **表示**：换数学表示 / 编码 / 抽象层 |
+| `mechanism-shift` | **机制**：换「为什么有效」的作用机制 |
+| `theory-shift` | **理论坐标系**：换一套数学语言并导出后果 |
+| `evaluation-shift` | **评估对象**：换度量 / 协议 / 观察量 |
+| `boundary-shift` | **边界**：发现不可能性 / 反例 / 失效条件 |
+
+> **`island` ≠ `niche`。** 两个正交维度，不得混用：
+>
+> | 维度 | 回答 | 取值 |
+> |---|---|---|
+> | `island` | idea **从哪里生成** | `P1`—`P6` / `local` |
+> | `niche` | idea **在科学结构上改变了什么** | 上表七轴 |
+>
+> **没有 `local` niche。** Local Search 已经是 island；一个 local 候选仍必须回答
+> 「它主要改变了机制？假设？还是评估？」。
+>
+> **不得用 R12 的叙事 preset `N1`—`N10` 当 niche 取值**（`V6` 强制）。两套枚举
+> 回答两个不同的问题，而且映射**有损** —— 例如叙事 preset「效率 / 可行性」在七轴里
+> 没有对应项。为了少维护一套枚举而让 Narrative ontology 泄漏进 Discovery，
+> 代价是候选聚类按「怎么讲故事」而不是「改了什么结构」发生。
+
+#### R4.2.2 `elite` = **within-niche 代表**，不是全局冠军（冻结）
+
+```text
+R4 elite = within-niche representative, not global winner
+```
+
+- **niche 只负责覆盖（coverage）。** 七个轴各留一个代表，保证 archive 里
+  「改假设的」「改表示的」「发现边界的」都在场。
+- **descriptors 只描述 candidate。** `structural_signature` 的五维距离、
+  `cross_domain_surprise`、`deductive_yield` 都只是**描述与搜索启发**，
+  **不得**用来在 archive 内做全局排序。
+- **selection pressure 从 R6 起才引入**（两阶段 fitness，见 §R6.3）。
+  在 R4 用 novelty 分数选 champion，会让 archive 退化成 Top-K ——
+  正是本节开头禁止的那条路径，只换了个名字。
 - **为什么**：只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」
   提前杀掉 —— 那正是 increment attractor 的入口。
+
+- **`state_check.py` V6 强制**：`hypotheses[].niche` ∈ 上表七轴。
+- **`state_check.py` V15 强制**：每个出现过的 niche 至少有一条 `status: elite`。
+  没有 elite 的 niche 要嘛补一条 elite，要嘛就不要开这个 niche。
 
 ### R4.3 archive 的更新规则
 
@@ -422,7 +466,7 @@ R6: Recombine            才允许不同世界互相借东西
 | `cross-domain crossover` | **跨 island** 组合两个候选的表示与机制（`P3` 抽象骨架 × `P4` 远域类比最常配对）。**这是唯一允许跨 island 融合的阶段** —— R3 严禁早熟收敛，见 R6.0 |
 | `simplification` | 删掉不必要假设 —— **删比加优先** |
 | `theory-induced deduction` | 从某个 theory lens 推出新命题 |
-| `new niche creation` | 现有 niche 都不合适时开新 niche（须同时给出 elite，否则 V15 失败） |
+| `new niche creation` | **让 population 首次占据一个当前尚为空的合法 niche** —— 即某个科学结构轴此前没有任何候选。**不是**动态发明第八个枚举值：七轴冻结（`V6`）。（须同时给出 elite，否则 V15 失败） |
 
 **每次进化 `generation + 1`**；到 **2 轮**仍未收敛 → 落 `uncertainties[]` 并交 R7，**不得无限进化**。
 

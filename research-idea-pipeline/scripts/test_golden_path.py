@@ -91,7 +91,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "假设移除", "theory_lens": "transfer-learning",
         "nearest_prior": "LIT1", "falsifier": "若解除 AS1 后能力不恢复则 H1 不成立",
         "expected_information_gain": 0.6, "status": "elite",
-        "niche": "N2", "island": "P2", "operator": "assumption_breaker",
+        "niche": "assumption-shift", "island": "P2", "operator": "assumption_breaker",
         "parents": [], "generation": 0,
         "depends_on": ["AS1"], "validity": _validity()})
     s["hypotheses"].append({
@@ -102,7 +102,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "问题重构", "theory_lens": "partial-identification",
         "nearest_prior": "LIT1", "falsifier": "若部分识别界为空则 H2 无意义",
         "expected_information_gain": 0.5, "status": "elite",
-        "niche": "N1", "island": "P1", "operator": "reframe",
+        "niche": "formulation-shift", "island": "P1", "operator": "reframe",
         "parents": [], "generation": 0,
         "depends_on": [], "validity": _validity()})
     # 同 niche（N2）的第二条候选：R4 的「重排 elite 归属」必须**同 niche 有替代者**才合法，
@@ -115,7 +115,7 @@ def r3_dual_discovery(s: Dict[str, Any]) -> None:
         "novelty_source": "假设移除（部分）", "theory_lens": "transfer-learning",
         "nearest_prior": "LIT1", "falsifier": "若部分解除无增益则 H3 不成立",
         "expected_information_gain": 0.4, "status": "active",
-        "niche": "N2", "island": "P2", "operator": "assumption_breaker",
+        "niche": "assumption-shift", "island": "P2", "operator": "assumption_breaker",
         "parents": [], "generation": 0,
         "depends_on": ["AS1"], "validity": _validity()})
     # R3 同时创建 seed claims（status: ungrounded, falsifier 必填）
@@ -144,7 +144,7 @@ def r6_evolution(s: Dict[str, Any]) -> None:
         "novelty_source": "简化（删假设优先于加）", "theory_lens": "transfer-learning",
         "nearest_prior": "H1", "falsifier": "若简化版无增益则 H4 不成立",
         "expected_information_gain": 0.3, "status": "active",
-        "niche": "N2", "island": "P2", "operator": "simplification",
+        "niche": "assumption-shift", "island": "P2", "operator": "simplification",
         "parents": ["H1"], "generation": 1,
         "depends_on": ["AS1"], "validity": _validity()})
 

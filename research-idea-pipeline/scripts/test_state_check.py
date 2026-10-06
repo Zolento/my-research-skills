@@ -123,7 +123,7 @@ def valid_state() -> Dict[str, Any]:
                 "novelty_source": "assumption-breaking", "theory_lens": "transfer-learning",
                 "nearest_prior": "LoRA", "falsifier": "R2 不降级",
                 "expected_information_gain": 0.4, "status": "active",
-                "niche": "N2", "island": "P2", "generation": 0, "status": "elite",
+                "niche": "assumption-shift", "island": "P2", "generation": 0, "status": "elite",
                 "operator": "assumption_breaker", "parents": [],
                 "depends_on": ["AS13"],
                 "validity": {"status": "valid", "reason": "上游假设未被推翻", "since_state_version": 0},
@@ -523,18 +523,21 @@ class TestV13V15(unittest.TestCase):
 
     def test_v15_niche_without_elite_is_hard(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="active"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="mechanism-shift", status="active"))
         r = sc.check_state(doc)
         self.assertEqual(r.exit_code, sc.EXIT_HARD); self.assertEqual(r.rules(), ["V15"])
 
     def test_v15_two_niches_each_with_elite_is_clean(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N5", status="elite"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="mechanism-shift", status="elite"))
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
     def test_v15_elite_counts_even_with_active_sibling(self) -> None:
         doc = valid_state()
-        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2", niche="N2", status="active"))
+        doc["hypotheses"].append(dict(doc["hypotheses"][0], id="H2",
+                                      niche="assumption-shift", status="active"))
         self.assertEqual(sc.check_state(doc).exit_code, sc.EXIT_OK)
 
     def test_v6_niche_must_be_preset_name(self) -> None:
@@ -1366,6 +1369,91 @@ class TestExamplesFreeOfRetiredPipeline(unittest.TestCase):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
         for path in sorted((self.ROOT / "examples").glob("*.md")):
             self.assertIn(path.name, readme, f"README 的示例清单未登记 {path.name}")
+
+
+class TestQdNicheDecoupling(unittest.TestCase):
+    """HIGH-1：QD niche 与 R12 叙事 preset 是**两套独立枚举**。
+
+    起因：`N1`—`N10` 曾同时被当 Narrative preset 与 QD archive niche，理由是
+    「避免第二套枚举」。代价是 Narrative ontology 泄漏进 Discovery，而且映射**有损** ——
+    例如 preset「效率 / 可行性」在七个科学结构轴里没有对应项。
+    允许 `N1`—`N10` 的位置只有：R12 / narrative preset / venue calibration。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    # 一行的上下文若含这些词，说明它在讲 QD / Discovery
+    QD_MARKERS = ("QD archive", "QD niche", "QD 科学结构轴", "hypotheses[].niche",
+                  "population", "niche")
+    # 一行的上下文若含这些词，说明它在讲叙事 preset / 校准 —— 那就是合法位置
+    PRESET_SAFE_MARKERS = ("preset", "叙事", "narrative", "calibration", "修辞")
+
+    def test_qd_niches_are_exactly_the_seven_axes(self) -> None:
+        self.assertEqual(sc.QD_NICHES, (
+            "assumption-shift", "formulation-shift", "representation-shift",
+            "mechanism-shift", "theory-shift", "evaluation-shift", "boundary-shift"))
+
+    def test_no_qd_niche_is_a_preset_name(self) -> None:
+        for niche in sc.QD_NICHES:
+            self.assertIsNone(re.match(r"^N\d+$", niche), f"{niche} 是 preset 编号，不是科学结构轴")
+
+    def test_there_is_no_local_niche(self) -> None:
+        # local 已经是 island；niche 回答的是「改了什么结构」
+        self.assertNotIn("local", sc.QD_NICHES)
+
+    def test_n_presets_never_appear_in_qd_context(self) -> None:
+        offenders = []
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            header = ""
+            for lineno, line in enumerate(lines, 1):
+                # 表格数据行继承自己的表头作为上下文（否则「最佳 preset」列的值会误报）
+                if re.fullmatch(r"\|[\s:|-]+\|", line.strip()) and lineno >= 2:
+                    header = lines[lineno - 2]
+                context = line + " " + header
+                if not re.search(r"\bN(?:10|[1-9])\b", line):
+                    continue
+                if any(marker in context for marker in self.PRESET_SAFE_MARKERS):
+                    continue
+                if any(marker in context for marker in self.QD_MARKERS):
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:70]}")
+        self.assertEqual(offenders, [], "N1—N10 出现在 Discovery/QD 上下文：" + str(offenders))
+
+    def test_validator_rejects_a_preset_as_niche(self) -> None:
+        doc = valid_state()
+        doc["hypotheses"][0]["niche"] = "N5"
+        report = sc.check_state(doc, source="<test>")
+        self.assertEqual(report.rules(), ["V6"])
+        self.assertIn("叙事 preset", report.violations[0].detail)
+
+    def test_island_and_niche_are_documented_as_orthogonal(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("`island` ≠ `niche`", text)
+        self.assertIn("没有 `local` niche", text)
+        self.assertIn("idea **从哪里生成**", text)
+        self.assertIn("科学结构上改变了什么", text)
+
+    def test_elite_is_a_within_niche_representative(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("R4 elite = within-niche representative, not global winner", text)
+
+    def test_new_niche_creation_is_reinterpreted(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        self.assertIn("首次占据一个当前尚为空的合法 niche", text)
+        self.assertIn("动态发明第八个枚举值", text)
+
+    def test_narrative_patterns_drops_the_dual_identity_claim(self) -> None:
+        text = (self.ROOT / "references" / "narrative-patterns.md").read_text(encoding="utf-8")
+        self.assertNotIn("也是 **R4 的 QD archive niche 取值**", text)
+        self.assertIn("只是叙事 preset，不是 QD archive 的 niche", text)
+
+    def test_next_actions_template_does_not_steal_the_preset_namespace(self) -> None:
+        # `N<k>` 已被 project-layout 的 ID 表保留给叙事 preset
+        text = (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8")
+        section = text[text.index("## Next recommended actions"):text.index("## Current decision")]
+        self.assertNotRegex(section, r"`N\d+`", "Next recommended actions 不得用 `N<k>` 当动作序号")
 
 
 class TestEigContract(unittest.TestCase):

@@ -199,7 +199,7 @@ A001 → A002 → A003 → A004 / A005
 ## Active hypotheses
 | # | 假设 | 状态 | niche |
 |---|---|---|---|
-| H1 | 松弛后可保留可行性保证 | elite | N2 |
+| H1 | 松弛后可保留可行性保证 | elite | `assumption-shift` |
 
 ## Critical uncertainties
 - 待核实条数：2
@@ -223,8 +223,8 @@ A001 → A002 → A003 → A004 / A005
 ## Next recommended actions
 | # | 动作 | 优先级 | 依赖 |
 |---|---|---|---|
-| N1 | 补齐松弛方案的可行性证明 | P0 | — |
-| N2 | 跑消融矩阵 E4—E7 | P1 | N1 |
+| 1 | 补齐松弛方案的可行性证明 | P0 | — |
+| 2 | 跑消融矩阵 E4—E7 | P1 | 1 |
 
 ## Current decision
 - 决策：continue

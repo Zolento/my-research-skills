@@ -233,7 +233,7 @@
       "falsifier": "解耦后跨中心落差不变或扩大（由 X8 判别）",
       "expected_information_gain": 0.35,
       "status": "elite",
-      "niche": "N2",
+      "niche": "assumption-shift",
       "island": "P2",
       "generation": 0,
       "operator": "assumption_breaker",

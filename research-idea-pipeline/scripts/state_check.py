@@ -41,7 +41,9 @@ Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为�
     V3  无任何 E 引用的 C 必须 `status: ungrounded`；有 E 却标 `ungrounded` 也是违规
     V4  每条 F 必须被至少一个 `claims[].known_flaws` 或 `experiments[].known_flaws` 引用
     V5  `epistemic_status` ∈ 五值；`Hypothesized` / `Unknown` 的条目不得出现在 `supporting_evidence`
-    V6  每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）
+    V6  每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift /
+        representation-shift / mechanism-shift / theory-shift / evaluation-shift /
+        boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10`
     V7  `U.cheapest_discriminating_test` 必须指向存在的 X，或字面量 `TBD`
     V8  `X.parent` 必须是存在的 X 或 `null`；树不得成环
     V9  `assurance[].kill_condition` 非空，且 `discriminating_test` 指向存在的 X 或 `TBD`
@@ -167,8 +169,15 @@ FAILURE_KINDS: Tuple[str, ...] = (
     "falsified", "unsupported", "inconclusive",
     "failed-to-reproduce", "engineering-failure", "deprioritized",
 )
-# Wave 2：QD archive 的 niche 复用 N1—N10 preset 名（不引入第二套枚举）
-NICHES: Tuple[str, ...] = tuple(f"N{n}" for n in range(1, 11))
+# HIGH-1：QD niche 与 R12 的叙事 preset **是两套独立枚举**。
+# QD niche 回答「这个 candidate 主要在哪个**科学结构轴**上离开已有范式」；
+# R12 的 `N1`—`N10` 回答「这套叙事用哪种修辞实现」。把两者合并会让
+# Narrative ontology 泄漏进 Discovery，且映射本身是有损的（例如「效率 / 可行性」
+# 在七轴里根本没有对应项）。
+QD_NICHES: Tuple[str, ...] = (
+    "assumption-shift", "formulation-shift", "representation-shift",
+    "mechanism-shift", "theory-shift", "evaluation-shift", "boundary-shift",
+)
 ISLANDS: Tuple[str, ...] = ("P1", "P2", "P3", "P4", "P5", "P6", "local")
 # HIGH-2：`P3` 只产 typed intermediate（`abstract_skeleton`），**不产 candidate** ——
 # 它不得出现在 `hypotheses[].island` 上。因此候选可用的 island 少一个。
@@ -267,7 +276,7 @@ RULES: Dict[str, str] = {
     "V3": "无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规",
     "V4": "每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用",
     "V5": "epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence",
-    "V6": "每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举）",
+    "V6": "每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift / representation-shift / mechanism-shift / theory-shift / evaluation-shift / boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10`",
     "V7": "U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD",
     "V8": "X.parent 必须是存在的 X 或 null；树不得成环",
     "V9": "assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD",
@@ -904,7 +913,11 @@ def _v5(ctx: _Context) -> List[Violation]:
 
 
 def _v6(ctx: _Context) -> List[Violation]:
-    """V6：每条 H 的 niche 非空，且取值必须是 N1—N10 之一（QD archive 的前提）。"""
+    """V6：每条 H 的 niche 非空，且取值必须是七个 QD 科学结构轴之一。
+
+    **QD niche 与 R12 的叙事 preset `N1`—`N10` 是两套独立枚举。** 用 preset 名
+    当 QD niche 在这里会被判违规（HIGH-1）。
+    """
     out: List[Violation] = []
     for index, hypothesis in ctx.hypotheses:
         value = hypothesis.get("niche")
@@ -914,11 +927,12 @@ def _v6(ctx: _Context) -> List[Violation]:
                 "V6", f"hypotheses[{index}].niche", detail, value, _subject_of(hypothesis),
             ))
             continue
-        if value.strip() not in NICHES:
+        if value.strip() not in QD_NICHES:
             out.append(Violation(
                 "V6",
                 f"hypotheses[{index}].niche",
-                f"不是 N1—N10 之一（QD archive 的 niche 复用 preset 名，不引入第二套枚举）",
+                f"不是七个 QD 科学结构轴之一（{'|'.join(QD_NICHES)}）；"
+                "R12 的叙事 preset `N1`—`N10` 不得用在这里",
                 value,
                 _subject_of(hypothesis),
             ))
@@ -974,7 +988,7 @@ def _v15(ctx: _Context) -> List[Violation]:
     niches = {}
     for index, hypothesis in ctx.hypotheses:
         niche = hypothesis.get("niche")
-        if not (_text_ok(niche) and niche.strip() in NICHES):
+        if not (_text_ok(niche) and niche.strip() in QD_NICHES):
             continue
         status = hypothesis.get("status")
         status = status.strip() if _text_ok(status) else ""
@@ -1891,7 +1905,7 @@ def _selftest_state() -> Dict[str, Any]:
             },
             "novelty_source": "assumption-breaking", "theory_lens": "transfer",
             "nearest_prior": "LoRA", "falsifier": "R2 不降级",
-            "expected_information_gain": 0.4, "status": "elite", "niche": "N2", "island": "P2", "generation": 0,
+            "expected_information_gain": 0.4, "status": "elite", "niche": "assumption-shift", "island": "P2", "generation": 0,
             "operator": "assumption_breaker", "parents": [],
             "depends_on": ["AS1"],
             "validity": {"status": "valid", "reason": "尚无失效上游", "since_state_version": 0},
@@ -2071,12 +2085,18 @@ def selftest() -> int:
     check("V14 generation 为负 → 3", v14b.exit_code == EXIT_HARD and v14b.rules() == ["V14"])
 
     v6b = report_with(lambda d: d["hypotheses"][0].update(niche="assumption-breaking"))
-    check("V6 niche 不在 N1—N10 → 3", v6b.exit_code == EXIT_HARD and v6b.rules() == ["V6"])
+    v6c = report_with(lambda d: d["hypotheses"][0].update(niche="N2"))
+    check("V6 用叙事 preset 当 QD niche → 3（HIGH-1）",
+          v6c.exit_code == EXIT_HARD and v6c.rules() == ["V6"]
+          and "叙事 preset" in v6c.violations[0].detail)
+    check("V6 niche 不是 QD 科学结构轴 → 3",
+          v6b.exit_code == EXIT_HARD and v6b.rules() == ["V6"])
 
     def _no_elite(d):
-        d["hypotheses"].append(dict(d["hypotheses"][0], id="H2", niche="N5", status="active", generation=0))
+        d["hypotheses"].append(dict(d["hypotheses"][0], id="H2",
+                                    niche="mechanism-shift", status="active", generation=0))
     v15 = report_with(_no_elite)
-    check("V15 niche N5 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
+    check("V15 niche 无 elite → 3", v15.exit_code == EXIT_HARD and v15.rules() == ["V15"])
 
     def _all_killed_niche(d):
         """V15 回归：一个 niche 的候选全被杀后，state 仍须合法。"""

@@ -285,7 +285,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `falsifier` | 字符串 | ✅ | |
 | `expected_information_gain` | 数值（如 `0.0`） | ✅ | EIG 排序用（spec §4） |
 | `status` | `active` \| `elite` \| `archived` \| `killed` | ✅ | |
-| `niche` | `N1`—`N10` 之一（**V6 强制**；复用 preset 名，不引入第二套枚举） | ✅ | V6；QD archive 的前提 |
+| `niche` | 七个 QD 科学结构轴之一（**V6 强制**）：`assumption-shift` / `formulation-shift` / `representation-shift` / `mechanism-shift` / `theory-shift` / `evaluation-shift` / `boundary-shift` | ✅ | V6；QD archive 的前提。**与 R12 的叙事 preset `N1`—`N10` 无关**，不得混用 |
 | `island` | `P1`—`P6` / `local` | ✅ | 该候选由哪条 escape 轨产生（默认开启 `P1`—`P4`；`local` = Local Search）；**V13 强制**。**`P3` 不出现在这里** —— 它只产 typed intermediate（见 §5.0 规则 1） |
 | `operator` | 十二算子之一（见下表） | ✅ | 产生该候选的搜索算子；`generation == 0` 时**必须与 `island` 一一对应**；**V16 强制** |
 | `parents` | `H` id 数组，可为 `[]` | ✅ | 谱系：父候选；初始候选写 `[]`；**V17 强制**（必须存在、不得自指或成环、generation 严格大于每个 parent） |
@@ -470,7 +470,7 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 | V3 | 无任何 E 引用的 C 必须 status: ungrounded；有 E 却标 ungrounded 也是违规 | 硬 | 无证据的 `C3` 标 `supported`；有 `E1` 的 `C0` 标 `ungrounded` |
 | V4 | 每条 F 必须被至少一个 claims[].known_flaws 或 experiments[].known_flaws 引用 | 硬 | `F3` 只出现在 `failures[].referenced_by` 里，没有任何 `known_flaws` 指向它 |
 | V5 | epistemic_status ∈ 五值；Hypothesized / Unknown 的条目不得出现在 supporting_evidence | 硬 | `C0.supporting_evidence: ["E4"]`，而 `E4.epistemic_status: Hypothesized`；或写了 `"observed"`（大小写） |
-| V6 | 每条 H 的 `niche` 非空**且 ∈ `N1`—`N10`**（复用 preset 名，不引入第二套枚举） | 硬 | `"niche": ""` / `"niche": "N11"`（越界）；**旧描述性 niche 名同样违规**（见 `deprecated-terms.txt`） |
+| V6 | 每条 H 的 `niche` 非空**且 ∈ 七个 QD 科学结构轴**（assumption-shift / formulation-shift / representation-shift / mechanism-shift / theory-shift / evaluation-shift / boundary-shift）—— **不得**用 R12 的叙事 preset `N1`—`N10` | 硬 | `"niche": ""`；`"niche": "N5"`（**叙事 preset 越界**）→ 应写 `"boundary-shift"`；**旧描述性 niche 名同样违规**（见 `deprecated-terms.txt`） |
 | V7 | U.cheapest_discriminating_test 必须指向存在的 X，或字面量 TBD | 硬 | 指向 `X18`，但 `experiments[]` 里没有 `X18`；或写「暂无」 |
 | V8 | X.parent 必须是存在的 X 或 null；树不得成环 | 硬 | `X7.parent: "X8"`、`X8.parent: "X7"`（互指成环）；或 `parent: "X99"` |
 | V9 | assurance[].kill_condition 非空，且 discriminating_test 指向存在的 X 或 TBD | 硬 | `"kill_condition": ""`；`discriminating_test` 指向未登记的实验 |
@@ -479,7 +479,7 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 | V12 | status == failed 的 X 必须被某条 failures[].referenced_by 引用（失败不得消失） | 硬 | failed 实验没有对应 `F` |
 | V13 | hypotheses[].island ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 **`P3` 不得出现**（P3 只产 typed intermediate，不产 candidate） | 硬 | `"island": "PX"`；`"island": "P3"` |
 | V14 | hypotheses[].generation 是非负整数 | 硬 | `"generation": "1"` / `-1` |
-| V15 | 每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite | 硬 | `N5` 下全是 `active` |
+| V15 | 每个 live niche（含 status ∈ {active, elite} 的候选）至少有一条 status: elite；全部 killed/archived 的 niche 不要求 elite | 硬 | `assumption-shift` 下全是 `active` |
 | V16 | hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应 | 硬 | `{"island": "P2", "generation": 0, "operator": "reframe"}`；或 `"operator": "Reframe"`（大小写）；或空串 |
 | V17 | hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环） | 硬 | `"parents": ["H9"]` 但无 `H9`；`"parents": []` 而 `generation: 1`；`H3.parents: ["H4"]` 且 `H4.parents: ["H3"]` |
 | V18 | 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；since_state_version 是 ≤ state_version 的非负整数 | 硬 | 缺 `validity`；`"status": "ok"`；`"reason": ""`；`since_state_version: 7` 而 `state_version: 3` |
@@ -723,22 +723,21 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 | `pivot_proposal` | **无同名值** → 这是 **R14 的 `decision: pivot`**，不是 R10 处置；R10 用 `KILL_BRANCH` + `state_delta` 收掉旧分支 |
 | `accept_limitation` | **它是 `closure`，不是 `disposition`** → `closure: ACCEPTED_LIMITATION`，并同步写 `C.scope` 或 `C.known_flaws` |
 
-#### 3.12.4 niche 描述性概念 → `N1`—`N10`
+#### 3.12.4 niche 描述性概念 → 七个 QD 科学结构轴
 
 | 描述性 niche 概念 | `hypotheses[].niche` |
 |---|---|
-| 新问题 / 新设定 | `N1` |
-| 移除假设 / 瓶颈突破 | `N2` |
-| 跨域理论迁移 | `N3` |
-| 现象发现与解释 | `N4` |
-| 统一框架 | `N5` |
-| 效率 / 可行性 | `N6` |
-| 鲁棒性 / 泛化 | `N7` |
-| 评测反转 / 基准改造 | `N8` |
-| 矛盾解决 | `N9` |
-| 不可能性 / 负结果 | `N10` |
+| 移除 / 反转一条被共享的假设 | `assumption-shift` |
+| 换问题表述 / 未知量 / 目标 / 成功判据 | `formulation-shift` |
+| 换数学表示 / 编码 / 抽象层 | `representation-shift` |
+| 换「为什么有效」的作用机制 | `mechanism-shift` |
+| 换一套数学语言并导出后果 | `theory-shift` |
+| 换度量 / 协议 / 观察量 | `evaluation-shift` |
+| 发现不可能性 / 反例 / 失效条件 | `boundary-shift` |
 
-> ⚠️ **任何英文描述性 niche 名（含旧名与新造名）都不得写进 `hypotheses[].niche`** ——
-> V6 只收 `N1`—`N10`，旧描述性名已登记在 [deprecated-terms.txt](deprecated-terms.txt)。
+> ⚠️ **任何描述性 niche 名（含旧名与新造名）都不得直接写进 `hypotheses[].niche`** ——
+> V6 只收上表七个英文轴值。**R12 的叙事 preset `N1`—`N10` 同样不得写进去**：
+> 两套枚举回答两个不同问题，且映射**有损**（例如 preset「效率 / 可行性」在七轴里没有对应项）。
+> 旧描述性名已登记在 [deprecated-terms.txt](deprecated-terms.txt)。
 > 本表左列刻意只用**中文概念**，就是为了不把废弃原文再写进正文。
-> 高风险范式类候选按**实际改写的对象**取 `N1`（改写 formulation）或 `N10`（改写 boundary）。
+> 高风险范式类候选按**实际改写的对象**取 `formulation-shift`（改写问题表述）或 `boundary-shift`（改写边界 / 反例）。

@@ -68,7 +68,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**）。**`P3` 只产 typed intermediate，不产 candidate** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`**）/ `claims`（**seed**：每个 candidate 至少一条 `C`，`status: ungrounded`） |
 | **R4** | `isolated-populations` | 隔离种群 → structural signature → QD archive | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） |
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
-| **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**首次占据一个当前为空的合法轴**；**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `assumptions` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
 | **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） |
 | **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `assurance[].discriminating_test` / `failures` / `known_flaws`（把新 `F` 挂上） |
@@ -773,8 +773,12 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **流程：** R3 双轨发现（`P1`—`P6` 由**隔离开的 Exploration Agents** 生成，`local` 另起一轨；
   **生成期互不可见**，见 [phase-r3-r6-discovery.md](references/phase-r3-r6-discovery.md) §R3.3—§R3.6）→
   R4 隔离种群 → `structural_signature` 五维聚类 → **QD archive**（**只保多样性，不做总分排序**）→
+  **niche 是七个科学结构轴**（`assumption-` / `formulation-` / `representation-` / `mechanism-` /
+  `theory-` / `evaluation-` / `boundary-shift`），**不是** R12 的叙事 preset `N1`—`N10`；
+  **R4 elite = within-niche representative, not global winner** →
   R5 共演化检索（每轮至少一条 query 由最新候选生成）→
-  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction / new niche；
+  R6 进化（mutation / cross-domain crossover / simplification / theory-induced deduction /
+  **new niche = 首次占据一个当前为空的合法轴**（七轴冻结，见 §R4.2.1）；
   **跨 island 融合只允许在这里发生**，并写 `operator` + `parents` 谱系）。
 - **边界三句话：** `R3: Diverge`（让不同世界出现）→ `R4: Preserve Diversity`（不让它们被总分压扁）
   → `R6: Recombine`（才允许互相借东西）。
