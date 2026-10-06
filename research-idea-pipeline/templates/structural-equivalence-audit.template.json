@@ -1,0 +1,107 @@
+{
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "_usage": "Structural Equivalence audit artifact 骨架（Minimal Structural Delta Certificate）。落盘路径：.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json（SENA-1，R7 写）或 <H>.sena2.json（SENA-2，R13 写）。字段与枚举逐字定义见 references/structural-equivalence-policy.md §8；十四个 facet 与十一个 typed relation 见该文件 §3；verdict 十值见 §7；反事实坍缩与它的 verdict 相容表见 §6.2；`assurance[]` 可选扩展字段见 §9.2。写回后必须跑 python3 scripts/structural_equivalence_check.py --artifact <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）。本模板自身必须通过检查器。三条最容易违反的规则：① `domain_stripped_alignment` 的任一 facet 值不得包含 `domain_terms` 里的 token；② `counterfactual_collapse` 必填且 `collapse_result` 必须与 `verdict` 相容；③ `claimed_novelty_level` 不得强于 `verdict`。本文件是 Control Plane artifact，不是第九类 Research State 对象；`research-state.json` 只保留 `assurance[].audit_ref` 这样的路径引用。示例值与「示例占位」字样必须替换为真实值，否则不得被当作结论引用。",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "stage": "R7",
+  "candidate": "H17",
+  "closest_priors": [
+    "LIT42",
+    "LIT81"
+  ],
+  "retrieval_status": "sufficient",
+  "domain_terms": [
+    "MRI",
+    "k-space",
+    "source-free",
+    "Flow Matching",
+    "cross-center",
+    "跨中心",
+    "扫描仪",
+    "重建"
+  ],
+  "domain_aware_alignment": {
+    "problem": "跨中心 MRI 重建在未见扫描仪上性能落差大，且目标中心无可标注数据（示例占位）",
+    "setting": "多中心 MRI 采集，训练源域与部署目标域设备不同，目标域只有无标注 k-space",
+    "observables": "欠采样 k-space 测量，以及各中心采集协议元数据",
+    "available_information": "源中心配对 k-space 与图像；目标中心仅有欠采样测量，没有全采样参考",
+    "target_or_latent_quantity": "目标域全采样图像，等价于随采集算子变化的潜在图像分布",
+    "assumptions": "源域与目标域共享解剖结构先验；二者差异可以用采集算子参数化",
+    "adaptation_or_intervention_object": "重建网络的输入标准化层与数据一致性项的权重",
+    "objective": "最小化目标域无参考重建的分布距离",
+    "mechanism": "用采集算子参数作为条件变量，把跨中心差异吸收进条件分布而不是网络权重",
+    "information_flow": "目标域测量 → 采集算子估计 → 条件先验 → 重建 → 无参考一致性评分",
+    "theory_object": "条件随机场的分解表述，条件变量为采集算子",
+    "predictions_or_guarantees": "若采集算子被正确估计，则跨中心落差不随中心数增加而恶化",
+    "evaluation_target": "目标域无参考评分与少量有参考中心的 held-out 指标",
+    "boundary_or_failure_regime": "当目标域采集算子无法由测量估计时，条件分解退化，落差回到 baseline"
+  },
+  "domain_stripped_alignment": {
+    "problem": "源总体与目标总体之间的分布落差在只能观测到间接测量时无法直接校正",
+    "setting": "源总体有配对监督；目标总体只有经过信息损失算子的间接观测，且无标注",
+    "observables": "经过已知算子族的间接观测，以及算子族的标识元数据",
+    "available_information": "源总体配对（输入，目标）；目标总体仅有间接观测，无配对目标",
+    "target_or_latent_quantity": "目标总体上的潜在目标量，其分布随算子参数变化",
+    "assumptions": "两个总体共享潜在结构先验；差异可由算子族参数完全参数化",
+    "adaptation_or_intervention_object": "条件输入的标准化层与一致性项的权重",
+    "objective": "最小化目标总体上无配对目标时的分布散度",
+    "mechanism": "把算子参数作为条件变量，使总体差异进入条件分布而非模型参数",
+    "information_flow": "目标总体间接观测 → 算子参数估计 → 条件先验 → 估计器 → 无配对一致性评分",
+    "theory_object": "带条件变量的因子分解表述",
+    "predictions_or_guarantees": "若算子参数被正确估计，则跨总体落差随总体数增加而不恶化",
+    "evaluation_target": "目标总体上的无配对评分加少量配对总体的 held-out 指标",
+    "boundary_or_failure_regime": "当算子参数不可由间接观测识别时，条件分解退化到无适配 baseline"
+  },
+  "matched_core": [
+    "均为「目标总体无配对目标 + 间接观测」的无监督适配问题",
+    "均用算子参数作为条件变量吸收总体差异",
+    "均以无配对一致性评分作为目标总体选择判据",
+    "三者的承重假设均为「共享潜在结构先验 + 差异可由算子族参数化」"
+  ],
+  "candidate_only_elements": [
+    "把算子参数从固定超参数改为随目标测量在线估计的潜变量",
+    "在一致性项中加入算子参数的可识别性正则，使估计可解",
+    "给出「算子不可识别 ⇒ 条件分解退化」的失败边界刻画"
+  ],
+  "prior_only_elements": [
+    "prior 假设算子参数在部署前由少量配对样本离线标定",
+    "prior 不讨论算子参数可识别性，因此没有失败边界刻画"
+  ],
+  "minimal_structural_delta": [
+    "available information 改变：算子参数从「部署前离线标定」变为「由目标间接观测在线估计」",
+    "assumptions 改变：新增承重假设「算子参数在目标总体内可由间接观测识别」",
+    "failure regime 改变：新增「算子不可识别」这一显式失败边界"
+  ],
+  "load_bearing_analysis": {
+    "changed_information": "算子参数的信息来源从外部配对标定改为目标总体间接观测本身",
+    "changed_assumptions": "新增承重假设：算子参数在目标总体内可识别；prior 不需要它",
+    "changed_predictions": "新增可证伪预测：在线估计器在算子可识别的目标总体上优于离线标定，在不可识别时不劣于 baseline",
+    "changed_boundary": "新增失败边界：算子参数不可识别时条件分解退化为无适配 baseline",
+    "changed_mechanism": "unchanged"
+  },
+  "counterfactual_collapse": {
+    "replacement": "把在线算子参数估计换回 prior 的「部署前离线配对标定」，其余结构不动",
+    "predicted_consequence": "若承重变化只在这里，则失败边界刻画消失、可识别性正则失去对象、新增预测不可判定；三者同时消失说明 delta 承重",
+    "collapse_result": "does-not-collapse"
+  },
+  "differentiating_consequences": [
+    "存在一个可在两个目标中心上判定的实验：在线估计 vs 离线标定，在算子可识别中心与不可识别中心上的差异方向相反",
+    "失败边界给出可判定的不可能性陈述：算子参数不可识别时任何条件分解都等价于无适配 baseline"
+  ],
+  "discriminating_tests": [
+    "X21（stage=X3，claim_targeted=[C4]）：在两个目标中心上对比在线估计与离线标定，预注册「可识别中心上在线估计更优、不可识别中心上二者持平」",
+    "X22（stage=X4）：人为破坏算子参数可识别性（打散元数据），检验失败边界预测"
+  ],
+  "claimed_novelty_level": "formulation-delta",
+  "verdict": "formulation-delta",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（据本次检索未见结构等价前作，检索式见附录 X）。本判定只覆盖 surface ∪ facet ∪ structure-stripped 三路检索返回的 LIT42 与 LIT81；检索未覆盖的领域不构成反例也不构成支持。",
+  "blind_spots": [
+    "system identification 与 econometrics 文献未被穷尽检索，可能已有同类在线算子估计",
+    "结构抽取由 LLM 辅助完成，facet 边界可能与人类判断不一致",
+    "「算子参数可识别」的具体条件未在方案阶段证明，只登记为承重假设",
+    "LIT42 的原文表述可能在算法细节上与 candidate 更接近，当前对齐只覆盖到 facet 粒度"
+  ],
+  "evidence": [
+    "LIT42",
+    "LIT81"
+  ]
+}

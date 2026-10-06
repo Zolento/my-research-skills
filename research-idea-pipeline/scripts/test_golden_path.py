@@ -34,6 +34,7 @@ import unittest
 from typing import Any, Callable, Dict, List
 
 import state_check as sc
+import structural_equivalence_check as seq
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATE_CHECK = ROOT / "scripts" / "state_check.py"
@@ -426,14 +427,19 @@ class TestAdversarialGoldenPaths(_Base):
         self.assertIn("V21", self.check(state).rules(),
                       "done 的实验没有 preregistration 必须被拦住")
 
-    # ---- C 假范式新颖性（**当前无机械闸门 → 记为缺口**）----
+    # ---- C 假范式新颖性（**已由 Structural Equivalence 闸门覆盖**）----
 
-    def test_path_c_fake_paradigm_novelty_is_a_KNOWN_GAP(self):
-        """两条候选只有措辞不同、结构签名完全一致 —— 当前**没有任何规则**能识别。
+    def test_path_c_fake_paradigm_novelty_is_gated_by_structural_equivalence(self):
+        """两条候选只有措辞不同、结构签名完全一致 —— 旧缺口，现已闭环。
 
-        这不是测试失败，而是**已登记缺口**：
-        需要 `structural-equivalence` 双 pass（canonicalize 七元组 → 与 nearest_prior 比结构）。
-        测试在此**明确记录缺口**，而不是把断言写松来假装它已被覆盖。
+        闭环方式**不是**给 `state_check.py` 加一条 V 规则，而是新增专用检查器
+        `scripts/structural_equivalence_check.py`（`EQ1`—`EQ13`）。
+        职责划分：`state_check.py` 管八类对象与 `S1`—`S7` / `V1`—`V24`；
+        结构等价的**审计完整性**由 `EQ` 闸门管。
+
+        本测试保留旧场景的复现，并断言两侧的真实边界：
+        ① state 层确实没有 V 规则能识别同构双胞胎（分工的记录，不是缺口）；
+        ② EQ 闸门确实拦得住「同构候选却声称 `paradigm-candidate`」。
         """
         state = self._state_at_r10()
         twin = copy.deepcopy(state["hypotheses"][1])
@@ -443,12 +449,25 @@ class TestAdversarialGoldenPaths(_Base):
         twin["opened"] = True if False else True  # noqa: 保持字段稳定
         state["hypotheses"].append(twin)
         report = self.check(state)
-        structural_rules = [r for r in report.rules() if r in ("V22", "V23")]
-        self.assertEqual(
-            structural_rules, [],
-            msg="当前实现了结构等价闸门？如已实现请更新本测试并补规则号")
-        self.skipTest(
-            "已知缺口：无 structural-equivalence 闸门，措辞不同的同构候选会被当成两个方向")
+        self.assertEqual([r for r in report.rules() if r in ("V22", "V23")], [],
+                         "state 层不负责结构等价判定；出现 V22/V23 说明分工被改")
+
+        # ② EQ 闸门：一份「结构等价（collapses）」却声称 paradigm-candidate 的 artifact 必须被拦下
+        artifact = json.loads(
+            (ROOT / "templates" / "structural-equivalence-audit.template.json")
+            .read_text(encoding="utf-8"))
+        artifact["candidate"] = "H3"
+        artifact["verdict"] = "equivalent"
+        artifact["claimed_novelty_level"] = "paradigm-candidate"
+        artifact["counterfactual_collapse"]["collapse_result"] = "collapses"
+        artifact["load_bearing_analysis"] = {
+            key: "unchanged" for key in seq.LOAD_BEARING_KEYS}
+        artifact["minimal_structural_delta"] = []
+        artifact["differentiating_consequences"] = []
+        artifact["discriminating_tests"] = []
+        rules = seq.check_artifact(artifact, source="<golden-path C>").rules()
+        self.assertEqual(rules, ["EQ13"],
+                         f"同构候选过度声称 paradigm 必须只由 EQ13 拦下，实际命中 {rules}")
 
     # ---- D decision ≠ truth ----
 

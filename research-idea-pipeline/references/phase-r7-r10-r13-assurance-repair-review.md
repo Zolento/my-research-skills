@@ -438,6 +438,59 @@ Kill Condition: If alternatives match MIND under equal compute,
 `contribution type → evidence contract → venue calibration` 是唯一入口
 （见 [venue-standards.md](venue-standards.md) §10）；**禁止**「venue 直接选 preset」。
 
+### R7.11 SENA-1（pre-experiment structural novelty audit）
+
+**Structural Equivalence 的第一次正式运行放在 R7。** 定义见
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §10.4。
+
+**不新增 persona。** 复用本阶段已派遣的：
+
+| 角色 | 在 SENA-1 里的职责 |
+|---|---|
+| `S-Lit` | 主责：检索覆盖、最接近结构前作、L3 穷尽记录 |
+| `R-Novelty` | 交叉验证：delta 是否非平凡、是否只是 relabeling |
+| `R-Theory` | 按需：theory object 是否真的改变、假设是否承重 |
+
+**输出仍遵循既有 Assurance 五元组**（`(Attack, Target, Alternative, Discriminating Test, Kill Condition)`）：
+
+```text
+Attack:          H17 may be structurally equivalent to LIT42.
+Target:          H17 novelty claim.
+Alternative:     The proposed theory is a relabeling of the same adaptation mechanism.
+Test:            Counterfactual collapse against LIT42.
+Kill Condition:  If replacing the claimed delta leaves assumptions, predictions
+                 and discriminating tests unchanged, paradigm-level novelty fails.
+```
+
+**落盘（三条同时产出）：**
+
+1. **完整审计 artifact**（Control Plane）：
+   `.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json`
+   —— schema 与必填规则见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §8；
+   写回后跑 `python3 scripts/structural_equivalence_check.py --artifact <file>`（退出码 0）。
+2. **state 侧的 summary 引用**：`assurance[]` 新增一条，复用原有三键，并填可选键
+   `target` / `attack_type: "structural-equivalence"` / `literature` / `audit_ref`。
+3. **人读审阅文档**：`routes/<R>/docs/<被审ID>-review-r01.md`（五元组摘要）。
+
+**R7 的具体硬规则：**
+
+1. **`discriminating_test` 仍必须是存在的 `X` id 或字面量 `TBD`**（`V9`）。
+   **反事实坍缩不是实验节点**，**不得**写进 `discriminating_test`；它写在 artifact 的
+   `counterfactual_collapse` 里。
+2. **R7 不得要求 artifact 审计** —— 那时还没有 code / logs / failed runs（见下表 R13 时机表）。
+   SENA-1 审的是**方案**，不是实现。
+3. **assurance 不得直接改 `claims[].status`** —— 只能经 R10。
+4. **verdict 只用十个冻结值**（[structural-equivalence-policy.md](structural-equivalence-policy.md) §7）：
+   必须叫 `paradigm-candidate`，**不得**叫 `paradigm-novel`。
+5. **未发现结构等价前作时只能写**「against the retrieved literature, no structural equivalent was
+   identified」；**不得**写「首次」/「没人做过」/「该方向空白」。措辞等级查
+   [evidence-policy.md](evidence-policy.md) §1。
+6. **不做 venue 判断** —— venue fit 进 R7 是既有硬禁令，Structural Equivalence 同样不得引入。
+7. **不做数字 novelty 分**：verdict 是 category，不是 score。
+
+**交给 R8 的绑定契约：** SENA-1 的 verdict 决定 R8 允许的 claim 强度
+（见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.5）。
+
 ## R13. artifact-aware 审计
 
 **审计对象不是论文**，而是：`paper` / `claim graph` / `experiment graph` / `code` /
@@ -459,6 +512,48 @@ metric misuse / post-hoc selection bias —— **不通过即不得提交**，
 **禁止在无 artifact 的阶段要求 artifact 审计** —— 那会产出一条永远无法执行、只能填「待补」的规则。
 
 **失败的实验不得在审计里消失**：`state_check.py` V4 + V12 是机械前置。
+
+### R13.1 SENA-2（realized-artifact structural audit）
+
+**必须有第二次 Structural Equivalence audit。** 定义见
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §10.7。
+
+**为什么需要它：** proposal 阶段声称「新 formulation / 新 mechanism」，
+真正实现后可能退化成「baseline + mask + loss」。只审方案**测不出**这种退化。
+
+**R13 必须**从**实际** artifact 提取 `G_realized`：
+
+| 来源 | 提取什么 |
+|---|---|
+| 实际代码 | 真正实现了哪些结构元素 |
+| 实际 equation | 目标、约束、信息流是否还是声称的那套 |
+| 实际 experiment | 判别实验是否真的能区分 delta |
+| 实际 mechanism | 作用路径是否与 `G_planned` 一致 |
+| 实际 result | 结果是否支持声称的 consequence |
+
+然后比较三者：
+
+```text
+G_planned  vs  G_realized  vs  G_prior
+```
+
+**novelty drift 判定：** verdict 下移即 drift。例：
+
+```text
+planned:  formulation-delta
+   ↓
+realized: component-delta
+```
+
+**处置硬规则：**
+
+1. **这种 downgrade 必须进入 review / repair** —— 落 `reviews[].findings` 与
+   `reviews[].integrity_gate`，并把未闭合缺口交 R10（落 `repairs[]`，`V23` 强制）。
+2. **不得**继续按原 novelty claim 投稿 —— 原 claim 强度超过 realized 结构时，
+   走 R10 的 `NARROW_SCOPE` / `REPAIR_CLAIM`（见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.6）。
+3. **落盘**：`.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.sena2.json`，
+   `stage` 字段写 `R13`。写回后跑 `python3 scripts/structural_equivalence_check.py --route <routes/<R>>`。
+4. **不新增 persona**：SENA-2 由 R13 已派遣的角色承担，`S-Integrity` 负责 Integrity Gate 判定。
 
 ## 读 / 写 World Model（强制）
 

@@ -1,0 +1,87 @@
+{
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "_usage": "Structural Equivalence audit artifact 骨架（Minimal Structural Delta Certificate）。落盘路径：.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json（SENA-1，R7 写）或 <H>.sena2.json（SENA-2，R13 写）。字段与枚举逐字定义见 references/structural-equivalence-policy.md §8；十四个 facet 与十一个 typed relation 见该文件 §3；verdict 十值见 §7；反事实坍缩与它的 verdict 相容表见 §6.2；`assurance[]` 可选扩展字段见 §9.2。写回后必须跑 python3 scripts/structural_equivalence_check.py --artifact <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）。本模板自身必须通过检查器。三条最容易违反的规则：① `domain_stripped_alignment` 的任一 facet 值不得包含 `domain_terms` 里的 token；② `counterfactual_collapse` 必填且 `collapse_result` 必须与 `verdict` 相容；③ `claimed_novelty_level` 不得强于 `verdict`。本文件是 Control Plane artifact，不是第九类 Research State 对象；`research-state.json` 只保留 `assurance[].audit_ref` 这样的路径引用。示例值与「示例占位」字样必须替换为真实值，否则不得被当作结论引用。",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@1",
+  "stage": "R7",
+  "candidate": "H2",
+  "closest_priors": [
+    "LIT2",
+    "LIT7"
+  ],
+  "retrieval_status": "sufficient",
+  "domain_terms": [
+    "MRI",
+    "k-space",
+    "跨中心",
+    "source-free"
+  ],
+  "domain_aware_alignment": {
+    "problem": "同一重建问题下的两种正则化实现（示例占位）",
+    "setting": "多中心 MRI，源中心配对、目标中心无标注 k-space",
+    "observables": "欠采样 k-space 测量",
+    "available_information": "源中心配对 k-space 与图像；目标中心仅有欠采样测量",
+    "target_or_latent_quantity": "全采样图像",
+    "assumptions": "潜在图像分布由同一先验族生成",
+    "adaptation_or_intervention_object": "重建网络的正则化项权重",
+    "objective": "最小化有参考重建误差",
+    "mechanism": "用先验正则约束解空间，差异只体现在正则项写法",
+    "information_flow": "测量 → 重建 → 有参考误差",
+    "theory_object": "条件随机场分解",
+    "predictions_or_guarantees": "误差随正则权重呈单峰",
+    "evaluation_target": "有参考 PSNR / SSIM",
+    "boundary_or_failure_regime": "正则权重过大时过平滑"
+  },
+  "domain_stripped_alignment": {
+    "problem": "同一估计问题下的两种正则化实现",
+    "setting": "单总体，训练与部署条件相同",
+    "observables": "经过算子族的间接观测",
+    "available_information": "源总体与目标总体均有配对监督",
+    "target_or_latent_quantity": "潜在目标量",
+    "assumptions": "潜在目标分布由同一先验族生成",
+    "adaptation_or_intervention_object": "估计器的正则项权重",
+    "objective": "最小化有配对目标的误差",
+    "mechanism": "用先验正则约束解空间，差异只体现在正则项写法",
+    "information_flow": "间接观测 → 估计 → 配对误差",
+    "theory_object": "带正则的变分目标",
+    "predictions_or_guarantees": "误差随正则权重呈单峰",
+    "evaluation_target": "有配对目标的误差指标",
+    "boundary_or_failure_regime": "正则权重过大时过平滑"
+  },
+  "matched_core": [
+    "domain-stripped 后十四个 facet 与 LIT2 逐项等价",
+    "信息流与失败边界完全一致"
+  ],
+  "candidate_only_elements": [
+    "把该框架用于新 modality（transfer 价值，不是结构差异）"
+  ],
+  "prior_only_elements": [
+    "prior 在另一个 modality 上验证"
+  ],
+  "minimal_structural_delta": [
+    "domain-aware setting 改变：目标总体从有标注变为无标注"
+  ],
+  "load_bearing_analysis": {
+    "changed_information": "目标总体的可用信息减少（无配对目标）",
+    "changed_assumptions": "unchanged",
+    "changed_mechanism": "unchanged",
+    "changed_predictions": "unchanged",
+    "changed_boundary": "unchanged"
+  },
+  "counterfactual_collapse": {
+    "replacement": "把 modality 换回 prior 的领域，其余不动",
+    "predicted_consequence": "承重结构不变，只剩领域标签差异",
+    "collapse_result": "collapses"
+  },
+  "differentiating_consequences": [],
+  "discriminating_tests": [],
+  "claimed_novelty_level": "transfer-only",
+  "verdict": "transfer-only",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（本件判 transfer-only：贡献是迁移与合法性论证，不是新范式）",
+  "blind_spots": [
+    "跨领域结构对应依赖 LLM 抽取，可能漏掉机制级差异"
+  ],
+  "evidence": [
+    "LIT2",
+    "LIT7"
+  ]
+}

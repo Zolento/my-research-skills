@@ -95,6 +95,33 @@
 **升级纪律：** 一次只升一级；每级记录检索式与命中数。`--exhaustive` 会自动执行
 2—5 轮直到满足饱和判据。
 
+### A3.1 三路检索（需要 Structural Equivalence 检查的候选强制）
+
+对需要 Structural Equivalence 检查的 `H`，**除上面的通用扩检外**，还必须至少产生三类 query：
+
+| query 类 | 用什么语言 | 例 |
+|---|---|---|
+| `surface` | 原领域语言 | `MRI cross-center reconstruction` |
+| `facet` | `problem` / supervision-data regime / `observables` / `objective` / `mechanism` 等 scientific facets | `target population without paired targets` |
+| `structure-stripped` | 去掉 domain / method / theory branding，只留 abstract scientific skeleton | `indirect observations` + `information-losing operator` + `target-only adaptation` |
+
+最终 priors 取**并集**：
+
+```text
+retrieved priors = surface ∪ facet ∪ stripped
+```
+
+**重点避免：** 「MRI 文献里没人做，所以 idea 新」。一个 structural prior 可以来自
+statistics / econometrics / causal inference / system identification / control /
+inverse problems / optimization / information theory / 其它 ML 领域 ——
+**只要 structural correspondence 成立**。
+
+**本项与通用扩检的关系：** 三路检索**不替代** §A3 的五轮扩检，也不改变 L1/L2/L3 尽职调查等级。
+它是**额外**要求的一类 query 构造，服务于 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.2。
+
+**脚本支持：** 三路 query 与通用扩检一样，用 `--also-query` 逐条显式传入；
+每路检索式与命中数记进 field-map 文档。**不得**只跑 `surface` 一路就声称已做结构检索。
+
 ## A4. 饱和判定与输出
 
 ### A4.1 饱和判据
@@ -256,13 +283,17 @@ I_t → Q_{t+1} → L_{t+1} → I_{t+1}
 1. **每轮 R5 必须至少有一条 query 由最新候选的表述生成**，并写明它来自哪条候选。
    例：候选把问题重述为「partial identifiability」，下一轮就该搜
    `partial identification under indirect observations`，**不是**继续搜 `prior adaptation`。
-2. **`literature[].relation` 五类关系必填**（`supports` / `contradicts` / `shares-assumption` /
-   `shares-structure` / `solves-analogous-problem` / `uses-same-theory`）——
+2. **`literature[].relation` 六值关系必填**（`supports` / `contradicts` / `shares-assumption` /
+   `shares-structure` / `solves-analogous-problem` / `uses-same-theory`；**六值封冻，不得新增**）——
    这是把「按关键词最近邻找」升级为「按结构关系找」的落点。
-3. **检索纪律一字不动**：禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查等级、
+   结构等价特有的细粒度关系落在 audit artifact 里，再映射到六值之一，见
+   [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.3。
+3. **三路检索强制**：需要 Structural Equivalence 检查的候选必须做
+   `surface ∪ facet ∪ structure-stripped`（§A3.1）。
+4. **检索纪律一字不动**：禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查等级、
    429 退避 `10→20→40→80→160s`、代理环境识别、饱和判据、负检索记录 —— 全部见本文档正文与
    [literature-policy.md](literature-policy.md)。
-4. **R5 可以随时被 R3/R6 调用**（它是常驻服务）；它的产物只写 `literature[]` / `evidence[]`
+5. **R5 可以随时被 R3/R6 调用**（它是常驻服务）；它的产物只写 `literature[]` / `evidence[]`
    （`kind: literature`），**不得**直接写 `hypotheses[]`。
 
 ---

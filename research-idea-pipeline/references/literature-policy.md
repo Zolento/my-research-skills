@@ -123,6 +123,11 @@ Step 4: 饱和判定（见 §3.3）
 - **L3 穷尽：** 在 L2 基础上追加 ⑤ 否定式查询（如 `X without Y`、`limits of X`、
   `X is impossible`、`negative results X`）⑥ 最接近工作的**引文追溯**（其参考文献
   与被引文献）⑦ 至少一个**不同学科**的同构问题。检索过程全部留档。
+- **⑧ structure-stripped（条件强制）：** 需要 Structural Equivalence 检查的候选
+  **必须**额外做 `surface ∪ facet ∪ structure-stripped` 三路检索
+  （见 [phase-r2-r5-field-mapping-retrieval.md](phase-r2-r5-field-mapping-retrieval.md) §A3.1
+  与 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.2）。
+  本项是**额外的 query 构造要求**，**不改变**上表的最少检索式数量与等级判定。
 
 ### 3.3 饱和判据（Saturation）
 

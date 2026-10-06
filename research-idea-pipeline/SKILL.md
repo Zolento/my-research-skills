@@ -701,6 +701,9 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | **调用契约（四个用户入口）** | [references/invocation-prompts.md](references/invocation-prompts.md) | `start-project` / `continue-research` / `explore` / `audit`：固定用户调用契约，**用户不需要知道 `R` 编号**；防止实际使用时绕过新哲学（一上手就发散、编造状态） |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
+| **Structural Equivalence 政策** | [references/structural-equivalence-policy.md](references/structural-equivalence-policy.md) | **跨阶段保证服务（不是第 16 个阶段）**：canonical scientific structure（十四个 facet + 十一个 typed relation）、domain-aware / domain-stripped 两套表示、load-bearing delta、Counterfactual Collapse Test、verdict 十值（含 `paradigm-candidate`）、audit artifact 契约、SENA-1（R7）/ SENA-2（R13）、无 score 纪律、`EQ1`—`EQ13` 机械闸门 |
+| **Structural Equivalence 模板** | [templates/structural-equivalence-audit.template.json](templates/structural-equivalence-audit.template.json) | Minimal Structural Delta Certificate 骨架；**模板自身必须通过 artifact 侧 `EQ4`—`EQ13`**（`--route` 侧的 `EQ1` / `EQ2` / `EQ3` / `EQ12` 需要真实 state，模板不跑） |
+| **Structural Equivalence 检查器** | [scripts/structural_equivalence_check.py](scripts/structural_equivalence_check.py) | **机械闸门**：只查「审计做没做完整 / 引用是否存在 / schema 是否满足 / claim 强弱是否与 verdict 相容」，**不宣判 novelty**；`--artifact` / `--route` / `--selftest` / `--list-rules`；退出码 0 / 1 / 3 / 4 |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routes/<R>/INDEX.md` 骨架（**资产目录 + 时间线**：Route Overview / Key Documents / Experiments / Decisions / Reviews / Milestones / Recent Research Changes / Archive；**不含已证实/已证伪/TODO/Bugs/Warnings**） |
 | 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
@@ -1222,7 +1225,20 @@ done
 #    见 writing-policy.md §0
 #    这里固定跑**默认档**：examples/ 与 templates/ 是存量样例，不按 asd-ste100 追溯改写。
 #    asd-ste100 是**当次调用**的可选档（--max-chars 25），不是仓库级闸门。
+
+# 7) Structural Equivalence 检查器 —— 自检 + 模板 + 四份 fixture 必须全绿
+python3 scripts/structural_equivalence_check.py --selftest
+python3 scripts/structural_equivalence_check.py --artifact templates/structural-equivalence-audit.template.json
+for f in examples/structural-equivalence/*.json; do
+  python3 scripts/structural_equivalence_check.py --artifact "$f" || exit 1
+done
+#    真实项目里还要跑路线级交叉校验：
+#    python3 scripts/structural_equivalence_check.py --route .research-idea-pipeline/routes/<R>
 ```
+
+> **唯一的发布判据是 `scripts/release_check.py` 的最后一行**（`PASS` / `FAIL`）。
+> 上面的逐条命令只用于**诊断**；其中 1—7 项已全部收进那一个闸门。
+> 手动逐条跑不能替代 `release_check.py`（AGENTS.md Rule 10）。
 
 > **D4 的"已废弃措辞"清单要持续维护**：每次改规则时，把**被替换掉的旧表述**
 > 追加进来。这份 grep 清单是防漂移最省力的一道闸。

@@ -61,6 +61,7 @@ research-idea-pipeline/
 │   ├── INDEX.md                      # 路线级 INDEX.md 骨架（资产目录 + 时间线）
 │   ├── STATUS.md                     # 路线级 STATUS.md 骨架（state 的人类投影）
 │   ├── research-state.template.json  # Research State 骨架（八类对象 + 附加槽位）
+│   ├── structural-equivalence-audit.template.json  # Structural Equivalence audit 骨架（十四个 facet + verdict）
 │   └── scheduler.template.json       # 调度 telemetry 骨架（不进 state）
 ├── examples/
 │   ├── example-project-layout.md     # 多路线目录与文档管理（新目录规范的完整示例）
@@ -68,7 +69,8 @@ research-idea-pipeline/
 │   ├── example-full-pipeline.md      # 主链路串联（R3—R6 → R8 → R12 → R7）
 │   ├── example-field-mapping-standalone.md  # 单独文献调研（R2 / R5）
 │   ├── example-followup-review.md    # 接续复核
-│   └── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
+│   ├── example-writing-tier.md       # 受控中文两档对照（asd-ste100 改写样例）
+│   └── structural-equivalence/       # audit fixture 四件：equivalent.json / transfer-only.json / formulation-delta.json / paradigm-candidate.json
 └── docs/refs/                        # 参考文献库格式示例（目标项目里放根目录 docs/refs/）
 ```
 

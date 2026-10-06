@@ -428,9 +428,16 @@
   ],
   "assurance": [
     {
-      "kill_condition": "若 X8 显示解耦前后跨中心落差的改善 ≤ 0.1 dB，则 C0 的机制主张被杀死（示例占位）",
+      "kill_condition": "若把 H1 声称的 delta 换回 LIT1 的对应结构后，假设、预测与判别实验都不变，则 H1 的 paradigm-level novelty 主张被杀死（示例占位；反事实记录见 audit_ref）",
       "discriminating_test": "X8",
-      "verification_tier": "T0"
+      "verification_tier": "T0",
+      "target": "H1",
+      "attack_type": "structural-equivalence",
+      "literature": [
+        "LIT1",
+        "LIT2"
+      ],
+      "audit_ref": ".research-idea-pipeline/routes/<R>/assurance/structural-equivalence/H1.json"
     },
     {
       "kill_condition": "若低场对照在 SNR 归一化后显示解耦无增益，则 C1 被杀死（示例占位；当前无预算，登记为待办）",

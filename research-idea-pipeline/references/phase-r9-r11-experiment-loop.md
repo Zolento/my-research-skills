@@ -218,6 +218,32 @@ Claim ↔ Method ↔ Code ↔ Result ↔ Conclusion
 benchmark cherry-picking / data leakage / metric misuse / post-hoc selection bias。
 **只读最终论文比读完整 trace 更难发现这些问题**，所以审计对象是 trace。
 
+### R10.8 prior collision 的修复语义（Structural Equivalence）
+
+SENA-1 / SENA-2 判出 structural equivalence 时，**不要**自动把 scientific claim 改成 `contradicted`。
+
+> **novelty claim 失败 != scientific proposition false.**
+
+R10 的处置**必须**映射到既有冻结枚举（`disposition` 五值 + `closure` 两值），**不得**新增取值：
+
+| 语义意图 | 落点 |
+|---|---|
+| `NARROW_CLAIM` | `disposition: NARROW_SCOPE` |
+| `REFRAME` | `disposition: REPAIR_CLAIM` |
+| `MERGE_WITH_PRIOR` | `disposition: REPAIR_CLAIM` + `state_delta` 指向 nearest prior |
+| `RUN_MORE_RETRIEVAL` | `disposition: RUN_TEST`，把检索写成该 claim 的 discriminating experiment |
+| `DEPRIORITIZE_H` | `hypotheses[].status: archived` + `failures[].kind: deprioritized` |
+| `ARCHIVE_BRANCH` | `disposition: KILL_BRANCH` |
+| `ACCEPT_LIMITATION` | `closure: ACCEPTED_LIMITATION` |
+
+**Failure Memory 的写法：** `kind: prior-collision` **不是**合法枚举值。
+用既有 `kind`（`unsupported` / `deprioritized` / `inconclusive`），把碰撞写在 `what` / `why`。
+
+只有 prior **真正提供反驳 scientific proposition 的证据**时，才走 `contradicted`，
+且**必须**经 R10（`V22` 强制）。
+
+完整定义见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.6。
+
 ---
 
 ## R11 状态回写（`result → claim → uncertainty → next experiment`）

@@ -469,6 +469,43 @@ R4 elite = within-niche representative, not global winner
 | 某 **live niche** 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`。**若该 niche 只有这一条候选，就让它合法为空** —— 该 niche 不再有 live 候选，V15 不再要求它（见 §R4.2.1）。**不需要、也不得发明一个"关闭 niche"的动作**：候选全灭即自然为空。停止整条**路线**用 `decision`（`pivot` / `archive`）表达，**不要**靠改 `hypotheses[].status` 来表达。 |
 | 候选被 R6 判 `killed` | `status: killed` 并写 `failures[]`（`kind: deprioritized`） |
 
+### R4.4 Cheap structural fingerprint（domain-aware / domain-stripped）
+
+**R4 不做完整 literature novelty audit。** R4 只做**便宜**的结构指纹，服务于去重与聚类。
+
+每个 `H` 产出一份 fingerprint artifact：
+
+```text
+.research-idea-pipeline/routes/<R>/populations/fingerprints/<H>.json
+```
+
+artifact 含两套表示（定义见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §3 与 §4）：
+
+| 字段 | 内容 |
+|---|---|
+| `domain_aware` | 十四个 facet 的领域语言表示（保留 modality / task / method family / theory 术语）|
+| `domain_stripped` | 十四个 facet 的结构角色表示（去掉 domain / method / theory branding）|
+| `domain_terms` | 被剥掉的领域 / 品牌 / 修辞 token 清单 |
+
+R4 用这两套表示做四件事：
+
+1. **intra-population dedup** —— `domain_stripped` 逐项一致、且五维距离全为 0 的两条候选是同一 cluster；
+2. **proximity / structural clustering** —— 聚类依据仍是 `structural_signature` 五维距离；
+3. **帮助 QD archive 保持真正的结构多样性** —— 挡掉「文字不同、结构相同」的伪多样性；
+4. **标记明显 structural duplicate** —— 标进 `populations/fingerprints/`，供 R7 复核。
+
+**R4 不得**：
+
+- 宣称 prior novelty（那要等 R5 检索 / R7 SENA-1）；
+- 搜完整 literature；
+- 给 novelty 分；
+- 因为 feasibility 低就淘汰 high-risk candidate。
+
+**数值载体不变：** `hypotheses[].structural_signature` 仍是**五维整数距离**（`S4` 强制），
+fingerprint artifact 是它的**文本补充**，**不是**替代，**不得**新增数值维度。
+fingerprint 与 `populations/intermediates/` 一样是 **Control Plane artifact**：
+**不分配** `C` / `E` / `X` ID，**不进** `research-state.json`，**不得**被当作结论引用。
+
 ---
 
 ## R6. 进化与两阶段 fitness
