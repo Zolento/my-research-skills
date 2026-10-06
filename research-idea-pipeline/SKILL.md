@@ -62,7 +62,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 
 | Phase | 名称 | 作用 | 读 state | 写 state |
 |---|---|---|---|---|
-| **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` |
+| **R0** | `research-contract` | 目标 / 约束 / 资源 / **provisional anchor** | — | `contract` + 模板骨架（含 `state_version: 0`） |
 | **R1** | `research-state` | **常驻**：维护八类一等对象 | 全部 | 全部 |
 | **R2** | `field-mapping` | field grammar + occupancy map + 检索纪律 | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` |
 | **R3** | `dual-discovery` | 双轨发现：**隔离 Exploration Agents**（`P1`—`P6` 算子）+ `local`；执行者只编排（**上下文隔离**） | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） |
@@ -70,8 +70,8 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
 | **R5** | `co-evolving-retrieval` | idea → 新 query → 新文献（**常驻服务**） | `hypotheses` | `literature` / `evidence`(kind=literature) |
 | **R6** | `evolution` | mutation / crossover / simplification / 新 niche（**唯一允许跨 island 融合**） | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R7** | `adversarial-assurance` | 六攻击面审核 + 硬门禁 `G1—G5` | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） |
-| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） |
-| **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） |
+| **R8** | `evidence-contract` | 每个 central claim 一张证据契约 | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） |
+| **R9** | `experiment-tree` | 实验树 `X1—X6` + EIG 选择 + provenance | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `failures` / `known_flaws`（把新 `F` 挂上） |
 | **R10** | `metacognitive-repair` | **critical flaw ⇒ state 必须改变** | 全 state + artifact | `repairs` + **执行 `state_delta`** |
 | **R11** | `state-update` | result → claim / uncertainty → next experiment | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` |
 | **R12** | `narrative` | **state 的视图**：六槽位 + presets + 六维 | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） |

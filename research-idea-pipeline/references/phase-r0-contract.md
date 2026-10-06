@@ -81,7 +81,7 @@
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R0** | — | `contract` |
+| **R0** | — | `contract` + 模板骨架（含 `state_version: 0`） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

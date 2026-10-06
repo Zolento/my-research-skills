@@ -231,7 +231,7 @@ Expansion rule
 
 | 阶段 | 读 | 写 |
 |---|---|---|
-| **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） |
+| **R8** | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） |
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。

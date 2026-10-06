@@ -207,6 +207,14 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 3. **多跳传播是 R11 的责任，不是校验器的。** R11 必须**迭代到不动点**后再跑校验器；
    `state_check.py` 只查一跳（图算法无法逐条判错）。
 
+   **不动点的判定（必须可执行，不得只写口号）：**
+   - 对**全体一类对象**做一趟扫描；若这一趟中**没有任何对象的 `validity.status` 发生变化**，
+     即为不动点，停止。
+   - **必须设上限**：扫描趟数上限 = 对象总数（下界 3）。**禁止无限迭代。**
+   - 到达上限仍未收敛 → **不得静默继续**：须落 `uncertainties[]`（`importance: critical`），
+     并在 `repairs[]` 记一条 `disposition: FIX_IMPLEMENTATION`，然后才可进入下一阶段。
+   - 传播**只允许改 `validity`**；任何 `claims[].status` 的改动必须走 R8 或 R10（§5 硬规则 4）。
+
 ### 3.1 `claims[]` — Claim Graph（`C<n>`）
 
 **结论：每个 claim 必须有可证伪的 `falsifier`，且 `supporting_evidence` / `refuting_evidence` 只能指向真实存在的 `E`。**
@@ -484,15 +492,15 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 | 阶段 | 读什么（state 字段） | 写什么（state 字段） | 对应文件 |
 |---|---|---|---|
-| **R0** Research Contract | — | `contract` | `phase-r0-contract.md` |
+| **R0** Research Contract | — | `contract` + 模板骨架（含 `state_version: 0`） | `phase-r0-contract.md` |
 | **R2** Field Mapping | `literature` / `assumptions` / `uncertainties` | `literature` / `evidence`(kind=literature) / `assumptions` / `uncertainties` | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R3** | `literature` / `assumptions` / `failures` / `contract.constraints` | `hypotheses`（**含 `niche` / `island` / `operator` / `parents: []` / `generation: 0`；同一 niche 至少一条 `elite`**）/ `claims`（**seed**：每个候选至少一条 `C`，`status: ungrounded`） | `phase-r3-r6-discovery.md` |
 | **R4** Isolated Populations | `hypotheses` | `hypotheses[].status`（**QD archive 精修：重排 elite 归属**） | `phase-r3-r6-discovery.md` |
 | **R5** Co-evolving Retrieval | `hypotheses` | `literature` / `evidence`(kind=literature) | `phase-r2-r5-field-mapping-retrieval.md` |
 | **R6** | `hypotheses` / `uncertainties` / `failures` | `hypotheses[].generation` / `hypotheses[].status` / `hypotheses[].operator` / `hypotheses[].parents` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r3-r6-discovery.md` |
 | **R7** | `claims` / `evidence` / `hypotheses` | `assurance` / `failures` / `uncertainties` / `known_flaws`（把新 `F` 挂上） | `phase-r7-r10-r13-assurance-repair-review.md` |
-| **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments[].preregistration`（**冻结 Outcome→state_delta**） | `phase-r8-evidence-contract.md` |
-| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
+| **R8** Evidence Contract | `claims` / `evidence` / `assurance` | `claims[].contract` / `claims[].status`（**仅证据驱动的单向升级**：`ungrounded` → `partially-supported` / `supported`） / `evidence` / `claims[].supporting_evidence` / `refuting_evidence` / `uncertainties` / `experiments`（**创建 `planned` 条目 + 冻结 `preregistration`**） | `phase-r8-evidence-contract.md` |
+| **R9** | `uncertainties`(critical, high 且 high) / `claims` | `experiments`（**执行**）/ `experiments[].status` / `experiments[].result_at_state_version` / `failures` / `known_flaws`（把新 `F` 挂上） | `phase-r9-r11-experiment-loop.md` |
 | **R10** Metacognitive Repair | 全 state + artifact | `repairs` + **执行 `state_delta`** | `phase-r9-r11-experiment-loop.md` |
 | **R11** Update World Model | 全 state | 归并去重 + **失效传播至不动点** + `state_version` +1 + 跑 `state_check.py` | `phase-r9-r11-experiment-loop.md` |
 | **R12** Narrative | `claims` / `evidence` / `failures` / `uncertainties` | `narrative_view`（+ 必要时新增 `uncertainties`） | `phase-r12-narrative.md` |
