@@ -805,7 +805,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   **不得**因工程风险高、暂无 theorem、不会实现、非主流、venue fit 不明、证据不足而杀。
   **进入 population 的门槛 = 完成 L2 检索**；要写进文档的「首次提出」类声称仍要求 L3 + 负检索记录。
   **不派遣 S-Repro。**`R3 screening ≠ R7 assurance`。
-- **交付物：** **population + QD archive**（每个出现过的 niche 至少一个 `elite`）+ 技术路线归纳表 +
+- **交付物：** **population + QD archive**（每个 **live niche** 至少一个 `elite`）+ 技术路线归纳表 +
   创新性边界界定 + **失败记忆**（被搁置的候选写 `failures[]`，不得删除）。
   **不再产出「QD archive 的 elite 集合（3—5 个）」——该概念在 Wave 2 起作废。**
 - **预算：** 默认 4 islands（`P1`—`P4`；`P5`/`P6` 按需启用）× 每岛 3—6 候选；进化 ≤2 轮。
@@ -1121,7 +1121,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     系统会稳定收敛到「安全、合理、容易做的小改动」。所以 R3—R6 只看
     `representation_distance` / `structural_novelty` / `cross_domain_surprise` / `deductive_yield`，
     `EIG` 也只作记录不作排序依据；venue 适配推迟到 **R12 / R13**。
-    配套机制是 **QD archive**（每个 niche 留一个 elite，**V15 机械强制**）——
+    配套机制是 **QD archive**（每个 **live niche** 留一个 elite，**V15 机械强制**）——
     **只留综合分最高的一个，会让「可行性 5 的增量 idea」把「可行性 2 的范式 idea」提前杀掉。**
 
 

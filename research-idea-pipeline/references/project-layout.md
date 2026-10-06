@@ -589,6 +589,15 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 > **上述"固定节"与 `templates/STATUS.md`、`scripts/render_status.py` 的输出必须三者一致。**
 > 这条由 `scripts/test_render_status.py` 的 `TestStatusSectionParity` **机械核对**：
 > 生成物的 `## ` 节集合必须与模板声明逐项相等（名称与顺序都算）。
+>
+> **哪一份是权威：`scripts/render_status.py`。** STATUS 本质是机器投影，
+> 所以 **renderer 是 executable specification**，`templates/STATUS.md` 只是它的
+> canonical skeleton —— 模板与 renderer 冲突时**以 renderer 为准**，并改模板。
+> 否则模板会悄悄长成**第二份格式规范**。
+>
+> **同形的范围不止节名。** 每节的**块形态**（bullet / 表格 / 散文）也必须一致 ——
+> 只核节名会漏掉「模板用表格、renderer 全出 bullet」这种分叉。
+> 这条由 `TestStatusSectionParity` 的 **content-shape parity** 机械核对。
 
 ### 4.3 `README.md` 必须稳定（路线身份证）
 
@@ -684,7 +693,7 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 | R 阶段 | 产出文档（交付物） | 落盘路径 | 同时必须更新 |
 |---|---|---|---|
 | **R2 / R5** | 领域地图（含负检索记录） | `routes/<R>/docs/<R>NNN-field-map.md` | `STATUS.md`（Critical uncertainties：未达饱和必须记） |
-| **R3—R6** | hypothesis 候选清单（**含 idea 级创新性/可行性审核评分**）+ 技术路线归纳 + 创新性边界 + population + 淘汰清单 | `routes/<R>/docs/<R>NNN-discovery.md` | `STATUS.md`（Active hypotheses；**放弃的 idea → Most important negative findings**；未核实的无人区声称 → Critical uncertainties）；`INDEX.md` 文档表 |
+| **R3—R6** | hypothesis 候选清单（**含 idea 级创新性/可行性审核判定**，**不是 1—5 评分**）+ 技术路线归纳 + 创新性边界 + population + 淘汰清单 | `routes/<R>/docs/<R>NNN-discovery.md` | `STATUS.md`（Active hypotheses；**放弃的 idea → Most important negative findings**；未核实的无人区声称 → Critical uncertainties）；`INDEX.md` 文档表 |
 | **R8** | 论文提案 + 证据契约 | `routes/<R>/docs/<R>NNN-proposal.md` | `STATUS.md`、`INDEX.md` |
 | **R9—R11** | 实验规划 + 结果分析 | `routes/<R>/docs/<R>NNN-experiment-plan.md`（**取其独立序号**）+ `routes/<R>/docs/<R>NNN-result-analysis.md` | `STATUS.md`（Next recommended actions、Active experiments）；`experiments/` 与 `results/` 的 XID 注册（§6.3） |
 | **R12** | 证据台账 + claim graph（`C0—C5`）+ **2—4 套六槽位叙事（`S1—S6`）** + 六攻击面审稿人评审（**全部派遣，S-Lit 恒派，S-Devil 不打分**）+ **门禁 `G1—G5` 判定** + 六维排序 + 最佳叙事推荐 + **缺失证据清单与最小必要实验 / 定理** | `routes/<R>/docs/<R>NNN-narrative.md` | `STATUS.md`（被覆盖的叙事方向 → **Most important negative findings**；最佳叙事 → **Strongest supported findings**；门禁 `fail` 或六维中位 <3 → **Critical uncertainties**） |

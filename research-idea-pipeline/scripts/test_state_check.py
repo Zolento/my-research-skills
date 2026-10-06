@@ -1409,6 +1409,252 @@ class TestDeprecatedTermScan(unittest.TestCase):
         self.assertEqual(offenders, [], "已退役措辞出现在正文：\n  " + "\n  ".join(offenders))
 
 
+class TestShippedHintsStayInPackage(unittest.TestCase):
+    """面向用户的输出不得把读者指向**不随包安装**的文件。
+
+    起因（repo-wide literal execution audit 抓到）：`state_check.py` 的违规提示与
+    `--help` 都写着「规则定义见 docs/r-architecture-wave1-spec.md §2.3」——
+    那是 dev-only 文件，装到 `~/.agents/skills/` 之后必然不存在。
+    **指路指向不存在的文件，比不指路更糟。**
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def _write(self, doc):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump(doc, handle, ensure_ascii=False)
+        handle.close()
+        name = pathlib.Path(handle.name)
+        self.addCleanup(lambda: name.unlink(missing_ok=True))
+        return str(name)
+
+    def test_help_stays_in_package(self) -> None:
+        # 直接取 help 文本：`main(["--help"])` 会抛 SystemExit
+        text = sc.build_parser().format_help()
+        self.assertNotIn("docs/", text, "--help 指向了不随包安装的文件")
+        self.assertIn("references/research-state-policy.md", text, "help 必须指向包内权威规则表")
+
+    def test_violation_hint_stays_in_package(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["falsifier"] = ""
+        code, out, err = _run("--check", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out + err, "违规提示指向了不随包安装的文件")
+
+    def test_shape_hint_stays_in_package(self) -> None:
+        doc = valid_state()
+        doc["state_version"] = "0"
+        code, out, err = _run("--check", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out + err, "形状提示指向了不随包安装的文件")
+
+    def test_json_output_does_not_leak_dev_paths(self) -> None:
+        doc = valid_state()
+        doc["claims"][0]["falsifier"] = ""
+        code, out, _err = _run("--check", "--json", self._write(doc))
+        self.assertEqual(code, sc.EXIT_HARD)
+        self.assertNotIn("docs/", out)
+
+    def test_validator_docstring_marks_dev_specs_as_unshipped(self) -> None:
+        text = (self.ROOT / "scripts" / "state_check.py").read_text(encoding="utf-8")
+        self.assertIn("这些 spec 不随 skill 安装", text)
+
+
+class TestReleaseCheckGate(unittest.TestCase):
+    """`scripts/release_check.py` 的每个步骤都要能真的判 FAIL。
+
+    为什么需要它：一次真实事故是「闸门跑了，但**读数读错**」——
+    于是把发布闸门收敛成单一 `PASS` / `FAIL`。代价是闸门自己成了单点，
+    所以它的每一步都必须有反例：**步骤失效时要变红，而不是恒真。**
+
+    **不在这里调 `step_tests()`** —— 它会重跑整个测试套件，造成递归。
+    「全套测试通过」这一步由 `release_check.py` 自己跑；AGENTS.md 的发布清单以它为准。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    MUTATED = ("SKILL.md", "references/research-state-policy.md")
+
+    @classmethod
+    def setUpClass(cls):
+        # 还原守卫：变异测试写的是**真实仓库文件**。任何提前退出都不得留下改动。
+        cls._originals = {rel: (cls.ROOT / rel).read_text(encoding="utf-8")
+                          for rel in cls.MUTATED}
+
+    @classmethod
+    def tearDownClass(cls):
+        for rel, original in cls._originals.items():
+            path = cls.ROOT / rel
+            if path.read_text(encoding="utf-8") != original:
+                path.write_text(original, encoding="utf-8")
+
+    def setUp(self):
+        import release_check  # noqa: PLC0415 — 同目录模块，按需导入以免影响其他测试
+        self.rc = release_check
+
+    def _mutate(self, rel, old, new, step):
+        path = self.ROOT / rel
+        original = path.read_text(encoding="utf-8")
+        self.assertIn(old, original, msg=f"{rel} 里找不到待改文本")
+        path.write_text(original.replace(old, new, 1), encoding="utf-8")
+        try:
+            return step()
+        finally:
+            path.write_text(original, encoding="utf-8")
+
+    def test_rule_table_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_rule_table_parity()
+        self.assertTrue(ok, detail)
+        self.assertIn("逐字一致", detail)
+
+    def test_rule_table_step_detects_a_text_drift(self) -> None:
+        ok, _ = self._mutate("references/research-state-policy.md",
+                             "| V1 | 每个 C 的 falsifier 非空 | 硬 |",
+                             "| V1 | 每个 C 的 falsifier 不许为空 | 硬 |",
+                             self.rc.step_rule_table_parity)
+        self.assertFalse(ok, "规则文本漂移时该步骤必须 FAIL")
+
+    def test_readwrite_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_readwrite_parity()
+        self.assertTrue(ok, detail)
+
+    def test_readwrite_step_detects_a_cell_drift(self) -> None:
+        ok, _ = self._mutate("SKILL.md",
+                             "`literature` / `assumptions` / `failures` / `contract.constraints`",
+                             "`literature` / `assumptions` / `failures`",
+                             self.rc.step_readwrite_parity)
+        self.assertFalse(ok, "读写格漂移时该步骤必须 FAIL")
+
+    def test_referenced_scripts_step_passes_on_current_tree(self) -> None:
+        ok, detail = self.rc.step_referenced_scripts_exist()
+        self.assertTrue(ok, detail)
+
+    def test_referenced_scripts_step_detects_a_missing_script(self) -> None:
+        ok, _ = self._mutate("SKILL.md", "name: research-idea-pipeline",
+                             "name: research-idea-pipeline\n\n见 `scripts/no_such_script.py`。",
+                             self.rc.step_referenced_scripts_exist)
+        self.assertFalse(ok, "引用了不存在的脚本时该步骤必须 FAIL")
+
+    def test_every_step_is_present_and_named(self) -> None:
+        titles = [title for title, _ in self.rc.STEPS]
+        self.assertGreaterEqual(len(titles), 5)
+        for title in titles:
+            self.assertTrue(title.strip(), "步骤必须有名字")
+
+
+class TestNoThirdScoringSystem(unittest.TestCase):
+    """R3—R6 不得产生第三套数字评分，也不得提前做 venue fit。
+
+    冻结的设计只有两套聚合机制：R12 的 `G1—G5` + 六维；R7 / R10 / R13 的
+    极性归一化 + 逐维中位数。**R3—R6 只有 search descriptors 与判定**（coverage，
+    不做总分排序）。一旦文档里出现「双评分」或把 1—5 分塞给快筛角色，
+    执行者就会合理地重新造一个 `R3 novelty score + feasibility score`。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    BANNED = ("双评分", "可行性评分（1—5）", "审核评分")
+    NEGATIONS = ("不输出 1—5 分", "不产 1—5 分", "不是 1—5 评分")
+
+    def _docs(self):
+        for path in sorted(self.ROOT.rglob("*.md")):
+            rel = str(path.relative_to(self.ROOT))
+            if rel.startswith("docs/") or ".git" in rel:
+                continue
+            yield rel, path.read_text(encoding="utf-8")
+
+    def test_no_third_numeric_scoring_wording(self) -> None:
+        offenders = []
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                for word in self.BANNED:
+                    if word in line and not any(neg in line for neg in self.NEGATIONS):
+                        offenders.append(f"{rel}:{lineno}: {word}")
+        self.assertEqual(offenders, [], "第三套数字评分措辞仍在：\n  " + "\n  ".join(offenders))
+
+    def test_s_feas_is_a_feasibility_and_resource_auditor(self) -> None:
+        text = (self.ROOT / "references" / "roles.md").read_text(encoding="utf-8")
+        self.assertIn("### S-Feas — 可行性与资源审计员（Feasibility & Resource Auditor）", text)
+        self.assertIn("**不输出 1—5 分，不输出顶会匹配度。**", text)
+
+    def test_s_feas_lines_never_prescribe_venue_fit(self) -> None:
+        offenders = []
+        for rel, text in self._docs():
+            for lineno, line in enumerate(text.splitlines(), 1):
+                if "S-Feas" not in line:
+                    continue
+                if "venue fit" in line and "不做 venue fit" not in line:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:60]}")
+                if "顶会匹配度" in line and "不输出顶会匹配度" not in line:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()[:60]}")
+        self.assertEqual(offenders, [], "S-Feas 仍在做 venue fit：\n  " + "\n  ".join(offenders))
+
+    def test_r3_fitness_table_puts_venue_fit_on_the_blind_side(self) -> None:
+        text = (self.ROOT / "references" / "phase-r3-r6-discovery.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| **Search（R3—R6）**"))
+        self.assertTrue(row.rstrip().endswith("**venue fit** |"),
+                        "R3—R6 的 fitness 表必须把 venue fit 列在「不看」侧")
+
+    def test_r3_fast_screen_roles_use_the_non_scoring_skeleton(self) -> None:
+        text = (self.ROOT / "references" / "roles.md").read_text(encoding="utf-8")
+        self.assertIn("**骨架 3**", text)
+        self.assertIn("**不给分**", text)
+
+    def test_r12_review_dispatch_does_not_route_venue_fit_to_s_feas(self) -> None:
+        text = (self.ROOT / "references" / "phase-r12-narrative.md").read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| `S-Feas`（按需） |"))
+        self.assertNotIn("顶会匹配度", row)
+        self.assertNotIn("venue", row)
+
+
+class TestV15LiveNicheSemantics(unittest.TestCase):
+    """MAJOR-6 收口：V15 的 live niche 语义必须在**全部 active 文档**里一致。
+
+    起因：`_v15()` 与 `RULES["V15"]` 早已是「只有 live niche 才要求 elite」，
+    selftest 也有「niche 全 killed → exit 0」，但 active 文档仍写着
+    「每个**出现过的** niche 至少一条 elite」，R4.3 甚至规定
+    「单候选 niche 的 elite 被 archive 时 R14 不得 archive」，R6.2 又写
+    「进化不得让某 niche 失去 elite」。
+    **校验器改对了，执行规范没改对** —— 执行者会据此把合法状态判成违规。
+    """
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    DOCS = ("references/phase-r3-r6-discovery.md", "references/research-state-policy.md",
+            "references/narrative-patterns.md", "SKILL.md",
+            "scripts/state_check.py")
+    BANNED = ("每个出现过的 niche", "每个出现过的 `niche`",
+              "不得把它 `archive`", "进化不得让某个 niche 失去 elite",
+              '本仓库没有"关闭 niche"机制')
+
+    def test_banned_wording_is_gone(self) -> None:
+        offenders = []
+        for rel in self.DOCS:
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            for word in self.BANNED:
+                if word in text:
+                    offenders.append(f"{rel}: {word}")
+        self.assertEqual(offenders, [], "V15 旧措辞仍在 active 文档：\n  " + "\n  ".join(offenders))
+
+    def test_validator_top_comment_matches_the_rule(self) -> None:
+        text = (self.ROOT / "scripts" / "state_check.py").read_text(encoding="utf-8")
+        self.assertIn("V15 每个 **live niche**", text)
+
+    def test_policy_states_the_canonical_reading(self) -> None:
+        text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
+        self.assertIn("live niche = 至少存在一个", text)
+        self.assertIn("候选全部 `killed` / `archived` 的 niche 合法为空", text)
+
+    def test_all_dead_niche_is_legal(self) -> None:
+        doc = valid_state()
+        for hypothesis in doc["hypotheses"]:
+            hypothesis["status"] = "killed"
+        self.assertNotIn("V15", sc.check_state(doc, source="<test>").rules())
+
+    def test_live_niche_without_elite_is_hard(self) -> None:
+        doc = valid_state()
+        for hypothesis in doc["hypotheses"]:
+            hypothesis["status"] = "active"
+        self.assertIn("V15", sc.check_state(doc, source="<test>").rules())
+
+
 class TestControlledLanguageGate(unittest.TestCase):
     """受控中文 linter（默认档）在 `examples/` 与 `templates/` 上**硬违规必须为 0**。
 

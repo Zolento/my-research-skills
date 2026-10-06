@@ -3,6 +3,10 @@
 
 契约来源
 --------
+**安装态请查 `references/research-state-policy.md` §4.0 / §4.1 的规则表** ——
+下表逐字取自它，两者由 `scripts/test_state_check.py` 的 TestRuleTableParity 锁定。
+
+溯源（**这些 spec 不随 skill 安装**，只在开发仓库里）：
 `docs/r-architecture-wave1-spec.md` §2.2（八类一等对象的必填字段）
 与 §2.3（引用完整性规则 V1—V24）、§5（R10 处置 / 关闭枚举）；
 V11 / V12 见 `docs/r-architecture-wave2-spec.md` §4，V13—V15 见同文件 §3—§4；
@@ -53,7 +57,7 @@ Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为�
     V13 `hypotheses[].island` ∈ {P1..P6, local}（默认开启 P1—P4，P5/P6 按需），但 `P3` 不得出现
         （`P3` 只产 typed intermediate，不产 candidate）
     V14 `hypotheses[].generation` 是非负整数
-    V15 每个出现过的 `niche` 至少一条 `status: elite`
+    V15 每个 **live niche** 至少一条 `status: elite`（候选全灭的 niche 合法为空）
     V16 hypotheses[].operator ∈ 十二算子之一；generation == 0 时必须与 island 一一对应
     V17 hypotheses[].parents 必须是数组，每个 id 存在且 generation 严格大于每个 parent（不得自指或成环）
     V18 每个一等对象的 validity.status ∈ {valid, stale, invalid, pending}；validity.reason 非空；
@@ -76,7 +80,8 @@ Shape Gate（逐字取自 references/research-state-policy.md §4.0，全部为�
     * V13 `hypotheses[].island` ∈ {P1..P6, local}，但 **`P3` 不得出现**
       （`P3` 只产 typed intermediate，不产 candidate）；
     * V14 `hypotheses[].generation` 是非负整数；
-    * V15 每个出现过的 `niche` 至少一条 `status: elite`；
+    * V15 每个 **live niche**（至少一个 `active` / `elite` 候选）至少一条 `status: elite`；
+      候选全部 `killed` / `archived` 的 niche 合法为空；
     * V16 `operator` 必须是十二算子之一（strip 后精确比对）；`generation == 0` 且 `island` 合法时，
       还要求 `operator` 与 `ISLAND_OPERATOR` 一一对应（`island` 本身非法由 V13 负责，不重复计）；
     * V17 `parents` 必须是数组；每个元素是存在的 `H` id、不得自指、且父候选 `generation`
@@ -1808,7 +1813,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="state_check.py",
         description="Research World Model（R1）机械闸门：Shape Gate S1—S7 + 引用完整性 V1—V24"
-                    "（docs/r-architecture-wave1-spec.md §2.3）",
+                    "（权威规则表：references/research-state-policy.md §4.0 / §4.1）",
     )
     parser.add_argument("state", nargs="?", default=None,
                         help="state JSON 路径（如 templates/research-state.template.json）")
@@ -1841,7 +1846,7 @@ def emit(report: Report, as_json: bool, quiet: bool) -> None:
               "references/research-state-policy.md §4.0")
     elif report.violations and not quiet:
         print("[hint] 每条违规形如「规则号 硬违规 · JSON 路径 判据 · 现值」；"
-              "规则定义见 docs/r-architecture-wave1-spec.md §2.3")
+              "规则定义见本 skill 的 references/research-state-policy.md §4.1")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

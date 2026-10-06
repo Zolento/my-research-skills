@@ -173,6 +173,79 @@ class TestStatusSectionParity(unittest.TestCase):
         self.assertEqual(spec, template, msg="规格 §4.2 与 templates/STATUS.md 节集合不一致")
         self.assertEqual(spec, rendered, msg="规格 §4.2 与 render_status.py 输出节集合不一致")
 
+    # ---- content-shape parity（只核节名会漏掉「模板表格 / renderer bullet」这种分叉）----
+
+    @staticmethod
+    def _bodies(text: str):
+        """返回 {节名: [节体行]}，跳过第一个 `##` 之前的内容。"""
+        bodies, name, buf = {}, None, []
+        for line in text.splitlines():
+            if line.startswith("## "):
+                if name is not None:
+                    bodies[name] = buf
+                name, buf = line[3:].strip(), []
+            elif name is not None:
+                buf.append(line)
+        if name is not None:
+            bodies[name] = buf
+        return bodies
+
+    @staticmethod
+    def _shape(body):
+        rows = [line for line in body if line.strip()]
+        if not rows:
+            return "empty"
+        if rows == ["_（无）_"]:
+            return "empty-marker"
+        if all(line.lstrip().startswith("- ") for line in rows):
+            return "bullets"
+        if all(line.lstrip().startswith("|") for line in rows):
+            return "table"
+        return "prose"
+
+    def _content_fixture(self):
+        """每节都有内容的 state —— 否则形状不可分辨（空节只能是 empty-marker）。"""
+        return {
+            "state_version": 3,
+            "claims": [{"id": "C1", "statement": "x", "parent": None, "status": "supported"}],
+            "hypotheses": [{"id": "H1", "statement": "y", "status": "elite"}],
+            "uncertainties": [{"id": "U1", "question": "q", "importance": "critical",
+                               "uncertainty": "high", "status": "open",
+                               "cheapest_discriminating_test": "X1"}],
+            "experiments": [{"id": "X1", "status": "planned"}],
+            "failures": [{"id": "F1", "kind": "inconclusive", "what": "w"}],
+            "assurance": [{"kill_condition": "k", "discriminating_test": "X1",
+                           "verification_tier": "T0"}],
+            "repairs": [{"flaw": "f", "disposition": "RUN_TEST",
+                         "state_delta": "d", "closure": "OPEN"}],
+            "decision": {"verdict": "continue"},
+        }
+
+    def test_content_shape_parity(self):
+        rendered = rs.render(self._content_fixture(), "A")
+        template = (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8")
+        rendered_bodies = self._bodies(rendered)
+        template_bodies = self._bodies(template)
+        self.assertEqual(list(template_bodies), list(rendered_bodies),
+                         msg="模板与 renderer 的节名或顺序不一致")
+        for name in rendered_bodies:
+            self.assertEqual(
+                self._shape(template_bodies[name]), self._shape(rendered_bodies[name]),
+                msg=f"节「{name}」的块形态与 renderer 不一致 —— "
+                    "模板必须与 renderer 同形（renderer 是 executable specification）")
+
+    def test_fixture_makes_every_section_non_empty(self):
+        # 守卫：fixture 退化成空 state 时，形状检查会静默变成「全是 empty-marker」
+        shapes = {name: self._shape(body)
+                  for name, body in self._bodies(rs.render(self._content_fixture(), "A")).items()}
+        self.assertNotIn("empty-marker", shapes.values(), msg=f"fixture 有节为空：{shapes}")
+
+    def test_template_uses_no_tables(self):
+        template = (self.ROOT / "templates" / "STATUS.md").read_text(encoding="utf-8")
+        tables = [name for name, body in self._bodies(template).items()
+                  if self._shape(body) == "table"]
+        self.assertEqual(tables, [], msg=f"模板里这些节仍是表格：{tables}")
+
     def test_no_wall_clock_in_rendered_status(self):
         """幂等的硬边界：投影里不得出现墙钟时间（否则两次生成必然不同）。"""
         import datetime

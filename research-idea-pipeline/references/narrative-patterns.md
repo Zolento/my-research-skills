@@ -34,7 +34,8 @@
 > `boundary-shift`（见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R4.2.1）。
 >
 > **`state_check.py` V6 只收那七轴** —— 把 preset 名写进 `hypotheses[].niche` 会被判违规。
-> V15 仍强制「每个出现过的 niche 留一个 elite」，但那是 **QD niche**，与 preset 无关。
+> V15 只对 **live niche**（至少存在一个 `status ∈ {active, elite}` 的候选）要求 elite；
+> 候选全部 `killed` / `archived` 的 niche **合法为空**。那是 **QD niche** 的规则，与 preset 无关。
 
 ## 1. 十套叙事 preset 表
 

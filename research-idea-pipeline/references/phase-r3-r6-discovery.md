@@ -17,7 +17,7 @@
 | **正确性** | 前提是否自洽、有无明显逻辑缺口 | 方法正确性：推导 / 实现 / 指标 / 统计是否成立 |
 | **理论** | 是否需要理论支撑、前提是否合理 | 证明是否成立、假设是否必要 |
 | **复现性** | **不涉及**（无代码，不派 `S-Repro`） | **必查**（`S-Repro`） |
-| **审查深度** | 快筛：双评分 + 一条致命反驳（见 §R3.7） | 深审：六个攻击面 + 交叉质询 + 逐维中位数 |
+| **审查深度** | 快筛：**双判定** + 一条致命反驳（见 §R3.7；**不产 1—5 分**） | 深审：六个攻击面 + 交叉质询 + 逐维中位数 |
 | **产出** | **未排序的** population + QD archive + 淘汰理由 | 审查结论卡片 + 修改建议 |
 
 **一句话记法：R3—R6 管「值得做吗」，R7 / R10 / R13 管「做对了吗」。**
@@ -373,7 +373,7 @@ venue fit 不明确 / 当前证据不足。
 
 ### R4.2 Quality-Diversity archive（**不是 Top-K**）
 
-**禁止** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为每个 niche 留一个 elite：
+**禁止** `21 ideas → 打分 → Top-3 → 丢掉其余`。改为每个 **live niche** 留一个 elite：
 
 ```text
 Niche assumption-shift（改了一条被共享的假设）      elite: H12
@@ -430,15 +430,18 @@ R4 elite = within-niche representative, not global winner
   提前杀掉 —— 那正是 increment attractor 的入口。
 
 - **`state_check.py` V6 强制**：`hypotheses[].niche` ∈ 上表七轴。
-- **`state_check.py` V15 强制**：每个出现过的 niche 至少有一条 `status: elite`。
-  没有 elite 的 niche 要嘛补一条 elite，要嘛就不要开这个 niche。
+- **`state_check.py` V15 强制**：每个 **live niche** 至少有一条 `status: elite`。
+  **live niche = 至少存在一个 `status ∈ {active, elite}` 的候选。**
+  **若该 niche 的候选全部 `killed` / `archived`，则该 niche 合法为空** ——
+  不要求重新制造 elite，也不阻止 R14 `archive`。
+  没有 elite 的 **live** niche 要嘛补一条 elite，要嘛就不要开这个 niche。
 
 ### R4.3 archive 的更新规则
 
 | 事件 | 动作 |
 |---|---|
 | 新候选进 archive | 与该 niche 的 elite 比较；胜者 `elite`，败者 `active`（**两者都留在 population**，不删） |
-| 某 niche 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`。**若该 niche 只有这一条候选，则 R14 不得把它 `archive`** —— 用 `decision`（`pivot` / `archive`）表达"这条路停止"，**不要**靠改 `hypotheses[].status` 来表达；否则 V15 会在下一次校验时报出。**本仓库没有"关闭 niche"机制，不要发明它。** |
+| 某 **live niche** 的 elite 被 R7 判 `已被覆盖`，或被 R14 `archive` | elite 转 `archived`，**必须同时**把同 niche 的另一条升为 `elite`。**若该 niche 只有这一条候选，就让它合法为空** —— 该 niche 不再有 live 候选，V15 不再要求它（见 §R4.2.1）。**不需要、也不得发明一个"关闭 niche"的动作**：候选全灭即自然为空。停止整条**路线**用 `decision`（`pivot` / `archive`）表达，**不要**靠改 `hypotheses[].status` 来表达。 |
 | 候选被 R6 判 `killed` | `status: killed` 并写 `failures[]`（`kind: deprioritized`） |
 
 ---
@@ -474,7 +477,8 @@ R6: Recombine            才允许不同世界互相借东西
 
 - 进化不得让某个 island 的候选全被 `killed`（全灭说明该轨的提问方式有问题，应作为
   `uncertainties[]` 记下来，而不是静默消失）。
-- 进化不得让某个 niche 失去 elite（V15 会在下一轮校验时报出来）。
+- 进化不得让某个 **live** niche 失去 elite（V15 会在下一轮校验时报出来）。
+  候选全部 `killed` / `archived` 的 niche **合法为空**，V15 不再要求它。
 
 ### R6.3 两阶段 fitness（**Wave 2 最重要的纪律**）
 

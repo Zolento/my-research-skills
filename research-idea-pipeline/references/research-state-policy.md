@@ -526,6 +526,10 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 3. V3 的判定是**双向**的：漏标 `ungrounded` 与错标 `ungrounded` 都是硬违规。
 4. 校验器报的是**字段与 ID**，不是措辞。措辞等级一律查 [evidence-policy.md](evidence-policy.md) §1 / §3，
    **不得**用 state 里的 `epistemic_status` 直接充当「已核实」。
+5. **V15 的 live niche 口径（唯一解释，不得各自发挥）：** **live niche = 至少存在一个
+   `status ∈ {active, elite}` 的候选**。每个 live niche 至少保留一条 `elite`。
+   **候选全部 `killed` / `archived` 的 niche 合法为空** —— 不要求重新制造 elite，
+   也不阻止 R14 `archive`。**不得**把它读成「每个**出现过的** niche 都要有 elite」。
 
 ---
 

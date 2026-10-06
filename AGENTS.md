@@ -122,12 +122,31 @@ a wrong action.
 - Keep the strength of every hedge. Do not turn "may fail" into "fails".
 - Keep the numbers, the conditions, and the scope.
 
+## Rule 10 — Read one machine verdict, not a line of output
+
+A person reads a gate result. That read is an unverified step.
+
+One round reported "zero hard faults" four times. The person read the last line of
+the linter output. That line was a note. The count was on the line above. Five
+faults stayed hidden for four commits.
+
+- Put every release gate behind one command.
+- Read only the last line of that command. It says `PASS` or `FAIL`.
+- Do not ask a maintainer to find a number in the output.
+- Add a new gate to that command. Do not add a manual step.
+
 ## Checklist before the release
 
-1. For each skill that you changed, run its test suite.
-2. For each skill that you changed, run its validator self-test.
-3. Run the link check for each skill.
-4. Run the deprecated-word scan.
-5. Run the controlled-language linter.
-6. Apply Rule 2. Compare the source branch with the target branch.
-7. Read `git status`. The tree must be clean.
+1. Run the release gate in each changed skill. Read the last line. It says
+   `PASS` or `FAIL`.
+
+   ```
+   python3 scripts/release_check.py
+   ```
+
+   The gate runs the test suite, the validator self-test, the template check, the
+   rule-table comparison, the read/write table comparison, and the link check.
+2. Apply Rule 2. Compare the source branch with the target branch.
+3. Read `git status`. The tree must be clean.
+
+Do not add a manual gate to this list. Add the check to the release gate.
