@@ -163,7 +163,7 @@ Expected outcomes（O1…）/ Result / Interpretation / Links（config、manifes
 **结论：`State = machine truth`；`STATUS = human current-state view`。
 STATUS 必须自动或半自动生成，不得成为新的人工 truth source。**
 
-生成入口：`python scripts/research/render_status.py --route <R>`（读 active claims / active hypotheses /
+生成入口：`python scripts/render_status.py --route <R>`（读 active claims / active hypotheses /
 unresolved uncertainties / active experiments / critical attacks / latest decision）。
 
 固定节：Last updated + State version / Current thesis（含 status）/ Strongest supported findings /

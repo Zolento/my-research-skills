@@ -1,7 +1,7 @@
 <!--
 路线级 STATUS.md 骨架。
 用法：复制到 routes/<R>/STATUS.md。
-生成入口：scripts/research/render_status.py。
+生成入口：scripts/render_status.py。
 要求：本文件是 research-state.json 的投影，不是第二份真相。
       同一份 state 连续生成两次，内容必须一致。这就是幂等。
       禁止手工补充 state 之外的事实。
@@ -10,7 +10,7 @@
 # routes/<R> — STATUS
 
 > 本文件是 `research-state.json` 的投影，不是第二份真相。
-> 应由 `scripts/research/render_status.py` 生成，手改无效。
+> 应由 `scripts/render_status.py` 生成，手改无效。
 > 要新增事实，先改 `research-state.json`，再重新生成。
 
 ---

@@ -420,7 +420,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    | `routes/<R>/INDEX.md` | 这条路线**有哪些材料** | 中等 |
 
    **三者都是人类视图（DI-4），必须可从 `research-state.json` 投影。**
-   **`STATUS.md` 由 `scripts/research/render_status.py` 生成，禁止手改。**
+   **`STATUS.md` 由 `scripts/render_status.py` 生成，禁止手改。**
    **INDEX 不再承载 已证实 / 已证伪 / TODO / Bugs / Warnings；当前状态一律进 STATUS。**
    每次产出后更新所在路线的 `INDEX.md`（资产）；状态变化先写回 state，
    再重新生成 `STATUS.md`；跨路线层面的变化同步更新根 `INDEX.md`（路线总表投影）。

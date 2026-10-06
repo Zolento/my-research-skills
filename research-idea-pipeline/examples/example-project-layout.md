@@ -181,7 +181,7 @@ A001 → A002 → A003 → A004 / A005
 # routes/A — STATUS
 
 > 本文件是 research-state.json 的投影，不是第二份真相。
-> 由 scripts/research/render_status.py 生成，手改无效。
+> 由 scripts/render_status.py 生成，手改无效。
 
 ## Last updated + State version
 - 最后更新：2025-01-02

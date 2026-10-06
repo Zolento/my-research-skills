@@ -525,7 +525,7 @@ anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum 
 **结论：`State = machine truth`；`STATUS = human current-state view`。
 STATUS 必须自动或半自动生成，不得成为新的人工 truth source。**
 
-- **生成入口：** `python scripts/research/render_status.py --route <R>`
+- **生成入口：** `python scripts/render_status.py --route <R>`
   （读 active claims / active hypotheses / unresolved uncertainties / active experiments /
   critical attacks / latest decision）。
 - **幂等是硬要求：** 同一份 `research-state.json` 连续生成两次，`STATUS.md` 必须
@@ -539,7 +539,7 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 # routes/<R>/STATUS.md
 
 > 本文件是 `research-state.json` 的投影，不是第二份真相。
-> 应由 `scripts/research/render_status.py` 生成；手改无效。
+> 应由 `scripts/render_status.py` 生成；手改无效。
 
 ## Last updated + State version
 ## Current thesis（含 status）
