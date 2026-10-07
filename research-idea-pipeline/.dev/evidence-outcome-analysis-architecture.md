@@ -57,8 +57,9 @@ A central experimental hypothesis cannot be automatically falsified by one run.
 5. Add positive, negative, invalid and pivot executable examples to the release gate.
 6. Run original and new tests, independent bounded forward test and final review.
 
-Development notes remain at branch root docs and are excluded from any future main
-merge. Runtime references contain only skill guidance and relevant examples.
+Development notes live in research-idea-pipeline/.dev/ and are classified
+KEEP_BRANCH_ONLY. Exclude them from any future main merge and installation copy.
+Runtime references contain only skill guidance and relevant examples.
 
 ## Implementation review
 
@@ -105,3 +106,17 @@ as a new runtime error or as an all-model scientific accuracy guarantee.
 Followups remain plans. apply does not execute them or write scheduler telemetry;
 the R11 caller retains its original EIG and scheduling responsibilities. The independent
 review's conservative unknown-validity path is compatible with that division.
+
+## Repository convention synchronization
+
+Adopted main's shared AGENTS.md and README policy. The architecture journal moved
+from repository-root docs/ into this component's .dev/. Classification is
+KEEP_BRANCH_ONLY. Formal references, templates and runnable fixtures remain outside
+.dev/. Release scans ignore branch notes and reject formal links to them; removing
+.dev/ must not affect the scientific pipeline. No feature implementation was merged
+into main as part of this shared-policy synchronization.
+
+Shared-policy revalidation passes 551 pipeline tests (four baseline skips) and
+108 manuscript tests. A separately copied pipeline with .dev/ omitted also passes
+its complete release gate. This file remains KEEP_BRANCH_ONLY for the requested
+main merge.
