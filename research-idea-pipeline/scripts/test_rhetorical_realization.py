@@ -4,9 +4,14 @@ import copy
 import json
 from pathlib import Path
 import unittest
+import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
 
 import rhetorical_realization as rr
 import validate_rhetorical_variant as rv
+import release_check
 
 EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "narrative-realization"
 
@@ -157,6 +162,168 @@ class TestSensitivity(unittest.TestCase):
             if probe["variant_id"] == "V2":
                 probe["response"]["unsupported_or_overstated_claims"] = ["Unsupported novelty"]
         self.assertEqual(rr.select(*args)["selected_variant"], "V3")
+
+
+class TestAdversarialEquivalence(unittest.TestCase):
+    def setUp(self):
+        self.state, self.snapshot, self.variants = fixture()
+
+    def check(self, variant):
+        return rv.validate(self.state, self.snapshot, variant)["status"]
+
+    def mutate_text(self, old, new):
+        variant = copy.deepcopy(self.variants[0])
+        self.assertIn(old, variant["text"])
+        variant["text"] = variant["text"].replace(old, new)
+        # The generator's semantic declaration is unchanged: audit must read prose.
+        self.assertEqual(variant["semantics"], self.snapshot["semantics"])
+        return variant
+
+    def test_case_1_valid_evidence_framing(self):
+        neutral, evidence = self.variants[:2]
+        self.assertEqual(self.check(evidence), "PASS")
+        self.assertEqual(neutral["semantics"]["numerical_values"], evidence["semantics"]["numerical_values"])
+        self.assertIn("Reported comparison / effect", evidence["text"])
+        self.assertLess(evidence["text"].index("S5 Evidence Contract"), evidence["text"].index("S1 Context"))
+
+    def test_case_2_novelty_inflation(self):
+        self.assertEqual(self.check(self.mutate_text("We study changing X", "We are the first to change X")), "FAIL")
+
+    def test_case_3_scope_inflation(self):
+        self.assertEqual(self.check(self.mutate_text("On Dataset-A under protocol Y", "Universally across all datasets")), "FAIL")
+
+    def test_case_4_limitation_laundering(self):
+        for text in ("", "Minor practical detail, broadly robust"):
+            self.assertEqual(self.check(self.mutate_text(
+                "Single dataset; statistical significance and cross-setting robustness are untested.", text)), "FAIL")
+
+    def test_case_5_statistical_inflation(self):
+        for phrase in ("a statistically significant PSNR improvement", "a robust PSNR improvement"):
+            self.assertEqual(self.check(self.mutate_text("a mean PSNR improvement", phrase)), "FAIL")
+
+    def test_case_6_valid_prior_work_delta(self):
+        contribution = self.variants[2]
+        self.assertEqual(self.check(contribution), "PASS")
+        self.assertIn("Closest prior-work delta", contribution["text"])
+        self.assertIn(self.state["evidence"][1]["source_ref"], contribution["text"])
+        self.assertEqual(contribution["semantics"]["prior_work_delta"], self.snapshot["semantics"]["prior_work_delta"])
+
+    def test_case_7_causal_inflation(self):
+        self.assertEqual(self.check(self.mutate_text("is associated with", "causes")), "FAIL")
+
+    def test_case_8_same_claims_different_ordering(self):
+        self.assertEqual(self.check(self.variants[2]), "PASS")
+        self.assertEqual(self.variants[0]["semantics"], self.variants[2]["semantics"])
+        self.assertLess(self.variants[2]["text"].index("S2 Tension"), self.variants[2]["text"].index("S1 Context"))
+
+    def test_all_frozen_fields_are_checked(self):
+        for field in rv.FIELDS:
+            with self.subTest(field=field):
+                v = copy.deepcopy(self.variants[0])
+                v["semantics"][field].append("unsupported change")
+                self.assertEqual(self.check(v), "FAIL")
+
+    def test_source_changes_cannot_be_repaired_by_narrative(self):
+        for key in ("claims", "evidence", "uncertainties", "failures", "assumptions", "literature"):
+            with self.subTest(key=key):
+                state = copy.deepcopy(self.state)
+                state[key][0]["validity"]["reason"] = "Changed for storytelling"
+                self.assertEqual(rv.validate(state, self.snapshot, self.variants[0])["status"], "FAIL")
+        state = copy.deepcopy(self.state)
+        state["claims"].append(copy.deepcopy(state["claims"][0]))
+        state["claims"][-1]["id"] = "C99"
+        self.assertEqual(rv.validate(state, self.snapshot, self.variants[0])["status"], "FAIL")
+
+    def test_existing_view_descriptor_is_the_only_permitted_state_change(self):
+        state = copy.deepcopy(self.state)
+        state["narrative_view"]["note"] = "Selected audited variant V1"
+        self.assertEqual(rv.validate(state, self.snapshot, self.variants[0])["status"], "PASS")
+
+    def test_unknown_operator_extra_prose_and_unbounded_round_fail(self):
+        mutations = [lambda v: v["operators"].append("inflate_novelty"),
+                     lambda v: v.update(profile="optimize-reviewer-score"),
+                     lambda v: v.update(round=2), lambda v: v.update(round=True),
+                     lambda v: v.update(text=v["text"] + "\nWe propose a novel unprecedented framework."),
+                     lambda v: v.update(overall_score=5)]
+        for mutate in mutations:
+            v = copy.deepcopy(self.variants[0])
+            mutate(v)
+            self.assertEqual(self.check(v), "FAIL")
+
+    def test_snapshot_and_mapping_tampering_fail(self):
+        for mutate in (lambda s: s["manifest"]["evidence_mapping"]["C0"].update(supports=["E2"]),
+                       lambda s: s["manifest"].update(preset="N10"),
+                       lambda s: s["slots"]["S6"].clear()):
+            snapshot = copy.deepcopy(self.snapshot)
+            mutate(snapshot)
+            self.assertEqual(rv.validate(self.state, snapshot, self.variants[0])["status"], "FAIL")
+
+    def test_omitted_failure_uncertainty_and_comparator_are_not_trusted(self):
+        for field in ("limitations", "failure_cases", "uncertainty", "scope"):
+            manifest = copy.deepcopy(self.snapshot["manifest"])
+            manifest["bindings"][field] = []
+            manifest["empty_reasons"][field] = "Hide it"
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                rv.freeze(self.state, manifest)
+
+    def test_boundary_position_identical_for_every_profile(self):
+        for v in self.variants:
+            text = v["text"]
+            self.assertLess(text.index("limitations:"), text.index("S1 Context"))
+            self.assertLess(text.index("failure_cases:"), text.index("S5 Evidence Contract"))
+        prefix = self.variants[0]["text"].split("\n\nS1 Context")[0]
+        self.assertTrue(all(v["text"].startswith(prefix) for v in self.variants))
+
+    def test_bad_prose_is_blocked_before_probe(self):
+        v = self.mutate_text("We study changing X", "We are the first to change X")
+        with self.assertRaises(ValueError):
+            rr.prepare_probe(self.state, self.snapshot, v)
+
+    def test_malformed_inputs_fail_closed(self):
+        for value in (None, [], {}, "bad"):
+            self.assertEqual(rv.validate(self.state, self.snapshot, value)["status"], "FAIL")
+            self.assertEqual(rv.validate(self.state, value, self.variants[0])["status"], "FAIL")
+
+
+class TestCLIAndRelease(unittest.TestCase):
+    def test_end_to_end_cli_generation_validator_and_blind_task_are_read_only(self):
+        state, snapshot, variants = fixture()
+        script = rv.ROOT / "scripts" / "rhetorical_realization.py"
+        checker = rv.ROOT / "scripts" / "validate_rhetorical_variant.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            files = {"state": state, "snapshot": snapshot, "variant": variants[0]}
+            for name, value in files.items():
+                (folder / (name + ".json")).write_text(json.dumps(value), encoding="utf-8")
+            args = [arg for name in files for arg in ("--" + name, str(folder / (name + ".json")))]
+            before = (folder / "state.json").read_bytes()
+            proc = subprocess.run([sys.executable, str(checker), *args], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stdout)
+            proc = subprocess.run([sys.executable, str(script), "probe-task", *args], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stdout)
+            self.assertEqual(set(json.loads(proc.stdout)), {"instruction", "questions", "narrative"})
+            variant_path = folder / "variant.json"
+            v = variants[0]
+            v["text"] += " Unsupported claim"
+            variant_path.write_text(json.dumps(v), encoding="utf-8")
+            proc = subprocess.run([sys.executable, str(checker), *args], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 3)
+            self.assertEqual(json.loads(proc.stdout)["status"], "FAIL")
+            variant_path.write_text("bad JSON", encoding="utf-8")
+            proc = subprocess.run([sys.executable, str(checker), *args], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 4)
+            self.assertEqual((folder / "state.json").read_bytes(), before)
+        proc = subprocess.run([sys.executable, str(script), "generate", "--state", str(EXAMPLE / "source-state.json"),
+                               "--manifest", str(EXAMPLE / "manifest.json")], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertEqual(len(json.loads(proc.stdout)["variants"]), 4)
+
+    def test_release_step_detects_mutated_actual_prose(self):
+        _, snapshot, variants = fixture()
+        variants[0]["text"] += " We are the first."
+        output = json.dumps({"snapshot": snapshot, "variants": variants})
+        with patch.object(release_check, "_run", return_value=(0, output)):
+            self.assertFalse(release_check.step_rhetorical_realization()[0])
 
 
 if __name__ == "__main__":

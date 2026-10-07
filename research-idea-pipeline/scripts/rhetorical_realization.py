@@ -34,6 +34,13 @@ def blind_task(text):
     }
 
 
+def prepare_probe(state, snapshot, variant):
+    gate = validate(state, snapshot, variant)
+    if gate["status"] != "PASS":
+        raise ValueError("probe blocked by equivalence gate: " + str(gate["errors"]))
+    return blind_task(variant["text"])
+
+
 def evaluation_plan(snapshot, judges):
     """Create before observing any response; caller persists this preregistration."""
     if not isinstance(judges, list) or len(judges) < 2:
@@ -243,6 +250,8 @@ def main(argv=None):
     p.add_argument("--manifest", type=Path, required=True)
     p = sub.add_parser("probe-task", help="emit ONLY the payload for an independent blind judge")
     p.add_argument("--variant", type=Path, required=True)
+    p.add_argument("--state", type=Path, required=True)
+    p.add_argument("--snapshot", type=Path, required=True)
     p = sub.add_parser("score", help="adjudicator compares a blind response to the frozen truth")
     p.add_argument("--snapshot", type=Path, required=True)
     p.add_argument("--response", type=Path, required=True)
@@ -263,7 +272,7 @@ def main(argv=None):
             snapshot = freeze(state, manifest)
             result = {"snapshot": snapshot, "variants": generate(state, snapshot)}
         elif args.command == "probe-task":
-            result = blind_task(read(args.variant)["text"])
+            result = prepare_probe(read(args.state), read(args.snapshot), read(args.variant))
         elif args.command == "plan":
             result = evaluation_plan(read(args.snapshot), read(args.judges))
         elif args.command in ("audit", "select"):
