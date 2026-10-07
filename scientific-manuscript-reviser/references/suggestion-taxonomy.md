@@ -4,6 +4,10 @@
 
 | Internal category | User bank | Inspect |
 |---|---|---|
+| scientific_logic | Scientific logic | broken/missing/circular links, hypotheses, assumptions and alternative explanations |
+| theory | Theory and proof | definitions, proof steps, theorem scope, theory/method alignment |
+| experimental_design | Experimental design | identification, controls, fairness, metrics, leakage and reproducibility |
+| conclusion_validity | Claim and conclusion validity | result entailment, strength/scope drift, overclaim and underclaim |
 | narrative | Narrative | motivation, tension, gap, contribution hierarchy, claim order, introduction progression, method motivation, result interpretation, discussion and conclusion |
 | paragraph | Paragraph structure | role, progression, length imbalance, repeated mini conclusions/transitions, excessive symmetry, jumps, redundant setup, density |
 | claims | Claims and evidence | nearby evidence, actual quantitative effect and comparator, novelty delta, calibrated strength, abstract/body agreement |
@@ -11,14 +15,14 @@
 | references | References and presentation | statement-first narration, citation meaning, reference identity and attachments |
 | defensive | Defensive language | necessary calibration, optional hedge, redundant defense, unsupported weakening |
 
-All six categories are inspected, but empty categories stay empty. Keep as is is
+All ten categories are inspected, but empty categories stay empty. Keep as is is
 a separate protected set, not a seventh suggestion quota. One underlying problem
 gets one entry; frequency and representative locations describe repetition.
 
 ## Internal JSON bank
 
 Top-level keys are `schema` (manuscript-suggestions@1), `manuscript_digest`, `mode`
-(audit/suggest/revise), `short_diagnosis`, `reviewed_categories` (all six),
+(audit/suggest/architect/revise), `coherence_digest`, `short_diagnosis`, `reviewed_categories` (all ten),
 `suggestions`, `keep_as_is`, and `quality_audit`.
 
 Each suggestion contains
@@ -28,6 +32,12 @@ id, category, severity, confidence, location, original_span,
 diagnosis, why_it_matters, scientific_risk, recommended_action,
 alternatives, rule_refs, apply_by_default
 ```
+
+Also include `source_finding_ids`. Scientific entries cite existing coherence
+findings, never aggregator-invented criticism. Their alternatives additionally
+include `requires`, one of the four scientific repair requirement types. Their
+severity cannot be lowered below the scientific finding. Text calibration that
+changes a protected claim is high risk, even though it requires no experiment.
 
 `location` is `{start, end}` using zero-based Unicode character offsets and an
 exclusive end, not byte offsets. `original_span` must match exactly. Confidence
@@ -41,7 +51,7 @@ introduce tension before method, or sharpen a topic sentence in the current orde
 Two wording synonyms are not two directions. In Suggest and Revise, an important
 issue gets 2–3 genuine alternatives. Audit may simply identify actions. Small
 grammar fixes need no manufactured alternatives. `apply_by_default` is false for
-every high-risk entry and all Audit/Suggest entries.
+every high-risk entry and all Audit/Suggest/Architect entries.
 
 Keep entries contain `location`, `original_span`, `rationale`. Preserve already
 clear wording, domain vocabulary and helpful author variation. Never edit them

@@ -4,8 +4,12 @@ Mode, section boundaries, input identity and available evidence context
 
 ## Short diagnosis
 ## Protected scientific facts and unresolved extraction questions
+## Scientific argument graph and main logic chain
+## RQ–hypothesis–experiment–result–claim matrix
+## Scientific coherence findings and structured scorecard
+## Well Supported
 ## Top suggestions
-## Six-category suggestion bank
+## Ten-category suggestion bank
 ## Keep as is
 
 ## Optional revision
