@@ -117,6 +117,12 @@
 
 ## R3. 双轨发现（**上下文隔离是硬规则**）
 
+生成或 reseed 前，读取 Failure Memory 中的 negative_knowledge 与 stop_rules，
+使用 [outcome constraints](evidence-outcome-analysis.md) 约束搜索空间。已被否证的 scoped
+hypothesis 不得换 ID 后静默恢复。保留 parents 与旧负知识，解释新 assumption、scope
+或判别证据改变了什么。执行规划还须通过 check-plan；写作不能覆盖这些科学约束。
+
+
 > **谁生成候选（Wave 4 裁决，取代 Wave 3 的「执行者分轨生成」）：**
 > **R3 的候选由隔离 Exploration Agents 按 island 独立生成。** 中央执行者只负责构造各 island
 > 的最小共享输入、实施上下文隔离、`typed intermediate` 路由、收集与结构化候选、分配 ID

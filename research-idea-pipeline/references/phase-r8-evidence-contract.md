@@ -148,6 +148,22 @@ R8 **不执行**实验，只登记。
 - `status` 进入 `running` / `done` / `failed` 后，`frozen_at_state_version` **必须**是
   ≤ `result_at_state_version` 的非负整数（`V21`）。
 
+#### Outcome 与 negative constraints 的冻结
+
+新项目先在 R0 冻结 `contract.outcome_policy`。R8 为每个实验声明
+`hypothesis_targeted` 和 `outcome_protocol` 的 dataset、design、scope。
+同时声明 hypothesis 的 scientific_scope 和 central。不得看完结果再降低 replication 门槛。
+
+创建或重试实验前，读取 Failure Memory 的 negative_knowledge、stop_rules 和 retry_conditions。
+运行 `scripts/evidence_outcome.py check-plan`。被阻止的计划保留 execution_blocked_by，
+不进入执行。满足 revisit 或 fix 条件时，用实际证据填写 outcome_plan_clearance，
+显式清除已解除的 execution hold，再重跑 state_check 和 check-plan。
+只改变 seed 或代码 commit 不会自动解除 stop rule。
+
+对已 WEAKENED 的 hypothesis，只在 retry_conditions 明确满足且增加辨别信息时安排 replication。
+已有 FALSIFIED 记录不能改回 SUPPORTED。新的科学假设须有新的 ID、scope、lineage 和证据理由。
+详见 [Evidence Outcome contract](evidence-outcome-contract.md)。
+
 ### R8.2.5 证据驱动的**单向升级**（R8 不做任何降级）
 
 **R8 只能让 `claims[].status` 向上走。** 除 R10 外，R8 是唯一能改它的阶段

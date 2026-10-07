@@ -77,6 +77,9 @@
 继续推进当前研究，在已授权资源内执行，不要重复首次接管。
 围绕主锚点，让实验结果产生下一条方法假设和可判别的干预。
 机制未证实时可以提出候选，但不得把机制假设写成既定事实。
+结果产生后先做 [Evidence Outcome Analysis](evidence-outcome-analysis.md)，再经 R10/R11 回写。
+有效 negative evidence 进入科学记忆，无效执行不能否证 hypothesis。选下一动作前读取
+stop rules，并通过 planning 与 post-update Assurance；缺审计则 HOLD。
 候选失败后检查失败范围。遇到方法瓶颈，按 R5.1 补检索并阅读关键机制与实现资料。
 将资料转成有来源、适用条件和最小对照的方法干预，再继续探索。
 不要求先解释全部未知。遇到真实阻塞时说明依赖和可继续的独立工作。

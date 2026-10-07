@@ -7,7 +7,7 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。 |
+| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。内部 Evidence Outcome Analysis 区分有效负证据与无效执行，固化 scoped updates、negative knowledge 和下一步决策。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改。提供 Scientific Coherence Audit、Compact / Full Blueprint、多选 suggestion bank、作者风格保护和语义 / style 门禁；可独立安装，不依赖其他 skill。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图**字符草稿**架构师：读代码 / 论文 / 配置 / 用户说明，产出若干份结构不同的 Markdown 字符示意图 draft，作为 SVG / TikZ / Figma 代理的结构蓝图。强制四级证据（A/B/C/D）、强制区分 train / inference / frozen，禁止补造不存在的模块；含契约校验脚本与离线测试。 |
 

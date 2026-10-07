@@ -92,6 +92,13 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 
 ## 4. `next_actions[]` 条目结构
 
+选择执行动作前，读取 [Evidence Outcome Analysis](evidence-outcome-analysis.md) 的
+Failure Memory constraints。实验建议中的六值决定不替换 scheduler priority，也不授权
+改锚点。结果产生后必须先经 outcome analysis、R10/R11 update 和 Assurance。
+check-plan 未通过或 execution_blocked_by 非空时，不得重跑。已澄清的新条件需有
+source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算澄清。
+
+
 ```json
 {
   "action": "X14",

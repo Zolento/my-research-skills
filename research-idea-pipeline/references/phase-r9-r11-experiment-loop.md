@@ -74,7 +74,8 @@ e* = argmax_e  E[ΔU | e] / cost(e)
 
 ### R9.4 失败实验不得消失（强制）
 
-失败的实验**必须双写**：
+执行失败的实验**必须双写**。有效 negative result 保持 `done`，不因不支持 hypothesis 就写成 `failed`。
+先按 [Evidence Outcome Analysis](evidence-outcome-analysis.md) 判断有效性和各目标结果：
 
 ```jsonc
 // experiments[]：{"id":"X9", …, "status":"failed"}
@@ -84,6 +85,21 @@ e* = argmax_e  E[ΔU | e] / cost(e)
 
 **`state_check.py` V4 机械强制：** 每条 `F` 必须被某个 `claims[].known_flaws` 或
 `experiments[].known_flaws` 引用。**失败不得在叙事中消失**（R12 的视图也必须带上它们）。
+
+### R9.O Evidence Outcome Analysis（内部子阶段）
+
+每次结果收集后、科学状态回写前，执行 [outcome workflow](evidence-outcome-analysis.md)
+和 [artifact contract](evidence-outcome-contract.md)。先保存原始 packet，再提取 observations、
+validity、scoped claim/hypothesis effects、failure attribution、negative knowledge 与候选决定。
+R9.O 不直接改 claim，不修改 narrative。R10/R11 只应用通过独立审计的 proposal。
+
+启用 outcome_policy 后，不得先写 `done/failed` 再补分析。原始运行结束而审计未完成时，
+实验 lifecycle 保持 `running`，标记 `result_pending: true`，packet 明确记录实际 execution_status。
+这里的 running 表示实验流程尚未收尾，不表示训练进程仍运行。终态和 receipt 在同一
+R10/R11 transaction 中写入；不要为了过门禁声称执行仍在发生。
+
+执行前先读取 Failure Memory 的 negative constraints，并运行 check-plan。仅改 seed、
+code commit 或 preregistration 时间不能绕过同一科学协议的 stop rule。
 
 ### R9.5 实验计划书（`<R>NNN-experiment-plan.md`，R9—R11 落盘）
 
@@ -256,8 +272,8 @@ R10 的处置**必须**映射到既有冻结枚举（`disposition` 五值 + `clo
 
 | 步 | 动作 | 写哪个字段 |
 |---|---|---|
-| 1 | 把结果登记为证据 | `evidence[]` 新增 `E<n>`（`epistemic_status` 按实际：跑了 = `Observed`，只是推导 = `Supported`） |
-| 2 | 把证据连到 claim | `claims[].supporting_evidence` / `refuting_evidence`；`status` 按 §R10 更新 |
+| 1 | 先完成 R9.O，再登记有效可推断结果 | `evidence[]` 新增有 scope 的 `E<n>`；无效执行只进 Failure Memory 与 outcome receipt，不充当 claim 证据 |
+| 2 | 按 FULL/LOCAL 区分把证据连到 claim | `claims[].supporting_evidence` / `refuting_evidence`；`status` 按 §R10 更新 |
 | 3 | 更新不确定性（**允许部分下降**） | `uncertainties[]`：`uncertainty` 可 `high → medium → low`，`status` 可保持 `open`；只在**已有充分判别证据**时转 `closed`；由 `unexpected` 引出的 `U<n>` **必须新增** |
 | 4 | 回填 EIG 对照（telemetry） | `scheduler.json` 的 `eig_calibration.records`：`predicted_information_gain` + **`observed_delta`** + `actual_information_gain`（生产者 / 消费者见 [scheduler-policy.md](scheduler-policy.md) §6.1） |
 | 5 | 生成下一步 | `experiments[]` 新增 `planned` 节点，`parent` 指向本次；或在 `next_branches` 里登记 |
@@ -284,6 +300,8 @@ R10 的处置**必须**映射到既有冻结枚举（`disposition` 五值 + `clo
   是**完全合法**的科研状态 —— **不得**因为「没关掉」就判它不闭环（见
   [research-state-policy.md](research-state-policy.md) §3.8）。`closed` 需要**充分判别证据**，
   不允许为了凑闭环而关。
+- outcome transaction 后先做 Assurance，再释放逐目标的 CONTINUE/RETRY/REDESIGN/PIVOT/STOP/HOLD。
+  缺审计时 HOLD。它们不替代 R14 的 route-level 决定，也不授权改项目锚点。
 - 收尾跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，
   **硬违规须为 0**。
 
@@ -292,6 +310,9 @@ R10 的处置**必须**映射到既有冻结枚举（`disposition` 五值 + `clo
 
 ## 自检（R9—R11）
 
+- [ ] 每个终态实验已有 source-bound outcome receipt；无效执行未否证 hypothesis
+- [ ] 逐目标处理 mixed outcome；PIVOT/STOP 的 stop rule 与 negative knowledge 已落盘
+- [ ] 下一动作已读取 constraints、通过 planning gate 与 post-update Assurance
 - [ ] 实验树 `parent` 无环，根节点 `parent = null`
 - [ ] `X1`/`X2` **没有**承担 claim 判别
 - [ ] 实验排序写出了「改变哪条 `U` / 方向 / 成本口径」，且**未**用指标提升当依据

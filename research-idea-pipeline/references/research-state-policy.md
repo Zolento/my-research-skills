@@ -770,3 +770,23 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 > 旧描述性名已登记在 [deprecated-terms.txt](deprecated-terms.txt)。
 > 本表左列刻意只用**中文概念**，就是为了不把废弃原文再写进正文。
 > 高风险范式类候选按**实际改写的对象**取 `formulation-shift`（改写问题表述）或 `boundary-shift`（改写边界 / 反例）。
+
+
+### 3.13 Evidence Outcome Analysis additive fields
+
+R9.O 是结果收集与 R10/R11 之间的内部能力，不新增一等对象或 R 阶段编号。
+`contract.outcome_policy` 冻结项目 replication 标准；`experiments[].outcome_analysis` 保存
+packet、逐目标 analysis、独立 audit、历史 context 和 state delta receipt。
+`claims/hypotheses[].scoped_outcomes` 与 `outcome_status` 表示科学支持，不替换既有
+claim lifecycle 或 QD 枚举。`hypotheses[].scientific_scope` 与 `central` 在执行前声明。
+`failures[].negative_knowledge`、`stop_rules` 与 `failure_attributions` 属于科学 Failure Memory。
+`uncertainties[]` 继续承载 open questions；next actions 随 receipt 存储，调度统计仍在 telemetry。
+
+完整字段、生产者、消费者和迁移规则见 [outcome contract](evidence-outcome-contract.md)。
+原 S1—S7 / V1—V24 不改号、不改义。启用 policy 后增加 EO1 outcome gate，
+每个 done/failed 结果必须有可回溯 receipt。没有 policy 的旧 state 保持兼容，不能据此
+声称旧结果已经完成分析。新项目启用 policy；已有项目显式回填，不虚构缺失日志。
+
+R9 只产 proposal。R10/R11 应用通过独立 audit 的副本，保留有效负证据与无效执行的区别，
+局部否证不改全局 claim，记录 immutable 历史后运行 state_check。Assurance 通过后才可
+释放逐目标实验决定。R14 四值与项目锚点授权纪律不变，R12 不得反向覆盖负证据。
