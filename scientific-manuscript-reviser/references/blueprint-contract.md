@@ -87,3 +87,7 @@ Compare the approved section sketches against the draft with the shared invarian
 checker, exact hierarchy/evidence contract and H1/H2 checks. H3/naturalness are in
 semantic and editorial passes. Do not generate a different central claim for convenience.
 No external model APIs are called or simulated by these helpers.
+
+Theory alignment coverage follows graph node types as well as claim labels.
+A theorem, lemma, proposition, bound or corollary cannot skip alignment by using
+a different claim_type spelling. Unresolved scientific findings keep drafting blocked.

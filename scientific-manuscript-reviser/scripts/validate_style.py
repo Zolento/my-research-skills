@@ -4,7 +4,6 @@
 Exit 0 PASS, 3 FAIL, 4 NEEDS_REVIEW or invalid input. Offsets are Unicode characters.
 """
 import argparse
-from collections import Counter
 import json
 from pathlib import Path
 import re
@@ -26,10 +25,15 @@ TECH_ENVS = {'equation', 'equation*', 'align', 'align*', 'aligned', 'gather', 'g
              'tabular*', 'array', 'matrix', 'bmatrix', 'pmatrix'}
 
 
+def escaped(text, position):
+    prefix = text[:position]
+    return (len(prefix) - len(prefix.rstrip('\\'))) % 2 == 1
+
+
 def balanced_end(text, start, opening='{', closing='}'):
     depth = 0
     for i in range(start, len(text)):
-        if i and text[i - 1] == '\\':
+        if escaped(text, i):
             continue
         if text[i] == opening:
             depth += 1
@@ -76,7 +80,7 @@ def scan(text):
         protect(m.start(), stop, 'technical environment')
         if end < 0:
             warn(m.start(), stop, 'Unclosed technical environment.')
-    for m in re.finditer(r'^\s*\|.*\|\s*$|^\s*@\w+\s*\{', text, re.M):
+    for m in re.finditer(r'^\s*\|.*\|\s*$|^\s*@\w+\s*\{|^\s*(?:-{3,}|\*{3,}|_{3,})\s*$', text, re.M):
         if mask[m.start()]:
             continue
         if '@' in m[0] and not m[0].lstrip().startswith('|'):
@@ -91,22 +95,24 @@ def scan(text):
         if mask[i]:
             i += 1
             continue
-        if text[i] == '%' and re.search(r'\\[A-Za-z]+', text) and (i == 0 or text[i - 1] != '\\') and not (i and text[i - 1].isdigit()):
+        if text[i] == '%' and re.search(r'\\[A-Za-z]+', text) and not escaped(text, i) and not (i and text[i - 1].isdigit()):
             end = text.find('\n', i)
             protect(i, end if end >= 0 else len(text), 'TeX comment')
             i = end if end >= 0 else len(text)
             continue
         opener = next((x for x in ('$$', '\\[', '\\(', '$', '`') if text.startswith(x, i)), None)
         if opener:
+            if opener == '`':
+                opener = re.match(r'`+', text[i:])[0]
             closer = {'\\[': '\\]', '\\(': '\\)'}.get(opener, opener)
             end = i + len(opener)
             while True:
                 end = text.find(closer, end)
-                if end < 0 or not (end and text[end - 1] == '\\'):
+                if end < 0 or not escaped(text, end):
                     break
                 end += len(closer)
             stop = end + len(closer) if end >= 0 else len(text)
-            protect(i, stop, 'math' if opener != '`' else 'inline code')
+            protect(i, stop, 'inline code' if opener.startswith('`') else 'math')
             if end < 0:
                 warn(i, stop, 'Unclosed inline delimiter or ambiguous currency notation.')
             i = stop
@@ -117,7 +123,12 @@ def scan(text):
             protect(i, stop, 'URL')
             i = stop
             continue
-        notation = re.match(r'\d+(?:\.\d+)?\s*[:–]\s*\d+(?:\.\d+)?\b|[A-Za-z_]\w*::[A-Za-z_]\w*', text[i:])
+        citation = re.match(r'\[@[^\]\n]+\]', text[i:])
+        if citation:
+            protect(i, i + len(citation[0]), 'citation notation')
+            i += len(citation[0])
+            continue
+        notation = re.match(r'\d+(?:\.\d+)?\s*(?::|–|--)\s*\d+(?:\.\d+)?\b|[A-Za-z_]\w*::[A-Za-z_]\w*', text[i:])
         if notation and (i == 0 or not text[i - 1].isalnum()):
             protect(i, i + len(notation[0]), 'ratio/range/identifier')
             i += len(notation[0])
@@ -130,7 +141,8 @@ def scan(text):
             if name in TECH_COMMANDS or (len(name) > 1 and name not in PROSE_COMMANDS):
                 pos = stop
                 # Protected payloads, with optional arguments. href's visible text is prose.
-                max_braces = 1 if name == 'href' else 8
+                max_braces = (2 if name in {'frac', 'dfrac', 'tfrac', 'SI', 'newcommand', 'renewcommand', 'providecommand'}
+                              else 1 if name in TECH_COMMANDS else 8)
                 braces = 0
                 while pos < len(text):
                     start = pos
@@ -161,7 +173,7 @@ def scan(text):
 def validate(text):
     parsed = scan(text)
     findings = list(parsed['warnings'])
-    for m in re.finditer(r'[;:—–]', parsed['prose']):
+    for m in re.finditer(r'[;:—–]|(?<!-)-{2,3}(?!-)', parsed['prose']):
         findings.append({'rule': 'H1', 'severity': 'error',
                          'location': location(text, m.start(), m.end()),
                          'message': 'Prohibited punctuation in a prose span.'})
@@ -180,6 +192,18 @@ def validate(text):
             findings.append({'rule': 'H2', 'severity': 'error',
                              'location': location(text, a.start(), b.end()),
                              'message': 'Adjacent sentences repeatedly start with references.'})
+    for m in refs:
+        trailing = re.match(r'\s*(?:,\s*|(?:and|or)\s+)\d+(?:\.\d+)*\b', text[m.end():], re.I)
+        if trailing:
+            findings.append({'rule': 'H2', 'severity': 'error', 'location': location(text, m.start(), m.end() + trailing.end()),
+                             'message': 'Multiple figure/table/section numbers in a stacked reference phrase.'})
+    for m in re.finditer(r'\\(?:ref|cref|Cref|autoref)\{([^{}]+)\}', text):
+        if any(s['start'] <= m.start() < s['end'] for s in blocked):
+            continue
+        keys = [k.strip() for k in m[1].split(',')]
+        if len(keys) > 1 and all(re.match(r'(?:fig|tab|table|sec|section)[:_-]', k, re.I) for k in keys):
+            findings.append({'rule': 'H2', 'severity': 'error', 'location': location(text, m.start(), m.end()),
+                             'message': 'A cross-reference command stacks figure/table/section identifiers.'})
     status = 'FAIL' if any(f['severity'] == 'error' for f in findings) else 'NEEDS_REVIEW' if findings else 'PASS'
     return {'status': status, 'findings': findings,
             'note': 'Mechanical candidates only. H2 meaning, H3 calibration and naturalness require semantic audit.'}

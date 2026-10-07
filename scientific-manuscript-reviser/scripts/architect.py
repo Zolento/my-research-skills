@@ -199,7 +199,7 @@ def _blueprint(material, graph, report, blueprint, outline_audit):
     for p in paragraphs.values():
         if any(x not in paragraphs or x == p['id'] for x in p['logical_predecessor'] + p['logical_successor']):
             errors.append('paragraph logic reference missing or circular')
-    findings = {f['id']: f for f in coherence.get('findings', [])}
+    findings = {f['id']: f for f in coherence.get('findings', []) + coherence.get('structural_diagnostics', [])}
     gap_ids = []
     for gap in blueprint['gaps']:
         if set(gap) != {'finding_id', 'paragraph_ids', 'requires'} or gap['finding_id'] not in findings or gap['requires'] not in ac.REPAIRS or not gap['paragraph_ids'] or any(x not in paragraphs or paragraphs[x]['gap_marker'] != 'SCIENTIFIC GAP TO RESOLVE' or gap['finding_id'] not in paragraphs[x]['finding_ids'] for x in gap['paragraph_ids']):
@@ -251,7 +251,8 @@ def _blueprint(material, graph, report, blueprint, outline_audit):
                     errors.append('invalid outline check')
                 else:
                     verdict(check)
-            theory_claims = {i for i, c in claims.items() if c['claim_type'] == 'theoretical'}
+            graph_nodes = {n['id']: n for n in graph['nodes']}
+            theory_claims = {i for i, c in claims.items() if c['claim_type'].lower() in ('theoretical', 'theorem', 'lemma', 'proposition', 'bound', 'corollary') or graph_nodes.get(i, {}).get('type') in ac.THEORY_TYPES}
             aligned = []
             for check in outline_audit['alignment_checks']:
                 if set(check) != {'claim_id', 'status', 'rationale'}:

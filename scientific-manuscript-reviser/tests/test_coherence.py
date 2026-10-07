@@ -48,7 +48,7 @@ def logic_fixture(theory=False):
                                    'alternative_explanations': ['Optimization may explain it; no mechanism asserted.'],
                                    'discriminating_evidence_ids': ['O'], 'verdict': 'SUPPORTED',
                                    'why': 'Claim only concerns matched mean comparison.'}],
-              'scorecard': {s: {'level': 'adequate', 'evidence_node_ids': ['O'], 'finding_ids': [],
+              'scorecard': {s: {'level': 'not applicable' if not theory and s in ('Theory completeness', 'Proof reliability', 'Theory method alignment') else 'adequate', 'evidence_node_ids': ['O'], 'finding_ids': [],
                                'why': 'Protocol fixture judgment, not measured model performance.'} for s in ac.SCORECARD},
               'well_supported': [{'node_ids': ['C'], 'edge_ids': ['E4'], 'why': 'Located bounded comparison.'}],
               'aggregation': []}

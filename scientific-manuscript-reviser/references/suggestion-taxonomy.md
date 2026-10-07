@@ -34,7 +34,9 @@ alternatives, rule_refs, apply_by_default
 ```
 
 Also include `source_finding_ids`. Scientific entries cite existing coherence
-findings, never aggregator-invented criticism. Their alternatives additionally
+findings or stable structural diagnostic IDs, never aggregator-invented criticism.
+Every critical/major finding or diagnostic must remain visible in a scientific
+bank entry. Structural candidates retain their unverified/context-limited status. Their alternatives additionally
 include `requires`, one of the four scientific repair requirement types. Their
 severity cannot be lowered below the scientific finding. Text calibration that
 changes a protected claim is high risk, even though it requires no experiment.

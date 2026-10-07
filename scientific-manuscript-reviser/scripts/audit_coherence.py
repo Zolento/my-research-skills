@@ -121,6 +121,12 @@ def topology(graph):
         if node['type'] == 'Hypothesis' and not any(e['type'] == 'tests' and nid in (e['source'], e['target']) and nodes[e['target'] if e['source'] == nid else e['source']]['type'] == 'Experimental design' for e in graph['edges']):
             findings.append({'code': 'UNTESTED_HYPOTHESIS', 'node_ids': [nid], 'severity': 'major',
                              'why': 'No experiment testing this extracted hypothesis.'})
+    for a, b in zip(graph['main_chain'], graph['main_chain'][1:]):
+        if not any({e['source'], e['target']} == {a, b} for e in graph['edges']):
+            findings.append({'code': 'MISSING_LINK', 'node_ids': [a, b], 'severity': 'major',
+                             'why': 'Adjacent main-chain nodes have no located relation.'})
+    for f in findings:
+        f['id'] = 'D-' + f['code'] + '-' + '-'.join(f['node_ids'])
     return findings
 
 
@@ -183,6 +189,8 @@ def _audit(text, graph, report):
                 unknown.append(finding['id'] + ' ' + finding['verification_status'])
             elif finding['verdict'] in ('UNSUPPORTED', 'CONTRADICTED') or finding['severity'] in ('critical', 'major'):
                 failures.append(finding['id'])
+            elif finding['verdict'] in ('UNDERDETERMINED', 'PARTIALLY_SUPPORTED'):
+                unknown.append(finding['id'] + ' ' + finding['verdict'])
             if finding['code'] == 'DATA_LEAKAGE' and finding['severity'] != 'critical':
                 errors.append('central-result data leakage must be Critical')
             repairs = finding['repairs']
@@ -216,6 +224,10 @@ def _audit(text, graph, report):
                 errors.append('invalid RQ chain node ' + key)
         if row['identifiable'] not in ('PASS', 'FAIL', 'UNKNOWN') or row['testable'] not in ('PASS', 'FAIL', 'UNKNOWN') or any(not nonempty(row[k]) for k in ('support_condition', 'refute_condition', 'permitted_conclusion')):
             errors.append('incomplete RQ conditions')
+        if 'FAIL' in (row['identifiable'], row['testable']):
+            failures.append('research question ' + row['rq_id'] + ' lacks identification/testability')
+        elif 'UNKNOWN' in (row['identifiable'], row['testable']):
+            unknown.append('research question ' + row['rq_id'] + ' needs verification')
         if not row['experiment_ids'] and row['hypothesis_ids']:
             unknown.append('UNTESTED_HYPOTHESIS for ' + row['rq_id'])
     if Counter(rows) != Counter(rq_ids):
@@ -227,6 +239,12 @@ def _audit(text, graph, report):
             continue
         if not step['dependencies'] or any(set(d) != {'kind', 'id'} or d['kind'] not in ('previous_step', 'definition', 'assumption', 'lemma', 'known_theorem', 'external_citation', 'algebraic_identity') or d['id'] not in (steps if d['kind'] == 'previous_step' else nodes) for d in step['dependencies']):
             errors.append('proof dependencies must be traced before use')
+        else:
+            kinds = {'definition': {'Definition'}, 'assumption': {'Assumption'}, 'lemma': {'Lemma'},
+                     'known_theorem': {'Theorem', 'Prior knowledge'}, 'external_citation': {'Prior knowledge'},
+                     'algebraic_identity': {'Definition', 'Prior knowledge'}}
+            if any(d['kind'] != 'previous_step' and (d['id'] == step['proposition_id'] or nodes[d['id']]['type'] not in kinds[d['kind']]) for d in step['dependencies']):
+                errors.append('proof dependency role mismatch or circular premise')
         if step['verdict'] == 'FAIL':
             failures.append('proof ' + step['id'])
         elif step['verdict'] == 'NOT_VERIFIED':
@@ -245,9 +263,14 @@ def _audit(text, graph, report):
             errors.append('invalid counterfactual audit')
             continue
         counter_ids.append(counter['claim_id'])
-        if nodes.get(counter['claim_id'], {}).get('type') == 'Mechanism claim' and not counter['alternative_explanations']:
-            errors.append('mechanism claim requires competing explanations')
-        if counter['verdict'] == 'UNDERDETERMINED':
+        causal = any(e['target'] == counter['claim_id'] and e['reasoning_type'] == 'causal' for e in edges.values())
+        if (nodes.get(counter['claim_id'], {}).get('type') == 'Mechanism claim' or causal) and not counter['alternative_explanations']:
+            errors.append('mechanistic/causal claim requires competing explanations')
+        if any(not nonempty(x) for x in counter['alternative_explanations']):
+            errors.append('alternative explanations must be explicit')
+        if counter['verdict'] in ('UNSUPPORTED', 'CONTRADICTED'):
+            failures.append('counterfactual ' + counter['claim_id'])
+        elif counter['verdict'] in ('UNDERDETERMINED', 'PARTIALLY_SUPPORTED'):
             unknown.append('ALTERNATIVE_EXPLANATION_NOT_RULED_OUT for ' + counter['claim_id'])
     if Counter(counter_ids) != Counter(graph['central_claim_ids']):
         errors.append('every central claim needs counterfactual interrogation')
@@ -256,18 +279,25 @@ def _audit(text, graph, report):
         errors.append('aggregation may only rank existing findings once')
     if set(report['scorecard']) != set(SCORECARD):
         errors.append('incomplete structured scientific scorecard')
-    for item in report['scorecard'].values():
+    for name, item in report['scorecard'].items():
         if set(item) != {'level', 'evidence_node_ids', 'finding_ids', 'why'} or item['level'] not in ('strong', 'adequate', 'needs attention', 'serious issue', 'not applicable') or not nonempty(item['why']) or any(x not in nodes for x in item['evidence_node_ids']) or any(x not in finding_ids for x in item['finding_ids']):
             errors.append('invalid scientific profile entry')
         elif item['level'] != 'not applicable' and not item['evidence_node_ids']:
             errors.append('scorecard judgment needs located evidence')
+        elif item['level'] in ('needs attention', 'serious issue') and not item['finding_ids']:
+            errors.append('scorecard concern must trace to an existing finding')
+        if name in ('Theory completeness', 'Proof reliability', 'Theory method alignment') and not theory_ids and item['level'] != 'not applicable':
+            errors.append('absent theory cannot be rated verified or adequate')
     for strength in report['well_supported']:
         if set(strength) != {'node_ids', 'edge_ids', 'why'} or not nonempty(strength['why']) or not strength['node_ids'] or any(x not in nodes for x in strength['node_ids']) or any(x not in edges for x in strength['edge_ids']):
             errors.append('invalid Well Supported source trace')
+        elif any(c['edge_id'] in strength['edge_ids'] and c['verdict'] not in ('supported', 'partially_supported') for c in report['edge_checks']):
+            errors.append('Well Supported cannot cite unsupported or unverified links')
     if structural:
         unknown.extend(f['code'] for f in structural)
     status = 'FAIL' if errors or failures else 'NEEDS_REVIEW' if unknown else 'PASS'
     return {'status': status, 'errors': errors, 'failed_links': failures, 'unresolved': unknown,
+            'manuscript_digest': digest(text), 'graph_digest': digest(graph),
             'findings': sorted(all_findings, key=lambda f: report['aggregation'].index(f['id'])) if not errors else all_findings,
             'structural_diagnostics': structural, 'well_supported': report['well_supported'],
             'scorecard': report['scorecard'], 'note': 'Local semantic judgments are not formal proof verification or scientific ground truth.'}

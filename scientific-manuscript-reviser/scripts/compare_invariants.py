@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import re
 
-from validate_style import COMMAND, REF, balanced_end, scan
+from validate_style import COMMAND, REF, escaped, scan
 
 CATEGORIES = ('claims', 'numbers', 'metrics', 'datasets', 'methods', 'baselines',
               'comparators', 'statistical_statements', 'causal_status', 'novelty',
@@ -110,7 +110,7 @@ def corruption(text):
               {'code', 'inline code', 'URL', 'bibliography', 'TeX comment'}]
     depth, envs = 0, []
     for i, char in enumerate(text):
-        if any(s['start'] <= i < s['end'] for s in ignore) or (i and text[i - 1] == '\\'):
+        if any(s['start'] <= i < s['end'] for s in ignore) or escaped(text, i):
             continue
         if char == '{':
             depth += 1

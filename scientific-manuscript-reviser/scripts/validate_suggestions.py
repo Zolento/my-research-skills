@@ -37,7 +37,9 @@ def _validate(text, bank, coherence):
     else:
         if bank['coherence_digest'] != digest(coherence):
             errors.append('stale coherence audit binding')
-        origins = {f['id']: f for f in coherence.get('findings', [])}
+        if coherence.get('manuscript_digest') != digest(text):
+            errors.append('coherence audit belongs to a different manuscript')
+        origins = {f['id']: f for f in coherence.get('findings', []) + coherence.get('structural_diagnostics', [])}
     ids, duplicate = [], set()
     for s in bank['suggestions']:
         fields = {'id', 'category', 'severity', 'confidence', 'location', 'original_span',
@@ -82,6 +84,9 @@ def _validate(text, bank, coherence):
             errors.append('duplicate editorial option')
         if s['severity'] in ('major', 'critical') and bank['mode'] != 'audit' and (not 2 <= len(options) <= 3 or len(set(directions)) != len(options)):
             errors.append('important editorial issue needs 2–3 distinct directions')
+    covered = {fid for s in bank['suggestions'] if s.get('category') in SCIENCE_CATEGORIES for fid in s.get('source_finding_ids', [])}
+    if not {fid for fid, f in origins.items() if f['severity'] in ('critical', 'major')} <= covered:
+        errors.append('critical/major scientific issue hidden in the suggestion bank')
     if len(ids) != len(set(ids)):
         errors.append('duplicate suggestion identity')
     for kept in bank['keep_as_is']:

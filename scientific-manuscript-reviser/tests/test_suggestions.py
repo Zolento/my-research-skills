@@ -10,7 +10,7 @@ from compare_invariants import digest
 
 
 def bank_fixture(text='We measured error on Dataset A.', mode='suggest', category='narrative', severity='major'):
-    coherence = {'status': 'PASS', 'findings': []}
+    coherence = {'status': 'PASS', 'findings': [], 'manuscript_digest': digest(text)}
     suggestion = {'id': 'S1', 'category': category, 'severity': severity, 'confidence': 'high',
                   'location': {'start': 0, 'end': len(text)}, 'original_span': text,
                   'diagnosis': 'Contribution visibility needs a real editorial choice.',
