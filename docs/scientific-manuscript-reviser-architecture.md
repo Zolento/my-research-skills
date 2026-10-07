@@ -121,3 +121,9 @@ silently change original claims under an “equivalent” label.
   structural orphan/cycle/untested diagnostics, local verdict fixtures for twenty
   scientific counterexamples, Critical leakage, proof unknowns and aggregation
   provenance. These test audit contracts, not autonomous LLM error-detection accuracy.
+- Narrative/naturalization/defensiveness/profile and suggestions: 62 tests PASS.
+  Weak pattern candidates stay separate from contextual quality judgments. Explicit
+  author rules override descriptive sample statistics; high-risk edits cannot apply.
+- Architect: 87 tests PASS. Material epistemic types, audited graph claim identity,
+  sufficiency, thesis/evidence/novelty, paragraph purpose/style, scientific gap placement,
+  portfolio/literature and approved section drafting share the scientific gates.
