@@ -25,6 +25,8 @@
     6. 文档里引用的每个 `scripts/*.py` 都真实存在
     7. `structural_equivalence_check.py --selftest` + audit 模板 + 七份 fixture
        —— Structural Equivalence 的 `EQ1`—`EQ13` + `NN1`—`NN14`（只查审计完整性，不宣判 novelty）
+    8. Rhetorical Realization 来源冻结 + 四个实际正文的 RE1–RE5 审计
+       —— 文本攻击注入测试必须能把发布闸门判红
 
 退出码
 ------

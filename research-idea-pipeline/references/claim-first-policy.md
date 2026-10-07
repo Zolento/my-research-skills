@@ -331,7 +331,7 @@ R3—R6 / R8 为 P1。
 | D1 Claim Graph | `C0—C5`、`Ci ← Ej` 语法、`C0` 一句话 | §3 |
 | D2 Scientific Typing | `(O, T, R)` 逐字枚举与写法 | §5 |
 | D3 Anchor Eligibility | 三值结论、`prior` 不是 `decision`、冲突告知 | §6 |
-| D4 Narrative Realization | central proposition（`S3`）与可证伪性 | §4 |
+| D4a Claim-Hierarchy Realization | central proposition（`S3`）与可证伪性；D4b–D4d 冻结后仅表达 | §4 |
 | D7 Hard Gates | `G1` / `G4` 的判定依据 | §2、§3 |
 | D9 Output | 缺失证据清单、最小必要实验 / 定理 | §3 |
 
@@ -355,7 +355,7 @@ R3—R6 / R8 为 P1。
 | [evidence-policy.md](evidence-policy.md) | §3 认知状态 ↔ 措辞等级映射 | `epistemic_status` 五值 | §2 |
 | [roles.md](roles.md) | §1B 攻击面审稿人（R12 主审） | `R-Novelty` / `R-Causal` 攻击 `Ci ← Ej` 的缺口 | §3、§4 |
 | [venue-standards.md](venue-standards.md) | §10 contribution type → evidence contract → calibration | `(O, T, R)` 与证据契约 | §5 |
-| [../templates/research-state.template.json](../templates/research-state.template.json) | R12 段 | `evidence_ledger` / `claim_graph` / `typing` / `anchor_eligibility` 字段 | §2、§3、§5、§6 |
+| [../templates/research-state.template.json](../templates/research-state.template.json) | R12 段 | `claims[]` / `evidence[]` 与 `narrative_view`；typing / eligibility 保存在叙事文档 | §2、§3、§5、§6 |
 | [../examples/example-d-narrative.md](../examples/example-d-narrative.md) | 全篇示例 | 台账、claim graph、`(O, T, R)`、anchor eligibility、`[待补]` | §2—§6 |
 
 **维护规则：**

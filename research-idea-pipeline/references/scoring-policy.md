@@ -21,6 +21,10 @@ R12（叙事审核）与 R7 / R10 / R13（方案复核）都要**多子代理审
 
 ### 六个 reviewer 不是独立样本（硬约束）
 
+D4d 另有固定多模型的 blind recovery 面板；它测理解，不产生 scientific evidence。
+该面板也不构成真人共识，不替代 D5/G1–G5。realization 的四维最差恢复与配对 fragility
+见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md) §3–§4；不进入本文件六维或综合分。
+
 R12 的六个攻击面审稿人与 R7 / R10 / R13 的六个攻击面算子，都是**同一个基础模型换不同 prompt**。
 它们的判断**高度相关（`corr ≫ 0`）**，**不是独立样本**。因此：
 
@@ -127,6 +131,9 @@ R12 的 D7 对**每一套候选叙事**逐项判定下列五项。
 ---
 
 ## 4. 排序维度六维（1—5，逐维必须给理由与证据）
+
+本节比较 D4a 的 scientific hierarchy。D4d 在每套冻结 hierarchy 内选择表达，
+不优化 reviewer overall score，也不改变本节科学维度。RE gate PASS 不是 G gate PASS。
 
 **门禁通过之后才排序。** 排序只用下面六个维度，枚举逐字如下（不得改名、不得意译）：
 

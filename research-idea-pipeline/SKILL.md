@@ -691,6 +691,8 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 子代理角色库 | [references/roles.md](references/roles.md) | 会议审稿人 R-CVPR / R-ICML / R-NeurIPS / **R-MICCAI**（**仅 venue calibration 用，不参与科学发现**）；**攻击面审稿人 R-Novelty / R-Causal / R-Experimental / R-Theory / R-Generalization / R-Utility**；A-Author / A-Experimenter；S-Lit / S-Nov / S-Theory / S-Feas / S-Devil / S-Repro / **S-Integrity** |
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
 | 叙事 preset 库 | [references/narrative-patterns.md](references/narrative-patterns.md) | **十套叙事 preset（N1—N10，非互斥、非创新等级）**、**(O,T,R) + anchor 选 preset**、**六槽位 S1—S6**、跨域 **Transfer Legitimacy Argument（L1/L2/L3）**、禁用表述、叙事自检 |
+| Rhetorical Realization | [references/rhetorical-operators.md](references/rhetorical-operators.md)、[references/rhetoric-equivalence-policy.md](references/rhetoric-equivalence-policy.md) | D4a 科学 hierarchy 与 D4b 表达搜索分离；冻结 14 项、RE1–RE5、盲恢复与配对敏感性；不优化 reviewer overall score |
+| Realization 工具与模板 | [scripts/rhetorical_realization.py](scripts/rhetorical_realization.py)、[scripts/validate_rhetorical_variant.py](scripts/validate_rhetorical_variant.py)、[templates/narrative-realization.md](templates/narrative-realization.md) | 有界生成、来源绑定、实际正文 gate、blind payload、恢复比较、多模型面板；独立 artifact，不迁移 State schema |
 | **Claim-first 政策** | [references/claim-first-policy.md](references/claim-first-policy.md) | **R12 现行（P0）**：总纲公式（`Claim strength × Evidence alignment × Reviewer comprehensibility`）、**证据台账 `epistemic_status`**、**Claim Graph `C0—C5` + `Ci ← Ej`**、**可证伪 central proposition**、**`(O,T,R)` 三轴**、**Anchor Eligibility Test**。**R3—R6 / R8 / R7 / R10 / R13 的接入登记为 P1**（见 `docs/claim-first-spec.md` §9） |
 | 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T8 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **Wave 6 目录规范**：**八条 DI invariant**、`routes/` 聚合、**`README`/`STATUS`/`INDEX` 三文件职责分离**、**`STATUS.md = f(research-state.json)` 投影**、`XID` 贯穿、`experiments/` 与 `results/` 分离、`docs/decisions/DEC`、**三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、锚点变更单、route fork 门槛、Git 边界、`AGENTS.md` 优先与可达性校验、并发写入 |
@@ -863,10 +865,16 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   **这是基于「预期贡献」的叙事预演，不是基于「实测结果」的包装** —— 实验完成后应
   **回到 R12 复核叙事是否仍成立**。字母顺序上位于方案生成与方案复核之间。
 - **流程（D0—D9 的 pre/post 归属见上）：** D0 证据台账 → D1 claim graph **复核**（**不创建**）→ D2 科学分类 `(O, T, R)` →
-  D3 Anchor Eligibility → D4 叙事实现（**2—4 套真正不同的 claim hierarchy**；六槽位
-  `S1—S6`；含包装前后对照）→ D5 攻击面审核 → D6 venue calibration → （**R-Novelty / R-Causal / R-Experimental /
+  D3 Anchor Eligibility → D4a Scientific Narrative Search（**2—4 套真正不同的 claim hierarchy**；六槽位
+  `S1—S6`；含包装前后对照）→ 逐套 freeze → D4b Rhetorical Realization → D4c Semantic-Equivalence Audit →
+  D4d Blind Claim-Recovery Probe（四维恢复 + paired sensitivity）→ D5 攻击面审核 → D6 venue calibration → （**R-Novelty / R-Causal / R-Experimental /
   R-Theory / R-Generalization / R-Utility 六人全部派遣 + S-Lit 恒派 + S-Devil 不打分**）→
   R12 / R13 的 venue calibration → D7 硬门禁 `G1—G5` → D8 六维排序 → D9 最佳叙事推荐。
+- **冻结后的表达搜索：** 每套 hierarchy 只用 evidence framing / contribution stance，
+  四个预登记 profile、一轮搜索。保持 claim/evidence/comparator/uncertainty/scope/prior delta/
+  assumptions/limitations/failure/causal status/interpretation 不变；正文与 metadata 都检查。
+  boundary 固定前置；不允许 weakness laundering 或用分数救回非等价表达。
+  多模型盲恢复缺数据时标 INCOMPLETE；不改 State 补答案，不宣称科学判断已被改善。
 - **交付物：** 证据台账 + claim graph + 每套候选的六槽位叙事 + 六攻击面审稿人意见 +
   S-Devil 致命弱点清单 + S-Lit 核验结论 + 门禁逐项判定 + 六维排序 + 最佳叙事推荐 +
   **缺失证据清单与最小必要实验 / 定理**。
@@ -1064,12 +1072,11 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
    不能让不完整的检索伪装成完整结论。
 4. **为什么 R7 / R10 / R13 支持接续复核？** 接续复核聚焦上次未解决问题与新增变更，避免
    重复完整审查，同时用"变更追踪表"保证审查连续性。
-5. **为什么单设 R12 做叙事？** 同一 idea 在不同叙事下，审稿人的接收意愿差异显著：
-   跨域迁移类 idea 在"跨域理论迁移"叙事下可能被判增量，换到"瓶颈突破/移除假设"叙事
-   下可能被视为理论贡献。**多 preset 并行生成 + 多子代理打分，才能找到该 idea 的最优
-   叙事位置。** 叙事包装不是夸大，而是**重新定位**。
-   （**本轮已改为：** 先定 claim 与证据，再过硬门禁 `G1—G5`，最后只在**通过门禁的
-   候选间**做六维比较 —— 见本节第 12—14 条。「多子代理」现指六个攻击面审稿人。）
+5. **为什么单设 R12 做叙事？** 同一 State 的科学内容可能因表达次序与隐含比较被误读。
+   D4a 先由 State 决定科学 hierarchy、preset 和证据映射，再逐套冻结；D4b 仅搜索同一
+   科学故事的等价表达。D4c 拒绝任何语义或边界改变，D4d 以盲恢复检验理解，并检查轻微
+   修辞扰动的敏感性。目标是准确恢复 claim/evidence/实际 delta/boundary，不是更高
+   reviewer overall score。G1–G5 和 D8 六维继续约束科学候选，二者不能被修辞恢复替代。
 6. **为什么角色不变？** 本 Skill 只做编排，角色定义、评分维度、审查视角全部沿用
    统一角色库，保证审查标准的一致性。
 7. **为什么文档也按路线分目录，而不是集中到根 `docs/`？** 早期设计把文档集中到根
@@ -1244,10 +1251,13 @@ for f in examples/structural-equivalence/*.json; do
 done
 #    真实项目里还要跑路线级交叉校验：
 #    python3 scripts/structural_equivalence_check.py --route .research-idea-pipeline/routes/<R>
+
+# 8) Rhetorical Realization —— 受限算子与 adversarial counterexamples
+python3 -m unittest discover -s scripts -p 'test_rhetorical_realization.py'
 ```
 
 > **唯一的发布判据是 `scripts/release_check.py` 的最后一行**（`PASS` / `FAIL`）。
-> 上面的逐条命令只用于**诊断**；其中 1—7 项已全部收进那一个闸门。
+> 上面的逐条命令只用于**诊断**；其中 1—8 项已全部收进那一个闸门。
 > 手动逐条跑不能替代 `release_check.py`（AGENTS.md Rule 10）。
 
 > **D4 的"已废弃措辞"清单要持续维护**：每次改规则时，把**被替换掉的旧表述**

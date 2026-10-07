@@ -75,6 +75,7 @@ G1–G5 是证据门禁，任何 fail 不可被分数救回；新 RE 门禁是�
 | sensitivity audit | 14 个新增测试 PASS；配对 range/variance/disagreement、类别判断漂移、缺数据 INCOMPLETE、最差恢复排序；release_check PASS（470 tests / 4 skips） |
 | adversarial cases | 33 个新增测试 PASS，含全部八 case、14 字段变异、正文/来源/预算/CLI/release 注入；release_check PASS（489 tests / 4 skips） |
 | recommendation guard | 任一恢复 FAIL 不推荐；模型/plan/来源完整性及固定 tie 顺序：36 个新增测试 PASS；release_check PASS（492 tests / 4 skips） |
+| R12 integration | SKILL / README / presets / roles / scoring / State 权限说明 / examples / 模板已同步；来源载体冲突已改正文，schema 不变；release_check PASS（492 tests / 4 skips），git diff --check 干净 |
 
 ## 交付验证与剩余问题
 

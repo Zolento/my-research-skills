@@ -95,10 +95,13 @@
    本例作者想定位成 `理论`，但证据支持的是 `性能` 与 `现象` → **必须显式告知**
    「你想定位成理论，但现有证据支持的是性能。最强可辩护 anchor 是性能」，
    并写进路线 INDEX 的 Warnings。**不得**帮作者强化不被证据支持的故事。
-5. **D4 叙事实现**：本例是**跨域类**，所以**必须做一次 anti-application stress test**
+5. **D4a 科学叙事实现**：本例是**跨域类**，所以**必须做一次 anti-application stress test**
    （至少测 `N2` / `N3` / `N5` / `N9`），再生成 **2—4 套真正不同的 claim hierarchy**。
    每套写满**六槽位** `S1`—`S6`：`S5` 给出 `Ci ← Ej` 对照，`S6` 写出**不成立的条件**。
    详写的候选 **≥300 字**，其余候选给摘要。**同一 claim 换四种措辞不算候选。**
+   逐套冻结后，再跑 D4b–D4d 的等价表达和盲恢复。
+   [操作例子](narrative-realization/README.md)给出四个固定 profile。
+   未完成真实多模型 probe 时标 INCOMPLETE。
 6. **D5 攻击面审核**：六个攻击面审稿人**全部派遣** —— `R-Novelty` / `R-Causal` /
    `R-Experimental` / `R-Theory` / `R-Generalization` / `R-Utility`，每人只在**自己的
    主责维度**给一个 `1—5`。`S-Lit` **恒派**（本例判「部分重叠」）。`S-Devil` 必派但
