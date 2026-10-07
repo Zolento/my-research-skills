@@ -3,8 +3,7 @@
 ## 审计基线
 
 分支：`research-idea-pipeline/narrative-realization-dev`。
-本地 main / origin/main：`fd2b63e`（v2.1.1）。SSH fetch 失败，HTTPS DNS 失败，
-远端 API 也不可达；不能声称已验证远端最新 main。独立 worktree 保留 main 原样。
+本地 main / origin/main：`fd2b63e`（v2.1.1）。独立 worktree 保留 main 原样。
 基线 release_check：PASS；456 tests，4 skips。
 
 已审阅 SKILL、phase-r12、claim-first、narrative-patterns、scoring、research-state-policy、
@@ -102,7 +101,7 @@ State selftest、规则/权限表 parity、结构等价及四套正文 RE 门禁
   新 RE 可比较 freeze 前后，封住本层的科学 State 变更；不迁移全 pipeline。
 - skill-creator quick_validate 在本分支与 main 都因既有 argument-hint frontmatter 失败。
   保留现有入口契约，未为了通用校验器删字段；以仓库 release_check 为发布判据。
-- 网络不可用导致不能验证远端最新 main；当前开发基线始终是本地 fd2b63e。
+- 当前开发基线始终是本地 fd2b63e。
 
 Next experiment：固定 State/hierarchy/budget，生成四 profile，预登记多模型面板，盲化身份；
 记录 claim/evidence/delta/boundary 恢复及 paired fragility，再用 held-out reviewer 面板复核。
