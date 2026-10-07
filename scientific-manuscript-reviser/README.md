@@ -27,7 +27,7 @@ experiment, entailment, cross-section and counterfactual passes. Aggregation onl
 combines existing findings. No scientific validity is inferred from fluent prose.
 Critical/major gaps remain visible; a plan cannot supply missing results.
 
-## Suggestions and personal style
+## Core principles
 
 The bank inspects ten categories, led by Scientific logic, Theory/proof, Experimental
 design and Claim/conclusion validity, followed by Narrative, Paragraph structure,
@@ -46,6 +46,12 @@ exemptions. H2 avoids stacked figure/table/section narration while retaining ide
 H3 retains genuine uncertainty and rejects unsupported confidence or self-diminishment.
 
 ## Mechanical helpers and semantic trust boundary
+
+Install the skill with
+
+```sh
+npx skills add Zolento/my-research-skills -g -s scientific-manuscript-reviser -y
+```
 
 Python 3.9 or newer, with only standard-library runtime dependencies. From this directory
 

@@ -1,110 +1,92 @@
-# 示例索引与覆盖矩阵
+# Examples and Coverage
 
-> ⚠️ **本文件不是 draft。** 校验示例时请用 `examples/example-*.md`，
-> **不要**用 `examples/*.md`——那会把本文件也当 draft，报出一串"缺段"错误。
+This is an index, not a figure draft. Validate `examples/example-*.md` rather than
+`examples/*.md`, which would incorrectly treat this index as a draft.
 
-本目录的示例是**照抄对象**——它们示范的写法会被直接复制。所以哪条规则有示例、
-哪条没有，必须是**可查的**，不能靠记忆（这正是 `SKILL.md` §8 A3 记录的漂移来源）。
+All five examples use the implementation in [demo-source](demo-source/README.md).
+The matrices below distinguish demonstrated features from supported features that
+still need a worked example.
 
-## 1. 示例清单
+## Examples
 
-| 文件 | 演示什么 | 有据来源 |
-|---|---|---|
-| [example-code-grounded.md](example-code-grounded.md) | 从一个小型真实源码库产出 3 个结构不同的 draft 的完整流程 | `demo-source/` |
-| [example-uncertainty.md](example-uncertainty.md) | 证据不足时如何降级到 `Uncertainties`、`MUST_NOT_INCLUDE` 如何生效、`[? label]` 占位 | `demo-source/` |
-| [example-sketch-legend.md](example-sketch-legend.md) | **形状编码语义图例**（`╔═╗` / `[ IFFT ]` / tensor 堆叠 / `[slice]` / `╭─╮`）+ `SKETCH_VARIANTS: both` 双画法对照 | `demo-source/` |
-| [example-domain-adaptation.md](example-domain-adaptation.md) | 新增的 `FIGURE_TYPE: domain_adaptation` + `SKETCH_STYLE: stage_panel`；source-free 分隔带与冻结/可训练 | `demo-source/` |
-| [example-auto-inference.md](example-auto-inference.md) | `FIGURE_TYPE: auto` / `SKETCH_STYLE: auto` 的推断声明，以及"**何时才该问**、问什么" | `demo-source/` |
+| File | What it demonstrates |
+|---|---|
+| [example-code-grounded.md](example-code-grounded.md) | Three structurally different drafts grounded in a small codebase |
+| [example-uncertainty.md](example-uncertainty.md) | Missing evidence, `MUST_NOT_INCLUDE` and `[? label]` placeholders |
+| [example-sketch-legend.md](example-sketch-legend.md) | Shape semantics and paired clean/enhanced sketches with `SKETCH_VARIANTS: both` |
+| [example-domain-adaptation.md](example-domain-adaptation.md) | `domain_adaptation`, `stage_panel`, source-free boundaries and frozen/trainable status |
+| [example-auto-inference.md](example-auto-inference.md) | Explicitly inferred figure type and sketch style, including when narrative focus needs clarification |
 
-## 2. 怎么校验
+## Validation
 
-**所有示例都必须通过 `--strict`**（`SKILL.md` §8「机器校验」）：
+Run from the skill directory. Every draft must pass strict validation with no errors
+or warnings.
 
-```bash
-cd academic-figure-draft-architect
+```sh
 for f in examples/example-*.md; do
   python3 scripts/check_draft.py --strict "$f" || exit 1
 done
-# 预期：每个文件都是 0 error(s), 0 warning(s)，退出码 0
 ```
 
-## 3. 覆盖矩阵：`FIGURE_TYPE`
+## Figure type coverage
 
-| `FIGURE_TYPE` | 覆盖示例 |
+| `FIGURE_TYPE` | Examples |
 |---|---|
-| `method-overview` | example-code-grounded、example-uncertainty |
+| `method-overview` | example-code-grounded, example-uncertainty |
 | `architecture` | example-sketch-legend |
-| `training` | ❌ **未覆盖** |
-| `inference` | ❌ **未覆盖** |
-| `optimization` | ⚠️ 仅间接（example-auto-inference 在推断声明里推断为它，未显式声明） |
+| `training` | Not covered |
+| `inference` | Not covered |
+| `optimization` | Indirect only, inferred in example-auto-inference |
 | `domain_adaptation` | example-domain-adaptation |
-| `motivation` | ❌ **未覆盖**（需要论文文本，`demo-source/` 不提供） |
-| `comparison` | ❌ **未覆盖**（`demo-source/` 无基线实现） |
-| `ablation` | ❌ **未覆盖**（`demo-source/` 无变体配置） |
+| `motivation` | Not covered, requires manuscript evidence absent from demo-source |
+| `comparison` | Not covered, demo-source has no baseline implementation |
+| `ablation` | Not covered, demo-source has no variant configurations |
 
-## 4. 覆盖矩阵：visual grammar（A–H）
+## Visual grammar coverage
 
-| grammar | 覆盖示例 |
+| Grammar | Examples |
 |---|---|
-| A `Linear Pipeline` | example-sketch-legend、example-auto-inference |
-| B `Dual / Multi Branch` | ❌ **未覆盖** |
+| A `Linear Pipeline` | example-sketch-legend, example-auto-inference |
+| B `Dual / Multi Branch` | Not covered |
 | C `Hierarchical System` | example-uncertainty |
-| D `Iterative Loop` | example-code-grounded、example-auto-inference |
-| E `Train vs Inference` | example-code-grounded、example-uncertainty |
+| D `Iterative Loop` | example-code-grounded, example-auto-inference |
+| E `Train vs Inference` | example-code-grounded, example-uncertainty |
 | F `Data / Model / Objective` | example-sketch-legend |
-| G `Source / Target Domain` | example-code-grounded、example-domain-adaptation |
+| G `Source / Target Domain` | example-code-grounded, example-domain-adaptation |
 | H `Temporal / Stage View` | example-domain-adaptation |
 
-## 5. 覆盖矩阵：参数取值
+## Parameter coverage
 
-| 参数 | 已覆盖 | 未覆盖 |
+| Parameter | Demonstrated | Not demonstrated |
 |---|---|---|
-| `SKETCH_STYLE` | `auto`、`enhanced`、`stage_panel` | `block_architecture`、`loop_centric`；`clean` 仅在 example-auto-inference 的**推断声明**里出现，无显式声明示例 |
-| `SKETCH_VARIANTS` | `single`、`both` | — |
-| `DETAIL_LEVEL` | `medium`、`auto` | `overview`、`detailed` |
-| `NUM_DRAFTS` | `2`、`3` | `4`、`5` |
+| `SKETCH_STYLE` | `auto`, `enhanced`, `stage_panel` | `block_architecture`, `loop_centric`; `clean` appears only as an inferred choice |
+| `SKETCH_VARIANTS` | `single`, `both` | None |
+| `DETAIL_LEVEL` | `medium`, `auto` | `overview`, `detailed` |
+| `NUM_DRAFTS` | `2`, `3` | `4`, `5` |
 
-## 6. 未覆盖清单（显式，供维护用）
+## Source boundaries
 
-以下格子**没有示例**。这不代表规则不存在，只代表**没有被示范过**；
-新增示例时请同步更新本表，否则下一个人还得重新数一遍。
+Demo-source implements self-supervised MRI reconstruction with a flow-matching
+prior and an unrolled solver. Its code supports the following figure types, even
+where no dedicated example is present.
 
-```text
-grammar        B Dual / Multi Branch
-FIGURE_TYPE    training / inference / optimization（仅间接）/ motivation / comparison / ablation
-SKETCH_STYLE   block_architecture / loop_centric（clean 仅间接）
-DETAIL_LEVEL   overview / detailed
-NUM_DRAFTS     4 / 5
-```
-
-## 7. `demo-source/` 的能力边界
-
-`demo-source/` 是**自监督 MRI 重建 + flow-matching 先验 + unrolled solver** 的最小真实代码，
-它是所有示例的证据来源。它能支撑与**不能**支撑的 `FIGURE_TYPE`：
-
-| 可支撑 | 依据 |
+| Figure type | Source |
 |---|---|
-| `method-overview` | `train.py::train()` 串起两阶段 + 推理 |
-| `architecture` | `models/flow.py::FlowPrior.encode/velocity` 的条件结构 |
-| `training` | `train.py::training_step()` 与三个 loss |
+| `method-overview` | `train.py::train()` connects both stages and inference |
+| `architecture` | `models/flow.py::FlowPrior.encode/velocity` defines conditioning |
+| `training` | `train.py::training_step()` and its three losses |
 | `inference` | `infer.py::reconstruct()` |
-| `optimization` | `solver.py::solve()` 的 `dc_step` / `prior_step` 交替 |
-| `domain_adaptation` | `train.py::source_pretrain()` / `target_adapt()` 的不同数据可见性 |
+| `optimization` | `solver.py::solve()` alternates `dc_step` and `prior_step` |
+| `domain_adaptation` | `train.py::source_pretrain()` and `target_adapt()` use different data access |
 
-| 不可支撑 | 原因 |
-|---|---|
-| `ablation` | 没有任何变体配置（`configs/base.yaml` 只有一份 base） |
-| `comparison` | 没有基线实现 |
-| `motivation` | 没有论文正文，失败机制只能来自用户口述 |
+Ablation figures need actual variant configurations. Comparison figures need an
+implemented baseline. Motivation figures need additional manuscript or user
+material. Extend the source before adding examples that depend on missing code.
+Do not invent components to fill the coverage matrix. See the
+[evidence policy](../references/evidence-policy.md).
 
-**要给 `ablation` / `comparison` 补有据的示例，必须先扩 `demo-source/`**
-（加一组消融配置 / 一个基线实现）。不扩就只能写"示意"，
-而示意违反 [evidence-policy.md](../references/evidence-policy.md) 的 A/B/C/D 纪律。
+## Maintenance
 
-## 8. 维护提示
-
-改了任何**规则 / 枚举 / 列名 / 计数 / 路径**后：
-
-1. 跑 §2 的校验命令，确认 5 份示例仍然 `--strict` 通过；
-2. 检查本文件 §3–§5 的矩阵是否还准确（尤其是新增 `FIGURE_TYPE` / grammar 时）；
-3. 特别检查**示例是否还在示范旧写法**——这是 §8 A3 点名的历史坑。
+After changing a rule, enum, output field or path, rerun strict validation and
+update these matrices. Review the examples themselves for obsolete conventions,
+rather than relying on a passing index or test alone.
