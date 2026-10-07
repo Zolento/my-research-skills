@@ -1,0 +1,493 @@
+{
+  "schema": "evidence-outcome-example@1",
+  "scenario": "positive",
+  "timestamp": "2026-10-08T00:00:00+00:00",
+  "state": {
+    "state_version": 0,
+    "contract": {
+      "goal": "判断某机制性假设是否在目标分布上成立",
+      "primary_anchor": "theory",
+      "constraints": "单卡，≤ 40 GPU·小时",
+      "resources": "已有代码与一份公开数据集",
+      "provisional_anchor_rationale": "先用理论锚点把问题形式化，证据到位后复核",
+      "out_of_scope": "不做新数据集采集，不做临床验证",
+      "outcome_policy": {
+        "schema": "evidence-outcome-policy@1",
+        "frozen_at_state_version": 0,
+        "min_valid_runs": 2,
+        "min_seeds": 2,
+        "min_datasets": 1,
+        "require_independent_replication": false,
+        "min_verification_tier": "T2"
+      }
+    },
+    "claims": [
+      {
+        "id": "C1",
+        "statement": "X improves M against P on Dataset A at fixed compute.",
+        "parent": null,
+        "subclaims": [],
+        "status": "ungrounded",
+        "supporting_evidence": [],
+        "refuting_evidence": [],
+        "nearest_alternative": "增益来自更多训练步数",
+        "falsifier": "等训练步数下增益消失",
+        "scope": "Dataset A / fixed budget",
+        "known_flaws": [],
+        "depends_on": [
+          "H1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "id": "E1",
+        "kind": "literature",
+        "supports": [],
+        "contradicts": [],
+        "strength": "partial",
+        "scope": "target domain",
+        "epistemic_status": "Supported",
+        "source_ref": "LIT1",
+        "verification_tier": "T1",
+        "depends_on": [
+          "LIT1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "AS1",
+        "statement": "目标分布与源分布共享该结构",
+        "status": "tacit",
+        "challenged_by": [],
+        "if_false": "机制主张不成立",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "Intervention X improves metric M against matched comparator P.",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 3,
+          "representation_distance": 1,
+          "theory_lens_distance": 3,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "The preregistered improvement is absent under matched P.",
+        "expected_information_gain": 0.6,
+        "status": "elite",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        },
+        "scientific_scope": "Dataset A / fixed budget",
+        "central": true
+      },
+      {
+        "id": "H2",
+        "statement": "把问题重述为部分识别问题",
+        "structural_signature": {
+          "assumption_distance": 3,
+          "formulation_distance": 4,
+          "representation_distance": 2,
+          "theory_lens_distance": 4,
+          "mechanism_distance": 1
+        },
+        "novelty_source": "问题重构",
+        "theory_lens": "partial-identification",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分识别界为空则 H2 无意义",
+        "expected_information_gain": 0.5,
+        "status": "elite",
+        "niche": "formulation-shift",
+        "island": "P1",
+        "operator": "reframe",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      },
+      {
+        "id": "H3",
+        "statement": "仅解除部分假设即可恢复能力",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 2,
+          "representation_distance": 2,
+          "theory_lens_distance": 2,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除（部分）",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分解除无增益则 H3 不成立",
+        "expected_information_gain": 0.4,
+        "status": "active",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "experiments": [
+      {
+        "id": "X1",
+        "parent": null,
+        "stage": "X3",
+        "claim_targeted": [
+          "C1"
+        ],
+        "hypothesis_targeted": [
+          "H1"
+        ],
+        "alternative_targeted": [
+          "ALT-1"
+        ],
+        "code_commit": "abc123",
+        "data_split": "Dataset A test split",
+        "seed": 0,
+        "metric": "M",
+        "result": "",
+        "interpretation": "Result not yet interpreted.",
+        "unexpected": [],
+        "known_flaws": [],
+        "next_branches": [],
+        "status": "running",
+        "preregistration": {
+          "frozen_at_state_version": 0,
+          "outcomes": [
+            {
+              "id": "O1",
+              "observation": "M improves against matched P.",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "strengthen"
+                }
+              ]
+            },
+            {
+              "id": "O2",
+              "observation": "M does not improve against matched P.",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "weaken"
+                }
+              ]
+            }
+          ]
+        },
+        "result_at_state_version": null,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "Frozen planned comparison.",
+          "since_state_version": 0
+        },
+        "outcome_protocol": {
+          "dataset": "Dataset A",
+          "design": "X versus P under matched compute",
+          "scope": "Dataset A / fixed budget",
+          "independent_replication": false
+        }
+      }
+    ],
+    "literature": [
+      {
+        "id": "LIT1",
+        "ref": "[Author, 2024]",
+        "relation": "shares-assumption",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "failures": [],
+    "uncertainties": [
+      {
+        "id": "U1",
+        "question": "该结构是否可识别？",
+        "importance": "critical",
+        "uncertainty": "high",
+        "cheapest_discriminating_test": "TBD",
+        "status": "open",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assurance": [],
+    "repairs": [],
+    "narrative_view": {
+      "rendered_claims": [
+        "C1"
+      ],
+      "note": "Frozen communication view."
+    }
+  },
+  "packet": {
+    "schema": "evidence-result@1",
+    "experiment_id": "X1",
+    "experiment_digest": "237623d905119d99f5fa8b590b206ecbea2c6ef762af0912723a8969ea59bd93",
+    "execution_status": "completed",
+    "result_summary": "M improves by 0.8 against matched P.",
+    "sources": [
+      {
+        "id": "S1",
+        "kind": "log",
+        "location": "X1/run.log",
+        "content": "M improves by 0.8 against matched P. Protocol and metric checked against frozen configuration.",
+        "digest": "224789f60a9673c3005fa76d60ece46040b54bcc310ca2c2f1c6f294e2ce37b3"
+      }
+    ],
+    "observations": [
+      {
+        "id": "O1",
+        "statement": "M improves by 0.8 against matched P.",
+        "scope": "Dataset A / fixed budget",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    ]
+  },
+  "analysis": {
+    "schema": "evidence-outcome-analysis@1",
+    "id": "OA-X1",
+    "experiment_id": "X1",
+    "base_state_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "context_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "packet_digest": "2d492aab0d2cfe5c9264d6c18e90413ee6121ca580040707dba370e5740cf5d8",
+    "outcome": "POSITIVE_EVIDENCE",
+    "verification_tier": "T2",
+    "validity_checks": {
+      "execution": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "protocol": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "measurement": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "evaluation": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    },
+    "claim_updates": [
+      {
+        "id": "C1",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "SUPPORTED",
+        "evidence": [
+          "O1"
+        ],
+        "direction": "positive",
+        "identification": "PASS",
+        "reason": "M improves by 0.8 against matched P.",
+        "replication_ids": [
+          "X1"
+        ],
+        "previous_support": "ungrounded",
+        "new_support": "supported",
+        "scope_change": null
+      }
+    ],
+    "hypothesis_updates": [
+      {
+        "id": "H1",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "SUPPORTED",
+        "evidence": [
+          "O1"
+        ],
+        "direction": "positive",
+        "identification": "PASS",
+        "reason": "M improves by 0.8 against matched P.",
+        "replication_ids": [
+          "X1"
+        ]
+      }
+    ],
+    "failure_attributions": [],
+    "alternatives": [],
+    "decisions": [
+      {
+        "target_ids": [
+          "C1",
+          "H1"
+        ],
+        "action": "CONTINUE",
+        "reason": "M improves by 0.8 against matched P.",
+        "required_fixes": [],
+        "stop_rule_id": null,
+        "next_action_id": "N1"
+      }
+    ],
+    "stop_rules": [],
+    "followups": [
+      {
+        "id": "N1",
+        "target_ids": [
+          "C1",
+          "H1"
+        ],
+        "description": "Discriminate H1 against its nearest alternative after the stated prerequisite.",
+        "expected_information_gain": "high",
+        "cost": "low",
+        "scientific_value": "high",
+        "risk": "medium",
+        "decision_it_resolves": "Whether the proposed intervention changes the measured effect."
+      }
+    ],
+    "negative_knowledge": [],
+    "repairs": [],
+    "open_questions": [],
+    "uncertainty_updates": [],
+    "unchanged": [
+      "Dataset, metric, comparator, scope and narrative remain unchanged."
+    ],
+    "reasoning_summary": "M improves by 0.8 against matched P."
+  },
+  "audit": {
+    "schema": "evidence-outcome-audit@1",
+    "state_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "packet_digest": "2d492aab0d2cfe5c9264d6c18e90413ee6121ca580040707dba370e5740cf5d8",
+    "analysis_digest": "a940df2bf4fcb480ec3428c052f2bb526555156d1c14dc50261de0c0d09f4a3b",
+    "checks": {
+      "result_faithful": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "validity_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "inference_calibrated": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "scope_preserved": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "attributions_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "confirmation_bias_checked": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "replication_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "alternatives_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "decisions_justified": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      }
+    }
+  },
+  "assurance": {
+    "schema": "evidence-outcome-assurance@1",
+    "state_digest": "1f4fcb9f909ff7a9a887b1ba0b22a2147d0dca207973c8032e11886a346396fb",
+    "analysis_digest": "a940df2bf4fcb480ec3428c052f2bb526555156d1c14dc50261de0c0d09f4a3b",
+    "checks": {
+      "integrity": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "claim_calibration": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "reproducibility": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "stop_rule_compliance": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      }
+    }
+  },
+  "expected_outcome": "POSITIVE_EVIDENCE",
+  "expected_decisions": [
+    "CONTINUE"
+  ]
+}

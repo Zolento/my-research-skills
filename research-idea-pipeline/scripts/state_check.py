@@ -464,6 +464,7 @@ class Report:
     source: str = ""
     violations: List[Violation] = field(default_factory=list)
     shape: List[Violation] = field(default_factory=list)
+    outcome: List[Violation] = field(default_factory=list)
     checked: Dict[str, int] = field(default_factory=dict)
     error: Optional[str] = None
     error_kind: Optional[str] = None
@@ -478,7 +479,7 @@ class Report:
         return [rule for rule in SHAPE_ORDER if rule in present]
 
     def all_violations(self) -> List[Violation]:
-        return list(self.shape) + list(self.violations)
+        return list(self.shape) + list(self.violations) + list(self.outcome)
 
     def rule_counts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {}
@@ -504,6 +505,8 @@ class Report:
             "shape": [violation.as_dict() for violation in self.shape],
             "violations": [violation.as_dict() for violation in self.violations],
         }
+        if self.outcome:
+            payload["outcome"] = [v.as_dict() for v in self.outcome]
         if self.error is not None:
             payload["error"] = self.error
             payload["error_kind"] = self.error_kind
@@ -519,6 +522,8 @@ class Report:
             breakdown = "、".join(f"{rule}×{count}" for rule, count in self.shape_counts().items())
             return (f"[shape] 共 {len(self.shape)} 处形状错误（{breakdown}）；"
                     f"V1—V24 未执行（先修形状）；{counts}")
+        if self.outcome:
+            return f"[outcome] {len(self.outcome)} 处 EO1 硬违规；state 不合规；{counts}"
         if not self.violations:
             return f"[ok] 0 处硬违规：V1—V{RULE_ORDER[-1][1:]} 全部通过；{counts}"
         breakdown = "、".join(f"{rule}×{count}" for rule, count in self.rule_counts().items())
@@ -1751,6 +1756,14 @@ def check_state(doc: Any, source: str = "<memory>") -> Report:
     for rule in RULE_ORDER:
         violations.extend(CHECKS[rule](ctx))
 
+    # Additive outcome policy. S1–S7 / V1–V24 retain their frozen identities.
+    import evidence_outcome
+    try:
+        outcome_errors = evidence_outcome.state_errors(effective)
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
+        outcome_errors = ["invalid outcome state: " + str(exc)]
+    outcome = [Violation("EO1", "experiments[].outcome_analysis", detail) for detail in outcome_errors]
+
     checked = {
         "claims": len(ctx.claims),
         "evidence": len(ctx.evidence),
@@ -1764,10 +1777,11 @@ def check_state(doc: Any, source: str = "<memory>") -> Report:
         "repairs": len(ctx.repairs),
     }
     return Report(
-        ok=not violations,
-        exit_code=EXIT_OK if not violations else EXIT_HARD,
+        ok=not violations and not outcome,
+        exit_code=EXIT_OK if not violations and not outcome else EXIT_HARD,
         source=source,
         violations=violations,
+        outcome=outcome,
         checked=checked,
         unwrapped_from=unwrapped_from,
     )

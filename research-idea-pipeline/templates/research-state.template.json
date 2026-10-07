@@ -245,7 +245,8 @@
         "status": "valid",
         "reason": "AS1 未被推翻（示例占位）",
         "since_state_version": 0
-      }
+      },
+      "scientific_scope": null
     }
   ],
   "experiments": [
@@ -304,7 +305,8 @@
         "status": "valid",
         "reason": "结果已按预注册写入（示例占位）",
         "since_state_version": 0
-      }
+      },
+      "outcome_analysis": null
     },
     {
       "id": "X8",
@@ -336,7 +338,8 @@
         "status": "pending",
         "reason": "尚未运行（示例占位）",
         "since_state_version": 0
-      }
+      },
+      "outcome_analysis": null
     }
   ],
   "literature": [
@@ -379,7 +382,8 @@
         "reason": "未受任何失效上游波及（示例占位，按实际情况替换）",
         "since_state_version": 0
       },
-      "source_review": null
+      "source_review": null,
+      "negative_knowledge": []
     }
   ],
   "uncertainties": [
@@ -486,5 +490,6 @@
     "verdict": "continue",
     "rationale": "（示例占位）",
     "next_phase": "R9"
-  }
+  },
+  "_outcome_usage": "New R0 projects freeze contract.outcome_policy from templates/evidence-outcome-policy.template.json. This existing illustrative state remains a legacy example; do not pretend its terminal runs have outcome audits. Backfill actual artifacts before strict adoption. Schema and workflow are in references/evidence-outcome-contract.md."
 }

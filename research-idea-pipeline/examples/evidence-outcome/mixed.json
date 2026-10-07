@@ -1,0 +1,751 @@
+{
+  "schema": "evidence-outcome-example@1",
+  "scenario": "mixed",
+  "timestamp": "2026-10-08T00:00:00+00:00",
+  "state": {
+    "state_version": 0,
+    "contract": {
+      "goal": "判断某机制性假设是否在目标分布上成立",
+      "primary_anchor": "theory",
+      "constraints": "单卡，≤ 40 GPU·小时",
+      "resources": "已有代码与一份公开数据集",
+      "provisional_anchor_rationale": "先用理论锚点把问题形式化，证据到位后复核",
+      "out_of_scope": "不做新数据集采集，不做临床验证",
+      "outcome_policy": {
+        "schema": "evidence-outcome-policy@1",
+        "frozen_at_state_version": 0,
+        "min_valid_runs": 2,
+        "min_seeds": 2,
+        "min_datasets": 1,
+        "require_independent_replication": false,
+        "min_verification_tier": "T2"
+      }
+    },
+    "claims": [
+      {
+        "id": "C1",
+        "statement": "X improves M against P on Dataset A at fixed compute.",
+        "parent": null,
+        "subclaims": [
+          "C2",
+          "C3"
+        ],
+        "status": "ungrounded",
+        "supporting_evidence": [],
+        "refuting_evidence": [],
+        "nearest_alternative": "增益来自更多训练步数",
+        "falsifier": "等训练步数下增益消失",
+        "scope": "Dataset A / fixed budget",
+        "known_flaws": [],
+        "depends_on": [
+          "H1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      },
+      {
+        "id": "C2",
+        "statement": "The predicted mechanism changes proxy Z.",
+        "parent": "C1",
+        "subclaims": [],
+        "status": "ungrounded",
+        "supporting_evidence": [],
+        "refuting_evidence": [],
+        "nearest_alternative": "增益来自更多训练步数",
+        "falsifier": "等训练步数下增益消失",
+        "scope": "Dataset A / fixed budget",
+        "known_flaws": [],
+        "depends_on": [
+          "H1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      },
+      {
+        "id": "C3",
+        "statement": "X improves M under the declared stress setting across replications.",
+        "parent": "C1",
+        "subclaims": [],
+        "status": "ungrounded",
+        "supporting_evidence": [],
+        "refuting_evidence": [],
+        "nearest_alternative": "增益来自更多训练步数",
+        "falsifier": "等训练步数下增益消失",
+        "scope": "Dataset A / fixed budget",
+        "known_flaws": [],
+        "depends_on": [
+          "H1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "id": "E1",
+        "kind": "literature",
+        "supports": [],
+        "contradicts": [],
+        "strength": "partial",
+        "scope": "target domain",
+        "epistemic_status": "Supported",
+        "source_ref": "LIT1",
+        "verification_tier": "T1",
+        "depends_on": [
+          "LIT1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "AS1",
+        "statement": "目标分布与源分布共享该结构",
+        "status": "tacit",
+        "challenged_by": [],
+        "if_false": "机制主张不成立",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "The proposed mechanism predicts a change in proxy Z.",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 3,
+          "representation_distance": 1,
+          "theory_lens_distance": 3,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "The predicted proxy Z change is absent under the frozen identifying control.",
+        "expected_information_gain": 0.6,
+        "status": "elite",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        },
+        "scientific_scope": "Dataset A / fixed budget",
+        "central": true
+      },
+      {
+        "id": "H2",
+        "statement": "The performance gain could result from increased capacity.",
+        "structural_signature": {
+          "assumption_distance": 3,
+          "formulation_distance": 4,
+          "representation_distance": 2,
+          "theory_lens_distance": 4,
+          "mechanism_distance": 1
+        },
+        "novelty_source": "问题重构",
+        "theory_lens": "partial-identification",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分识别界为空则 H2 无意义",
+        "expected_information_gain": 0.5,
+        "status": "elite",
+        "niche": "formulation-shift",
+        "island": "P1",
+        "operator": "reframe",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      },
+      {
+        "id": "H3",
+        "statement": "仅解除部分假设即可恢复能力",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 2,
+          "representation_distance": 2,
+          "theory_lens_distance": 2,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除（部分）",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分解除无增益则 H3 不成立",
+        "expected_information_gain": 0.4,
+        "status": "active",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "experiments": [
+      {
+        "id": "X1",
+        "parent": null,
+        "stage": "X3",
+        "claim_targeted": [
+          "C1",
+          "C2",
+          "C3"
+        ],
+        "hypothesis_targeted": [
+          "H1"
+        ],
+        "alternative_targeted": [
+          "ALT-1"
+        ],
+        "code_commit": "abc123",
+        "data_split": "Dataset A test split",
+        "seed": 0,
+        "metric": "M and proxy Z",
+        "result": "",
+        "interpretation": "Result not yet interpreted.",
+        "unexpected": [],
+        "known_flaws": [],
+        "next_branches": [],
+        "status": "running",
+        "preregistration": {
+          "frozen_at_state_version": 0,
+          "outcomes": [
+            {
+              "id": "O1",
+              "observation": "M improves against matched P.",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "strengthen"
+                }
+              ]
+            },
+            {
+              "id": "O2",
+              "observation": "M does not improve against matched P.",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "weaken"
+                }
+              ]
+            },
+            {
+              "id": "O3",
+              "observation": "The predicted proxy Z change is absent.",
+              "update": [
+                {
+                  "target": "C2",
+                  "op": "weaken"
+                },
+                {
+                  "target": "H1",
+                  "op": "weaken"
+                }
+              ]
+            },
+            {
+              "id": "O4",
+              "observation": "The repeated-seed stress comparison identifies an improvement.",
+              "update": [
+                {
+                  "target": "C3",
+                  "op": "strengthen"
+                }
+              ]
+            }
+          ]
+        },
+        "result_at_state_version": null,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "Frozen planned comparison.",
+          "since_state_version": 0
+        },
+        "outcome_protocol": {
+          "dataset": "Dataset A",
+          "design": "Matched P comparison, proxy Z measurement and a fixed stress setting",
+          "scope": "Dataset A / fixed budget",
+          "independent_replication": false
+        }
+      }
+    ],
+    "literature": [
+      {
+        "id": "LIT1",
+        "ref": "[Author, 2024]",
+        "relation": "shares-assumption",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "failures": [],
+    "uncertainties": [
+      {
+        "id": "U1",
+        "question": "该结构是否可识别？",
+        "importance": "critical",
+        "uncertainty": "high",
+        "cheapest_discriminating_test": "TBD",
+        "status": "open",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assurance": [],
+    "repairs": [],
+    "narrative_view": {
+      "rendered_claims": [
+        "C1"
+      ],
+      "note": "Frozen communication view."
+    }
+  },
+  "packet": {
+    "schema": "evidence-result@1",
+    "experiment_id": "X1",
+    "experiment_digest": "c945bc06862237fe033e58ec8aa3bbfc406773ff05bd96dacbab3b52e520bc28",
+    "execution_status": "completed",
+    "result_summary": "M improves by 0.8 against matched P. Proxy Z does not change as predicted. M decreases by 0.4 under stress in one run. Broad robustness is not identified.",
+    "sources": [
+      {
+        "id": "S1",
+        "kind": "log",
+        "location": "X1/run.log",
+        "content": "M improves by 0.8 against matched P. Proxy Z does not change as predicted. M decreases by 0.4 under stress in one run. Broad robustness is not identified. Matched compute, protocol and measurement checks completed.",
+        "digest": "c99afd586485edeef47edb0999bf5c495b21b2815702d9fa8021c3edff670bb9"
+      }
+    ],
+    "observations": [
+      {
+        "id": "O1",
+        "statement": "M improves by 0.8 against matched P.",
+        "scope": "Dataset A / fixed budget",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      {
+        "id": "O2",
+        "statement": "Proxy Z does not change as predicted.",
+        "scope": "Dataset A / fixed budget",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      {
+        "id": "O3",
+        "statement": "M decreases by 0.4 under stress in one run. Broad robustness is not identified.",
+        "scope": "Dataset A / fixed budget",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    ]
+  },
+  "analysis": {
+    "schema": "evidence-outcome-analysis@1",
+    "id": "OA-X1",
+    "experiment_id": "X1",
+    "base_state_digest": "3e83efe932bb22b26d70fa390b4b98ca79ea52a021da5bc1deaa5c377f620e28",
+    "context_digest": "3e83efe932bb22b26d70fa390b4b98ca79ea52a021da5bc1deaa5c377f620e28",
+    "packet_digest": "1534da9eb6db5426ba5448dd8bf9e13d4e65ee8fcafa87f6ca091977c1e1b7ab",
+    "outcome": "MIXED_EVIDENCE",
+    "verification_tier": "T2",
+    "validity_checks": {
+      "execution": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "protocol": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "measurement": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "evaluation": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    },
+    "claim_updates": [
+      {
+        "id": "C1",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "SUPPORTED",
+        "evidence": [
+          "O1"
+        ],
+        "direction": "positive",
+        "identification": "PASS",
+        "reason": "M improves by 0.8 against matched P.",
+        "replication_ids": [
+          "X1"
+        ],
+        "previous_support": "ungrounded",
+        "new_support": "supported",
+        "scope_change": null
+      },
+      {
+        "id": "C2",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "WEAKENED",
+        "evidence": [
+          "O2"
+        ],
+        "direction": "negative",
+        "identification": "PASS",
+        "reason": "Proxy Z does not change as predicted.",
+        "replication_ids": [
+          "X1"
+        ],
+        "previous_support": "ungrounded",
+        "new_support": "ungrounded",
+        "scope_change": null
+      },
+      {
+        "id": "C3",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "UNRESOLVED",
+        "evidence": [
+          "O3"
+        ],
+        "direction": "neutral",
+        "identification": "UNKNOWN",
+        "reason": "M decreases by 0.4 under stress in one run. Broad robustness is not identified.",
+        "replication_ids": [
+          "X1"
+        ],
+        "previous_support": "ungrounded",
+        "new_support": "ungrounded",
+        "scope_change": null
+      }
+    ],
+    "hypothesis_updates": [
+      {
+        "id": "H1",
+        "scope": "Dataset A / fixed budget",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "WEAKENED",
+        "evidence": [
+          "O2"
+        ],
+        "direction": "negative",
+        "identification": "PASS",
+        "reason": "Proxy Z does not change as predicted.",
+        "replication_ids": [
+          "X1"
+        ]
+      }
+    ],
+    "failure_attributions": [
+      {
+        "type": "unknown",
+        "confidence": "low",
+        "evidence": [
+          "S1"
+        ],
+        "alternative_explanations": [
+          "An unisolated optimization effect remains possible."
+        ],
+        "what_would_disambiguate": "Inspect training traces and run a controlled replication."
+      }
+    ],
+    "alternatives": [
+      {
+        "hypothesis_id": "H2",
+        "evidence_for": [
+          "O1",
+          "O2"
+        ],
+        "evidence_against": [],
+        "status": "UNRESOLVED",
+        "discriminating_next_action": "N2"
+      }
+    ],
+    "decisions": [
+      {
+        "target_ids": [
+          "C1"
+        ],
+        "action": "CONTINUE",
+        "reason": "No improvement against matched P.",
+        "required_fixes": [],
+        "stop_rule_id": null,
+        "next_action_id": "N1"
+      },
+      {
+        "target_ids": [
+          "C2",
+          "H1"
+        ],
+        "action": "PIVOT",
+        "reason": "No improvement against matched P.",
+        "required_fixes": [],
+        "stop_rule_id": "SR-X1",
+        "next_action_id": "N2"
+      },
+      {
+        "target_ids": [
+          "C3"
+        ],
+        "action": "REDESIGN",
+        "reason": "No improvement against matched P.",
+        "required_fixes": [],
+        "stop_rule_id": null,
+        "next_action_id": "N3"
+      }
+    ],
+    "stop_rules": [
+      {
+        "id": "SR-X1",
+        "target_ids": [
+          "C2",
+          "H1"
+        ],
+        "scope": "Dataset A / fixed budget",
+        "kind": "protocol",
+        "rule": "Do not repeat the same protocol without resolving the stated condition.",
+        "protocol_signature": "9ad4897e70322b19c2a450818c181f55acd7a615f43ca96bb00319ad8ea9fa28",
+        "revisit_conditions": [
+          "The disputed scientific assumption changes with inspected evidence."
+        ]
+      }
+    ],
+    "followups": [
+      {
+        "id": "N1",
+        "target_ids": [
+          "C1",
+          "H1"
+        ],
+        "description": "Discriminate H1 against its nearest alternative after the stated prerequisite.",
+        "expected_information_gain": "high",
+        "cost": "low",
+        "scientific_value": "high",
+        "risk": "medium",
+        "decision_it_resolves": "Whether the proposed intervention changes the measured effect."
+      },
+      {
+        "id": "N2",
+        "target_ids": [
+          "C2",
+          "H1",
+          "H2"
+        ],
+        "description": "Preregister a capacity-matched comparison with proxy Z.",
+        "expected_information_gain": "high",
+        "cost": "low",
+        "scientific_value": "high",
+        "risk": "medium",
+        "decision_it_resolves": "Whether capacity rather than the mechanism explains the gain."
+      },
+      {
+        "id": "N3",
+        "target_ids": [
+          "C3"
+        ],
+        "description": "Preregister repeated-seed stress comparisons against matched P.",
+        "expected_information_gain": "high",
+        "cost": "low",
+        "scientific_value": "high",
+        "risk": "medium",
+        "decision_it_resolves": "Whether the stress effect persists within this declared condition."
+      }
+    ],
+    "negative_knowledge": [
+      {
+        "target_id": "C2",
+        "finding": "Proxy Z does not change as predicted.",
+        "ruled_out": [],
+        "not_ruled_out": [
+          "Sampling variation and the alternative hypothesis remain possible."
+        ],
+        "likely_failure_mode": "unknown",
+        "retry_allowed": false,
+        "retry_conditions": [],
+        "revisit_conditions": [
+          "Inspect new discriminating evidence within the same scientific scope."
+        ],
+        "confidence": "medium"
+      },
+      {
+        "target_id": "H1",
+        "finding": "Proxy Z does not change as predicted.",
+        "ruled_out": [],
+        "not_ruled_out": [
+          "Sampling variation and the alternative hypothesis remain possible."
+        ],
+        "likely_failure_mode": "unknown",
+        "retry_allowed": false,
+        "retry_conditions": [],
+        "revisit_conditions": [
+          "Inspect new discriminating evidence within the same scientific scope."
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "repairs": [
+      {
+        "kind": "scientific_redesign",
+        "description": "Add a preregistered stress comparison with repeated seeds.",
+        "target_ids": [
+          "C3"
+        ]
+      },
+      {
+        "kind": "abandon_or_narrow_claim",
+        "description": "Separate the observed performance gain from the unsupported mechanism attribution.",
+        "target_ids": [
+          "C2",
+          "H1"
+        ]
+      }
+    ],
+    "open_questions": [],
+    "uncertainty_updates": [],
+    "unchanged": [
+      "Dataset, metric, comparator, scope and narrative remain unchanged."
+    ],
+    "reasoning_summary": "Performance improves, the mechanism prediction weakens, and robustness remains unresolved. No whole-experiment success label is justified."
+  },
+  "audit": {
+    "schema": "evidence-outcome-audit@1",
+    "state_digest": "3e83efe932bb22b26d70fa390b4b98ca79ea52a021da5bc1deaa5c377f620e28",
+    "packet_digest": "1534da9eb6db5426ba5448dd8bf9e13d4e65ee8fcafa87f6ca091977c1e1b7ab",
+    "analysis_digest": "e7d969092e72d017c71a29a917cb8b2dcf0c82c7fb7c49a144e2efee900f0467",
+    "checks": {
+      "result_faithful": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "validity_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "inference_calibrated": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "scope_preserved": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "attributions_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "confirmation_bias_checked": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "replication_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "alternatives_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "decisions_justified": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      }
+    }
+  },
+  "assurance": {
+    "schema": "evidence-outcome-assurance@1",
+    "state_digest": "a6e8c0e178782afd1ef379df4f5c822e2d90efd43e57f75685b63e3131513124",
+    "analysis_digest": "e7d969092e72d017c71a29a917cb8b2dcf0c82c7fb7c49a144e2efee900f0467",
+    "checks": {
+      "integrity": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "claim_calibration": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "reproducibility": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      },
+      "stop_rule_compliance": {
+        "status": "PASS",
+        "reason": "Illustrative source-bound protocol verdict. Not a scientific accuracy benchmark."
+      }
+    }
+  },
+  "expected_outcome": "MIXED_EVIDENCE",
+  "expected_decisions": [
+    "CONTINUE",
+    "PIVOT",
+    "REDESIGN"
+  ]
+}
