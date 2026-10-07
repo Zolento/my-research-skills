@@ -22,11 +22,13 @@ def read(path):
 def links():
     failures = []
     for path in ROOT.rglob('*.md'):
+        if '.dev' in path.relative_to(ROOT).parts:
+            continue
         for target in re.findall(r'\[[^\]\n]+\]\(([^)\s]+)\)', path.read_text()):
             if target.startswith(('http:', 'https:', '#')):
                 continue
             local = (path.parent / target.split('#')[0]).resolve()
-            if not local.is_relative_to(ROOT) or not local.exists():
+            if not local.is_relative_to(ROOT) or not local.exists() or '.dev' in local.relative_to(ROOT).parts:
                 failures.append(str(path.relative_to(ROOT)) + ' → ' + target)
     return failures
 

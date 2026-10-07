@@ -35,6 +35,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
@@ -1393,7 +1394,7 @@ class TestDeprecatedTermScan(unittest.TestCase):
 
     ROOT = pathlib.Path(__file__).resolve().parent.parent
     FENCE = re.compile(r"```.*?```", re.S)
-    # 清单自己含被禁词；dev-only 的 docs/ 不随包发布
+    # 清单自己含被禁词；.dev/ 的开发记录不随包发布
     EXEMPT = ("references/deprecated-terms.txt",)
     # 逐个判断的**语境例外**：某个退役词在「不要用它」这类说明里有合法用途。
     # 例外必须显式登记在这里，不能靠放宽正则。
@@ -1418,7 +1419,7 @@ class TestDeprecatedTermScan(unittest.TestCase):
         offenders = []
         for path in sorted(self.ROOT.rglob("*.md")):
             rel = str(path.relative_to(self.ROOT))
-            if rel in self.EXEMPT or rel.startswith("docs/"):
+            if rel in self.EXEMPT or rel.startswith("docs/") or ".dev" in path.relative_to(self.ROOT).parts:
                 continue
             text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
             for lineno, line in enumerate(text.splitlines(), 1):
@@ -1564,7 +1565,7 @@ class TestResidualSemanticVocabulary(unittest.TestCase):
     def _docs(self):
         for path in sorted(self.ROOT.rglob("*.md")):
             rel = str(path.relative_to(self.ROOT))
-            if rel.startswith("docs/") or ".git" in rel:
+            if rel.startswith("docs/") or ".git" in rel or ".dev" in path.relative_to(self.ROOT).parts:
                 continue
             yield rel, path.read_text(encoding="utf-8")
 
@@ -1835,6 +1836,20 @@ class TestReleaseCheckGate(unittest.TestCase):
                              self.rc.step_referenced_scripts_exist)
         self.assertFalse(ok, "引用了不存在的脚本时该步骤必须 FAIL")
 
+    def test_branch_notes_do_not_become_release_script_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            scratch = root / '.dev' / 'nested'
+            scratch.mkdir(parents=True)
+            note = scratch / 'review.md'
+            note.write_text('Temporary check: scripts/no_such_script.py')
+            with patch.object(self.rc, 'ROOT', root):
+                self.assertTrue(self.rc.step_referenced_scripts_exist()[0])
+                note.unlink()
+                self.assertTrue(self.rc.step_referenced_scripts_exist()[0])
+                (root / 'README.md').write_text('Required helper: scripts/no_such_script.py')
+                self.assertFalse(self.rc.step_referenced_scripts_exist()[0])
+
     def test_every_step_is_present_and_named(self) -> None:
         titles = [title for title, _ in self.rc.STEPS]
         self.assertGreaterEqual(len(titles), 5)
@@ -1858,7 +1873,7 @@ class TestNoThirdScoringSystem(unittest.TestCase):
     def _docs(self):
         for path in sorted(self.ROOT.rglob("*.md")):
             rel = str(path.relative_to(self.ROOT))
-            if rel.startswith("docs/") or ".git" in rel:
+            if rel.startswith("docs/") or ".git" in rel or ".dev" in path.relative_to(self.ROOT).parts:
                 continue
             yield rel, path.read_text(encoding="utf-8")
 
@@ -2079,7 +2094,7 @@ class TestQdNicheDecoupling(unittest.TestCase):
         offenders = []
         for path in sorted(self.ROOT.rglob("*.md")):
             rel = str(path.relative_to(self.ROOT))
-            if rel.startswith("docs/") or ".git" in rel:
+            if rel.startswith("docs/") or ".git" in rel or ".dev" in path.relative_to(self.ROOT).parts:
                 continue
             lines = path.read_text(encoding="utf-8").splitlines()
             header = ""
@@ -2637,7 +2652,7 @@ class TestPackagedLinks(unittest.TestCase):
     """本 skill 会被整包拷到 `~/.agents/skills/` 等安装点使用。
 
     因此**任何指向包外的相对链接，在安装态必然断** —— 而在开发树里它可能恰好可达
-    （`research-idea-pipeline-dev/docs/` 就在旁边），于是开发期的链接检查**是绿的**。
+    （开发分支的 `.dev/` 文件恰好可达），于是开发期的链接检查**是绿的**。
     这类缺陷只在「装出去」那一刻暴露，必须机械化拦住。
 
     规则：每个 `*.md` 里的相对链接，解析后必须 ① 存在，② 仍在 skill 根目录内。
@@ -2649,6 +2664,8 @@ class TestPackagedLinks(unittest.TestCase):
 
     def _links(self):
         for path in sorted(self.ROOT.rglob("*.md")):
+            if ".dev" in path.relative_to(self.ROOT).parts:
+                continue
             text = self.FENCE.sub("", path.read_text(encoding="utf-8"))
             for match in self.LINK.finditer(text):
                 target = match.group(1).split("#")[0]
@@ -2663,14 +2680,36 @@ class TestPackagedLinks(unittest.TestCase):
             resolved = (path.parent / target).resolve()
             if not resolved.exists():
                 missing.append(f"{path.relative_to(root)} -> {target}")
-            elif root not in resolved.parents and resolved != root:
+            elif (root not in resolved.parents and resolved != root) or ".dev" in resolved.relative_to(root).parts:
                 outside.append(f"{path.relative_to(root)} -> {target}")
         self.assertEqual(missing, [], msg="断链（相对链接目标不存在）：\n  " + "\n  ".join(missing))
         self.assertEqual(
             outside, [],
-            msg="链接指向 skill 包之外 —— 安装后必然断裂，请改为代码体或包内路径：\n  "
+            msg="链接指向包外或 .dev/ —— 安装后必然断裂，请改为正式包内路径：\n  "
                 + "\n  ".join(outside),
         )
+
+    def test_branch_notes_do_not_participate_in_packaged_link_validation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            scratch = root / '.dev' / 'nested'
+            scratch.mkdir(parents=True)
+            note = scratch / 'review.md'
+            note.write_text('[Draft](missing.md)')
+            with patch.object(self, 'ROOT', root):
+                self.test_relative_links_stay_inside_the_package()
+                note.unlink()
+                self.test_relative_links_stay_inside_the_package()
+
+    def test_formal_docs_cannot_depend_on_existing_branch_notes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            scratch = root / '.dev'
+            scratch.mkdir()
+            (scratch / 'plan.md').write_text('Branch-only plan')
+            (root / 'README.md').write_text('[Required specification](.dev/plan.md)')
+            with patch.object(self, 'ROOT', root), self.assertRaises(AssertionError):
+                self.test_relative_links_stay_inside_the_package()
 
     def test_link_scan_is_not_vacuous(self):
         self.assertGreaterEqual(len(list(self._links())), 200, "链接扫描数量骤降，正则或目录结构可能变了")

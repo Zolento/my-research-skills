@@ -163,7 +163,7 @@ def step_referenced_scripts_exist() -> Tuple[bool, str]:
     pattern = re.compile(r"scripts/([A-Za-z0-9_\-]+\.py)")
     for path in sorted(ROOT.rglob("*.md")):
         rel = str(path.relative_to(ROOT))
-        if rel.startswith("docs/") or ".git" in rel:
+        if rel.startswith("docs/") or ".git" in rel or ".dev" in path.relative_to(ROOT).parts:
             continue
         for name in pattern.findall(path.read_text(encoding="utf-8")):
             seen.add(name)
