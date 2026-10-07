@@ -72,7 +72,8 @@
   "counterfactual_collapse": {
     "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
     "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
-    "collapse_result": "does-not-collapse"
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
   },
   "differentiating_consequences": [
     "新增不可能性结论：算子不可识别时任何条件分解都不可解",

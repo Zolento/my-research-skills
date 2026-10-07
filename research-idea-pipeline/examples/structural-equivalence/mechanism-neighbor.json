@@ -70,7 +70,8 @@
   "counterfactual_collapse": {
     "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
     "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
-    "collapse_result": "partially-collapses"
+    "collapse_result": "partially-collapses",
+    "verification_status": "predicted"
   },
   "differentiating_consequences": [
     "参数识别失败时退化路径与 prior 不同"

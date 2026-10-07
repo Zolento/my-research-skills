@@ -13,7 +13,7 @@
 两层规则：
 
     `EQ1`—`EQ13`   结构等价契约（policy §12.1）
-    `NN1`—`NN13`   near-neighbor 判断层（policy §30）
+    `NN1`—`NN14`   near-neighbor 判断层（policy §30）
 
 **没有任何规则形如「idea must be novel」。** LLM 不是 scientific novelty 的 truth oracle，
 机械闸门也**不得**代替它宣判。本脚本只把「没有审计就主张强 novelty」这类**可判定的**缺口拦下。
@@ -251,6 +251,10 @@ SCALAR_DECISION_KEYS: Tuple[str, ...] = (
     "structural_distance", "similarity", "cosine", "novelty_score", "scalar_distance",
 )
 RETRIEVAL_HEURISTIC_USE = "retrieval-clustering-only"
+# §6.3 反事实验证状态：区分「证据存在」与「反事实已推导 / 已执行」。
+COUNTERFACTUAL_VERIFICATION: Tuple[str, ...] = ("predicted", "derived", "executed", "unresolved")
+# does-not-collapse 至少需要 derived；executed 是经验 / 算法类 claim 的目标档。
+COUNTERFACTUAL_MIN_STRONG: Tuple[str, ...] = ("derived", "executed")
 # operator → 必做的 stripping / mapping（V16 的十二算子之一）
 THEORY_OPERATOR = "theory_lens"
 REMOTE_ANALOGY_OPERATOR = "remote_analogy"
@@ -306,7 +310,7 @@ RULES: Dict[str, str] = {
     "EQ13": "更强的 claimed_novelty_level 不得与更弱的 verdict 冲突",
     "NN1": "correspondence 必须完整：十四个 facet 全在，且不含额外键",
     "NN2": "correspondence 每项的 relation / provenance 必须在冻结枚举内，且 evidence_span 非空",
-    "NN3": "UNRESOLVED 必须被保留；load-bearing facet 出现 UNRESOLVED 时禁止 structural-delta 与 structural-delta-strong，出现 2 个及以上时必须为 uncertain",
+    "NN3": "UNRESOLVED 必须被保留；load_bearing_facets 中任一 facet 为 UNRESOLVED 时 near_neighbor_verdict 必须为 uncertain（不得据此判 neighbor 家族，也不得判 delta 家族）",
     "NN4": "load_bearing_facets 必须非空且是十四个 facet 的子集",
     "NN5": "关键结论不得主要依赖 INFERRED；load-bearing facet 中 EXPLICIT / DERIVED 少于一半时禁止 structural-delta，且 trust_basis 必须非空、collapse_result 为 does-not-collapse 时另需 equation / algorithm / code / executable-counterfactual / discriminating-experiment 之一",
     "NN6": "local_neighborhood_test 必须完整；neighbor_confirmed 为 true 时 near_neighbor_verdict 必须是 neighbor 家族",
@@ -317,6 +321,7 @@ RULES: Dict[str, str] = {
     "NN11": "remote_analogy_mapping 必须按 operator 触发；added_structure 为 false 时结论不得是 structural-novelty",
     "NN12": "near_neighbor_verdict 必须与 verdict 相容，且 claimed_novelty_level 不得超过其上限",
     "NN13": "禁止任何 scalar 决定 novelty；retrieval_heuristic 的 use 必须逐字为 retrieval-clustering-only",
+    "NN14": "counterfactual_collapse.verification_status 必须存在且属于四值；collapse_result 为 does-not-collapse 时至少为 derived",
 }
 RULE_ORDER: List[str] = list(RULES)
 
@@ -666,7 +671,7 @@ def check_artifact(doc: Any, source: str = "<memory>") -> Report:
 
 
 # ---------------------------------------------------------------------------
-# Near-neighbor 规则（NN1—NN13；policy §30）
+# Near-neighbor 规则（NN1—NN14；policy §30）
 #
 # 这些规则只验证**审计纪律**：矩阵完整、枚举合法、span 存在、unresolved 被保留、
 # stripping / mapping 按 operator 触发、claim 强度不超过上限。
@@ -779,7 +784,7 @@ def _nn_validate_object(report: Report, rule: str, key: str, doc: Dict[str, Any]
 
 def _check_near_neighbor(report: Report, doc: Dict[str, Any],
                          operator: Optional[str] = None) -> None:
-    """NN1—NN13：只验证审计纪律，不判断结构是否真的等价。
+    """NN1—NN14：只验证审计纪律，不判断结构是否真的等价。
 
     `operator` 只在 route 模式传入（来自 `hypotheses[].operator`），用于 `NN10` / `NN11` 的触发检查。
     """
@@ -799,14 +804,11 @@ def _check_near_neighbor(report: Report, doc: Dict[str, Any],
         unresolved = [facet for facet in bearings
                       if isinstance(matrix.get(facet), dict)
                       and matrix[facet].get("relation") == "UNRESOLVED"]
-        if unresolved and near in DELTA_FAMILY:
-            report.add("NN3", "correspondence",
-                       f"load-bearing facet 上保留了 UNRESOLVED：{'、'.join(unresolved)}；"
-                       "此时禁止 structural-delta 与 structural-delta-strong",
-                       "、".join(unresolved))
-        if len(unresolved) >= 2 and near not in (None, "uncertain"):
+        if unresolved and near in NEAR_NEIGHBOR_VERDICTS and near != "uncertain":
             report.add("NN3", "near_neighbor_verdict",
-                       f"{len(unresolved)} 个 load-bearing facet 为 UNRESOLVED，必须判 uncertain", near)
+                       f"load-bearing facet 为 UNRESOLVED：{'、'.join(unresolved)}；"
+                       "必须判 uncertain —— 证据不足既不能膨胀成 novelty，也不能塌缩成 neighbor",
+                       near)
         strong = [facet for facet in bearings
                   if isinstance(matrix.get(facet), dict)
                   and matrix[facet].get("provenance") in STRONG_PROVENANCE]
@@ -858,7 +860,8 @@ def _check_near_neighbor(report: Report, doc: Dict[str, Any],
                 report.add("NN6", "local_neighborhood_test.local_modification_kinds",
                            f"必须是 §16.3 十一类之一：{'、'.join(map(str, bad_kinds))}",
                            "、".join(map(str, bad_kinds)))
-        if local.get("neighbor_confirmed") is True and near in DELTA_FAMILY:
+        if local.get("neighbor_confirmed") is True and near in NEAR_NEIGHBOR_VERDICTS \
+                and near not in NEIGHBOR_FAMILY:
             report.add("NN6", "local_neighborhood_test.neighbor_confirmed",
                        "为 true 时 near_neighbor_verdict 必须是 neighbor 家族", near)
     report.checked += 1
@@ -871,7 +874,7 @@ def _check_near_neighbor(report: Report, doc: Dict[str, Any],
         ("conclusion", "enum", REMOVAL_CONCLUSIONS),
     ))
     if isinstance(removal, dict) and removal.get("conclusion") == "component-local-delta" \
-            and near in DELTA_FAMILY:
+            and near in NEAR_NEIGHBOR_VERDICTS and near not in NEIGHBOR_FAMILY:
         report.add("NN7", "removal_test.conclusion",
                    "结论为 component-local-delta 时 near_neighbor_verdict 必须是 neighbor 家族", near)
     report.checked += 1
@@ -1026,6 +1029,22 @@ def _check_near_neighbor(report: Report, doc: Dict[str, Any],
             if heuristic.get("use") != RETRIEVAL_HEURISTIC_USE:
                 report.add("NN13", "retrieval_heuristic.use",
                            f"必须逐字为 {RETRIEVAL_HEURISTIC_USE}", heuristic.get("use"))
+    report.checked += 1
+
+    # --- NN14 反事实验证状态：「证据存在」不等于「反事实已验证」 ---
+    collapse = doc.get("counterfactual_collapse")
+    if isinstance(collapse, dict):
+        status = collapse.get("verification_status")
+        if not _enum_ok(status, COUNTERFACTUAL_VERIFICATION):
+            report.add("NN14", "counterfactual_collapse.verification_status",
+                       f"必须存在且属于 {' | '.join(COUNTERFACTUAL_VERIFICATION)} 之一",
+                       status)
+        elif collapse.get("collapse_result") == "does-not-collapse" \
+                and status not in COUNTERFACTUAL_MIN_STRONG:
+            report.add("NN14", "counterfactual_collapse.verification_status",
+                       "collapse_result 为 does-not-collapse 时至少为 derived"
+                       "（predicted / unresolved 只能作为待验证 structural-delta hypothesis）",
+                       status)
     report.checked += 1
 
 
@@ -1190,8 +1209,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON（stdout 只有 JSON）")
     parser.add_argument("--quiet", action="store_true", help="只打印汇总行")
     parser.add_argument("--selftest", action="store_true",
-                        help="跑内置自检（EQ1—EQ13 与 NN1—NN13 全覆盖）")
-    parser.add_argument("--list-rules", action="store_true", help="列出 EQ1—EQ13 与 NN1—NN13 及判据")
+                        help="跑内置自检（EQ1—EQ13 与 NN1—NN14 全覆盖）")
+    parser.add_argument("--list-rules", action="store_true", help="列出 EQ1—EQ13 与 NN1—NN14 及判据")
     return parser
 
 
@@ -1276,6 +1295,7 @@ def _selftest_artifact(**overrides: Any) -> Dict[str, Any]:
             "replacement": "replace",
             "predicted_consequence": "consequence",
             "collapse_result": "does-not-collapse",
+            "verification_status": "derived",
         },
         "differentiating_consequences": ["consequence"],
         "discriminating_tests": ["X1"],
@@ -1373,7 +1393,7 @@ def selftest() -> int:
         ("EQ13", {"claimed_novelty_level": "paradigm-candidate", "verdict": "reframing-only",
                   "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
                                               "collapse_result": "collapses"}}),
-        # --- near-neighbor 层（NN1—NN13）---
+        # --- near-neighbor 层（NN1—NN14）---
         ("NN1", {"correspondence": {f: {"relation": "MATCH", "provenance": "EXPLICIT",
                                         "evidence_span": "s", "note": "n"}
                                     for f in FACETS if f != "problem"}}),
@@ -1399,7 +1419,28 @@ def selftest() -> int:
                  "correspondence.information_flow.provenance": "INFERRED"}),
         ("NN5", {"load_bearing_facets": ["target_or_latent_quantity", "mechanism"],
                  "correspondence.mechanism.provenance": "INFERRED"}),
+        ("NN3", {"correspondence.target_or_latent_quantity.relation": "UNRESOLVED",
+                 "near_neighbor_verdict": "component-neighbor", "verdict": "component-delta",
+                 "claimed_novelty_level": "component-delta",
+                 "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                             "collapse_result": "collapses",
+                                             "verification_status": "predicted"},
+                 "minimal_structural_delta": [],
+                 "load_bearing_analysis": {k: "unchanged" for k in LOAD_BEARING_KEYS},
+                 "differentiating_consequences": [], "discriminating_tests": []}),
         ("NN6", {"local_neighborhood_test.neighbor_confirmed": True}),
+        ("NN6", {"local_neighborhood_test.neighbor_confirmed": True,
+                 "near_neighbor_verdict": "uncertain", "verdict": "uncertain",
+                 "claimed_novelty_level": "component-delta",
+                 "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                             "collapse_result": "partially-collapses",
+                                             "verification_status": "predicted"}}),
+        ("NN7", {"removal_test.conclusion": "component-local-delta",
+                 "near_neighbor_verdict": "uncertain", "verdict": "uncertain",
+                 "claimed_novelty_level": "component-delta",
+                 "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                             "collapse_result": "partially-collapses",
+                                             "verification_status": "predicted"}}),
         ("NN6", {"local_neighborhood_test.local_modification_kinds": ["banana"]}),
         ("NN6", {"local_neighborhood_test.rationale": ""}),
         ("NN7", {"removal_test.conclusion": "component-local-delta"}),
@@ -1436,6 +1477,17 @@ def selftest() -> int:
         ("NN13", {"retrieval_heuristic": {"scalar_distance": 0.73, "use": "novelty-gate"}}),
         ("NN13", {"retrieval_heuristic": {"scalar_distance": 0.73,
                                           "use": RETRIEVAL_HEURISTIC_USE, "extra": 1}}),
+        ("NN14", {"counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "does-not-collapse"}}),
+        ("NN14", {"counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "does-not-collapse",
+                                              "verification_status": "predicted"}}),
+        ("NN14", {"counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "does-not-collapse",
+                                              "verification_status": "unresolved"}}),
+        ("NN14", {"counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "collapses",
+                                              "verification_status": "vibes"}}),
     ]
     for expected, overrides in cases:
         probe = _selftest_artifact(**overrides)

@@ -502,7 +502,7 @@ Kill Condition:  If replacing the claimed delta leaves assumptions, predictions
 然后据此决定**当前最大 defensible novelty claim**，并给 `near_neighbor_verdict`
 （八值，见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §23）。
 写回后跑 `python3 scripts/structural_equivalence_check.py --route <routes/<R>>`
-（`EQ1`—`EQ13` + `NN1`—`NN13`，退出码 0）。
+（`EQ1`—`EQ13` + `NN1`—`NN14`，退出码 0）。
 
 **claim-strength gate，不是 idea-kill gate：** verdict 是 neighbor **不表示** idea 不值得做，
 只表示不能声称 paradigm novelty。**不得**把 verdict 实现成淘汰开关

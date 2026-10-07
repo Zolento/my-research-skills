@@ -132,9 +132,28 @@ class TestPolicyCodeParity(unittest.TestCase):
         rows = dict(re.findall(
             r"^\| `(NN\d+)` \| (.+?) \|$",
             _section("## 30. 机械闸门", "> **脚本不得决定"), re.M))
-        self.assertEqual(len(rows), 13, f"policy §30 只解析出 {len(rows)} 条规则行")
+        self.assertEqual(len(rows), 14, f"policy §30 只解析出 {len(rows)} 条规则行")
         self.assertEqual(rows, {k: v for k, v in seq.RULES.items() if k.startswith("NN")},
-                         "policy §30 的 NN1—NN13 判据与检查器 RULES 不一致")
+                         "policy §30 的 NN1—NN14 判据与检查器 RULES 不一致")
+
+    def test_documented_nn_ranges_match_checker(self) -> None:
+        expected = [key for key in seq.RULES if key.startswith("NN")]
+        paths = [ROOT / "SKILL.md", POLICY, TEMPLATE,
+                 ROOT / "references" / "phase-r7-r10-r13-assurance-repair-review.md"]
+        for path in paths:
+            ranges = re.findall(r"`?(NN1)`?—`?(NN\d+)`?", path.read_text())
+            self.assertTrue(ranges, str(path))
+            for first, last in ranges:
+                self.assertEqual((first, last), (expected[0], expected[-1]), str(path))
+
+    def test_counterfactual_verification_enum_matches_policy(self) -> None:
+        line = next(line for line in _policy().splitlines()
+                    if line.startswith("| `verification_status` |"))
+        rows = re.findall(r"`([a-z_-]+)`", line)[1:]
+        self.assertEqual(tuple(rows), seq.COUNTERFACTUAL_VERIFICATION,
+                         "policy §6.1 的 verification_status 四值与检查器不一致")
+        self.assertEqual(seq.COUNTERFACTUAL_MIN_STRONG, ("derived", "executed"))
+        self.assertTrue(set(seq.COUNTERFACTUAL_MIN_STRONG) <= set(seq.COUNTERFACTUAL_VERIFICATION))
 
     def test_near_neighbor_verdicts_match_policy(self) -> None:
         rows = re.findall(r"^\| `([a-z-]+)` \|",
@@ -184,9 +203,9 @@ class TestPolicyCodeParity(unittest.TestCase):
         self.assertEqual(ceilings, seq.NN_CLAIM_CEILING,
                          "policy §23.2 的 claim 上限表与代码不一致")
 
-    def test_rule_order_is_eq1_to_eq13_then_nn1_to_nn13(self) -> None:
+    def test_rule_order_is_eq1_to_eq13_then_nn1_to_nn14(self) -> None:
         self.assertEqual(seq.RULE_ORDER,
-                         [f"EQ{n}" for n in range(1, 14)] + [f"NN{n}" for n in range(1, 14)])
+                         [f"EQ{n}" for n in range(1, 14)] + [f"NN{n}" for n in range(1, 15)])
 
     def test_strong_and_weak_verdicts_partition_the_positive_side(self) -> None:
         self.assertEqual(set(seq.STRONG_VERDICTS) | set(seq.WEAK_VERDICTS) | {"uncertain"},
@@ -479,7 +498,9 @@ def nn_artifact(near, verdict, claimed, *, different=(), bearings=("information_
         "matched_core": ["core"], "candidate_only_elements": [], "prior_only_elements": [],
         "minimal_structural_delta": list(delta_set), "load_bearing_analysis": load,
         "counterfactual_collapse": {"replacement": "r", "predicted_consequence": "p",
-                                    "collapse_result": collapse},
+                                    "collapse_result": collapse,
+                                    "verification_status": ("derived" if collapse == "does-not-collapse"
+                                                            else "predicted")},
         "differentiating_consequences": list(consequences), "discriminating_tests": list(tests),
         "claimed_novelty_level": claimed, "verdict": verdict,
         "novelty_boundary": "against the retrieved literature, no structural equivalent was identified",
@@ -605,6 +626,70 @@ class TestNearNeighborMetamorphic(unittest.TestCase):
         doc["correspondence"]["objective"]["relation"] = "UNRESOLVED"
         doc["correspondence"]["mechanism"]["relation"] = "UNRESOLVED"
         self.assertIn("NN3", seq.check_artifact(doc).rules())
+
+    def test_single_unresolved_blocks_both_directions(self) -> None:
+        """对称不确定性闸门：load-bearing UNRESOLVED 既禁止 delta，也禁止 neighbor 塌缩。"""
+        for name in FIXTURE_VERDICTS:
+            doc = _load(FIXTURES / f"{name}.json")
+            facet = doc["load_bearing_facets"][0]
+            doc["correspondence"][facet]["relation"] = "UNRESOLVED"
+            doc["correspondence"][facet]["provenance"] = "UNKNOWN"
+            rules = seq.check_artifact(doc, source=name).rules()
+            self.assertIn("NN3", rules,
+                          f"{name}：load-bearing facet 变 UNRESOLVED 后仍给出了非 uncertain 的 verdict")
+            # 对称性：改成 uncertain 后 NN3 必须消失
+            doc["near_neighbor_verdict"] = "uncertain"
+            doc["verdict"] = "uncertain"
+            doc["claimed_novelty_level"] = "component-delta"
+            doc["counterfactual_collapse"] = {"replacement": "r", "predicted_consequence": "p",
+                                              "collapse_result": "partially-collapses",
+                                              "verification_status": "predicted"}
+            doc["local_neighborhood_test"]["neighbor_confirmed"] = False
+            doc["removal_test"]["conclusion"] = "unresolved"
+            self.assertEqual(seq.check_artifact(doc, source=f"{name}/uncertain").rules(), [],
+                             f"{name}：证据不足的完整 uncertain 审计必须通过")
+
+    def test_uncertain_cannot_confirm_a_neighbor(self) -> None:
+        doc = nn_artifact("uncertain", "uncertain", "component-delta",
+                          collapse="partially-collapses")
+        doc["local_neighborhood_test"]["neighbor_confirmed"] = True
+        self.assertIn("NN6", seq.check_artifact(doc).rules())
+
+    def test_uncertain_cannot_conclude_a_local_delta(self) -> None:
+        doc = nn_artifact("uncertain", "uncertain", "component-delta",
+                          collapse="partially-collapses")
+        doc["removal_test"]["conclusion"] = "component-local-delta"
+        self.assertIn("NN7", seq.check_artifact(doc).rules())
+
+    def test_predicted_counterfactual_is_not_strong_evidence(self) -> None:
+        doc = nn_artifact("structural-delta", "formulation-delta", "formulation-delta", **_DELTA)
+        doc["counterfactual_collapse"]["verification_status"] = "predicted"
+        self.assertIn("NN14", seq.check_artifact(doc).rules())
+        doc["counterfactual_collapse"]["verification_status"] = "executed"
+        self.assertNotIn("NN14", seq.check_artifact(doc).rules())
+
+    def test_counterfactual_status_matrix_with_code_present(self) -> None:
+        for status in seq.COUNTERFACTUAL_VERIFICATION:
+            with self.subTest(status=status):
+                doc = nn_artifact("structural-delta", "formulation-delta",
+                                  "formulation-delta", trust=("code",), **_DELTA)
+                doc["counterfactual_collapse"]["verification_status"] = status
+                rules = seq.check_artifact(doc).rules()
+                self.assertEqual(rules, [] if status in ("derived", "executed") else ["NN14"])
+
+    def test_unresolved_counterfactual_can_remain_a_hypothesis(self) -> None:
+        for status in ("predicted", "unresolved"):
+            with self.subTest(status=status):
+                doc = nn_artifact("uncertain", "uncertain", "none",
+                                  confirmed=False, removal="unresolved",
+                                  collapse="partially-collapses")
+                doc["counterfactual_collapse"]["verification_status"] = status
+                doc["correspondence"]["mechanism"]["relation"] = "UNRESOLVED"
+                doc["correspondence"]["mechanism"]["provenance"] = "UNKNOWN"
+                self.assertEqual(seq.check_artifact(doc).rules(), [])
+
+    def test_population_telemetry_producer(self) -> None:
+        self.skipTest("P1: population telemetry producer is not implemented, including UncertaintyAsymmetry")
 
     def test_nn11_and_nn12_are_the_semantic_distance_guard(self) -> None:
         """NN-11（语义远 / 结构同）与 NN-12（语义近 / 结构异）必须都稳定。"""

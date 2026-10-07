@@ -23,8 +23,8 @@
     4. 规则表逐字比对：policy §4.0 S1—S7 / §4.1 V1—V24 ↔ `state_check.py`
     5. 三方读写表逐格比对：SKILL §0 / policy §5 / 各 `phase-*.md`
     6. 文档里引用的每个 `scripts/*.py` 都真实存在
-    7. `structural_equivalence_check.py --selftest` + audit 模板 + 四份 fixture
-       —— Structural Equivalence 的 `EQ1`—`EQ13`（只查审计完整性，不宣判 novelty）
+    7. `structural_equivalence_check.py --selftest` + audit 模板 + 七份 fixture
+       —— Structural Equivalence 的 `EQ1`—`EQ13` + `NN1`—`NN14`（只查审计完整性，不宣判 novelty）
 
 退出码
 ------
@@ -197,7 +197,7 @@ STEPS = (
     ("规则表逐字比对（S1—S7 + V1—V24）", step_rule_table_parity),
     ("三方读写表逐格比对", step_readwrite_parity),
     ("文档引用的脚本存在", step_referenced_scripts_exist),
-    ("Structural Equivalence（EQ1—EQ13）自检 + 模板 + fixture", step_structural_equivalence),
+    ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
 )
 
 

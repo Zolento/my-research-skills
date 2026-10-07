@@ -214,6 +214,7 @@ prediction / guarantee / discriminating experiment / failure regime **是否变�
 | `replacement` | 非空字符串 | 具体替换了什么（`Δ` 换成 `Δ_prior` 的逐字描述）|
 | `predicted_consequence` | 非空字符串 | 替换后预期哪个 consequence 会怎样 |
 | `collapse_result` | `collapses` \| `partially-collapses` \| `does-not-collapse` | 反事实结论 |
+| `verification_status` | `predicted` \| `derived` \| `executed` \| `unresolved` | 反事实被验证到什么程度（§6.3）|
 
 ### 6.2 机器判据（`EQ8` 的一致性）
 
@@ -227,6 +228,26 @@ prediction / guarantee / discriminating experiment / failure regime **是否变�
 
 **这条检查是本服务最关键的 anti-cheat：** 声称 strong novelty 却记录「替换后完全坍缩」，
 或声称只是 relabeling 却记录「不坍缩」，都被机械拦下。
+
+### 6.3 `verification_status`：「证据存在」不等于「反事实已验证」
+
+`trust_basis` 回答「证据在哪」，`verification_status` 回答「反事实被推到了哪一步」。
+**两者必须同时记录** —— `code exists` 不等于 `counterfactual was executed`；
+`equation exists` 不等于 `equation proves the claimed non-collapse`。
+
+| status | 含义 |
+|---|---|
+| `predicted` | LLM / 理论上预计会怎样 |
+| `derived` | equation / proof / algorithm 能推出 |
+| `executed` | 真正做过 executable-counterfactual / experiment |
+| `unresolved` | 尚不可判 |
+
+**硬规则（`NN14`）：** `collapse_result` 为 `does-not-collapse` 时，`verification_status`
+**至少**为 `derived`。只有 `predicted` / `unresolved` 时，该反事实**只能**作为
+**待验证 structural-delta hypothesis**，**不得**作为 strong structural evidence。
+经验 / 算法类 claim 的目标档是 `executed`，但机械闸门只强制 `derived`（`executed` 由 R13 SENA-2 核）。
+
+> **LLM proposes the counterfactual. Evidence executes and verifies it.**
 
 ---
 
@@ -332,7 +353,8 @@ QD niche 的七轴在 [research-state-policy.md](research-state-policy.md) §3.4
   "counterfactual_collapse": {
     "replacement": "...",
     "predicted_consequence": "...",
-    "collapse_result": "does-not-collapse"
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
   },
   "differentiating_consequences": ["..."],
   "discriminating_tests": ["..."],
@@ -361,7 +383,7 @@ QD niche 的七轴在 [research-state-policy.md](research-state-policy.md) §3.4
 | 9 | `matched_core` 非空 |
 | 10 | `minimal_structural_delta` 在强 verdict 下非空 |
 | 11 | `load_bearing_analysis` 五键齐全；强 verdict 下至少一键表示真实改变 |
-| 12 | `counterfactual_collapse` 三键齐全，且与 `verdict` 相容（§6.2）|
+| 12 | `counterfactual_collapse` 四键齐全，且与 `verdict` 相容（§6.2）、与 `verification_status` 相容（§6.3）|
 | 13 | `differentiating_consequences` 在强 verdict 下非空 |
 | 14 | `discriminating_tests` 在强 verdict 下非空 |
 | 15 | `claimed_novelty_level` ∈ `none` \| `transfer-only` \| `component-delta` \| `mechanism-delta` \| `formulation-delta` \| `boundary-delta` \| `paradigm-candidate` |
@@ -670,7 +692,7 @@ R14 **不得**直接改 `claims[].status`（既有硬 invariant 不变）。
 
 检查器**必须**挂进唯一发布闸门 `scripts/release_check.py`（AGENTS.md Rule 10：
 「Add a new gate to that command. Do not add a manual step.」）。
-闸门步骤至少跑：自带自检 `--selftest`、audit 模板校验、以及四份 fixture 校验。
+闸门步骤至少跑：自带自检 `--selftest`、audit 模板校验、以及七份 fixture 校验。
 该步骤必须**可被变异注入判红**（有反例证明它不是恒真）。
 
 ---
@@ -937,7 +959,28 @@ object mapping / relation mapping / constraint mapping / failure-mode mapping
 
 **禁止**模型在证据不足时强制选择 `MATCH` / `DIFFERENT`。`UNRESOLVED` **必须**被保留。
 
-**若关键 load-bearing facet 中 `UNRESOLVED` 过多，不得给强 novelty verdict**（阈值见 `NN3`）。
+**对称不确定性闸门（`NN3`，冻结）：**
+
+> **Unknown evidence should block both novelty inflation and premature neighbor collapse.**
+
+`load_bearing_facets` 中**任一** facet 为 `UNRESOLVED` 时，`near_neighbor_verdict` **必须**为 `uncertain`：
+
+- **不得**判 delta 家族（`structural-delta` / `structural-delta-strong`）—— 防止「证据没搞清就宣布结构创新」；
+- **不得**判 neighbor 家族（`duplicate-equivalent` / `reframing-neighbor` / `transfer-neighbor` /
+  `component-neighbor` / `mechanism-neighbor`）—— 防止「不知道 mechanism 是否不同」被默认成「它是近邻」。
+
+**为什么必须对称：** SENA 是 **claim-strength gate，不是 idea-kill gate**。
+误判 `uncertain` 的成本只是「暂时不能声称强 novelty」；
+误判 `component-neighbor` 的成本是**一个真正远端的 idea 被系统错误降级**。后者更危险。
+
+**由此产生的相容要求**（由既有规则分别强制，不需要新增规则）：
+
+| 情形 | 必须 |
+|---|---|
+| `near_neighbor_verdict == uncertain` | `local_neighborhood_test.neighbor_confirmed` 必须为 `false`（否则 `NN6`）|
+| `near_neighbor_verdict == uncertain` | `removal_test.conclusion` 不得为 `component-local-delta`（否则 `NN7`）|
+
+即：**证据不足时，「已确认是近邻」与「已确认是局部 delta」都不能成立。**
 
 ### 21.3 可信度来源（禁止「多 LLM 同意 = 结构事实」）
 
@@ -1031,6 +1074,10 @@ new prediction / new theorem / new boundary / new algorithm / new experiment
 
 > **`structural-delta-strong` 仍然不等于 `globally novel`。**
 > 它只代表：**against current retrieved priors，存在强结构差异。**
+>
+> **它的门槛是 heuristic 代理判据，不是真值。** 冻结的门槛是「至少两种不同的
+> `novel_consequence_kinds`，且含 `boundary` 或 `experiment`」（`NN9`）。
+> 这是把 §14 的「同时产生」措辞落成可机械检查的形状，**不得**被读成对科学价值的判定。
 
 ### 23.2 与 `verdict` 的相容表（`NN12`）
 
@@ -1132,6 +1179,16 @@ QD archive；serving + challenging candidates；delayed R6 crossover；stagnatio
 | `CrossIslandRedundancy` | `P1` / `P2` / `P4` / `P5` 是否最终都落在同一结构簇 |
 | `LocalCollapseRate` | 多少候选最终被判 `component` / `reframing` neighbor |
 | `RemoteConversionRate` | `P4` / `P5` 的候选有多少形成真正的 formulation / theory / boundary delta |
+| `UncertaintyAsymmetry` | 面对不完整证据时，系统判 `neighbor` 与判 `delta` 的比例是否对称；理想是两者都收敛到 `uncertain` |
+
+`UncertaintyAsymmetry` 使用同一轮、同一检索快照下的首次审计提案。
+在机械闸门修正前记录提案，包含被拒绝的提案。每个 candidate-prior pair 只计一次。
+分母 `n` 是至少一个 load-bearing facet 为 `UNRESOLVED` 的提案数。
+分别记录 `neighbor_count / n`、`delta_count / n` 和 `uncertain_count / n`。
+neighbor / delta 家族采用 §23 的枚举。非法 verdict 单独计数，不移出分母。
+`n = 0` 时比例记录为 `null`。同时保留样本数与审计引用，支持复核。
+两种误判率都应为零，不能只看两者之差。相等的高误判率也不是成功。
+这些比例只用于诊断，不作为 reward、novelty gate 或候选淘汰条件。
 
 **两条硬规则：**
 
@@ -1159,7 +1216,7 @@ if distance > 0.6:
 
 ---
 
-## 30. 机械闸门：`NN1`—`NN13`
+## 30. 机械闸门：`NN1`—`NN14`
 
 检查器仍是 `scripts/structural_equivalence_check.py`。**它只验证审计纪律，不决定
 `H` 与 `P` 是否真的结构等价。**
@@ -1170,7 +1227,7 @@ if distance > 0.6:
 |---|---|
 | `NN1` | correspondence 必须完整：十四个 facet 全在，且不含额外键 |
 | `NN2` | correspondence 每项的 relation / provenance 必须在冻结枚举内，且 evidence_span 非空 |
-| `NN3` | UNRESOLVED 必须被保留；load-bearing facet 出现 UNRESOLVED 时禁止 structural-delta 与 structural-delta-strong，出现 2 个及以上时必须为 uncertain |
+| `NN3` | UNRESOLVED 必须被保留；load_bearing_facets 中任一 facet 为 UNRESOLVED 时 near_neighbor_verdict 必须为 uncertain（不得据此判 neighbor 家族，也不得判 delta 家族） |
 | `NN4` | load_bearing_facets 必须非空且是十四个 facet 的子集 |
 | `NN5` | 关键结论不得主要依赖 INFERRED；load-bearing facet 中 EXPLICIT / DERIVED 少于一半时禁止 structural-delta，且 trust_basis 必须非空、collapse_result 为 does-not-collapse 时另需 equation / algorithm / code / executable-counterfactual / discriminating-experiment 之一 |
 | `NN6` | local_neighborhood_test 必须完整；neighbor_confirmed 为 true 时 near_neighbor_verdict 必须是 neighbor 家族 |
@@ -1181,6 +1238,7 @@ if distance > 0.6:
 | `NN11` | remote_analogy_mapping 必须按 operator 触发；added_structure 为 false 时结论不得是 structural-novelty |
 | `NN12` | near_neighbor_verdict 必须与 verdict 相容，且 claimed_novelty_level 不得超过其上限 |
 | `NN13` | 禁止任何 scalar 决定 novelty；retrieval_heuristic 的 use 必须逐字为 retrieval-clustering-only |
+| `NN14` | counterfactual_collapse.verification_status 必须存在且属于四值；collapse_result 为 does-not-collapse 时至少为 derived |
 
 > **脚本不得决定「`H` 与 `P` 是否真的结构等价」。** LLM proposes correspondences；
 > evidence and constrained tests 决定这些对应关系可以被信任到什么程度。
@@ -1269,13 +1327,14 @@ Generate broadly → Preserve diversity → Find strongest prior mapping
 1. **本文件的枚举是权威。** `verdict` 十值、`near_neighbor_verdict` 八值、
    `claimed_novelty_level` 七值、十四个 facet、十一个 relation、`collapse_result` 三值、
    `relation` 三值、`provenance` 四值、`local modification` 十一类、
-   `novel_consequence_kinds` 五值、`new_structure_kinds` 六值、`trust_basis` 八值
+   `novel_consequence_kinds` 五值、`new_structure_kinds` 六值、`trust_basis` 八值、
+   `counterfactual_collapse.verification_status` 四值
    一旦改动，**必须**同轮扫四处：
    `scripts/structural_equivalence_check.py`（规则实现）、
    `templates/structural-equivalence-audit.template.json`（骨架）、
    `examples/structural-equivalence/`（fixture）、
    以及引用本文件的 `phase-*.md`（读写时机）。
-2. **`EQ1`—`EQ13` 与 `NN1`—`NN13` 的判据文本**同时存在于本文件 §12.1 / §30 与检查器常量中。
+2. **`EQ1`—`EQ13` 与 `NN1`—`NN14` 的判据文本**同时存在于本文件 §12.1 / §30 与检查器常量中。
    两处**逐字相同**，由 `test_structural_equivalence.py` 机械比对；改一处必须同轮改另一处。
 3. **新增 `assurance[]` 可选字段**时，**必须**同轮改：
    §9.2 表 + `templates/research-state.template.json` + 检查器。

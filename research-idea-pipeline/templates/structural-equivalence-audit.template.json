@@ -71,7 +71,8 @@
   "counterfactual_collapse": {
     "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
     "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
-    "collapse_result": "does-not-collapse"
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
   },
   "differentiating_consequences": [
     "新增可证伪预测：在线估计器在算子可识别的目标总体上优于离线标定"
@@ -236,5 +237,5 @@
     "equation",
     "literature"
   ],
-  "_usage": "Structural Equivalence / near-neighbor audit artifact 骨架（Minimal Structural Delta Certificate，schema @2）。落盘路径：.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json（SENA-1，R7 写）或 <H>.sena2.json（SENA-2，R13 写）。定义见 references/structural-equivalence-policy.md §8（@2 基础键）与 §24（near-neighbor 必填键），verdict 十值见 §7，near_neighbor_verdict 八值与相容表见 §23，NN 规则见 §30。写回后必须跑 python3 scripts/structural_equivalence_check.py --artifact <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 EQ1—EQ13 与 NN1—NN13。四条最容易违反的规则：① correspondence 必须覆盖十四个 facet 且每项带非空 evidence_span；② 证据不足时必须写 UNRESOLVED，不得强制选 MATCH/DIFFERENT；③ near_neighbor_verdict 是 claim 强度的决定项，claimed_novelty_level 不得超过 §23.2 的上限；④ 禁止任何 scalar 决定 novelty —— scalar 只能放在 retrieval_heuristic 且 use 逐字为 retrieval-clustering-only。本文件是 Control Plane artifact，不是第九类 Research State 对象；research-state.json 只保留 assurance[].audit_ref 这样的路径引用。示例值与「示例占位」字样必须替换为真实值。"
+  "_usage": "Structural Equivalence / near-neighbor audit artifact 骨架（Minimal Structural Delta Certificate，schema @2）。落盘路径：.research-idea-pipeline/routes/<R>/assurance/structural-equivalence/<H>.json（SENA-1，R7 写）或 <H>.sena2.json（SENA-2，R13 写）。定义见 references/structural-equivalence-policy.md §8（@2 基础键）与 §24（near-neighbor 必填键），verdict 十值见 §7，near_neighbor_verdict 八值与相容表见 §23，NN 规则见 §30。写回后必须跑 python3 scripts/structural_equivalence_check.py --artifact <file>，退出码 0 才算通过（3 = 存在硬违规，4 = 环境不满足）；模板自身必须通过 artifact 侧 EQ4—EQ11、EQ13 与 NN1—NN14。四条最容易违反的规则：① correspondence 必须覆盖十四个 facet 且每项带非空 evidence_span；② 证据不足时必须写 UNRESOLVED，不得强制选 MATCH/DIFFERENT；③ near_neighbor_verdict 是 claim 强度的决定项，claimed_novelty_level 不得超过 §23.2 的上限；④ 禁止任何 scalar 决定 novelty —— scalar 只能放在 retrieval_heuristic 且 use 逐字为 retrieval-clustering-only。本文件是 Control Plane artifact，不是第九类 Research State 对象；research-state.json 只保留 assurance[].audit_ref 这样的路径引用。示例值与「示例占位」字样必须替换为真实值。"
 }

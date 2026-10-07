@@ -71,7 +71,8 @@
   "counterfactual_collapse": {
     "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
     "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
-    "collapse_result": "does-not-collapse"
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
   },
   "differentiating_consequences": [
     "新增可证伪预测：在线估计器在算子可识别的目标总体上优于离线标定"
