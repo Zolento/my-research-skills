@@ -1,7 +1,8 @@
 # 示例：A005 — 叙事（claim-first 流程）
 
 > 本例演示 R12 的完整产物。顺序固定：D0 证据台账 → D1 claim graph → D2 `(O, T, R)` →
-> D3 anchor eligibility → D4 候选 claim hierarchy 与六槽位 → D5 攻击面审核 →
+> D3 anchor eligibility → D4a 候选 claim hierarchy 与六槽位 → freeze →
+> D4b 表达实现 → D4c 等价审核 → D4d 盲恢复 → D5 攻击面审核 →
 > D6 venue calibration → D7 硬门禁 → D8 六维排序 → D9 输出。
 > **证据在 claim 之前，claim 在叙事之前。** 文档骨架见
 > [project-layout.md](../references/project-layout.md) §2.4。
@@ -9,6 +10,12 @@
 > [phase-r12-narrative.md](../references/phase-r12-narrative.md)、
 > [narrative-patterns.md](../references/narrative-patterns.md)、
 > [scoring-policy.md](../references/scoring-policy.md)。
+
+本例保留 scientific hierarchy 的原有展示。
+独立表达层见 [source-bound example](narrative-realization/README.md)。
+该例可生成四套表达。每套都检查实际正文。
+未运行真实多模型 probe 时，恢复结果标 INCOMPLETE。
+不能从本例科学评分推断“最佳 rhetorical wording”。
 
 ---
 

@@ -58,6 +58,8 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
    `failures[]` 里（spec §4）。从叙事里删掉失败、只在 state 里留成功分支 = 违规。
 4. **叙事是视图。** R12 的叙事由 state 生成，**不得**在叙事里出现 state 没有的 claim / evidence；
    叙事暴露的新缺口**必须**回到 `uncertainties[]`。
+   D4b–D4d 的 rhetorical snapshot 内不行使新增 uncertainty 权限。发现 gap 后退出快照，
+   再由 R1/R8/R10 处理并重新冻结，见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md)。
 5. **state 不得写成散文。** 每个对象**必须**落 §3 的字段与 ID 引用；自然语言只允许出现在
    `statement` / `scope` / `interpretation` / `why` 这类字符串字段里，**不得**用一段文字代替 ID 引用。
 6. **收工条件含校验。** 任何写回 state 的阶段，收工前**必须**跑 `state_check.py`；硬违规未清零，

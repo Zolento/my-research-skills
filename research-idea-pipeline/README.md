@@ -178,8 +178,8 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 
 ### R12：claim-first 叙事（本 Skill 的差异化能力）
 
-同一 idea 在不同叙事下，审稿人的接收意愿差异显著。但**叙事层不得凌驾于证据之上**，
-所以 R12 的哲学是 **claim-first, evidence-constrained, narrative-last**：
+同一 State 的 claim、证据和边界可能因表达顺序被误读。**叙事层不得凌驾于证据之上**，
+R12 的哲学是 **claim-first, evidence-constrained, narrative-last**：
 
 > 找到**在现有证据下最强但不过度**的科学主张，再找最短的故事让审稿人正确理解它。
 > `Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensibility`
@@ -189,11 +189,15 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 1. **D0 证据台账** → **D1 Claim Graph**（`C0—C5`；每个 `Ci` 必须 `Ci ← Ej` 或标 `[待补]`）；
    **D2 科学分类** `(O, T, R)`；**D3 Anchor Eligibility** —— 作者的目标 anchor 是**先验偏好**，
    不是决定；与证据冲突时**必须显式告知**。
-2. **D4 叙事实现**：从[十套叙事 preset](references/narrative-patterns.md) 生成
+2. **D4a 科学叙事实现**：从[十套叙事 preset](references/narrative-patterns.md) 生成
    **2—4 套真正不同的 claim hierarchy**（**不是**同一主张的四种措辞），每套填满
    **六槽位 `S1—S6`**。跨域类必须做 **anti-application stress test**，迁移合法性按
    **`L1/L2/L3`** 分级 —— **不再要求人人都有 theorem**。
-3. **R7 攻击面审核**：六个**攻击面审稿人**（R-Novelty / R-Causal / R-Experimental /
+   然后逐套 freeze，进入 **D4b 等价表达 → D4c 正文等价门禁 → D4d 盲恢复与配对敏感性**。
+   四个固定 profile 仅改变 evidence framing / contribution stance。
+   完整说明见 [equivalence policy](references/rhetoric-equivalence-policy.md) 和
+   [runnable example](examples/narrative-realization/README.md)。
+3. **D5 攻击面审核**：六个**攻击面审稿人**（R-Novelty / R-Causal / R-Experimental /
    R-Theory / R-Generalization / R-Utility）**全部派遣、不得裁减**；**S-Lit 恒派**
    （L3 穷尽 + 负检索记录）；**S-Devil 不打分**（只出致命弱点清单 + 最简解释反例）。
 4. **R12 / R13 的 venue calibration**（按 contribution type 校准会议适配，**不是** venue 直接选 preset）
@@ -202,6 +206,10 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
    Generality / Narrative compression）→ **D9 输出**（含**缺失证据清单与最小必要实验 / 定理**）。
 5. **叙事包装 = 重新定位，不是夸大**：只改参照系，不改事实；每句声称都要能在
    方案里找到证据（`Ci ← Ej`）。
+
+表达层优化 claim/evidence/实际 prior delta/boundary 的恢复准确率，不优化 reviewer overall score。
+每套表达都冻结科学语义并保留相同前部 limitation 面板。恢复失败不推荐，缺数据标 INCOMPLETE。
+轻微等价措辞引发大幅恢复变化时标 RHETORICALLY_FRAGILE，原 G1–G5 和六维比较仍有效。
 
 ---
 

@@ -25,6 +25,8 @@
     6. 文档里引用的每个 `scripts/*.py` 都真实存在
     7. `structural_equivalence_check.py --selftest` + audit 模板 + 七份 fixture
        —— Structural Equivalence 的 `EQ1`—`EQ13` + `NN1`—`NN14`（只查审计完整性，不宣判 novelty）
+    8. Rhetorical Realization 来源冻结 + 四个实际正文的 RE1–RE5 审计
+       —— 文本攻击注入测试必须能把发布闸门判红
 
 退出码
 ------
@@ -35,6 +37,7 @@
 from __future__ import annotations
 
 import pathlib
+import json
 import re
 import subprocess
 import sys
@@ -190,6 +193,27 @@ def step_structural_equivalence() -> Tuple[bool, str]:
     return True, f"自检 + {len(targets)} 份 artifact 全绿"
 
 
+def step_rhetorical_realization() -> Tuple[bool, str]:
+    """Run real source projection and recheck every emitted narrative, not metadata alone."""
+    import validate_rhetorical_variant as rv
+    source = ROOT / "examples" / "narrative-realization" / "source-state.json"
+    manifest = ROOT / "examples" / "narrative-realization" / "manifest.json"
+    code, out = _run(["scripts/rhetorical_realization.py", "generate", "--state", str(source),
+                      "--manifest", str(manifest)])
+    if code != 0:
+        return False, f"generation exit={code} {out.strip()[-120:]}"
+    batch = json.loads(out)
+    variants = batch["variants"]
+    if len(variants) != len(rv.registry()["profiles"]) or {v["profile"] for v in variants} != set(rv.registry()["profiles"]):
+        return False, "pre-registered profile coverage differs"
+    state = json.loads(source.read_text(encoding="utf-8"))
+    for variant in variants:
+        gate = rv.validate(state, batch["snapshot"], variant)
+        if gate["status"] != "PASS":
+            return False, f"{variant['variant_id']}: {gate['errors']}"
+    return True, f"冻结来源 + {len(variants)} 份实际正文全通过 RE 门禁"
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),
     ("state_check --selftest", step_selftest),
@@ -198,6 +222,7 @@ STEPS = (
     ("三方读写表逐格比对", step_readwrite_parity),
     ("文档引用的脚本存在", step_referenced_scripts_exist),
     ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
+    ("Rhetorical Realization（RE1–RE5）来源与正文", step_rhetorical_realization),
 )
 
 

@@ -550,3 +550,8 @@ R7 / R10 / R13 的 S-Devil 仍按 §3 给出反向的新颖性反驳分（公式
 > ≥6** → [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3—R6 交付物与落盘；**最接近先前工作 ≥5 篇**
 > （**仅 R12 的 D5**；其余阶段为 3—5 篇，见 §3 S-Lit）→
 > [phase-r12-narrative.md](phase-r12-narrative.md) §D5。
+
+D4 的篇幅/候选数约束作用于 D4a scientific hierarchy，不按 rhetorical profile 重复计算。
+D4d 的 blind judge 是另一个 comprehension probe：使用 fresh context、固定多模型面板，
+只读正文与六个恢复问题，不读 State/truth/D5 意见。不裁减或替代 D5 的攻击面角色。
+协议见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md) §3。

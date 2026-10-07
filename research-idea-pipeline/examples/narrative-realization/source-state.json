@@ -1,0 +1,32 @@
+{
+  "_schema": "research-idea-pipeline/research-state@1",
+  "state_version": 1,
+  "contract": {"goal": "Study a bounded parameter change", "primary_anchor": "performance", "out_of_scope": ["Dataset-B and deployment are untested"]},
+  "claims": [
+    {"id": "C0", "statement": "On Dataset-A under protocol Y, changing parameter X is associated with a mean PSNR improvement of 0.8 dB relative to P.", "parent": null, "subclaims": ["C4"], "status": "supported", "supporting_evidence": ["E1"], "refuting_evidence": [], "nearest_alternative": "The difference may reflect regularization rather than a causal mechanism.", "falsifier": "Matched-budget replication shows no improvement.", "scope": "Dataset-A, protocol Y, matched budget, five seeds only", "known_flaws": ["F1"], "depends_on": ["E1"], "validity": {"status": "valid", "reason": "Observed bounded comparison", "since_state_version": 1}},
+    {"id": "C4", "statement": "We study changing X relative to P's fixed X; this is an engineering modification, without a priority claim.", "parent": "C0", "subclaims": [], "status": "partially-supported", "supporting_evidence": ["E2"], "refuting_evidence": [], "nearest_alternative": "P may already admit the same engineering change.", "falsifier": "P already uses the same change in the same setting.", "scope": "Difference from P within Dataset-A and protocol Y", "known_flaws": [], "depends_on": ["E2"], "validity": {"status": "valid", "reason": "Prior-work comparison recorded", "since_state_version": 1}}
+  ],
+  "evidence": [
+    {"id": "E1", "kind": "experiment", "supports": ["C0"], "contradicts": [], "strength": "strong", "scope": "Dataset-A, protocol Y", "epistemic_status": "Observed", "source_ref": "X1; matched-budget comparison", "verification_tier": "T2", "depends_on": ["X1"], "validity": {"status": "valid", "reason": "Original result retained", "since_state_version": 1}},
+    {"id": "E2", "kind": "literature", "supports": ["C4"], "contradicts": [], "strength": "partial", "scope": "P's fixed-X setting", "epistemic_status": "Supported", "source_ref": "Prior work P uses fixed X. Our work changes X. E1 supports the bounded empirical difference; no new scientific mechanism or firstness is established.", "verification_tier": "T1", "depends_on": ["LIT1"], "validity": {"status": "valid", "reason": "Closest prior-work difference verified in this illustrative fixture", "since_state_version": 1}}
+  ],
+  "assumptions": [
+    {"id": "AS1", "statement": "Train/test split and budget are matched to P.", "status": "explicit", "challenged_by": [], "if_false": "The comparison cannot support the stated effect.", "depends_on": [], "validity": {"status": "valid", "reason": "Fixed evaluation assumption", "since_state_version": 1}}
+  ],
+  "hypotheses": [],
+  "experiments": [
+    {"id": "X1", "parent": null, "stage": "X1", "claim_targeted": ["C0"], "alternative_targeted": [], "code_commit": "illustrative-fixture", "data_split": "Dataset-A protocol Y; fixed train/test split; matched budget", "seed": 0, "metric": "mean PSNR (dB) over five seeds", "result": "P: 30.0 dB; ours: 30.8 dB; mean difference: 0.8 dB. No significance test or confidence interval was obtained.", "interpretation": "Observational association in this setting only; not a causal mechanism or evidence of universal robustness.", "unexpected": [], "known_flaws": ["F1"], "next_branches": [], "status": "done", "preregistration": {"frozen_at_state_version": 0, "outcomes": [{"id": "O1", "observation": "Mean difference above zero", "update": [{"target": "C0", "op": "strengthen"}]}]}, "result_at_state_version": 1, "depends_on": [], "validity": {"status": "valid", "reason": "Result recorded", "since_state_version": 1}}
+  ],
+  "literature": [
+    {"id": "LIT1", "ref": "P, closest fixed-X work (illustrative example)", "relation": "shares-assumption", "depends_on": [], "validity": {"status": "valid", "reason": "Prior-work identity frozen", "since_state_version": 1}}
+  ],
+  "failures": [
+    {"id": "F1", "kind": "inconclusive", "what": "Single dataset; statistical significance and cross-setting robustness are untested.", "why": "No significance test or external replication", "referenced_by": ["C0", "X1"], "depends_on": [], "validity": {"status": "valid", "reason": "Known limitation retained", "since_state_version": 1}}
+  ],
+  "uncertainties": [
+    {"id": "U1", "question": "Does the effect survive replication on another dataset?", "importance": "high", "uncertainty": "high", "cheapest_discriminating_test": "TBD", "status": "open", "depends_on": [], "validity": {"status": "valid", "reason": "External validity unknown", "since_state_version": 1}}
+  ],
+  "assurance": [],
+  "repairs": [],
+  "narrative_view": {"presets_selected": [], "rendered_claims": [], "failed_experiments_kept": ["F1"], "note": "Illustrative frozen-source example; no real experiment is claimed"}
+}

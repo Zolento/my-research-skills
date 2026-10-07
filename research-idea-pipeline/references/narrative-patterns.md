@@ -4,7 +4,7 @@
 > 库**：`N1—N10` 是 **preset**，不是套路等级，更不是创新等级。
 
 > **记法警告（两条，先读）：**
-> 1. **`N1—N10` = narrative presets / rhetorical realizations**，即「同一份科学内容可以
+> 1. **`N1—N10` = scientific narrative presets**，即「同一份科学内容可以
 >    怎么讲」。它们**不是科学分类**、**互不排斥**、**不是创新等级**。
 >    一个 idea 可以同时满足多个 preset；preset 编号高低不代表工作强弱。
 >    真正的科学分类是 `(O, T, R)` 三轴（见 [claim-first-policy.md](claim-first-policy.md) §5）。
@@ -41,8 +41,10 @@
 
 ### 1.1 N1—N10 的读法
 
-- **它们是修辞实现，不是分类法。** 同一份 claim graph 可以用多套 preset 讲；
+- **它们是科学叙事 preset，不是分类法。** 同一份 claim graph 可以用多套 preset 讲；
   同一套 preset 也能承载不同的 claim hierarchy。
+  preset 选择属于 D4a Scientific Narrative Search；冻结后 D4b 的 rhetorical profiles
+  是另一层，不能在同一快照内切换 preset 或科学 framing。
 - **不互斥。** 一套叙事常同时命中 2—3 个 preset（例如 N2 + N6，或 N4 + N9）。
   主叙事只选**一个**作为主线，其余作为辅助表述。
 - **不是创新等级。** 选 N1 不代表比 N10 更创新；preset 不参与任何评分。
@@ -302,6 +304,11 @@
 ## 6. 叙事包装：重新定位，不是夸大
 
 **叙事包装 = 在不改变任何事实的前提下，改变读者理解该工作的参照系。**
+
+本节的重新定位先由 D4a 审核其科学含义已有 State 支持。冻结后，只允许
+[rhetorical-operators.md](rhetorical-operators.md) 的 evidence framing / contribution stance，
+不能在同一快照内改 contribution type、claim hierarchy、scope 或 interpretation。
+等价闸门与盲恢复见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md)。
 
 | 允许（重新定位） | 禁止（夸大） |
 |---|---|

@@ -20,7 +20,7 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 > 必须**回到 R12 复核叙事是否仍成立** —— 结论变了，叙事可能不再成立
 > （此时必须按新结果重写 claim graph 与六槽位，不得沿用旧叙事）。
 
-> **记法（两条）：** ① `N1—N10` = **narrative presets / rhetorical realizations**，
+> **记法（两条）：** ① `N1—N10` = **scientific narrative presets**，
 > 不是科学分类、不互斥、不是创新等级（见
 > [narrative-patterns.md](narrative-patterns.md) §1）；
 > ② 下文与 [narrative-patterns.md](narrative-patterns.md) 中的
@@ -46,7 +46,9 @@ Narrative quality = Claim strength × Evidence alignment × Reviewer comprehensi
 **一句话：B 决定「做不做」，C 决定「做什么」，D 决定「最强能声称什么、怎么讲」，E 决定「做得对不对」。**
 
 **流程权威链：** `D0 Evidence Ledger → D1 Claim Graph → D2 Scientific Typing →
-D3 Anchor Eligibility → D4 Narrative Realization → D5 Adversarial Review →
+D3 Anchor Eligibility → D4a Claim-Hierarchy Realization → freeze →
+D4b Rhetorical Realization → D4c Semantic-Equivalence Audit →
+D4d Blind Claim-Recovery Probe → D5 Adversarial Review →
 D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 **证据在 claim 之前，claim 在叙事之前** —— 任何一步不得跳序。
 本阶段的 claim 层枚举与判据**以 [claim-first-policy.md](claim-first-policy.md) §1—§6 为
@@ -91,6 +93,10 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 | **D2** | Scientific Typing | claim graph | `(O, T, R)` + 贡献类型 | 枚举逐字取自 [claim-first-policy.md](claim-first-policy.md) §5 |
 | **D3** | Anchor Eligibility | claim graph + typing | 每个 anchor 的 `eligible/conditional/not-eligible` | 与作者目标 anchor 冲突时**必须显式告知** |
 | **D4** | Narrative Realization | eligible anchors + claim graph | **2—4 套真正不同的 claim hierarchy** + 每套六槽位 | 必须是**不同的 claim 层级**，**不得**是同一 claim 的四种措辞 |
+| **D4a** | Claim-Hierarchy Realization | D0–D3 | 原 D4 的 scientific narrative search + 每套冻结快照 | 只组织 State 已有 claims；冻结后不得改科学语义 |
+| **D4b** | Rhetorical Realization | 单套 frozen snapshot | 四个固定 rhetorical profiles | 仅 evidence framing / contribution stance；一次批量生成 |
+| **D4c** | Semantic-Equivalence Audit | 每个 variant + snapshot + State | RE1–RE5 PASS/FAIL | 不等价即 FAIL；不修补 State；不靠分数抵消 |
+| **D4d** | Blind Claim-Recovery Probe | 已过 RE 的正文 | 四维恢复 + paired sensitivity diagnostic | 盲 judge 不读 truth；完整固定面板；不优化 overall score |
 | **D5** | Adversarial Review | 每套叙事 | 6 攻击面审稿人独立意见 + S-Devil 弱点 + S-Lit 核验 | 六人全部派遣；S-Lit 恒派 |
 | **D6** | Venue Calibration | 评审结果 | 会议适配判定（CVPR/ICML/NeurIPS/MICCAI） | 按 contribution type 校准，不按 venue 选 preset |
 | **D7** | Hard Gates | 每套叙事 | `G1—G5` 逐项 `pass/fail` | 任一 `fail` ⇒ `not_submission_ready` |
@@ -131,7 +137,7 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 | `Planned` | 计划中、尚未产生的证据 | ❌（标注 `[待补]`） |
 | `Unknown` | 未知 | ❌（标注 `[待补]`） |
 
-**产物：** 证据台账（`state.json` 的 `evidence_ledger`）。
+**产物：** 证据台账对应 State 的 `evidence[]`；展开表保存在叙事文档。
 
 **硬约束：**
 
@@ -162,7 +168,7 @@ D6 Venue Calibration → D7 Hard Gates → D8 Ranking → D9 Output`。
 
 **证据引用语法（逐字，不得改写）：** `C2 ← E3, E4`；无对应证据写 `C2 ← [待补]`。
 
-**产物：** claim graph（`state.json` 的 `claim_graph`）。
+**产物：** claim graph 对应 State 的 `claims[]`；本阶段的展开视图保存在叙事文档。
 
 **硬约束：**
 
@@ -244,7 +250,7 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 > `跨域` 与 `临床 / Use-inspired`）；它们**不是** `O` 的枚举值
 > （[claim-first-policy.md](claim-first-policy.md) §5 规则 4）。
 
-**产物：** `state.json` 的 `typing`（含 `O` / `T` / `R` / `contribution_type` /
+**产物：** 叙事文档的 typing（含 `O` / `T` / `R` / `contribution_type` /
 `central_proposition`）。
 
 **硬约束：** 三轴枚举**逐字**取自 [claim-first-policy.md](claim-first-policy.md) §5；
@@ -277,7 +283,7 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 
 **不得**帮作者强化不被证据支持的故事。
 
-**产物：** `state.json` 的 `anchor_eligibility`（每个 anchor 一条：值 + 理由，
+**产物：** 叙事文档的 anchor eligibility（每个 anchor 一条：值 + 理由，
 `conditional` 另附 `missing_evidence`）。
 
 **硬约束：** `not-eligible` 的 anchor **不得**用于 D4 的 preset 选择与叙事组织；
@@ -286,6 +292,13 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 ---
 
 ## D4. Narrative Realization
+
+本节原有动作和 D4.1–D4.5 属于 **D4a Scientific Narrative Search**。
+2–4 套 hierarchy 的要求不变；每套另有 D4b 的四个表达变体，两种候选不能混计。
+D4a 选择 central claim、claim hierarchy、scientific framing、preset、贡献顺序和
+evidence mapping；它只组织 State 已有知识。D4.1 的 C0/K/scope 差异必须对应
+不同的既有 claim，不得改同一 State 条目来制造候选。
+独立的 **Rhetorical Realization Search** 见下方 D4b–D4d。
 
 **输入：** `eligible` / `conditional` 的 anchor + claim graph + typing。
 
@@ -297,7 +310,7 @@ C5 ← [待补]     后果需要最小必要实验（见 D9）
 3. 每套按 [narrative-patterns.md](narrative-patterns.md) §3 写满六槽位 `S1—S6`。
 4. 每套附「包装前后对照」（§D4.4）。
 
-**产物：** `state.json` 的 `presets` 与 `slots`。
+**产物：** 叙事文档的 presets 与 slots；State 只落 D9.5 的 view 描述符。
 
 **硬约束：**
 
@@ -379,6 +392,10 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 
 **允许（重新定位）：**
 
+下表是 **D4a 的科学 framing 候选**，不是同一句话可自由改写的等价关系。
+新句涉及的失效条件、结构对应、统一关系或贡献类型必须已经由 State 支持。
+冻结后不得用该表切换 contribution type、因果强度、范围或 central claim。
+
 | 原始表述 | 重新定位后 | 改变了什么 |
 |---|---|---|
 | 我们提出了新模块 B | 现有方法依赖假设 X，我们**移除了 X** | 参照系：新增能力 → 解除限制 |
@@ -413,11 +430,72 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 > preset 编号与名称**必须**取自 [narrative-patterns.md](narrative-patterns.md) §1
 > 的十套表，不得自行改号或改名。**同时命中多个 preset 时，主叙事只写一个。**
 
+### D4a. Claim-Hierarchy Realization 与冻结
+
+完成上面的 2–4 套 hierarchy、六槽位和 stress test 后，逐套建立来源绑定的 manifest。
+scientific audit 检查 14 项语义来源、closest prior delta、因果/统计解释及全部边界。
+不因 rhetorical feedback 再挑更大的 claim 或改变 evidence interpretation。
+manifest 的形状与例子见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md) §1
+和 [../examples/narrative-realization/manifest.json](../examples/narrative-realization/manifest.json)。
+
+冻结 snapshot 同时锁定 State 除 narrative_view 外的全部内容、State version、hierarchy、
+preset、anchor、contribution_order、evidence_mapping、S1–S6 和 14 项语义。
+发现新 scientific gap 时先记 narrative_gap，退出此快照，交 R1/R8/R10 再重新冻结。
+不得为让表达通过而向 State 增加 claim/evidence 或修改 uncertainty。
+
+### D4b. Rhetorical Realization
+
+先读 [rhetorical-operators.md](rhetorical-operators.md)，只使用登记的两个算子族：
+evidence_framing、contribution_stance。每套 snapshot 固定一轮四 profile：neutral、
+evidence-forward、contribution-forward、slightly-conservative。生成器是
+[../scripts/rhetorical_realization.py](../scripts/rhetorical_realization.py) 的 generate 命令。
+
+可前置已有比较/效果/interpretation、明确 actual contribution 与 prior delta；
+不能改 metric、数值、aggregation、统计状态、conditions、certainty、causality、scope 或 novelty。
+固定前部 boundary 面板，所有 profile 保留全部 assumptions/uncertainties/failures。
+slightly-conservative 仅提醒原边界，不削弱或强化原 claim。
+MVP 保留来源原句，通过标签和顺序搜索；不把自由 paraphrase 自动认定等价。
+
+### D4c. Semantic-Equivalence Audit
+
+**Rhetorical search 只能在 semantic equivalence class 内进行。**
+每个 variant（含 neutral 和 perturbations）都运行
+[../scripts/validate_rhetorical_variant.py](../scripts/validate_rhetorical_variant.py)：
+RE1 来源冻结、RE2 语义冻结、RE3 白名单/预算、RE4 正文等价、RE5 boundary visibility。
+任何 FAIL 都隔离该 variant；缺字段也 FAIL。正文比较是受限 renderer 的逐字审计，
+不能仅检查 generator 自报 metadata。RE PASS 不替代原 G1–G5，也不证明 State 本身正确。
+
+### D4d. Blind Claim-Recovery Probe 与 sensitivity
+
+先持久化 evaluation_plan（至少两个不同 model ID，固定四 profile、一轮、阈值）。
+独立 fresh judge context 只收到 probe-task 导出的正文和六问题；不给 snapshot、State、
+profile、作者理由或其它 judge 的输出。该命令先执行 D4c，再导出盲 payload。
+问题恢复 central_claim、main_contribution、closest_prior_work_delta、key_evidence、main_boundary、
+unsupported_or_overstated_claims。adjudicator 再对冻结 truth 作 PASS/PARTIAL/FAIL 比较。
+
+realization 选择的顺序：semantic PASS → 零 unsupported/错误解释 → 最差 Claim Recovery →
+最差 Evidence Recovery → 最差 Novelty-Delta Recovery → 最差 Boundary Recovery →
+低配对 fragility → 预登记 tie 顺序。不能通过隐藏 limitation 获益。
+任一模型的任一恢复维度 FAIL 的 variant 不推荐；全部失败则 NO_ELIGIBLE_VARIANT。
+不读 overall score；D8 的六维仍比较 scientific hierarchy，不被该排序替换。
+
+sensitivity 在相同 snapshot/profile/judge 面板上计算 paired range、variance、disagreement。
+恢复从 FAIL 到 PASS 的大幅变化、错误 novelty/central interpretation 或可选 scientific judgment
+类别变化标 RHETORICALLY_FRAGILE。缺失/重复/错 snapshot 数据标 INCOMPLETE，不判稳定。
+同一模型不同角色不能代替多模型；LLM 结果是 T0，不声称真人 reviewer consensus。
+操作模板见 [../templates/narrative-realization.md](../templates/narrative-realization.md)。
+真实模型不可用时保留已有科学 hierarchy，声明 probe INCOMPLETE，不推荐“最佳 rhetorical wording”。
+
+**Anti-reward-hacking：** Strength visibility optimization, not weakness laundering.
+禁止追 overall score、弱化 limitation、夸大 novelty/scope、堆积极形容词、单模型定向优化或
+无界 recursive reviewer hill-climbing。盲评发现科学问题只作为 gap 交 Assurance，不自动改 State。
+
 ---
 
 ## D5. Adversarial Review
 
-**输入：** D4 产出的每一套叙事（含 claim hierarchy 与六槽位）。
+**输入：** D4 产出的每一套叙事（含 claim hierarchy 与六槽位）。D4b 的 realization
+必须经过 D4c；D4d 的恢复结果和 fragility 单列，不能替代本阶段科学审核。
 
 **动作：** 把每套叙事提交给**六个攻击面审稿人**独立审查 ——
 **六人全部派遣，不得裁减**；**`S-Lit` 恒派**；**`S-Devil` 必派但不打分**（它只出弱点与反例）；
@@ -595,7 +673,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - 门禁失败**不得**用高分抵消，**不得**走「带条件的推荐」出口
   （该出口只适用于 R7 / R10 / R13 的维度否决，见 [scoring-policy.md](scoring-policy.md) §5.1）。
 
-**产物：** `state.json` 的 `gates`。
+**产物：** 叙事文档的 gates 表；不新增 State 顶层字段。
 
 | idea | preset | G1 | G2 | G3 | G4 | G5 | 结论 |
 |---|---|---|---|---|---|---|---|
@@ -607,6 +685,9 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 ## D8. Ranking
 
 **输入：** **通过门禁**的叙事（门禁失败者不参与排序）。
+
+本节只比较 D4a 的科学 hierarchy。D4d 只在同一冻结 hierarchy 内选择表达，
+不改变本节六维，也不让“好理解”替证据不足的主张通过 G1–G5。
 
 **动作：** 对每套通过门禁的叙事，按**六维**给 `1—5`，并写**逐维理由**。
 六维的定义与标尺以 [scoring-policy.md](scoring-policy.md) §4 为唯一权威；
@@ -636,7 +717,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 - **不得只看 `Originality`。** 六维必须全部给出；缺失维度视为排序无效。
 - **门禁失败（`not_submission_ready`）的候选不进排序**（§D7）。
 
-**产物：** `state.json` 的 `ranking`。
+**产物：** 叙事文档的 ranking；不新增 State 顶层字段。
 
 **反模式（出现即视为违规）：**
 
@@ -666,6 +747,10 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 6. **最小必要实验 / 定理** —— 把缺失证据转成可执行的最小补齐方案：
    做哪个实验 / 证哪个命题、用什么数据与基线、判定成功的标准是什么。
    **必须给出「还差什么证据」，不得只给结论。**
+
+以上六项不变。每套 scientific hierarchy 另附 realization snapshot ID、RE 结果、
+四维恢复、固定 judge 面板、sensitivity、失败变体与 rejected reasons。
+RHETORICALLY_FRAGILE 和 INCOMPLETE 必须随推荐保留，不用高 overall score 覆盖。
 
 ### D9.2 推荐汇总表与最终建议
 
@@ -730,6 +815,7 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 | 叙事**视图描述符**（选了哪些 preset、渲染了哪些 claim、保留了哪些失败实验） | state 的 `narrative_view` | **state** |
 | 攻击面审稿人的五元组 | `assurance[]`（R7 写）／`reviews[]`（R13 写） | **state** |
 | 叙事暴露的新缺口 | `uncertainties[]`（`status: open`） | **state** |
+| 冻结快照、manifest、variants、plan、blind responses、recovery、sensitivity | `routes/<R>/narrative-realization/<doc-id>/` | 叙事文档的配套 **artifact**；不新增 State 顶层字段 |
 
 **`narrative_view` 四键（逐字，取自模板）：**
 
@@ -796,6 +882,10 @@ S6 Consequence & Boundary：改变了……；在……条件下不成立
 
 5. **判据（Carrier Completeness）：** 任何规则要求「产出 / 记录 / 持久化 X」，
    就必须同时存在 **`Producer(X)` + `Carrier(X)` + `Consumer(X)`**；三者缺一即为缺陷。
+
+6. **冻结后的 D4b–D4d 只允许更新既有 narrative_view 描述符。**
+   旧 R12 的新增 uncertainty 权限只适用于退出快照后的 gap 处理；冻结期间不行使。
+   描述符仍四键，note 可引用 `<doc-id>/snapshot/variant`，原始正文与评测不塞进 State。
 
 ## 定位补充：Narrative 是 Research State 的视图
 
