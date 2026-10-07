@@ -1,0 +1,75 @@
+{
+  "schema": "blueprint-audit@1",
+  "blueprint_digest": "1f9e4b3301468c9b08a0cc34a6467a4650d17581db50bb39ee1e853c77f7f9f5",
+  "material_digest": "3c5097125fc6bf627bcb90a3797e1afae03652ce7d7b9cc8881ad3c4a293ba1d",
+  "paragraph_checks": [
+    {
+      "paragraph_id": "P1",
+      "status": "PASS",
+      "rationale": "Source-bound protocol fixture sketch."
+    },
+    {
+      "paragraph_id": "P2",
+      "status": "PASS",
+      "rationale": "Source-bound protocol fixture sketch."
+    },
+    {
+      "paragraph_id": "P3",
+      "status": "PASS",
+      "rationale": "Source-bound protocol fixture sketch."
+    },
+    {
+      "paragraph_id": "P4",
+      "status": "PASS",
+      "rationale": "Source-bound protocol fixture sketch."
+    },
+    {
+      "paragraph_id": "P5",
+      "status": "PASS",
+      "rationale": "Source-bound protocol fixture sketch."
+    }
+  ],
+  "outline_checks": {
+    "central_thesis_visible": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "sections_serve_thesis": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "central_claim_evidence": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "experiment_purpose": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "theory_experiment_connection": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "conclusion_entailment": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "no_unsupported_leap": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "no_duplicated_role": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "contribution_visible": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    },
+    "boundary_proportionate": {
+      "status": "PASS",
+      "rationale": "Checked this bounded fixture plan."
+    }
+  },
+  "alignment_checks": []
+}

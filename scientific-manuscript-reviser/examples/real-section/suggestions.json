@@ -1,0 +1,133 @@
+{
+  "schema": "manuscript-suggestions@1",
+  "manuscript_digest": "acec9f8d82547ad36252f93cc364c0d7de503521818179210c1a7727b7be0b9a",
+  "mode": "suggest",
+  "coherence_digest": "5148f1e7202636264bb41a1c15f14aedecceb7304c3ff19a788880ca7a03ca46",
+  "short_diagnosis": "The study purpose and real general-inference boundary are clear. The expected benefit is untested in this excerpt and needs full-paper context. One small language choice is useful.",
+  "reviewed_categories": [
+    "scientific_logic",
+    "theory",
+    "experimental_design",
+    "conclusion_validity",
+    "narrative",
+    "paragraph",
+    "claims",
+    "language",
+    "references",
+    "defensive"
+  ],
+  "suggestions": [
+    {
+      "id": "S2",
+      "category": "scientific_logic",
+      "severity": "major",
+      "confidence": "low",
+      "location": {
+        "start": 232,
+        "end": 387
+      },
+      "original_span": "We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data.",
+      "diagnosis": "The graph has no local experiment testing the expected benefit. This is a context-limited structural candidate, not a demonstrated flaw in the full article.",
+      "why_it_matters": "The stated expectation must remain an expectation unless actual supporting results are located.",
+      "scientific_risk": "high",
+      "recommended_action": "Inspect the full manuscript before changing any scientific assertion.",
+      "alternatives": [
+        {
+          "id": "A",
+          "option": "Keep the expectation explicit and add a locator to existing supporting analysis only if found in the full manuscript.",
+          "tradeoff": "Requires context inspection and may leave the expectation untested.",
+          "direction": "inspect_existing_context",
+          "requires": "requires_text_change_only"
+        },
+        {
+          "id": "B",
+          "option": "If establishing benefit is a central research goal and evidence is absent, design a separate evaluation of that benefit.",
+          "tradeoff": "Requires new research rather than an editorial change.",
+          "direction": "evaluate_benefit",
+          "requires": "requires_new_experiment"
+        }
+      ],
+      "rule_refs": [
+        "C1"
+      ],
+      "apply_by_default": false,
+      "source_finding_ids": [
+        "D-UNTESTED_HYPOTHESIS-H"
+      ]
+    },
+    {
+      "id": "S1",
+      "category": "language",
+      "severity": "minor",
+      "confidence": "high",
+      "location": {
+        "start": 388,
+        "end": 499
+      },
+      "original_span": "Note that based on the selection of 11 papers we cannot make inferences on papers in general or in the journal.",
+      "diagnosis": "An empty meta-discourse lead-in precedes a necessary scientific boundary.",
+      "why_it_matters": "State the boundary directly without weakening or removing it.",
+      "scientific_risk": "low",
+      "recommended_action": "Delete only Note that and capitalize Based.",
+      "alternatives": [
+        {
+          "id": "A",
+          "option": "Remove the lead-in and retain the complete boundary sentence.",
+          "tradeoff": "More direct prose with less authorial meta-discourse.",
+          "direction": "remove_meta"
+        },
+        {
+          "id": "B",
+          "option": "Keep the original sentence.",
+          "tradeoff": "Preserves author wording but retains the empty lead-in.",
+          "direction": "keep_voice"
+        }
+      ],
+      "rule_refs": [
+        "L1",
+        "L4",
+        "H3"
+      ],
+      "apply_by_default": false,
+      "source_finding_ids": []
+    }
+  ],
+  "keep_as_is": [
+    {
+      "location": {
+        "start": 501,
+        "end": 578
+      },
+      "original_span": "We can, however, learn from the obstacles we encountered in the given papers.",
+      "rationale": "Direct, naturally asymmetric statement of what can be learned."
+    }
+  ],
+  "quality_audit": {
+    "manuscript_digest": "acec9f8d82547ad36252f93cc364c0d7de503521818179210c1a7727b7be0b9a",
+    "bank_digest": "3111c51cd17a0d4f746ffe1882f3658c3563f403c57d9d8f18ff7ff1ab08321d",
+    "findings": [
+      {
+        "suggestion_id": "S2",
+        "checks": {
+          "actionable": "PASS",
+          "distinct_alternatives": "PASS",
+          "not_synonym_only": "PASS",
+          "not_quota_driven": "PASS",
+          "calibrated_claim": "PASS",
+          "preserves_voice": "PASS"
+        }
+      },
+      {
+        "suggestion_id": "S1",
+        "checks": {
+          "actionable": "PASS",
+          "distinct_alternatives": "PASS",
+          "not_synonym_only": "PASS",
+          "not_quota_driven": "PASS",
+          "calibrated_claim": "PASS",
+          "preserves_voice": "PASS"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+profile_status: unknown_without_samples
+sample_digests: []
+sentence_length: unknown
+sentence_length_variance: unknown
+paragraph_density: unknown
+claim_directness: unknown
+hedging_level: unknown
+preferred_transitions: []
+citation_placement: unknown
+figure_reference_style: unknown
+verb_preferences: []
+nominalization_level: unknown
+lexical_formality: unknown
+first_person_usage: unknown
+passive_voice_usage: unknown
+paragraph_opening_patterns: []
+sentence_closing_patterns: []
+punctuation_rules:
+  prose_semicolon: forbidden
+  prose_colon: forbidden
+  prose_em_dash: forbidden
+  prose_en_dash: forbidden_unless_technical_range
+forbidden_patterns: []
+preferred_patterns: []
+explicit_user_rules: []

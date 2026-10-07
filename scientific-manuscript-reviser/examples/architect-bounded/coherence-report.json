@@ -1,0 +1,254 @@
+{
+  "schema": "scientific-coherence-audit@1",
+  "manuscript_digest": "82b90425ade20912171a7aeb326194f12e5dabb6e83a5f07e14c1ea645860a47",
+  "graph_digest": "61c5f8abe3e04712029a1d02157c60416e2d44807916002eb214787e24f430fc",
+  "passes": {
+    "claim_evidence": {
+      "status": "COMPLETE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    },
+    "theory": {
+      "status": "NOT_APPLICABLE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    },
+    "experiments": {
+      "status": "COMPLETE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    },
+    "entailment": {
+      "status": "COMPLETE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    },
+    "cross_section": {
+      "status": "COMPLETE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    },
+    "counterfactual": {
+      "status": "COMPLETE",
+      "examined_node_ids": [
+        "Q",
+        "H",
+        "E",
+        "O",
+        "C"
+      ],
+      "findings": []
+    }
+  },
+  "edge_checks": [
+    {
+      "edge_id": "E1",
+      "reasoning_type": "statistical",
+      "verdict": "supported",
+      "why": "Located relation checked for this protocol fixture."
+    },
+    {
+      "edge_id": "E2",
+      "reasoning_type": "statistical",
+      "verdict": "supported",
+      "why": "Located relation checked for this protocol fixture."
+    },
+    {
+      "edge_id": "E3",
+      "reasoning_type": "statistical",
+      "verdict": "supported",
+      "why": "Located relation checked for this protocol fixture."
+    },
+    {
+      "edge_id": "E4",
+      "reasoning_type": "statistical",
+      "verdict": "supported",
+      "why": "Located relation checked for this protocol fixture."
+    }
+  ],
+  "rq_matrix": [
+    {
+      "rq_id": "Q",
+      "hypothesis_ids": [
+        "H"
+      ],
+      "experiment_ids": [
+        "E"
+      ],
+      "result_ids": [
+        "O"
+      ],
+      "claim_ids": [
+        "C"
+      ],
+      "identifiable": "PASS",
+      "testable": "PASS",
+      "support_condition": "Higher M under Y.",
+      "refute_condition": "No higher M under Y.",
+      "permitted_conclusion": "Bounded mean performance comparison."
+    }
+  ],
+  "proof_steps": [],
+  "counterfactuals": [
+    {
+      "claim_id": "C",
+      "question": "Could the comparison persist without a mechanism?",
+      "alternative_explanations": [
+        "Optimization may explain it; no mechanism asserted."
+      ],
+      "discriminating_evidence_ids": [
+        "O"
+      ],
+      "verdict": "SUPPORTED",
+      "why": "Claim only concerns matched mean comparison."
+    }
+  ],
+  "scorecard": {
+    "Research question coherence": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Claim evidence alignment": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Theory completeness": {
+      "level": "not applicable",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Proof reliability": {
+      "level": "not applicable",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Theory method alignment": {
+      "level": "not applicable",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Experimental identification": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Baseline fairness": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Metric validity": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Ablation informativeness": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Statistical support": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Mechanism support": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Conclusion calibration": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    },
+    "Cross section consistency": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "O"
+      ],
+      "finding_ids": [],
+      "why": "Protocol fixture judgment, not measured model performance."
+    }
+  },
+  "well_supported": [
+    {
+      "node_ids": [
+        "C"
+      ],
+      "edge_ids": [
+        "E4"
+      ],
+      "why": "Located bounded comparison."
+    }
+  ],
+  "aggregation": []
+}

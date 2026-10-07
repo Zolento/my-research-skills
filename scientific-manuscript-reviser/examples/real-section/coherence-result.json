@@ -1,0 +1,181 @@
+{
+  "status": "NEEDS_REVIEW",
+  "errors": [],
+  "failed_links": [],
+  "unresolved": [
+    "Results, full experimental procedure and full-paper conclusions are outside this excerpt.",
+    "Limited input cannot certify whole-paper scientific coherence.",
+    "experiments NOT_VERIFIED",
+    "I1 NOT_VERIFIED",
+    "research question Q needs verification",
+    "UNTESTED_HYPOTHESIS"
+  ],
+  "manuscript_digest": "acec9f8d82547ad36252f93cc364c0d7de503521818179210c1a7727b7be0b9a",
+  "graph_digest": "b52dc9cffdbfed12ee4585ea88037a0b6cfb90e883aa0f9d50db2b84b8b75a67",
+  "findings": [
+    {
+      "id": "I1",
+      "code": "MISSING_FULL_PAPER_CONTEXT",
+      "category": "experimental_design",
+      "severity": "moderate",
+      "confidence": "low",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "reasoning_type": "statistical",
+      "verdict": "UNDERDETERMINED",
+      "why": "This excerpt gives the study purpose and intended benefit but not completed results, full protocol or cross-section conclusions.",
+      "alternative_interpretation": "Relevant testing and methodological details may exist elsewhere in the article.",
+      "verification_needed": "Inspect the full manuscript before judging identification, statistics or whole-paper consistency.",
+      "verification_status": "NOT_VERIFIED",
+      "basis": "INTERNAL INCONSISTENCY",
+      "external_sources": [],
+      "repairs": [
+        {
+          "id": "A",
+          "option": "Read the full protocol and results and trace existing evidence before proposing a scientific change.",
+          "requires": "requires_text_change_only"
+        }
+      ]
+    }
+  ],
+  "structural_diagnostics": [
+    {
+      "code": "UNTESTED_HYPOTHESIS",
+      "node_ids": [
+        "H"
+      ],
+      "severity": "major",
+      "why": "No experiment testing this extracted hypothesis.",
+      "id": "D-UNTESTED_HYPOTHESIS-H"
+    }
+  ],
+  "well_supported": [
+    {
+      "node_ids": [
+        "B"
+      ],
+      "edge_ids": [
+        "L2"
+      ],
+      "why": "The selection boundary is explicit and must remain visible."
+    }
+  ],
+  "scorecard": {
+    "Research question coherence": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "Q"
+      ],
+      "finding_ids": [],
+      "why": "The local study purpose is explicitly identifiable. Its testability needs full-paper context."
+    },
+    "Claim evidence alignment": {
+      "level": "needs attention",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "finding_ids": [
+        "I1"
+      ],
+      "why": "Not verified in the excerpt. Existing full-paper evidence must be inspected; no substantive defect is inferred."
+    },
+    "Theory completeness": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Proof reliability": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Theory method alignment": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Experimental identification": {
+      "level": "needs attention",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "finding_ids": [
+        "I1"
+      ],
+      "why": "Not verified in the excerpt. Existing full-paper evidence must be inspected; no substantive defect is inferred."
+    },
+    "Baseline fairness": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Metric validity": {
+      "level": "needs attention",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "finding_ids": [
+        "I1"
+      ],
+      "why": "Not verified in the excerpt. Existing full-paper evidence must be inspected; no substantive defect is inferred."
+    },
+    "Ablation informativeness": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Statistical support": {
+      "level": "needs attention",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "finding_ids": [
+        "I1"
+      ],
+      "why": "Not verified in the excerpt. Existing full-paper evidence must be inspected; no substantive defect is inferred."
+    },
+    "Mechanism support": {
+      "level": "not applicable",
+      "evidence_node_ids": [],
+      "finding_ids": [],
+      "why": "No corresponding material is supplied in this scoped excerpt. This is not a judgment about the full manuscript."
+    },
+    "Conclusion calibration": {
+      "level": "adequate",
+      "evidence_node_ids": [
+        "B"
+      ],
+      "finding_ids": [],
+      "why": "The local general-inference boundary is explicit. This does not establish the calibration of unseen full-paper conclusions."
+    },
+    "Cross section consistency": {
+      "level": "needs attention",
+      "evidence_node_ids": [
+        "Q",
+        "E",
+        "H"
+      ],
+      "finding_ids": [
+        "I1"
+      ],
+      "why": "Not verified in the excerpt. Existing full-paper evidence must be inspected; no substantive defect is inferred."
+    }
+  },
+  "note": "Local semantic judgments are not formal proof verification or scientific ground truth."
+}

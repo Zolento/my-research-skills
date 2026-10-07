@@ -1,0 +1,374 @@
+{
+  "schema": "manuscript-blueprint@1",
+  "material_digest": "3c5097125fc6bf627bcb90a3797e1afae03652ce7d7b9cc8881ad3c4a293ba1d",
+  "graph_digest": "61c5f8abe3e04712029a1d02157c60416e2d44807916002eb214787e24f430fc",
+  "coherence_digest": "09ff3dac11ed9c9313b2863cc334fe16b28b74053fba322b9b809e225945acde",
+  "depth": "full",
+  "claims": [
+    {
+      "id": "C",
+      "claim": "X improves mean M under Y.",
+      "claim_type": "empirical",
+      "importance": "central",
+      "evidence": [
+        "S-I4"
+      ],
+      "support_status": "SUPPORTED",
+      "assumptions": [],
+      "scope": "Under Y.",
+      "risk_of_overclaim": "low",
+      "used_in_sections": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5"
+      ]
+    }
+  ],
+  "sufficiency": {
+    "supported_claim_ids": [
+      "C"
+    ],
+    "partially_supported_claim_ids": [],
+    "unsupported_desired_claim_ids": [],
+    "missing_evidence": [],
+    "missing_theory": [],
+    "missing_experiments": [],
+    "missing_literature_grounding": [
+      "Novelty is not established."
+    ]
+  },
+  "theses": [
+    {
+      "id": "T1",
+      "text": "X improves mean M under Y. Matched comparison supports this bounded claim.",
+      "central_claim_id": "C",
+      "support_level": "SUPPORTED",
+      "main_evidence": [
+        "S-I4"
+      ],
+      "novelty_delta": "not established",
+      "novelty_evidence": [],
+      "strength": "Bounded evidence.",
+      "risk": "No mechanism evidence.",
+      "best_fit_venue": "unknown"
+    }
+  ],
+  "selected_thesis_id": "T1",
+  "architectures": [
+    {
+      "id": "A1",
+      "central_tension": "Does X improve M under Y?",
+      "opening_anchor": "Matched comparison.",
+      "claim_order": [
+        "C"
+      ],
+      "strongest_advantage": "Direct evidence.",
+      "main_risk": "Narrow scope.",
+      "required_evidence": [
+        "S-I4"
+      ],
+      "recommended_when": "Evidence is limited to Y."
+    },
+    {
+      "id": "A2",
+      "central_tension": "Does the matched protocol isolate the reported comparison?",
+      "opening_anchor": "Protocol constraint before performance.",
+      "claim_order": [
+        "C"
+      ],
+      "strongest_advantage": "Makes resource matching visible.",
+      "main_risk": "May delay the main observation.",
+      "required_evidence": [
+        "S-I4"
+      ],
+      "recommended_when": "Fair comparison is a likely comprehension bottleneck."
+    }
+  ],
+  "recommended_architecture_id": "A1",
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Introduction",
+      "purpose": "Present the introduction role of the bounded scientific argument.",
+      "claim_ids": [
+        "C"
+      ],
+      "subsections": [
+        {
+          "id": "SS1",
+          "title": "Introduction argument",
+          "purpose": "Serve the central comparison through a problem paragraph.",
+          "claim_ids": [
+            "C"
+          ],
+          "evidence_ids": [
+            "S-I4"
+          ],
+          "key_transition": "Connect observation to bounded claim.",
+          "paragraphs": [
+            {
+              "id": "P1",
+              "role": "problem",
+              "purpose": "Report the bounded mean comparison.",
+              "claim_ids": [
+                "C"
+              ],
+              "evidence_ids": [
+                "S-I4"
+              ],
+              "logical_predecessor": [],
+              "logical_successor": [
+                "P2"
+              ],
+              "content_to_include": [
+                "Bounded effect and comparator."
+              ],
+              "content_to_avoid": [
+                "Mechanism or generality."
+              ],
+              "reference_candidates": [],
+              "paragraph_sketch": "Does X improve M under protocol Y? We compare X and P with matched compute under Y.",
+              "writing_instruction": "Keep the claim bounded to Y and avoid mechanism attribution.",
+              "gap_marker": "",
+              "finding_ids": []
+            }
+          ],
+          "experiment_contract": null
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Method",
+      "purpose": "Present the method role of the bounded scientific argument.",
+      "claim_ids": [
+        "C"
+      ],
+      "subsections": [
+        {
+          "id": "SS2",
+          "title": "Method argument",
+          "purpose": "Serve the central comparison through a method_definition paragraph.",
+          "claim_ids": [
+            "C"
+          ],
+          "evidence_ids": [
+            "S-I4"
+          ],
+          "key_transition": "Connect observation to bounded claim.",
+          "paragraphs": [
+            {
+              "id": "P2",
+              "role": "method_definition",
+              "purpose": "Report the bounded mean comparison.",
+              "claim_ids": [
+                "C"
+              ],
+              "evidence_ids": [
+                "S-I4"
+              ],
+              "logical_predecessor": [
+                "P1"
+              ],
+              "logical_successor": [
+                "P3"
+              ],
+              "content_to_include": [
+                "Bounded effect and comparator."
+              ],
+              "content_to_avoid": [
+                "Mechanism or generality."
+              ],
+              "reference_candidates": [],
+              "paragraph_sketch": "We compare X and P under Y. The comparison uses matched compute.",
+              "writing_instruction": "Keep the claim bounded to Y and avoid mechanism attribution.",
+              "gap_marker": "",
+              "finding_ids": []
+            }
+          ],
+          "experiment_contract": null
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Results",
+      "purpose": "Present the results role of the bounded scientific argument.",
+      "claim_ids": [
+        "C"
+      ],
+      "subsections": [
+        {
+          "id": "SS3",
+          "title": "Results argument",
+          "purpose": "Serve the central comparison through a result paragraph.",
+          "claim_ids": [
+            "C"
+          ],
+          "evidence_ids": [
+            "S-I4"
+          ],
+          "key_transition": "Connect observation to bounded claim.",
+          "paragraphs": [
+            {
+              "id": "P3",
+              "role": "result",
+              "purpose": "Report the bounded mean comparison.",
+              "claim_ids": [
+                "C"
+              ],
+              "evidence_ids": [
+                "S-I4"
+              ],
+              "logical_predecessor": [
+                "P2"
+              ],
+              "logical_successor": [
+                "P4"
+              ],
+              "content_to_include": [
+                "Bounded effect and comparator."
+              ],
+              "content_to_avoid": [
+                "Mechanism or generality."
+              ],
+              "reference_candidates": [],
+              "paragraph_sketch": "X improves M by 0.8 under Y. This is a mean comparison under the stated protocol.",
+              "writing_instruction": "Keep the claim bounded to Y and avoid mechanism attribution.",
+              "gap_marker": "",
+              "finding_ids": []
+            }
+          ],
+          "experiment_contract": null
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Discussion",
+      "purpose": "Present the discussion role of the bounded scientific argument.",
+      "claim_ids": [
+        "C"
+      ],
+      "subsections": [
+        {
+          "id": "SS4",
+          "title": "Discussion argument",
+          "purpose": "Serve the central comparison through a discussion paragraph.",
+          "claim_ids": [
+            "C"
+          ],
+          "evidence_ids": [
+            "S-I4"
+          ],
+          "key_transition": "Connect observation to bounded claim.",
+          "paragraphs": [
+            {
+              "id": "P4",
+              "role": "discussion",
+              "purpose": "Report the bounded mean comparison.",
+              "claim_ids": [
+                "C"
+              ],
+              "evidence_ids": [
+                "S-I4"
+              ],
+              "logical_predecessor": [
+                "P3"
+              ],
+              "logical_successor": [
+                "P5"
+              ],
+              "content_to_include": [
+                "Bounded effect and comparator."
+              ],
+              "content_to_avoid": [
+                "Mechanism or generality."
+              ],
+              "reference_candidates": [],
+              "paragraph_sketch": "The comparison concerns mean M under Y. It does not identify a mechanism.",
+              "writing_instruction": "Keep the claim bounded to Y and avoid mechanism attribution.",
+              "gap_marker": "",
+              "finding_ids": []
+            }
+          ],
+          "experiment_contract": null
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "title": "Conclusion",
+      "purpose": "Present the conclusion role of the bounded scientific argument.",
+      "claim_ids": [
+        "C"
+      ],
+      "subsections": [
+        {
+          "id": "SS5",
+          "title": "Conclusion argument",
+          "purpose": "Serve the central comparison through a takeaway paragraph.",
+          "claim_ids": [
+            "C"
+          ],
+          "evidence_ids": [
+            "S-I4"
+          ],
+          "key_transition": "Connect observation to bounded claim.",
+          "paragraphs": [
+            {
+              "id": "P5",
+              "role": "takeaway",
+              "purpose": "Report the bounded mean comparison.",
+              "claim_ids": [
+                "C"
+              ],
+              "evidence_ids": [
+                "S-I4"
+              ],
+              "logical_predecessor": [
+                "P4"
+              ],
+              "logical_successor": [],
+              "content_to_include": [
+                "Bounded effect and comparator."
+              ],
+              "content_to_avoid": [
+                "Mechanism or generality."
+              ],
+              "reference_candidates": [],
+              "paragraph_sketch": "X improves mean M under Y. The supported conclusion remains a bounded comparison.",
+              "writing_instruction": "Keep the claim bounded to Y and avoid mechanism attribution.",
+              "gap_marker": "",
+              "finding_ids": []
+            }
+          ],
+          "experiment_contract": null
+        }
+      ]
+    }
+  ],
+  "gaps": [],
+  "experiment_portfolio": [
+    {
+      "material_id": "S-I4",
+      "necessity": "required",
+      "claim_ids": [
+        "C"
+      ],
+      "logic_gap": ""
+    }
+  ],
+  "literature_roles": [],
+  "outline_options": [
+    {
+      "area": "opening",
+      "option": "Open with the protocol constraint rather than the observed effect.",
+      "advantage": "Comparator fairness is immediately visible.",
+      "risk": "The result appears later.",
+      "best_when": "The audience needs the evaluation condition first."
+    }
+  ]
+}
