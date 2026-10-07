@@ -79,15 +79,18 @@ npx skills remove research-idea-pipeline -g -y  # 卸载
 
 ## 分支与开发产物
 
-`main` 的职责是**可安装的 skill 集合** —— 它的根目录只有本文件与各 skill 子目录。
+`main` 的职责是**可安装的 skill 集合** —— 它的根目录只有本文件、`AGENTS.md` 与各 skill 子目录。
 
-**根 `docs/` 属开发产物**（设计规格 `*-spec.md`、验证记录 `verify-*.md`、审查报告
-`review/*.md`），只与开发有关，**不在 `main` 上**；它保留在开发分支
-（如 `research-idea-pipeline-dev`），那是设计记录的家。
+开发规范以根 [AGENTS.md](AGENTS.md) 为准，所有分支遵循同一套目录和合并规则。
 
-> **维护提示：** 若在开发分支上**修改**根 `docs/`，再向 `main` 合并时会遇到
-> `modify/delete` 冲突 —— 因为 `main` 已删除该路径。**按「保留删除」处理**：
-> 开发文档不要进 `main`。新增开发文档请直接提交到开发分支。
+- 组件开发记录统一放在 `<component>/.dev/`。只有仓库级、跨组件记录使用根 `.dev/`。
+- 原根 `docs/` 中的开发计划、实现笔记和临时审查报告应迁入所属组件的 `.dev/`。
+  不再新建其他临时目录。正式文档、运行所需文献库和测试 fixture 保留正式位置。
+- `.dev/` 可提交到开发分支，默认不得进入 `main`。合并前逐项执行
+  `PROMOTE`、`KEEP_BRANCH_ONLY` 或 `DELETE`。提升为正式文档时先整理内容，再放入组件 README、references 或 docs。
+- 正式代码、测试和发布流程不得依赖 `.dev/`。删除它不能影响构建、测试或运行。
+- 从开发分支安装或手动复制时，应排除 `.dev/`，只保留正式 skill 文件。
+  不要整体忽略 `.dev/`，大型缓存或临时生成物可单独忽略。
 
 ---
 
@@ -95,6 +98,7 @@ npx skills remove research-idea-pipeline -g -y  # 卸载
 
 ```
 my-research-skills/
+├── AGENTS.md                          # 仓库开发规范：worktree / 分支 / 开发产物隔离
 ├── README.md                          # 本文件：子目录索引 + 安装与维护
 ├── research-idea-pipeline/            # skill 1（自带 README.md、docs/、.gitignore）
 │   ├── SKILL.md                       # 入口（frontmatter: name / description / argument-hint）
