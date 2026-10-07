@@ -39,5 +39,62 @@ class TestGeneration(unittest.TestCase):
         self.assertNotEqual(variants[0]["semantics"], variants[1]["semantics"])
 
 
+def full_response(snapshot):
+    response = rr.recovery_truth(snapshot)
+    response["unsupported_or_overstated_claims"] = []
+    return response
+
+
+class TestRecovery(unittest.TestCase):
+    def test_blind_payload_does_not_receive_snapshot_or_variant_metadata(self):
+        _, snapshot, variants = fixture()
+        payload = rr.blind_task(variants[0]["text"])
+        self.assertEqual(set(payload), {"instruction", "questions", "narrative"})
+        self.assertEqual(payload["narrative"], variants[0]["text"])
+        self.assertNotIn(snapshot["snapshot_digest"], json.dumps(payload))
+        self.assertNotIn("profile", payload)
+
+    def test_full_recovery_pass_and_partial_boundary(self):
+        _, snapshot, _ = fixture()
+        response = full_response(snapshot)
+        result = rr.score_recovery(snapshot, response)
+        self.assertEqual(set(result["metrics"].values()), {"PASS"})
+        response["main_boundary"].pop()
+        result = rr.score_recovery(snapshot, response)
+        self.assertEqual(result["metrics"]["Boundary Recovery"], "PARTIAL")
+
+    def test_empty_and_invented_claim_fail(self):
+        _, snapshot, _ = fixture()
+        for recovered in ([], ["We are the first and universally effective."]):
+            response = full_response(snapshot)
+            response["central_claim"] = recovered
+            result = rr.score_recovery(snapshot, response)
+            self.assertEqual(result["metrics"]["Claim Recovery"], "FAIL")
+
+    def test_unsupported_claim_and_overall_score_cannot_help(self):
+        _, snapshot, _ = fixture()
+        response = full_response(snapshot)
+        response["unsupported_or_overstated_claims"] = ["Unsupported firstness"]
+        self.assertFalse(rr.score_recovery(snapshot, response)["eligible"])
+        response["overall_score"] = 10
+        self.assertEqual(rr.score_recovery(snapshot, response)["status"], "INVALID")
+
+    def test_complete_multimodel_panel_and_stale_text_rejection(self):
+        state, snapshot, variants = fixture()
+        plan = rr.evaluation_plan(snapshot, [{"judge_id": "J1", "model_id": "model-A"},
+                                              {"judge_id": "J2", "model_id": "model-B"}])
+        probes = [rr.probe_record(plan, v, j["judge_id"], full_response(snapshot))
+                  for v in variants for j in plan["judges"]]
+        self.assertEqual(rr.panel(state, snapshot, variants, plan, probes)[0], [])
+        probes[0]["text_digest"] = "stale"
+        self.assertTrue(rr.panel(state, snapshot, variants, plan, probes)[0])
+
+    def test_same_model_roles_do_not_make_multimodel_panel(self):
+        _, snapshot, _ = fixture()
+        with self.assertRaises(ValueError):
+            rr.evaluation_plan(snapshot, [{"judge_id": "J1", "model_id": "same"},
+                                          {"judge_id": "J2", "model_id": "same"}])
+
+
 if __name__ == "__main__":
     unittest.main()
