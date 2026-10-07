@@ -416,7 +416,12 @@ class BottleneckRetrievalTests(unittest.TestCase):
         self.assertLess(phase.index("## A0. 先尝试 web search"), phase.index("## A1."))
         self.assertLess(phase.index("## A1."), phase.index("## A2."))
         for relative in ("README.md", "references/phase-r3-r6-discovery.md"):
-            self.assertIn("先尝试 web search，再本地与多源", (root / relative).read_text())
+            with self.subTest(path=relative):
+                text = (root / relative).read_text()
+                self.assertTrue(any(policy in text for policy in (
+                    "先尝试 web search，再本地与多源",
+                    "Attempt web search first, then query the local library and multiple sources.",
+                )), "Web search must precede local and multisource retrieval in either language")
 
     def test_refresh_queries_all_sources_and_expansion_rounds(self):
         with tempfile.TemporaryDirectory() as directory:
