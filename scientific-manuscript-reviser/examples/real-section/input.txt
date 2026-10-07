@@ -1,0 +1,3 @@
+The aim of this study is to investigate reproducibility in a sample of 11 PLOS ONE papers dealing with longitudinal data. We also collect information on usage of methods, how they are made available and computing environments used. We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data. Note that based on the selection of 11 papers we cannot make inferences on papers in general or in the journal.
+
+We can, however, learn from the obstacles we encountered in the given papers. Also, even reproducing a single paper creates scientific value. It provides a scientific check of the work and increases (or in case of failure decreases) trust in the results.

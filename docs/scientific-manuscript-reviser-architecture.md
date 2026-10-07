@@ -127,3 +127,23 @@ silently change original claims under an “equivalent” label.
 - Architect: 87 tests PASS. Material epistemic types, audited graph claim identity,
   sufficiency, thesis/evidence/novelty, paragraph purpose/style, scientific gap placement,
   portfolio/literature and approved section drafting share the scientific gates.
+
+- Final independent forward test: realistic incomplete materials produce a source-bound
+  Compact plan with NEEDS_REVIEW, bounded_outline=true, draft_ready=false. Desired
+  mechanism and generalization remain unsupported; planned experiments stay planned.
+- Review repaired unresolved moderate scientific findings being discarded, theorem
+  alignment bypass through claim labels, hidden structural diagnostics, stale source
+  bindings, proof dependency roles, counterfactual verdict handling, and technical
+  macro/dash/cross-reference scanner cases. Each correction has a regression case.
+- Real attributed manuscript excerpt keeps its true selection limitation and expected
+  benefit status. Missing full-paper evidence is NOT_VERIFIED rather than rated adequate.
+  Independent closeout confirms no remaining scoped blocking findings.
+- Final package gate PASS: 106 tests, self-contained links, authentic section and
+  synthetic Architect artifacts. Installed-folder CLI tests execute copies without
+  sibling skills. Original pipeline 501 tests PASS (4 existing skips), figure 47 PASS.
+  These are mechanical/protocol tests plus bounded agent forward testing, not an
+  accuracy benchmark or proof of every future scientific judgment.
+- Root README indexes modes, triggers, installation and independent packaging. Skill
+  documentation contains only runtime guidance, contracts and relevant examples.
+  This root development note must remain on the development branch and be excluded
+  from the final main tree.

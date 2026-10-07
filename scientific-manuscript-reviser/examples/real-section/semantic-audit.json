@@ -1,0 +1,237 @@
+{
+  "schema": "manuscript-semantic-audit@1",
+  "original_digest": "acec9f8d82547ad36252f93cc364c0d7de503521818179210c1a7727b7be0b9a",
+  "revised_digest": "fd4c3589be8330f240f73bff37cf2e1f6b484ee32a7ad8dbc24c2389a1182add",
+  "original_facts_digest": "25f7f554257a78600d8f06f63b4f362ea3f1bb58263693f41e93241309204b8c",
+  "revised_facts_digest": "6d6af89ea440b477fd41e64c518252297a7058c48f902fd9397a42f1877b665e",
+  "fact_checks": [
+    {
+      "original_id": "F0",
+      "revised_ids": [
+        "F0"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F1",
+      "revised_ids": [
+        "F1"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F2",
+      "revised_ids": [
+        "F2"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F3",
+      "revised_ids": [
+        "F3"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F4",
+      "revised_ids": [
+        "F4"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F5",
+      "revised_ids": [
+        "F5"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F6",
+      "revised_ids": [
+        "F6"
+      ],
+      "status": "PASS",
+      "rationale": "The source qualifier and limitation remain explicit after deleting only the empty lead-in."
+    },
+    {
+      "original_id": "F7",
+      "revised_ids": [
+        "F7"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F8",
+      "revised_ids": [
+        "F8"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F9",
+      "revised_ids": [
+        "F9"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F10",
+      "revised_ids": [
+        "F10"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "original_id": "F11",
+      "revised_ids": [
+        "F11"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    }
+  ],
+  "new_assertion_checks": [
+    {
+      "revised_id": "F0",
+      "original_ids": [
+        "F0"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F1",
+      "original_ids": [
+        "F1"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F2",
+      "original_ids": [
+        "F2"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F3",
+      "original_ids": [
+        "F3"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F4",
+      "original_ids": [
+        "F4"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F5",
+      "original_ids": [
+        "F5"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F6",
+      "original_ids": [
+        "F6"
+      ],
+      "status": "PASS",
+      "rationale": "The source qualifier and limitation remain explicit after deleting only the empty lead-in."
+    },
+    {
+      "revised_id": "F7",
+      "original_ids": [
+        "F7"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F8",
+      "original_ids": [
+        "F8"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F9",
+      "original_ids": [
+        "F9"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F10",
+      "original_ids": [
+        "F10"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    },
+    {
+      "revised_id": "F11",
+      "original_ids": [
+        "F11"
+      ],
+      "status": "PASS",
+      "rationale": "The source assertion is retained verbatim in the proposed revision."
+    }
+  ],
+  "global_checks": {
+    "claim_strength": {
+      "status": "PASS",
+      "rationale": "No claim is strengthened or weakened; the expected benefit remains an expectation."
+    },
+    "claim_evidence_alignment": {
+      "status": "PASS",
+      "rationale": "The two aims and expected value remain at their original locations."
+    },
+    "citation_meaning": {
+      "status": "PASS",
+      "rationale": "The excerpt contains no citation keys or attributed evidence links to relocate."
+    },
+    "reference_claim_alignment": {
+      "status": "PASS",
+      "rationale": "The excerpt contains no figure/table/equation identifiers."
+    },
+    "technical_meaning": {
+      "status": "PASS",
+      "rationale": "Reproducibility, longitudinal data, methods and computing environments are unchanged."
+    },
+    "scope_and_boundary": {
+      "status": "PASS",
+      "rationale": "Both occurrences of 11 and the no-general-inference boundary remain explicit."
+    },
+    "no_new_scientific_content": {
+      "status": "PASS",
+      "rationale": "Only Note that is removed and Based is capitalized."
+    },
+    "no_unsupported_weakening": {
+      "status": "PASS",
+      "rationale": "No hedge was added and no supported assertion was diluted."
+    }
+  }
+}

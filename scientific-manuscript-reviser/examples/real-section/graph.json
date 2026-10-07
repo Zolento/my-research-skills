@@ -1,0 +1,96 @@
+{
+  "schema": "scientific-argument-graph@1",
+  "manuscript_digest": "acec9f8d82547ad36252f93cc364c0d7de503521818179210c1a7727b7be0b9a",
+  "document_scope": "section",
+  "missing_context": [
+    "Results, full experimental procedure and full-paper conclusions are outside this excerpt."
+  ],
+  "nodes": [
+    {
+      "id": "Q",
+      "type": "Research question",
+      "label": "The aim of this study is to investigate reproducibility in a sample of 11 PLOS ONE papers dealing with longitudinal data.",
+      "source_span": "The aim of this study is to investigate reproducibility in a sample of 11 PLOS ONE papers dealing with longitudinal data.",
+      "location": {
+        "start": 0,
+        "end": 121
+      },
+      "context": "Materials and methods / Study questions, excerpt paragraphs 1–2"
+    },
+    {
+      "id": "E",
+      "type": "Experimental design",
+      "label": "We also collect information on usage of methods, how they are made available and computing environments used.",
+      "source_span": "We also collect information on usage of methods, how they are made available and computing environments used.",
+      "location": {
+        "start": 122,
+        "end": 231
+      },
+      "context": "Materials and methods / Study questions, excerpt paragraphs 1–2"
+    },
+    {
+      "id": "H",
+      "type": "Hypothesis",
+      "label": "We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data.",
+      "source_span": "We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data.",
+      "location": {
+        "start": 232,
+        "end": 387
+      },
+      "context": "Materials and methods / Study questions, excerpt paragraphs 1–2"
+    },
+    {
+      "id": "B",
+      "type": "Boundary",
+      "label": "Note that based on the selection of 11 papers we cannot make inferences on papers in general or in the journal.",
+      "source_span": "Note that based on the selection of 11 papers we cannot make inferences on papers in general or in the journal.",
+      "location": {
+        "start": 388,
+        "end": 499
+      },
+      "context": "Materials and methods / Study questions, excerpt paragraphs 1–2"
+    },
+    {
+      "id": "V",
+      "type": "Interpretation",
+      "label": "We can, however, learn from the obstacles we encountered in the given papers.",
+      "source_span": "We can, however, learn from the obstacles we encountered in the given papers.",
+      "location": {
+        "start": 501,
+        "end": 578
+      },
+      "context": "Materials and methods / Study questions, excerpt paragraphs 1–2"
+    }
+  ],
+  "edges": [
+    {
+      "id": "L1",
+      "source": "E",
+      "target": "Q",
+      "type": "tests",
+      "reasoning_type": "inductive",
+      "location": {
+        "start": 122,
+        "end": 231
+      },
+      "source_span": "We also collect information on usage of methods, how they are made available and computing environments used."
+    },
+    {
+      "id": "L2",
+      "source": "B",
+      "target": "Q",
+      "type": "qualifies",
+      "reasoning_type": "inductive",
+      "location": {
+        "start": 388,
+        "end": 499
+      },
+      "source_span": "Note that based on the selection of 11 papers we cannot make inferences on papers in general or in the journal."
+    }
+  ],
+  "central_claim_ids": [],
+  "main_chain": [
+    "E",
+    "Q"
+  ]
+}

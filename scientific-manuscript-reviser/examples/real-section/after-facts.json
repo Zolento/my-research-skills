@@ -1,0 +1,163 @@
+{
+  "schema": "manuscript-invariants@1",
+  "manuscript_digest": "fd4c3589be8330f240f73bff37cf2e1f6b484ee32a7ad8dbc24c2389a1182add",
+  "covered_categories": [
+    "claims",
+    "numbers",
+    "metrics",
+    "datasets",
+    "methods",
+    "baselines",
+    "comparators",
+    "statistical_statements",
+    "causal_status",
+    "novelty",
+    "scope",
+    "assumptions",
+    "limitations",
+    "uncertainty",
+    "figure_references",
+    "table_references",
+    "section_references",
+    "citation_keys",
+    "equation_references",
+    "technical_terminology"
+  ],
+  "absent_categories": [
+    "assumptions",
+    "baselines",
+    "causal_status",
+    "citation_keys",
+    "comparators",
+    "equation_references",
+    "figure_references",
+    "metrics",
+    "novelty",
+    "section_references",
+    "statistical_statements",
+    "table_references"
+  ],
+  "facts": [
+    {
+      "id": "F0",
+      "category": "claims",
+      "statement": "The aim of this study is to investigate reproducibility in a sample of 11 PLOS ONE papers dealing with longitudinal data.",
+      "location": {
+        "start": 0,
+        "end": 121
+      },
+      "source_span": "The aim of this study is to investigate reproducibility in a sample of 11 PLOS ONE papers dealing with longitudinal data."
+    },
+    {
+      "id": "F1",
+      "category": "scope",
+      "statement": "a sample of 11 PLOS ONE papers dealing with longitudinal data",
+      "location": {
+        "start": 59,
+        "end": 120
+      },
+      "source_span": "a sample of 11 PLOS ONE papers dealing with longitudinal data"
+    },
+    {
+      "id": "F2",
+      "category": "numbers",
+      "statement": "11",
+      "location": {
+        "start": 71,
+        "end": 73
+      },
+      "source_span": "11"
+    },
+    {
+      "id": "F3",
+      "category": "methods",
+      "statement": "usage of methods",
+      "location": {
+        "start": 153,
+        "end": 169
+      },
+      "source_span": "usage of methods"
+    },
+    {
+      "id": "F4",
+      "category": "uncertainty",
+      "statement": "We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data.",
+      "location": {
+        "start": 232,
+        "end": 387
+      },
+      "source_span": "We expect that this study will help future authors in making their work reproducible, even in complex settings such as when working with longitudinal data."
+    },
+    {
+      "id": "F5",
+      "category": "claims",
+      "statement": "We also collect information on usage of methods, how they are made available and computing environments used.",
+      "location": {
+        "start": 122,
+        "end": 231
+      },
+      "source_span": "We also collect information on usage of methods, how they are made available and computing environments used."
+    },
+    {
+      "id": "F6",
+      "category": "limitations",
+      "statement": "Based on the selection of 11 papers we cannot make inferences on papers in general or in the journal.",
+      "location": {
+        "start": 388,
+        "end": 489
+      },
+      "source_span": "Based on the selection of 11 papers we cannot make inferences on papers in general or in the journal."
+    },
+    {
+      "id": "F7",
+      "category": "claims",
+      "statement": "We can, however, learn from the obstacles we encountered in the given papers.",
+      "location": {
+        "start": 491,
+        "end": 568
+      },
+      "source_span": "We can, however, learn from the obstacles we encountered in the given papers."
+    },
+    {
+      "id": "F8",
+      "category": "claims",
+      "statement": "Also, even reproducing a single paper creates scientific value.",
+      "location": {
+        "start": 569,
+        "end": 632
+      },
+      "source_span": "Also, even reproducing a single paper creates scientific value."
+    },
+    {
+      "id": "F9",
+      "category": "claims",
+      "statement": "It provides a scientific check of the work and increases (or in case of failure decreases) trust in the results.",
+      "location": {
+        "start": 633,
+        "end": 745
+      },
+      "source_span": "It provides a scientific check of the work and increases (or in case of failure decreases) trust in the results."
+    },
+    {
+      "id": "F10",
+      "category": "technical_terminology",
+      "statement": "reproducibility",
+      "location": {
+        "start": 40,
+        "end": 55
+      },
+      "source_span": "reproducibility"
+    },
+    {
+      "id": "F11",
+      "category": "datasets",
+      "statement": "11 PLOS ONE papers",
+      "location": {
+        "start": 71,
+        "end": 89
+      },
+      "source_span": "11 PLOS ONE papers"
+    }
+  ],
+  "unresolved": []
+}

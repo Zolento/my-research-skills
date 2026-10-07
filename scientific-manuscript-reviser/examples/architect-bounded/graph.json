@@ -1,0 +1,123 @@
+{
+  "schema": "scientific-argument-graph@1",
+  "manuscript_digest": "82b90425ade20912171a7aeb326194f12e5dabb6e83a5f07e14c1ea645860a47",
+  "document_scope": "whole_paper",
+  "missing_context": [],
+  "nodes": [
+    {
+      "id": "Q",
+      "type": "Research question",
+      "label": "Does X improve M under protocol Y?",
+      "source_span": "Does X improve M under protocol Y?",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "context": "Toy fixture paragraph 1"
+    },
+    {
+      "id": "H",
+      "type": "Hypothesis",
+      "label": "X improves M under protocol Y.",
+      "source_span": "X improves M under protocol Y.",
+      "location": {
+        "start": 36,
+        "end": 66
+      },
+      "context": "Toy fixture paragraph 2"
+    },
+    {
+      "id": "E",
+      "type": "Experimental design",
+      "label": "We compare X and P with matched compute under Y.",
+      "source_span": "We compare X and P with matched compute under Y.",
+      "location": {
+        "start": 68,
+        "end": 116
+      },
+      "context": "Toy fixture paragraph 3"
+    },
+    {
+      "id": "O",
+      "type": "Observation",
+      "label": "X improves M by 0.8 under Y.",
+      "source_span": "X improves M by 0.8 under Y.",
+      "location": {
+        "start": 118,
+        "end": 146
+      },
+      "context": "Toy fixture paragraph 4"
+    },
+    {
+      "id": "C",
+      "type": "Claim",
+      "label": "X improves mean M under Y.",
+      "source_span": "X improves mean M under Y.",
+      "location": {
+        "start": 148,
+        "end": 174
+      },
+      "context": "Toy fixture paragraph 5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "E1",
+      "source": "E",
+      "target": "H",
+      "type": "tests",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "source_span": "Does X improve M under protocol Y?"
+    },
+    {
+      "id": "E2",
+      "source": "Q",
+      "target": "H",
+      "type": "motivates",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "source_span": "Does X improve M under protocol Y?"
+    },
+    {
+      "id": "E3",
+      "source": "E",
+      "target": "O",
+      "type": "measures",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "source_span": "Does X improve M under protocol Y?"
+    },
+    {
+      "id": "E4",
+      "source": "O",
+      "target": "C",
+      "type": "supports",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "source_span": "Does X improve M under protocol Y?"
+    }
+  ],
+  "central_claim_ids": [
+    "C"
+  ],
+  "main_chain": [
+    "Q",
+    "H",
+    "E",
+    "O",
+    "C"
+  ]
+}

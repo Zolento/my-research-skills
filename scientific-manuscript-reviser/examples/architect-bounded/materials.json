@@ -1,0 +1,67 @@
+{
+  "schema": "research-material-map@1",
+  "sources": [
+    {
+      "id": "S",
+      "text": "Does X improve M under protocol Y?\n\nX improves M under protocol Y.\n\nWe compare X and P with matched compute under Y.\n\nX improves M by 0.8 under Y.\n\nX improves mean M under Y."
+    }
+  ],
+  "items": [
+    {
+      "id": "S-I1",
+      "type": "established_fact",
+      "statement": "Does X improve M under protocol Y?",
+      "source_id": "S",
+      "location": {
+        "start": 0,
+        "end": 34
+      },
+      "source_span": "Does X improve M under protocol Y?"
+    },
+    {
+      "id": "S-I2",
+      "type": "established_fact",
+      "statement": "X improves M under protocol Y.",
+      "source_id": "S",
+      "location": {
+        "start": 36,
+        "end": 66
+      },
+      "source_span": "X improves M under protocol Y."
+    },
+    {
+      "id": "S-I3",
+      "type": "established_fact",
+      "statement": "We compare X and P with matched compute under Y.",
+      "source_id": "S",
+      "location": {
+        "start": 68,
+        "end": 116
+      },
+      "source_span": "We compare X and P with matched compute under Y."
+    },
+    {
+      "id": "S-I4",
+      "type": "experimental_result",
+      "statement": "X improves M by 0.8 under Y.",
+      "source_id": "S",
+      "location": {
+        "start": 118,
+        "end": 146
+      },
+      "source_span": "X improves M by 0.8 under Y."
+    },
+    {
+      "id": "S-I5",
+      "type": "established_fact",
+      "statement": "X improves mean M under Y.",
+      "source_id": "S",
+      "location": {
+        "start": 148,
+        "end": 174
+      },
+      "source_span": "X improves mean M under Y."
+    }
+  ],
+  "missing_context": []
+}

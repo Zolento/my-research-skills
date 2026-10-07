@@ -8,7 +8,19 @@
 | 目录 | 是什么 |
 |---|---|
 | [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。 |
+| [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改。提供 Scientific Coherence Audit、Compact / Full Blueprint、多选 suggestion bank、作者风格保护和语义 / style 门禁；可独立安装，不依赖其他 skill。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图**字符草稿**架构师：读代码 / 论文 / 配置 / 用户说明，产出若干份结构不同的 Markdown 字符示意图 draft，作为 SVG / TikZ / Figma 代理的结构蓝图。强制四级证据（A/B/C/D）、强制区分 train / inference / frozen，禁止补造不存在的模块；含契约校验脚本与离线测试。 |
+
+## 新增论文架构、审计与修改
+
+[`scientific-manuscript-reviser`](scientific-manuscript-reviser/SKILL.md) 是独立 skill，核心对象是 scientific argument。
+
+- **Audit** 审计已有论文，先检查科学推理，再检查 narrative、段落、语言和 style。默认提供多选建议，保护 Keep as is。
+- **Architect** 从不完整研究材料构建 thesis、claim/evidence map 和论文蓝图。普通大纲使用 Compact，详细大纲使用 paragraph-level Full Blueprint。
+- **Revise** 在明确要求修改时，按诊断和选择重写，并检查 scientific invariance 与个人 hard style rules。已批准蓝图可用于逐节起草。
+
+示例请求包括“分析这一节并给多个修改方向”“基于这些实验笔记给详细论文大纲”和“按已选建议修改并保留数值、scope 与 limitation”。计划实验不能写成已完成结果。生成和审计使用相同科学标准，不以 reviewer 分数或 AI detector 为优化目标。
+详细用法、验证边界和示例见 [skill README](scientific-manuscript-reviser/README.md)。
 
 ## 约定
 
@@ -29,6 +41,7 @@ npx skills add Zolento/my-research-skills -l
 # 逐个装（source 相同，便于统一更新）
 npx skills add Zolento/my-research-skills -g -s research-idea-pipeline -y
 npx skills add Zolento/my-research-skills -g -s academic-figure-draft-architect -y
+npx skills add Zolento/my-research-skills -g -s scientific-manuscript-reviser -y
 
 # 或一次装全部
 npx skills add Zolento/my-research-skills -g -s '*' -y
@@ -86,7 +99,10 @@ my-research-skills/
 ├── research-idea-pipeline/            # skill 1（自带 README.md、docs/、.gitignore）
 │   ├── SKILL.md                       # 入口（frontmatter: name / description / argument-hint）
 │   └── references/ scripts/ templates/ examples/
-└── academic-figure-draft-architect/   # skill 2（自带 README.md）
-    ├── SKILL.md                       # 入口；description 内含触发词，供 skills 发现
-    └── references/ scripts/ templates/ examples/
+├── academic-figure-draft-architect/   # skill 2（自带 README.md）
+│   ├── SKILL.md                       # 入口；description 内含触发词，供 skills 发现
+│   └── references/ scripts/ templates/ examples/
+└── scientific-manuscript-reviser/     # skill 3（独立论文架构、审计与修改）
+    ├── SKILL.md                       # 入口；按模式渐进读取 references
+    └── references/ scripts/ templates/ examples/ tests/
 ```
