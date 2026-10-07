@@ -35,8 +35,14 @@ manifest.bindings 为每个键登记 JSON Pointer 列表；不得指向 narrativ
 绑定时它必须指向已有 claim statement；不从 prose 自动创造贡献。
 manifest 另有 evidence_mapping、contribution_order、slots（六槽位的来源绑定）、
 empty_reasons（空字段理由）。它们也在 snapshot digest 内，不能被变体改写。
-closest delta、causal status、数字的正确来源及 completeness 由 D4a 的科学审核负责；
-机器校验仅能验证绑定真实、全 State 没变、选中 claim/evidence/scope/失败/未知未遗漏。
+机器先检查绑定的来源角色：claim statement 必须属于选中 claim 的对应身份；
+comparators 来自有效 literature / 已选 evidence source / 已完成实验 result，
+不能误绑 claim statement。S5 只允许已选 evidence 和已完成、有效、相关实验来源，
+不能把 uncertainty question 或未选中的 ungrounded claim 当结果。
+已选 evidence 引用的实验必须已完成且有效；计划中的 result 字符串不能当实测结果。
+S6 仍支持已有 scope、failure、uncertainty 和 assumption 的完整记录或指定边界条目。
+这些来源域检查不判断自由文本的科学含义：closest delta、causal status、数字的
+正确解释及 completeness 仍由 D4a 科学审核负责。
 
 ## 2. RE 门禁
 
@@ -84,6 +90,10 @@ PASS/PARTIAL/FAIL 映射到 2/1/0，只作诊断。按每个 judge 的配对 pro
 任一维 paired range = 2，或 closest delta / central claim 恢复出现新增错误解释，标
 **RHETORICALLY_FRAGILE**。可选 scientific judgment 只能是 supported/uncertain/unsupported
 三个类别；同一 judge 跨 profile 类别变化也标 fragile，不进入优化目标。
+同一 judge 的 unsupported_or_overstated_claims 集合跨 profile 改变，也标 fragile，
+并保留逐 variant / judge 的具体条目；仅列表顺序改变不触发。
+各 profile 一致出现 overstatement 时，可能仍标 STABLE，但所有相关候选均不 eligible；
+STABLE 不是科学正确或推荐资格的证明。
 缺 profile、缺 judge、重复 judge、错 snapshot 或未过 RE 时返回 INCOMPLETE，不声称稳定。
 不得靠 pooled mean 掩盖相反模型的 profile 变化。
 标 STABLE 只表示在该预登记面板/扰动中未触发阈值，不能外推到所有 reviewer。

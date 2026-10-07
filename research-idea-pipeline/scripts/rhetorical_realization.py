@@ -176,6 +176,10 @@ def sensitivity(state, snapshot, variants, plan, probes):
             values = {p["response"]["scientific_judgment"] for p in probes if p["judge_id"] == jid}
             if len(values) > 1:
                 reasons.append(f"{jid}: scientific judgment changes across equivalent profiles")
+        overstatements = {canonical(sorted(scored[(v["variant_id"], jid)]["unsupported_or_overstated_claims"]))
+                         for v in variants}
+        if len(overstatements) > 1:
+            reasons.append(f"{jid}: unsupported/overstated claim interpretation changes across equivalent profiles")
     for v in variants:
         vid = v["variant_id"]
         per_model = [scored[(vid, j["judge_id"])] for j in plan["judges"]]
@@ -190,7 +194,10 @@ def sensitivity(state, snapshot, variants, plan, probes):
                                            for other in variants))
         diagnostics[vid] = {"worst_recovery": worst, "max_paired_distance": distance,
                             "judge_disagreement": max(x["disagreement"] for x in between[vid].values()),
-                            "eligible": all(x["eligible"] for x in per_model)}
+                            "eligible": all(x["eligible"] for x in per_model),
+                            "unsupported_by_judge": {
+                                j["judge_id"]: scored[(vid, j["judge_id"])]["unsupported_or_overstated_claims"]
+                                for j in plan["judges"]}}
         for j in plan["judges"]:
             result = scored[(vid, j["judge_id"])]
             for key in ("central_claim", "closest_prior_work_delta"):

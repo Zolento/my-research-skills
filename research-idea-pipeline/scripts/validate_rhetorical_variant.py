@@ -87,6 +87,77 @@ def atoms(values):
     return list(dict.fromkeys(result))
 
 
+def source_domains(state, claim_ids, evidence_ids):
+    """Permitted source roles, not a natural-language semantic classifier.
+
+    D4a still reviews what a source means. Mechanical domains prevent unrelated,
+    ungrounded or planned facts from entering a checked realization via a slot.
+    """
+    claims = {f"/claims/{i}/{key}"
+              for i, c in enumerate(state["claims"]) if c["id"] in claim_ids
+              for key in ("statement", "scope", "nearest_alternative", "falsifier",
+                          "known_flaws", "supporting_evidence", "refuting_evidence")}
+    claim_fields = lambda key: {p for p in claims if p.endswith("/" + key)}
+    ev = {f"/evidence/{i}/{key}"
+          for i, e in enumerate(state["evidence"]) if e["id"] in evidence_ids
+          for key in ("id", "scope", "source_ref", "epistemic_status")}
+    ev_records = {f"/evidence/{i}" for i, e in enumerate(state["evidence"])
+                  if e["id"] in evidence_ids}
+    dependencies = {dep for e in state["evidence"] if e["id"] in evidence_ids
+                    for dep in e.get("depends_on", [])}
+    exp_records = set()
+    for i, exp in enumerate(state["experiments"]):
+        referenced = exp["id"] in dependencies
+        relevant = referenced or bool(set(exp.get("claim_targeted", [])) & set(claim_ids))
+        verified = exp["status"] in ("done", "failed") and exp["validity"]["status"] == "valid"
+        if referenced and not verified:
+            raise ValueError("referenced experimental source must be completed and valid")
+        if relevant and verified:
+            exp_records.add(f"/experiments/{i}")
+    exp_fields = lambda key: {p + "/" + key for p in exp_records}
+    literature = {f"/literature/{i}/ref" for i, item in enumerate(state["literature"])
+                  if item["validity"]["status"] == "valid"}
+    assumptions = {"/assumptions"} | {
+        f"/assumptions/{i}/{key}" for i in range(len(state["assumptions"]))
+        for key in ("statement", "if_false")}
+    uncertainty = {"/uncertainties"} | {
+        f"/uncertainties/{i}/question" for i in range(len(state["uncertainties"]))}
+    uncertainty |= {p for p in ev if p.endswith("/epistemic_status")}
+    uncertainty |= exp_fields("result") | exp_fields("interpretation")
+    scope = claim_fields("scope") | {p for p in ev if p.endswith("/scope")} | exp_fields("data_split")
+    if "out_of_scope" in state.get("contract", {}):
+        scope.add("/contract/out_of_scope")
+    failures = {"/failures"} | {f"/failures/{i}" for i in range(len(state["failures"]))}
+    failures |= {f"/failures/{i}/what" for i in range(len(state["failures"]))}
+    limitations = failures | claim_fields("known_flaws") | scope
+    failure_cases = failures | {f"/experiments/{i}" for i, x in enumerate(state["experiments"])
+                                         if x["status"] == "failed"}
+    source_refs = {p for p in ev if p.endswith("/source_ref")}
+    interpretation = ev_records | exp_fields("interpretation") | claim_fields("nearest_alternative")
+    causal = exp_fields("interpretation") | claim_fields("nearest_alternative") | claim_fields("statement")
+    numbers = exp_records | exp_fields("result") | exp_fields("metric") | exp_fields("data_split") | source_refs
+    comparators = literature | source_refs | exp_fields("result")
+    delta = source_refs | claim_fields("statement") | claim_fields("nearest_alternative") | exp_fields("interpretation")
+    domains = {
+        "central_claim": claim_fields("statement"), "supporting_claims": claim_fields("statement"),
+        "main_contribution": claim_fields("statement"), "evidence_ids": {p for p in ev if p.endswith("/id")},
+        "numerical_values": numbers, "comparators": comparators, "uncertainty": uncertainty,
+        "scope": scope, "assumptions": assumptions, "limitations": limitations,
+        "failure_cases": failure_cases, "prior_work_delta": delta, "causal_status": causal,
+        "scientific_interpretation": interpretation,
+    }
+    context = {"/contract/goal"} if "goal" in state.get("contract", {}) else set()
+    slots = {"S1": context | claim_fields("statement") | assumptions,
+             "S2": comparators | delta,
+             "S3": claim_fields("statement") | claim_fields("falsifier") | claim_fields("scope"),
+             "S4": causal | assumptions,
+             "S5": numbers | ev | ev_records | exp_fields("interpretation")
+                   | claim_fields("supporting_evidence") | claim_fields("refuting_evidence"),
+             "S6": scope | assumptions | uncertainty | limitations | failure_cases
+                   | claim_fields("falsifier") | exp_fields("unexpected")}
+    return domains, slots
+
+
 def freeze(state, manifest):
     """D4a source projection. Selection/framing has already been scientifically reviewed."""
     if state_check.check_state(state).exit_code != 0:
@@ -129,8 +200,20 @@ def freeze(state, manifest):
     bindings = manifest["bindings"]
     if not isinstance(bindings, dict) or set(bindings) != set(FIELDS):
         raise ValueError("all 14 semantic fields must be explicitly bound")
-    if any(not isinstance(paths, list) or len(paths) != len(set(paths)) for paths in bindings.values()):
+    if any(not isinstance(paths, list) or any(not isinstance(p, str) for p in paths)
+           or len(paths) != len(set(paths)) for paths in bindings.values()):
         raise ValueError("each binding must be a unique pointer list")
+    domains, slot_domains = source_domains(state, ids, eids)
+    for key, paths in bindings.items():
+        if not set(paths) <= domains[key]:
+            raise ValueError(f"source role mismatch for {key}")
+    identities = {
+        "central_claim": [f"/claims/{indices[ids[0]]}/statement"],
+        "supporting_claims": [f"/claims/{indices[cid]}/statement" for cid in ids[1:]],
+        "main_contribution": [f"/claims/{indices[manifest['main_contribution_id']]}/statement"],
+    }
+    if any(bindings[key] != paths for key, paths in identities.items()):
+        raise ValueError("claim bindings must refer to the selected claim identities")
     semantics = {key: [pointer(state, p) for p in bindings[key]] for key in FIELDS}
     expected = {
         "central_claim": [claims[ids[0]]["statement"]],
@@ -176,8 +259,10 @@ def freeze(state, manifest):
         raise ValueError("all six slots must have source bindings")
     slots = {}
     for key, paths in manifest["slots"].items():
-        if not isinstance(paths, list) or not paths:
+        if not isinstance(paths, list) or not paths or any(not isinstance(p, str) for p in paths):
             raise ValueError(f"slot {key} must be nonempty")
+        if len(paths) != len(set(paths)) or not set(paths) <= slot_domains[key]:
+            raise ValueError(f"source role mismatch for slot {key}")
         slots[key] = [pointer(state, path) for path in paths]
     snapshot = {"schema": "narrative-realization@1", "state_digest": state_digest(state),
                 "state_version": state["state_version"], "manifest": copy.deepcopy(manifest),

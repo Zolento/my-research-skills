@@ -137,6 +137,29 @@ class TestSensitivity(unittest.TestCase):
         self.assertEqual(rr.sensitivity(*args)["status"], "RHETORICALLY_FRAGILE")
         self.assertNotEqual(rr.select(*args)["selected_variant"], "V1")
 
+    def test_overstatement_disagreement_is_fragile_and_visible(self):
+        args = evaluation_fixture()
+        args[-1][0]["response"]["unsupported_or_overstated_claims"] = ["Unsupported novelty"]
+        audit = rr.sensitivity(*args)
+        self.assertEqual(audit["status"], "RHETORICALLY_FRAGILE")
+        self.assertEqual(audit["variants"]["V1"]["unsupported_by_judge"]["J1"],
+                         ["Unsupported novelty"])
+        self.assertNotEqual(rr.select(*args)["selected_variant"], "V1")
+
+    def test_constant_overstatement_is_stable_but_never_eligible(self):
+        args = evaluation_fixture()
+        for probe in args[-1]:
+            probe["response"]["unsupported_or_overstated_claims"] = ["Unsupported novelty"]
+        self.assertEqual(rr.sensitivity(*args)["status"], "STABLE")
+        self.assertEqual(rr.select(*args)["status"], "NO_ELIGIBLE_VARIANT")
+
+    def test_overstatement_list_order_does_not_create_fragility(self):
+        args = evaluation_fixture()
+        for i, probe in enumerate(args[-1]):
+            claims = ["Unsupported novelty", "Unsupported scope"]
+            probe["response"]["unsupported_or_overstated_claims"] = claims if i % 3 else claims[::-1]
+        self.assertEqual(rr.sensitivity(*args)["status"], "STABLE")
+
     def test_scientific_judgment_change_is_diagnostic_only(self):
         args = evaluation_fixture()
         for probe in args[-1]:
@@ -285,6 +308,62 @@ class TestAdversarialEquivalence(unittest.TestCase):
             manifest["bindings"][field] = []
             manifest["empty_reasons"][field] = "Hide it"
             with self.subTest(field=field), self.assertRaises(ValueError):
+                rv.freeze(self.state, manifest)
+
+    def test_source_roles_cannot_be_substituted(self):
+        for kind, field, paths in (
+                ("bindings", "comparators", ["/claims/0/statement"]),
+                ("bindings", "numerical_values", ["/uncertainties/0/question"]),
+                ("slots", "S5", ["/uncertainties/0/question"]),
+                ("slots", "S3", ["/literature/0/ref"])):
+            manifest = copy.deepcopy(self.snapshot["manifest"])
+            manifest[kind][field] = paths
+            with self.subTest(kind=kind, field=field), self.assertRaisesRegex(ValueError, "source role"):
+                rv.freeze(self.state, manifest)
+
+    def test_unselected_ungrounded_claim_cannot_enter_slots(self):
+        state = copy.deepcopy(self.state)
+        claim = copy.deepcopy(state["claims"][0])
+        claim.update(id="C99", status="ungrounded", supporting_evidence=[], refuting_evidence=[],
+                     parent=None, subclaims=[], known_flaws=[])
+        state["claims"].append(claim)
+        self.assertEqual(rv.state_check.check_state(state).exit_code, 0)
+        manifest = copy.deepcopy(self.snapshot["manifest"])
+        manifest["slots"]["S3"].append("/claims/2/statement")
+        with self.assertRaisesRegex(ValueError, "source role"):
+            rv.freeze(state, manifest)
+
+    def test_same_text_from_wrong_claim_identity_is_rejected(self):
+        state = copy.deepcopy(self.state)
+        state["claims"][1]["statement"] = state["claims"][0]["statement"]
+        self.assertEqual(rv.state_check.check_state(state).exit_code, 0)
+        manifest = copy.deepcopy(self.snapshot["manifest"])
+        manifest["bindings"]["central_claim"] = ["/claims/1/statement"]
+        with self.assertRaisesRegex(ValueError, "claim identities"):
+            rv.freeze(state, manifest)
+
+    def test_referenced_planned_experiment_is_not_observed_result(self):
+        state = copy.deepcopy(self.state)
+        state["experiments"][0].update(status="planned", prereg=None, result_at=None)
+        self.assertEqual(rv.state_check.check_state(state).exit_code, 0)
+        with self.assertRaisesRegex(ValueError, "completed and valid"):
+            rv.freeze(state, self.snapshot["manifest"])
+
+    def test_boundary_source_leaves_remain_supported(self):
+        manifest = copy.deepcopy(self.snapshot["manifest"])
+        manifest["slots"]["S6"].extend(["/uncertainties/0/question", "/assumptions/0/if_false"])
+        snapshot = rv.freeze(self.state, manifest)
+        self.assertTrue(all(rv.validate(self.state, snapshot, v)["status"] == "PASS"
+                            for v in rr.generate(self.state, snapshot)))
+
+    def test_non_string_and_duplicate_source_pointers_are_rejected(self):
+        for kind, field, paths in (("bindings", "comparators", [None]),
+                                   ("slots", "S5", [None]),
+                                   ("bindings", "comparators", ["/literature/0/ref"] * 2),
+                                   ("slots", "S5", ["/experiments/0/result"] * 2)):
+            manifest = copy.deepcopy(self.snapshot["manifest"])
+            manifest[kind][field] = paths
+            with self.subTest(kind=kind, paths=paths), self.assertRaises(ValueError):
                 rv.freeze(self.state, manifest)
 
     def test_boundary_position_identical_for_every_profile(self):

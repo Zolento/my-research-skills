@@ -77,6 +77,20 @@ G1–G5 是证据门禁，任何 fail 不可被分数救回；新 RE 门禁是�
 | recommendation guard | 任一恢复 FAIL 不推荐；模型/plan/来源完整性及固定 tie 顺序：36 个新增测试 PASS；release_check PASS（492 tests / 4 skips） |
 | R12 integration | SKILL / README / presets / roles / scoring / State 权限说明 / examples / 模板已同步；来源载体冲突已改正文，schema 不变；release_check PASS（492 tests / 4 skips），git diff --check 干净 |
 
+## 安装前复核
+
+复现并修复两个 manifest 来源域绕过：comparator 误绑 central claim、S5 误绑
+uncertainty question 原先可通过 freeze。现在按字段/槽位检查来源角色及选中对象身份，
+拒绝未选 ungrounded claim 与 planned 实验，保留原 fixture 的合法 boundary leaf。
+这不替代 D4a 的科学语义审计，不修改 State schema 或原有阶段。
+
+另一个诊断缺口是某 profile 被标 overstatement 而其它 profile 未被标时仍返回 STABLE。
+现在记录逐 judge 的 overstatement 集合变化并标 RHETORICALLY_FRAGILE；常量错误仍
+不可推荐，但不被误当成措辞变化；条目重排不触发 false positive。
+新增 9 个复核回归测试，覆盖上述反例、同文本错误 claim 身份、重复/非字符串指针。
+复核结果：45 个 R12 测试 PASS；完整 release_check PASS（501 tests / 4 既有 skips），
+State selftest、规则/权限表 parity、结构等价及四套正文 RE 门禁均通过；git diff --check 干净。
+
 ## 交付验证与剩余问题
 
 - D4a 科学审计仍是 snapshot 的信任边界；hash 不是签名，不证明原 State 正确。
