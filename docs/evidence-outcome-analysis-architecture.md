@@ -59,3 +59,49 @@ A central experimental hypothesis cannot be automatically falsified by one run.
 
 Development notes remain at branch root docs and are excluded from any future main
 merge. Runtime references contain only skill guidance and relevant examples.
+
+## Implementation review
+
+The first transition suite passed 31 tests. A second review added refusal of
+stopped executions, stale-decision HOLD, policy-removal detection, alternative
+assessment binding, explicit cleared holds and no-overwrite output. The expanded
+suite passes 38 tests. A mixed source packet now separately records performance,
+mechanism and stress outcomes rather than changing only metadata verdicts.
+
+Pending results stay in running pipeline lifecycle with result_pending until the
+receipt and terminal state can be recorded atomically. Invalid attempts preserve
+previous scientific support; uncertainty and local evidence receive provenance.
+Historical adoption returns an unaccepted backfill snapshot until coverage is
+complete. Flat validation contexts avoid recursively expanding source histories.
+
+An independent forward test used only a source state, raw numeric packet and the
+skill instructions. It preserved uncertain validity, accepted a bounded unresolved
+receipt and returned HOLD without Assurance. Exact scope binding required a label
+correction; the limitation is documented. Its observation that the legacy experiment
+interpretation remained stale led to synchronizing the audited scientific summary.
+This was an isolated same-model protocol exercise, not an independent model benchmark.
+
+A further compatibility conflict is V3: an ungrounded claim cannot have any E adjacency,
+even negative adjacency. WEAKENED now preserves its ungrounded lifecycle, records the
+scientific outcome independently, and links negative E via claim_target, receipt and
+Failure Memory. Supported claims can downgrade to partially-supported; FALSIFIED
+claims can become contradicted through the existing R10 disposition. No original
+rule is relaxed and no negative result manufactures positive support.
+
+## Final validation
+
+The final Evidence Outcome suite passes 47 tests, including all eighteen requested
+counterexamples and source/history/planning/decision mutations. The complete pipeline
+release passes 548 tests with four unchanged baseline skips, original S1–S7/V1–V24
+parity, read/write parity, Structural Equivalence, Rhetorical Realization and all
+five shipped outcome transactions. The unchanged manuscript reviser release passes
+106 tests and the figure architect passes 47 tests. git diff --check is clean.
+
+The generic system skill validator rejects the pre-existing argument-hint frontmatter
+on both main and this branch. That existing interface was preserved. The repository's
+release validator and its frontmatter/link/package checks pass. This is not described
+as a new runtime error or as an all-model scientific accuracy guarantee.
+
+Followups remain plans. apply does not execute them or write scheduler telemetry;
+the R11 caller retains its original EIG and scheduling responsibilities. The independent
+review's conservative unknown-validity path is compatible with that division.
