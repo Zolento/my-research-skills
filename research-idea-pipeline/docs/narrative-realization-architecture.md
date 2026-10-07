@@ -72,3 +72,4 @@ G1–G5 是证据门禁，任何 fail 不可被分数救回；新 RE 门禁是�
 | equivalence policy | 明确 RE1–RE5、14 项冻结、原句恢复和完整多模型面板；原 release_check PASS |
 | realization generation | 2 个只读/四 profile 测试 PASS；source fixture 通过 State gate；release_check PASS（458 tests / 4 skips） |
 | blind claim recovery | 8 个新增测试 PASS；无 truth 泄漏、三值恢复、overstatement/overall score 拒绝、双模型完整面板；release_check PASS（464 tests / 4 skips） |
+| sensitivity audit | 14 个新增测试 PASS；配对 range/variance/disagreement、类别判断漂移、缺数据 INCOMPLETE、最差恢复排序；release_check PASS（470 tests / 4 skips） |

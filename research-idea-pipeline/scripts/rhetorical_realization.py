@@ -139,6 +139,85 @@ def panel(state, snapshot, variants, plan, probes):
     return errors, scored
 
 
+def _spread(values):
+    mean = sum(values) / len(values)
+    return {"range": max(values) - min(values),
+            "variance": sum((x - mean) ** 2 for x in values) / len(values),
+            "disagreement": 1 - max(values.count(x) for x in set(values)) / len(values)}
+
+
+def sensitivity(state, snapshot, variants, plan, probes):
+    """Paired per-model perturbation audit. Pooled averages never certify stability."""
+    errors, scored = panel(state, snapshot, variants, plan, probes)
+    if errors:
+        return {"status": "INCOMPLETE", "errors": errors}
+    has_judgment = ["scientific_judgment" in p["response"] for p in probes]
+    if any(has_judgment) and not all(has_judgment):
+        return {"status": "INCOMPLETE", "errors": ["categorical judgments require complete paired coverage"]}
+    by_judge, between, diagnostics, reasons = {}, {}, {}, []
+    for j in plan["judges"]:
+        jid = j["judge_id"]
+        by_judge[jid] = {}
+        for metric in METRICS:
+            values = [LEVEL[scored[(v["variant_id"], jid)]["metrics"][metric]] for v in variants]
+            spread = _spread(values)
+            by_judge[jid][metric] = spread
+            if spread["range"] >= plan["fragility_range_threshold"]:
+                reasons.append(f"{jid}: {metric} paired range={spread['range']}")
+        if all(has_judgment):
+            values = {p["response"]["scientific_judgment"] for p in probes if p["judge_id"] == jid}
+            if len(values) > 1:
+                reasons.append(f"{jid}: scientific judgment changes across equivalent profiles")
+    for v in variants:
+        vid = v["variant_id"]
+        per_model = [scored[(vid, j["judge_id"])] for j in plan["judges"]]
+        worst = {m: min((x["metrics"][m] for x in per_model), key=LEVEL.get) for m in METRICS}
+        between[vid] = {m: _spread([LEVEL[x["metrics"][m]] for x in per_model]) for m in METRICS}
+        distance = 0
+        for j in plan["judges"]:
+            jid = j["judge_id"]
+            for m in METRICS:
+                a = LEVEL[scored[(vid, jid)]["metrics"][m]]
+                distance = max(distance, *(abs(a - LEVEL[scored[(other["variant_id"], jid)]["metrics"][m]])
+                                           for other in variants))
+        diagnostics[vid] = {"worst_recovery": worst, "max_paired_distance": distance,
+                            "judge_disagreement": max(x["disagreement"] for x in between[vid].values()),
+                            "eligible": all(x["eligible"] for x in per_model)}
+        for j in plan["judges"]:
+            result = scored[(vid, j["judge_id"])]
+            for key in ("central_claim", "closest_prior_work_delta"):
+                if result["field_results"][key]["unexpected"]:
+                    reasons.append(f"{j['judge_id']}/{vid}: incorrect {key} interpretation")
+    return {"status": "RHETORICALLY_FRAGILE" if reasons else "STABLE", "errors": [],
+            "reasons": reasons, "paired_by_judge": by_judge, "between_judges": between,
+            "variants": diagnostics, "snapshot_digest": snapshot["snapshot_digest"],
+            "note": "Ordinal diagnostics within this fixed panel only; not scientific evidence or reviewer consensus."}
+
+
+def select(state, snapshot, variants, plan, probes):
+    """Realization choice inside one hierarchy. D5/G1–G5/D8 still follow."""
+    audit = sensitivity(state, snapshot, variants, plan, probes)
+    if audit["status"] == "INCOMPLETE":
+        return {"status": "INCOMPLETE", "selected_variant": None, "audit": audit}
+    eligible = [v for v in variants if audit["variants"][v["variant_id"]]["eligible"]]
+    if not eligible:
+        return {"status": "NO_ELIGIBLE_VARIANT", "selected_variant": None, "audit": audit}
+    # Tie order comes from preregistration, not caller-provided list ordering.
+    profile_order = plan["profiles"]
+
+    def key(v):
+        result = audit["variants"][v["variant_id"]]
+        return (tuple(LEVEL[result["worst_recovery"][m]] for m in METRICS),
+                -result["max_paired_distance"], -result["judge_disagreement"],
+                -profile_order.index(v["profile"]))
+
+    winner = max(eligible, key=key)
+    return {"status": "SELECTED", "selected_variant": winner["variant_id"], "audit": audit,
+            "selection_basis": "semantic PASS; zero unsupported/incorrect claims; worst claim, evidence, delta, boundary recovery; lower fragility; fixed tie order",
+            "submission_ready": False,
+            "next": "D5 adversarial review, then original D6–D9; fragile diagnosis must remain visible"}
+
+
 def generate(state, snapshot):
     """Generate the entire pre-registered batch once; audit EVERY variant."""
     reg = registry()
@@ -170,6 +249,12 @@ def main(argv=None):
     p = sub.add_parser("plan", help="pre-register a multi-model panel before generating responses")
     p.add_argument("--snapshot", type=Path, required=True)
     p.add_argument("--judges", type=Path, required=True)
+    for name in ("audit", "select"):
+        p = sub.add_parser(name, help="evaluate the complete pre-registered paired panel")
+        p.add_argument("--state", type=Path, required=True)
+        p.add_argument("--batch", type=Path, required=True)
+        p.add_argument("--plan", type=Path, required=True)
+        p.add_argument("--probes", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         read = lambda p: json.loads(p.read_text(encoding="utf-8"))
@@ -181,13 +266,17 @@ def main(argv=None):
             result = blind_task(read(args.variant)["text"])
         elif args.command == "plan":
             result = evaluation_plan(read(args.snapshot), read(args.judges))
+        elif args.command in ("audit", "select"):
+            batch = read(args.batch)
+            func = sensitivity if args.command == "audit" else select
+            result = func(read(args.state), batch["snapshot"], batch["variants"], read(args.plan), read(args.probes))
         else:
             result = score_recovery(read(args.snapshot), read(args.response))
     except (OSError, ValueError, TypeError, KeyError, IndexError) as exc:
         print(json.dumps({"status": "FAIL", "errors": [str(exc)]}, ensure_ascii=False))
         return 4
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 3 if result.get("status") == "INVALID" else 0
+    return 3 if result.get("status") in ("INVALID", "INCOMPLETE", "NO_ELIGIBLE_VARIANT", "RHETORICALLY_FRAGILE") else 0
 
 
 if __name__ == "__main__":
