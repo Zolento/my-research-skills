@@ -213,6 +213,18 @@ R12 的哲学是 **claim-first, evidence-constrained, narrative-last**：
 
 ---
 
+## Evidence Outcome Analysis（内部能力）
+
+实验结果先经过 R9.O，再经 R10/R11 回写 scientific state。支持 positive、negative、mixed、
+inconclusive 与 invalid 分类，逐 claim/hypothesis 更新 scope 内支持状态。14 类 failure
+attribution 要求来源与替代解释，核心实验否证受预先冻结的 replication 标准约束。
+PIVOT/STOP 固化 negative knowledge 与 stop rule，Discovery/Planning 读取并约束下一动作。
+Narrative 不参与科学状态回写。原有 S/V 枚举保持兼容，启用 policy 后增加 EO1 门禁。
+
+入口规则见 [outcome workflow](references/evidence-outcome-analysis.md)，字段与命令见
+[outcome contract](references/evidence-outcome-contract.md)，可执行例子见
+[outcome examples](examples/evidence-outcome/README.md)。
+
 ## 全局硬约束（摘要，完整见 [SKILL.md §1](SKILL.md)）
 
 ### 1. 文献检索：先尝试 web search，再本地与多源

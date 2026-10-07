@@ -23,7 +23,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
-  version: "2.2.0"
+  version: "2.3.0"
   upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 
@@ -76,7 +76,7 @@ R0 研究契约 ─▶ R1 Research World Model ─▶ R2 领域测绘
   R5 共演化检索 R6 进化                         R10 元认知修复 R13 artifact 审计
               └───────────────────┬───────────────────────────┘
                                   ▼
-             R9 实验树 ─▶ R10 修复 ─▶ R11 回写 World Model
+             R9 实验树 ─▶ R9.O Outcome Analysis ─▶ R10 修复 ─▶ R11 回写 World Model
                                   ▼
              R12 叙事 ─▶ R13 审查 ─▶ R14 决策（continue | pivot | archive | submit）
 ```
@@ -921,12 +921,17 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **R1 常驻：** 维护八类一等对象；**不是一次调用**，任何阶段开工前先读、收工前写回。
 - **硬规则：** R0 **不得**产出 `claims[]`，**不写** `assurance[]`（后者由 R7 写）；
   契约期锚点是 **provisional**，由 R1 的 Anchor Eligibility Test 复核。
+- **新项目：** 按 [outcome contract](references/evidence-outcome-contract.md) 冻结 `contract.outcome_policy`。
+  旧项目显式回填历史 outcome，不将缺日志的实验伪造为已审计。原始八类对象与 lifecycle 枚举不变。
 
 ### R9 / R10 / R11 — 实验循环与修复门
 
 - **R9：** 实验树 `X1—X6`（`X2` 只做基线校准，**不得承担 claim 判别**）；
   用 **EIG** 选下一个实验：`e* = argmax E[ΔU|e]/cost(e)`，必须写出「改变哪条 `U` / 方向 / 成本口径」，
   并把预测值写进 `scheduler.json` 的 `predicted_information_gain`。
+- **R9.O：** 每次结果先做 [Evidence Outcome Analysis](references/evidence-outcome-analysis.md)，
+  区分有效负证据、mixed outcome、未决推断与无效执行，逐 claim/hypothesis 给出 scoped update。
+  独立审计通过后才经 R10/R11 回写。PIVOT/STOP 固化 stop rule，下一轮 Discovery/Planning 必须读取。
 - **R10：** **critical flaw ⇒ state 必须改变**；处置五值 `REPAIR_CLAIM|RUN_TEST|FIX_IMPLEMENTATION|NARROW_SCOPE|KILL_BRANCH`；
   关闭两值 `RESOLVED|ACCEPTED_LIMITATION`；落盘三元组 `flaw/disposition/state_delta/closure`。
 - **R11：** `result → claim update → uncertainty update → EIG 回填 → next experiment` **五步**，缺一不可。

@@ -27,6 +27,8 @@
        —— Structural Equivalence 的 `EQ1`—`EQ13` + `NN1`—`NN14`（只查审计完整性，不宣判 novelty）
     8. Rhetorical Realization 来源冻结 + 四个实际正文的 RE1–RE5 审计
        —— 文本攻击注入测试必须能把发布闸门判红
+    9. Evidence Outcome 的五份来源绑定示例、状态回写和 Assurance 决策
+       —— 原始结果变异必须让发布闸门判红
 
 退出码
 ------
@@ -214,6 +216,32 @@ def step_rhetorical_realization() -> Tuple[bool, str]:
     return True, f"冻结来源 + {len(variants)} 份实际正文全通过 RE 门禁"
 
 
+def step_evidence_outcome() -> Tuple[bool, str]:
+    """Exercise independent shipped artifacts through proposal, state and decision gates."""
+    import evidence_outcome as eo
+    import state_check as sc
+    paths = sorted((ROOT / 'examples' / 'evidence-outcome').glob('*.json'))
+    required = {'positive', 'valid-negative', 'invalid-experiment', 'pivot', 'mixed'}
+    if {p.stem for p in paths} != required:
+        return False, 'positive/negative/invalid/pivot/mixed artifact coverage differs'
+    for path in paths:
+        case = json.loads(path.read_text(encoding='utf-8'))
+        if case.get('schema') != 'evidence-outcome-example@1' or case.get('scenario') != path.stem:
+            return False, f'{path.name}: invalid example envelope'
+        gate = eo.validate(case['state'], case['packet'], case['analysis'], case['audit'])
+        if gate['status'] != 'PASS' or gate['outcome'] != case['expected_outcome']:
+            return False, f'{path.name}: outcome gate {gate}'
+        result = eo.apply(case['state'], case['packet'], case['analysis'], case['audit'], timestamp=case['timestamp'])
+        if result['status'] != 'PASS' or not sc.check_state(result['state']).ok:
+            return False, f'{path.name}: state transaction {result}'
+        decision = eo.decision_gate(result['state'], case['packet']['experiment_id'], case['assurance'])
+        if decision['status'] != 'PASS' or [d['action'] for d in decision['decisions']] != case['expected_decisions']:
+            return False, f'{path.name}: Assurance decision {decision}'
+        if result['state'].get('narrative_view') != case['state'].get('narrative_view'):
+            return False, f'{path.name}: communication view was modified'
+    return True, f'{len(paths)} 份来源/状态/决策全通过 EO 门禁（科学判断为示例，不是模型准确率）'
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),
     ("state_check --selftest", step_selftest),
@@ -223,6 +251,7 @@ STEPS = (
     ("文档引用的脚本存在", step_referenced_scripts_exist),
     ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
     ("Rhetorical Realization（RE1–RE5）来源与正文", step_rhetorical_realization),
+    ("Evidence Outcome 来源/回写/Assurance/决策", step_evidence_outcome),
 )
 
 

@@ -1,0 +1,9 @@
+{
+  "schema": "evidence-outcome-policy@1",
+  "frozen_at_state_version": 0,
+  "min_valid_runs": 2,
+  "min_seeds": 2,
+  "min_datasets": 1,
+  "require_independent_replication": false,
+  "min_verification_tier": "T2"
+}
