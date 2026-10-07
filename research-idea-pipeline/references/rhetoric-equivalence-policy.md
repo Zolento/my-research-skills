@@ -70,9 +70,10 @@ failure cases。任一 unsupported_or_overstated_claims 非空，候选不得被
 
 同一 snapshot 固定至少两个不同 model ID 的 judge 面板，variant IDs 在盲评时隐藏。
 同一模型换两个角色不算模型独立性。选择前必须有同一面板的完整覆盖。
-先筛 semantic PASS 和零 unsupported，再依次比较每维**最差**恢复：claim → evidence →
+先筛 semantic PASS、零 unsupported/错误解释且四维均无 FAIL，再依次比较每维**最差**恢复：claim → evidence →
 novelty delta → boundary；不合成 reviewer overall score，不删差结果。
 同恢复水平优先低 fragility；仍相同则 neutral / 固定预登记顺序。
+没有达到最低恢复条件的 variant 时返回 NO_ELIGIBLE_VARIANT，不推荐“最佳 wording”。
 D8 原六维比较仍只比较科学 hierarchy，不拿 realization 恢复度改科学贡献评价。
 
 ## 4. Rhetorical sensitivity

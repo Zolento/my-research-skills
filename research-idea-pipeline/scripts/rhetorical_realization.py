@@ -103,7 +103,8 @@ def score_recovery(snapshot, response):
     overstated = response["unsupported_or_overstated_claims"]
     return {"status": "VALID", "errors": [], "metrics": metrics, "field_results": details,
             "unsupported_or_overstated_claims": copy.deepcopy(overstated),
-            "eligible": not overstated and not any(d["unexpected"] for d in details.values())}
+            "eligible": not overstated and not any(d["unexpected"] for d in details.values())
+                        and all(value != "FAIL" for value in metrics.values())}
 
 
 def panel(state, snapshot, variants, plan, probes):

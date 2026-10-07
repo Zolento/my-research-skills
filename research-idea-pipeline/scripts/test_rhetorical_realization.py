@@ -163,6 +163,27 @@ class TestSensitivity(unittest.TestCase):
                 probe["response"]["unsupported_or_overstated_claims"] = ["Unsupported novelty"]
         self.assertEqual(rr.select(*args)["selected_variant"], "V3")
 
+    def test_no_claim_recovered_does_not_produce_a_recommendation(self):
+        args = evaluation_fixture()
+        for probe in args[-1]:
+            probe["response"]["central_claim"] = []
+        result = rr.select(*args)
+        self.assertEqual(result["status"], "NO_ELIGIBLE_VARIANT")
+        self.assertIsNone(result["selected_variant"])
+
+    def test_changed_plan_models_profiles_or_source_make_panel_incomplete(self):
+        for mutate in (lambda a: a[3]["judges"][0].update(model_id="replacement"),
+                       lambda a: a[2].pop(),
+                       lambda a: a[0]["uncertainties"][0].update(question="A new research question"),
+                       lambda a: a[-1][0].update(model_id="not-the-registered-model")):
+            args = evaluation_fixture()
+            mutate(args)
+            self.assertEqual(rr.sensitivity(*args)["status"], "INCOMPLETE")
+
+    def test_selection_uses_preregistered_tie_order_not_caller_batch_order(self):
+        state, snapshot, variants, plan, probes = evaluation_fixture()
+        self.assertEqual(rr.select(state, snapshot, list(reversed(variants)), plan, probes)["selected_variant"], "V1")
+
 
 class TestAdversarialEquivalence(unittest.TestCase):
     def setUp(self):

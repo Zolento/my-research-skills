@@ -74,3 +74,21 @@ G1–G5 是证据门禁，任何 fail 不可被分数救回；新 RE 门禁是�
 | blind claim recovery | 8 个新增测试 PASS；无 truth 泄漏、三值恢复、overstatement/overall score 拒绝、双模型完整面板；release_check PASS（464 tests / 4 skips） |
 | sensitivity audit | 14 个新增测试 PASS；配对 range/variance/disagreement、类别判断漂移、缺数据 INCOMPLETE、最差恢复排序；release_check PASS（470 tests / 4 skips） |
 | adversarial cases | 33 个新增测试 PASS，含全部八 case、14 字段变异、正文/来源/预算/CLI/release 注入；release_check PASS（489 tests / 4 skips） |
+| recommendation guard | 任一恢复 FAIL 不推荐；模型/plan/来源完整性及固定 tie 顺序：36 个新增测试 PASS；release_check PASS（492 tests / 4 skips） |
+
+## 交付验证与剩余问题
+
+- D4a 科学审计仍是 snapshot 的信任边界；hash 不是签名，不证明原 State 正确。
+- 正文编译器故意使用保守原句与完整 source records；未实现任意自由 paraphrase。
+  exact-unit 恢复可能把语义正确的 paraphrase 判 FAIL，需要未来独立 adjudication。
+- 盲 judge 的隔离、actual model ID 和执行日志由调用者保证；无模型 API provider 集成。
+  本次只有离线 synthetic responses，没有伪造或声称完成真实多模型实验。
+- main 的已知四个 skips 保留；包含老 state_check 无法识别阶段写入归属的缺口。
+  新 RE 可比较 freeze 前后，封住本层的科学 State 变更；不迁移全 pipeline。
+- skill-creator quick_validate 在本分支与 main 都因既有 argument-hint frontmatter 失败。
+  保留现有入口契约，未为了通用校验器删字段；以仓库 release_check 为发布判据。
+- 网络不可用导致不能验证远端最新 main；当前开发基线始终是本地 fd2b63e。
+
+Next experiment：固定 State/hierarchy/budget，生成四 profile，预登记多模型面板，盲化身份；
+记录 claim/evidence/delta/boundary 恢复及 paired fragility，再用 held-out reviewer 面板复核。
+与 score-selection 的离线对照 arm 比较跨模型稳定性；overall score 不反馈给本选择器。
