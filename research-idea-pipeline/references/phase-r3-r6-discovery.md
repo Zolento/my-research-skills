@@ -74,9 +74,9 @@
 - **检索必须走 R2 / R5**（或等价的
   [literature_search.py](../scripts/literature_search.py) 调用），
   按 [literature-policy.md](literature-policy.md) 规范检索**本地 + 多源**
-  （先本地、再 arxiv；**本地命中不是终点，仍须扩检**，429 指数退避）。
+  （先尝试 web search，再本地与多源；**命中仍须核验与扩检**，429 指数退避）。
 - **禁止内联自行实现一套检索。** 自行实现检索会**绕开 R2 / R5 的全部纪律**
-  （T1—T7 触发、L3 饱和判据、每源状态、负检索记录）。走 R2 / R5 / 等价脚本时，必须
+  （T1—T8 触发、L3 饱和判据、每源状态、负检索记录）。走 R2 / R5 / 等价脚本时，必须
   保留其**检索式、每源状态与负检索记录**。
 - **注意：本次调研支撑后续的创新性审核，属于 T4 / T5 触发场景**（**本节是概念级快筛，
   按 T4 的例外执行 L2**，见 [literature-policy.md](literature-policy.md) §2 的 T4 行），
@@ -552,6 +552,11 @@ R6: Recombine            才允许不同世界互相借东西
 3. 由 **scheduler** 决定下一步（`next_action_policy` 的 `paradigm_escape_if_stagnant`：
    reseed / 换算子 / 交 R7）；
 4. **只有能提炼成一个具体科学问题时**，才新增 `U<n>`。
+
+当前候选耗尽或诊断不再改变方法决定时，也应重选探索动作，见 [scheduler-policy.md](scheduler-policy.md) §3.1。
+历史 niche 覆盖完整不代表当前没有停滞。
+方法瓶颈按 [phase-r2-r5-field-mapping-retrieval.md](phase-r2-r5-field-mapping-retrieval.md) §R5.1 补检索。
+使用交接线索生成或改造方法，不把文献碰撞当作生成前的 novelty 淘汰门。
 
 **「两轮没收敛」本身不是科学未知。** 它描述的是**搜索过程行为**。
 能进 `uncertainties[]` 的必须是**具体命题**，例如

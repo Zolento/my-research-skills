@@ -29,7 +29,7 @@ research-idea-pipeline/
 │   ├── project-intake.md             # 存量项目接管清单（9 维度；已有信息不得重复询问）
 │   ├── claim-first-policy.md         # claim 语义：证据台账 + Claim Graph C0—C5 + 可证伪 central proposition + Anchor Eligibility
 │   ├── evidence-policy.md            # 措辞等级 ↔ 认知状态（唯一定义）
-│   ├── literature-policy.md          # 禁止只停留在本地；T1—T7 扩检；L1/L2/L3；饱和判据
+│   ├── literature-policy.md          # 禁止只停留在本地；T1—T8 扩检；L1/L2/L3；饱和判据
 │   ├── scoring-policy.md             # 两层评分：硬门禁 G1—G5 + 排序六维；极性归一化/中位数/一票否决
 │   ├── roles.md                      # 共享角色：八攻击面审稿人 + 证据核验员；venue 角色仅作 R12/R13 校准
 │   ├── narrative-patterns.md         # 十套叙事 preset（N1—N10，**只用于 R12**；QD niche 是七个独立科学结构轴）+ (O,T,R) 选 preset + 六槽位 S1—S6
@@ -207,9 +207,11 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 
 ## 全局硬约束（摘要，完整见 [SKILL.md §1](SKILL.md)）
 
-### 1. 文献检索：先本地，后多源 —— **禁止只停留在本地**
+### 1. 文献检索：先尝试 web search，再本地与多源
 
-本地是**起点与排序依据，不是终点**。凡触发下列任一条件，必须查**全部启用源**并扩大范围：
+先按 [literature-policy.md §1.1](references/literature-policy.md) 尝试 web search，核验发现的原始页面。
+再查本地与多源。工具不可用时记录并继续；明确离线时跳过。网页发现不能替代多源核验。
+凡触发下列任一条件，必须查**全部启用源**并扩大范围：
 
 | # | 触发条件 | 最低等级 |
 |---|---|---|
@@ -220,6 +222,7 @@ append-only。字段：日期 / 旧方向 → 新方向 / 类型（**增补** / 
 | T5 | 本地命中不足（< 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | "现有工作尚未……"式论断 | L2 强化 |
+| T8 | 方法瓶颈：已观察到性能平台、候选反复失败，或诊断不再改变方法决定且缺少新干预 | L2 强化 |
 
 - **尽职调查等级：** L1 快速 / L2 强化（≥4 检索式）/ L3 穷尽（≥8 检索式，含否定式与负结果）。
 - **饱和判据：** 连续两轮扩大检索零新增、或达上限、或达标且新增趋零。

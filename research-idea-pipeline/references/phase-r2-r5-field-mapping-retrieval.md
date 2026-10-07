@@ -8,7 +8,7 @@
 > 2. **未达饱和不得停止。** 停止时必须能说出依据（§A4）。
 
 
-> **小节号 `§A1`—`§A7` 是 R2 / R5 自己的流程序号**（不是旧命名残留）。
+> **小节号 `§A0`—`§A7` 是 R2 / R5 自己的流程序号**（不是旧命名残留）。
 
 ## 输入
 
@@ -26,6 +26,14 @@
 > 锚点未确认就做检索，容易漏掉决定成败的那一类文献。
 
 ---
+
+## A0. 先尝试 web search
+
+按 [literature-policy.md](literature-policy.md) §1.1 执行网页发现。
+先搜索当前问题的论文、作者实现与官方资料，再进入 A1 / A2。
+记录查询与实际打开的原始页面，将标题、DOI / arXiv ID 和机制术语传入后续检索。
+工具不可用或失败时，记录状态并继续 A1 / A2。明确离线请求不调用 web search。
+网页结果不替代多源、正文阅读或检索等级门槛。
 
 ## A1. 本地检索（起点，不是终点）
 
@@ -48,6 +56,7 @@
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 将写进文档的"现有工作尚未……"式论断 | L2 强化 |
+| T8 | 方法瓶颈：已观察到性能平台、候选反复失败，或诊断不再改变方法决定且缺少新干预 | L2 强化 |
 
 **执行要求：**
 
@@ -122,8 +131,9 @@ inverse problems / optimization / information theory / 其它 ML 领域 ——
 **脚本支持：** 三路 query 与通用扩检一样，用 `--also-query` 逐条显式传入；
 每路检索式与命中数记进 field-map 文档。**不得**只跑 `surface` 一路就声称已做结构检索。
 
-**R5 的产物 = closest structural prior set。** R5 **不下最终 verdict**（那是 R7 的）；
-它只负责把这个候选的最近结构前作集合交出去。R5 **不得**做 near-neighbor 淘汰。
+**R5 的结构审计产物 = closest structural prior set。** R5 **不下最终 verdict**（那是 R7 的）。
+方法瓶颈检索另交付 §R5.1 的方法线索，供 R3/R6 改造与 R8/R9 实验设计。
+R5 **不得**做 near-neighbor 淘汰。
 定义见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §25。
 
 ## A4. 饱和判定与输出
@@ -137,7 +147,7 @@ inverse problems / optimization / information theory / 其它 ML 领域 ——
 3. 已覆盖该等级要求的最少检索式数与结果数，且新增趋于 0。
 
 **不满足饱和就停止属于违规。** 因在线源不可用被迫停止时，必须标注
-"检索未达饱和，原因：<哪些源>不可用"并写入 `STATUS.md` 的 Critical uncertainties。
+"检索未达饱和，原因：<哪些源>不可用"。状态交接按 [literature-policy.md](literature-policy.md) §2.4 执行。
 
 ### A4.2 交付物
 
@@ -149,7 +159,7 @@ inverse problems / optimization / information theory / 其它 ML 领域 ——
 
 **其他交付物：**
 
-- **检索过程记录** —— 每轮检索式、命中数、是否扩大、扩大原因。
+- **检索过程记录** —— web search 查询与发现 URL、原始页面核验位置；后续多源的检索式、命中数、扩大原因。
 - **负检索记录（Negative Search Record）** —— L2/L3 必需：
   检索式列表 + 每式命中数 + **为什么这些命中不足以否定目标声明**。
   这是支撑"据本次检索未见"这一措辞的唯一依据。
@@ -193,11 +203,12 @@ inverse problems / optimization / information theory / 其它 ML 领域 ——
 2. **frontmatter：** `phase: R2 / R5 / type: field-map / status / created`。
 3. **更新该路线 `INDEX.md`（资产目录）：** `Key Documents` 新增本文件行，
    `Recent Research Changes` 加一行。
-4. **更新该路线 `STATUS.md`（当前状态）：** 先写回 `research-state.json`，再重新生成。
-   - 检索证实的结论 → **Strongest supported findings**；
-   - 被文献否定的假设 → **Most important negative findings**；
-   - 待核实的会议论文集条目、**检索未达饱和** → **Critical uncertainties**；
-   - 下一步补检索任务 → **Next recommended actions**。
+4. **按阶段权限写回 state，再生成 STATUS。** R5 仅写 literature / evidence。
+   - 检索缺口先写 field-map 的局限与交接小节。
+   - R2 的科学未知按其契约登记；R5 的科学影响交 R11，负向主张处置交 R10。
+   - 只要求检索时交付待交接项，不越权写 claim / hypothesis / uncertainty。
+   - 不手改 STATUS，也不把源不可用自动登记为 critical 科学未知。
+   - 归属权威定义见 [literature-policy.md](literature-policy.md) §2.4。
 5. **下载了 PDF 就必须建索引：** 本次调研若把任何 PDF 存进 `docs/refs/papers/`，
    必须在**同一步**写好 sidecar 元数据并重建索引：
 
@@ -284,7 +295,8 @@ I_t → Q_{t+1} → L_{t+1} → I_{t+1}
 
 **硬规则：**
 
-1. **每轮 R5 必须至少有一条 query 由最新候选的表述生成**，并写明它来自哪条候选。
+1. **每轮 R5 必须至少有一条 query 来自最新候选或当前瓶颈**，注明来源候选或观察记录。
+   候选耗尽时，以调度器传入的失败上下文构造 query，不得为满足输入而编造候选。
    例：候选把问题重述为「partial identifiability」，下一轮就该搜
    `partial identification under indirect observations`，**不是**继续搜 `prior adaptation`。
 2. **`literature[].relation` 六值关系必填**（`supports` / `contradicts` / `shares-assumption` /
@@ -294,11 +306,56 @@ I_t → Q_{t+1} → L_{t+1} → I_{t+1}
    [structural-equivalence-policy.md](structural-equivalence-policy.md) §10.3。
 3. **三路检索强制**：需要 Structural Equivalence 检查的候选必须做
    `surface ∪ facet ∪ structure-stripped`（§A3.1）。
-4. **检索纪律一字不动**：禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查等级、
+4. **检索纪律一字不动**：禁止只停留在本地、T1—T8 强制扩检、L1/L2/L3 尽职调查等级、
    429 退避 `10→20→40→80→160s`、代理环境识别、饱和判据、负检索记录 —— 全部见本文档正文与
    [literature-policy.md](literature-policy.md)。
 5. **R5 可以随时被 R3/R6 调用**（它是常驻服务）；它的产物只写 `literature[]` / `evidence[]`
    （`kind: literature`），**不得**直接写 `hypotheses[]`。
+
+---
+
+### R5.1 方法瓶颈检索与交接
+
+**触发与刷新权威定义见 [literature-policy.md](literature-policy.md) §2.3。**
+本节不新增阶段。R5 只登记文献与文献证据，方法写回仍由 R3/R6 执行。
+每轮开始前说明检索范围、预算与停止条件；无需为常规检索重复请求已有授权。
+
+**输入：** 当前瓶颈、来源候选或观察记录、失败范围、已试干预、约束和本轮预算。
+在 field-map 中关联瓶颈来源文件与记录 ID、查询日志、正文阅读位置和方法交接行。
+证据快照由相关结果、代码版本及配置确定；可以记录哈希或已有版本引用。
+状态版本变化或文档排版变化本身不是新证据。
+调度器或 R11 提供该上下文。不要更改本文末尾的 state 读写契约。
+
+**检索顺序：**
+
+1. 把失败现象改写成机制问题，说明尚未解释的是哪一部分。先按 A0 尝试 web search。
+2. 查询问题本身的解决方法、适用条件和已知失败模式。
+3. 查询相邻领域处理同类约束或信息结构的方法，不只重复项目名称。
+4. 从关键工作追溯前后引文，检查方法正文、附录及作者实现资料。
+5. 优先核对原论文、作者仓库和官方接口文档。记录资料位置与版本或日期。
+
+满足 Structural Equivalence 条件时，仍执行 §A3.1 的三路检索。
+本轮以解决瓶颈为目标，不要求在生成方法之前证明 novelty。
+
+**交付：** 在现有 field-map 的交接小节填写下表，不另建评分或状态对象。
+
+| 方法线索 | 来源与证据位置 | 适用条件及当前不匹配项 | 可改动构件与预期后果 | 最小对照及否证条件 | 下一步决定 |
+|---|---|---|---|---|---|
+| 已核实机制或待核实线索 | 论文节/式、代码路径与版本、官方资料页 | 当前设定满足什么、缺什么 | 相对现有方法具体改什么 | 如何区分简单替代解释 | 交 R3/R6 改造、交 R8/R9 设计或暂不采用 |
+
+来源事实、迁移推断和待验证假设必须分开写。
+只有摘要或搜索片段时，标注未核实正文。代码存在不代表机制已经验证。
+不能核验适用条件时，不得直接采用或宣称有效；可交给后续可行性检验。
+不得把作者数值当作当前项目的预期收益。
+
+每个采用或排除的方法线索都要说明它改变了哪个方法决定。
+未找到可用线索时，记录查过的问题族、无解原因及下一条搜索假设。
+不强制凑足候选数量，也不把相关文献列表当作突破口。
+
+**停止与回流：** 按 §A4 或预算停止检索，说明达成等级和缺口。
+持续执行授权下，交接后重选 R3/R6 或可执行实验，不能停在资料整理。
+同一证据下不重复相同查询。无新增线索时，重构问题或测试剩余假设。
+只要求检索、建议或审计时，完成本次范围后停止，不顺带实施方法。
 
 ---
 

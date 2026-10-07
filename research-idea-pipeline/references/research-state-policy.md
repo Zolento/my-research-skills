@@ -310,6 +310,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ### 3.5 `experiments[]` — Experiment Graph（`X<n>`）
 
+`id` 是实验编号，可继续使用 `X7`、`X20`、`X100`。实验数量不限于六个。
+`stage` 是六类实验目的，可以重复。例如 `id: X20, stage: X4`。
+不得把 `EXPERIMENT_STAGES` 当作 id 上限。登记失败时保留校验器原始错误，核对具体字段。
+
 **结论：每个实验节点必须携带完整 provenance；`stage` 只能是六段之一，`X2` 不得承担 claim 判别。**
 
 | 字段 | 取值 / 类型（逐字） | 必填 | 说明 |

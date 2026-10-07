@@ -838,7 +838,7 @@ def _check_near_neighbor(report: Report, doc: Dict[str, Any],
     collapse = doc.get("counterfactual_collapse")
     if isinstance(trust, list) and trust and isinstance(collapse, dict) \
             and collapse.get("collapse_result") == "does-not-collapse" \
-            and not (set(trust) & set(EXECUTABLE_TRUST)):
+            and not any(_enum_ok(item, EXECUTABLE_TRUST) for item in trust):
         report.add("NN5", "trust_basis",
                    "collapse_result 为 does-not-collapse 时，trust_basis 必须含可执行证据之一："
                    + " / ".join(EXECUTABLE_TRUST),
@@ -1059,7 +1059,7 @@ def _load_state(route: pathlib.Path) -> Tuple[Optional[Dict[str, Any]], Optional
         return None, f"找不到 research-state.json（{path}）"
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, f"research-state.json 不是合法 JSON：{exc}"
     if not isinstance(doc, dict):
         return None, "research-state.json 顶层不是对象"
@@ -1082,6 +1082,18 @@ def check_route(route_dir: pathlib.Path) -> Report:
         return report
     assert isinstance(state, dict)
 
+    # Validate container types before iterating or building hash-based indexes.
+    state_keys = ("claims", "evidence", "assumptions", "hypotheses", "experiments",
+                  "literature", "failures", "uncertainties", "assurance")
+    for key in state_keys:
+        entries = state.get(key, [])
+        if not isinstance(entries, list) or any(not isinstance(item, dict) for item in entries):
+            report.env_error = f"research-state.json 的 {key} 必须是对象数组"
+            return report
+        if key != "assurance" and any(not _text_ok(item.get("id")) for item in entries):
+            report.env_error = f"research-state.json 的 {key} 每项必须有非空字符串 id"
+            return report
+
     existing_ids = set()
     for key in ("claims", "evidence", "assumptions", "hypotheses", "experiments",
                 "literature", "failures", "uncertainties"):
@@ -1093,7 +1105,8 @@ def check_route(route_dir: pathlib.Path) -> Report:
                         for entry in state.get("hypotheses") or []
                         if isinstance(entry, dict)}
 
-    assurance = [entry for entry in state.get("assurance") or [] if isinstance(entry, dict)]
+    literature_ids = {entry["id"] for entry in state.get("literature", [])}
+    assurance = state.get("assurance", [])
     sena_records = [entry for entry in assurance
                     if entry.get("attack_type") == "structural-equivalence"]
 
@@ -1133,9 +1146,13 @@ def check_route(route_dir: pathlib.Path) -> Report:
             report.add("EQ2", f"{base}.target", "必须是 `H<n>` 或 `C<n>`", target)
         elif target not in existing_ids:
             report.add("EQ2", f"{base}.target", f"state 中不存在 id `{target}`", target)
-        for lit in record.get("literature") or []:
-            if lit not in existing_ids:
-                report.add("EQ3", f"{base}.literature", f"state 中不存在 `{lit}`", lit)
+        record_literature = _string_list(record.get("literature", []))
+        if record_literature is None:
+            report.add("EQ3", f"{base}.literature", "必须是字符串数组", record.get("literature"))
+        else:
+            for lit in record_literature:
+                if lit not in literature_ids:
+                    report.add("EQ3", f"{base}.literature", f"literature 中不存在 `{lit}`", lit)
 
     # --- EQ12 反向：磁盘 artifact 必须被 state 引用；并对每份被引用的 artifact 跑 artifact 规则 ---
     for path in _artifact_paths(route_dir):
@@ -1155,7 +1172,17 @@ def check_route(route_dir: pathlib.Path) -> Report:
         # NN10 / NN11 的 operator 触发检查只有 route 模式能做（需要 state 里的 operator）。
         doc, err = _load_json(path)
         if err is None and isinstance(doc, dict):
-            operator = (hypothesis_by_id.get(doc.get("candidate")) or {}).get("operator")
+            candidate = doc.get("candidate")
+            if not _text_ok(candidate) or candidate not in hypothesis_by_id:
+                report.add("EQ2", f"{rel}.candidate", "candidate 必须在 hypotheses 中存在", candidate)
+            expected_candidate = path.name.split(".", 1)[0]
+            if candidate != expected_candidate:
+                report.add("EQ12", f"{rel}.candidate", "candidate 必须与 artifact 文件名一致", candidate)
+            for key in ("closest_priors", "evidence"):
+                for lit in _string_list(doc.get(key)) or []:
+                    if lit not in literature_ids:
+                        report.add("EQ3", f"{rel}.{key}", f"literature 中不存在 `{lit}`", lit)
+            operator = (hypothesis_by_id.get(candidate) or {}).get("operator") if _text_ok(candidate) else None
             if operator in (THEORY_OPERATOR, REMOTE_ANALOGY_OPERATOR):
                 operator_report = Report(source=str(path))
                 _check_near_neighbor(operator_report, doc, operator=operator)
@@ -1168,7 +1195,7 @@ def check_route(route_dir: pathlib.Path) -> Report:
 def _load_json(path: pathlib.Path) -> Tuple[Any, Optional[str]]:
     try:
         return json.loads(path.read_text(encoding="utf-8")), None
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, str(exc)
 
 

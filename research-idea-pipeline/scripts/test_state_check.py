@@ -256,6 +256,17 @@ class TestValidState(unittest.TestCase):
         self.assertEqual(code, sc.EXIT_OK, msg=out + err)
         self.assertIn(f"V1—V{sc.RULE_ORDER[-1][1:]} 全部通过", out)
 
+    def test_experiment_ids_are_not_limited_to_stage_names(self) -> None:
+        doc = valid_state()
+        for number in range(20, 28):
+            experiment = copy.deepcopy(doc["experiments"][0])
+            experiment.update(id=f"X{number}", parent=None, next_branches=[])
+            doc["experiments"].append(experiment)
+        path = self.tmp.write(doc)
+        code, out, err = _run(str(path))
+        self.assertEqual(code, sc.EXIT_OK, out + err)
+        self.assertGreater(len(doc["experiments"]), len(sc.EXPERIMENT_STAGES))
+
     def test_valid_state_report_is_clean(self) -> None:
         report = sc.check_state(valid_state())
         self.assertTrue(report.ok)

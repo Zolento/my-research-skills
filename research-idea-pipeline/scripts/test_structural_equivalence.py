@@ -26,6 +26,8 @@ import pathlib
 import re
 import shutil
 import sys
+import subprocess
+from unittest import mock
 import tempfile
 import unittest
 from typing import Any, Dict, List, Optional, Tuple
@@ -283,6 +285,35 @@ class TestArtifactGate(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestMalformedArtifact(unittest.TestCase):
+    def test_nested_json_types_never_crash(self) -> None:
+        base = _load(TEMPLATE)
+        paths = []
+
+        def collect(value, path=()):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    paths.append(path + (key,))
+                    collect(child, path + (key,))
+
+        collect(base)
+        for path in paths:
+            for value in (None, True, 0, "", [], {}, [{}]):
+                with self.subTest(path=path, value=value):
+                    doc = copy.deepcopy(base)
+                    parent = doc
+                    for key in path[:-1]:
+                        parent = parent[key]
+                    parent[path[-1]] = value
+                    report = seq.check_artifact(doc)
+                    self.assertIn(report.exit_code(), (seq.EXIT_OK, seq.EXIT_HARD, seq.EXIT_ENV))
+
+    def test_object_in_trust_basis_is_a_violation(self) -> None:
+        doc = _load(TEMPLATE)
+        doc["trust_basis"] = [{}]
+        self.assertIn("NN5", seq.check_artifact(doc).rules())
+
+
 class TestRouteMode(unittest.TestCase):
     REF = ".research-idea-pipeline/routes/T/assurance/structural-equivalence/H1.json"
 
@@ -322,6 +353,60 @@ class TestRouteMode(unittest.TestCase):
     def test_valid_route_passes(self) -> None:
         report = seq.check_route(self.route)
         self.assertEqual(report.rules(), [], [v.render() for v in report.violations])
+
+    def test_artifact_candidate_must_match_its_file(self) -> None:
+        self.state["hypotheses"].append({"id": "H2"})
+        self.artifact["candidate"] = "H2"
+        self._write()
+        self.assertIn("EQ12", seq.check_route(self.route).rules())
+
+    def test_artifact_candidate_must_exist_in_hypotheses(self) -> None:
+        self.state["hypotheses"] = []
+        self.state["claims"] = [{"id": "H1"}]
+        self._write()
+        self.assertIn("EQ2", seq.check_route(self.route).rules())
+
+    def test_artifact_literature_must_exist_in_literature(self) -> None:
+        self.artifact["closest_priors"] = ["LIT99"]
+        self.artifact["evidence"] = ["LIT99"]
+        self.state["claims"] = [{"id": "LIT99"}]
+        self._write()
+        self.assertIn("EQ3", seq.check_route(self.route).rules())
+
+    def test_malformed_state_collections_return_environment_error(self) -> None:
+        for key in ("hypotheses", "literature", "assurance"):
+            original = copy.deepcopy(self.state[key])
+            for value in (None, True, 1, "bad", {}, [None], [{"id": []}]):
+                if key == "assurance" and value == [{"id": []}]:
+                    continue
+                with self.subTest(key=key, value=value):
+                    self.state[key] = value
+                    self._write()
+                    self.assertEqual(seq.check_route(self.route).exit_code(), seq.EXIT_ENV)
+            self.state[key] = original
+
+    def test_invalid_candidate_type_does_not_crash_route_cli(self) -> None:
+        self.artifact["candidate"] = {}
+        self._write()
+        result = subprocess.run(
+            [sys.executable, str(SCRIPTS / "structural_equivalence_check.py"),
+             "--route", str(self.route), "--json"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, seq.EXIT_HARD, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["exit_code"], seq.EXIT_HARD)
+        self.assertIn("EQ2", report["rule_counts"])
+        self.assertEqual(result.stderr, "")
+
+    def test_invalid_assurance_literature_is_rejected(self) -> None:
+        self.state["assurance"][0]["literature"] = [{}]
+        self._write()
+        self.assertIn("EQ3", seq.check_route(self.route).rules())
+
+    def test_unreadable_inputs_return_environment_error(self) -> None:
+        with mock.patch.object(pathlib.Path, "read_text", side_effect=PermissionError("denied")):
+            self.assertEqual(seq.check_route(self.route).exit_code(), seq.EXIT_ENV)
+            artifact = self.route / "assurance" / "structural-equivalence" / "H1.json"
+            self.assertEqual(seq.check_artifact_file(artifact).exit_code(), seq.EXIT_ENV)
 
     def test_missing_artifact_hits_eq1(self) -> None:
         (self.route / "assurance" / "structural-equivalence" / "H1.json").unlink()
