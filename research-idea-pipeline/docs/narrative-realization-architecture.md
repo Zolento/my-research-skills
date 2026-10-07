@@ -69,3 +69,4 @@ G1–G5 是证据门禁，任何 fail 不可被分数救回；新 RE 门禁是�
 |---|---|
 | architecture | 基线 release_check PASS（456 tests / 4 skips） |
 | operator registry | JSON 解析、7 算子 / 4 固定 profile 白名单检查 PASS；不改原有行为 |
+| equivalence policy | 明确 RE1–RE5、14 项冻结、原句恢复和完整多模型面板；原 release_check PASS |

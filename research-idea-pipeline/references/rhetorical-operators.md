@@ -48,3 +48,4 @@ Strength visibility optimization, not weakness laundering.
 预算和 judge 面板必须在看恢复结果前固定；失败只报告，不通过追加 wording 搜索追分。
 未来的 abstract salience、bounded scope framing、technical register、linguistic complexity
 不属于本分支新增算子。
+冻结与审计规则见 [rhetoric-equivalence-policy.md](rhetoric-equivalence-policy.md)。
