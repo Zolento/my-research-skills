@@ -1,0 +1,36 @@
+{
+  "central_claim_id": "C0",
+  "supporting_claim_ids": ["C4"],
+  "main_contribution_id": "C4",
+  "preset": "N7",
+  "anchor": "performance",
+  "anchor_eligibility": "eligible",
+  "scientific_framing": "Bounded empirical comparison; engineering delta; observational association",
+  "contribution_order": ["C0", "C4"],
+  "evidence_mapping": {"C0": {"supports": ["E1"], "refutes": []}, "C4": {"supports": ["E2"], "refutes": []}},
+  "bindings": {
+    "central_claim": ["/claims/0/statement"],
+    "supporting_claims": ["/claims/1/statement"],
+    "main_contribution": ["/claims/1/statement"],
+    "evidence_ids": ["/evidence/0/id", "/evidence/1/id"],
+    "numerical_values": ["/experiments/0"],
+    "comparators": ["/literature/0/ref"],
+    "uncertainty": ["/uncertainties"],
+    "scope": ["/claims/0/scope", "/claims/1/scope", "/contract/out_of_scope"],
+    "assumptions": ["/assumptions"],
+    "limitations": ["/failures"],
+    "failure_cases": ["/failures"],
+    "prior_work_delta": ["/evidence/1/source_ref"],
+    "causal_status": ["/experiments/0/interpretation", "/claims/0/nearest_alternative"],
+    "scientific_interpretation": ["/evidence/0", "/evidence/1", "/experiments/0/interpretation"]
+  },
+  "slots": {
+    "S1": ["/contract/goal"],
+    "S2": ["/evidence/1/source_ref"],
+    "S3": ["/claims/0/statement", "/claims/0/falsifier"],
+    "S4": ["/claims/1/statement"],
+    "S5": ["/experiments/0/result"],
+    "S6": ["/claims/0/scope", "/failures/0/what"]
+  },
+  "empty_reasons": {}
+}
