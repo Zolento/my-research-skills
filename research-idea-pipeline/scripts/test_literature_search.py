@@ -23,8 +23,12 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
+import re
 import sys
+import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Sequence, Tuple
@@ -380,6 +384,108 @@ class YearRangeTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # 4. 源状态与尽职调查等级
 # ---------------------------------------------------------------------------
+
+class BottleneckRetrievalTests(unittest.TestCase):
+    """方法补检索复用 refresh/exhaustive，不能把旧缓存或失败源当作更新。"""
+
+    def test_trigger_tables_have_the_same_ids_and_levels(self):
+        root = SCRIPTS.parent
+        paths = [root / "SKILL.md", root / "README.md", root / "references" / "literature-policy.md",
+                 root / "references" / "phase-r2-r5-field-mapping-retrieval.md"]
+        expected = {f"T{n}": "L3" if n in (1, 4, 6) else "L2"
+                    for n in range(1, 9)}
+        for path in paths:
+            with self.subTest(path=path):
+                rows = re.findall(r"^\| (?:\*\*)?(T\d+)(?:\*\*)? \| (.+)$",
+                                  path.read_text(), re.M)
+                levels = {key: re.search(r"L[123]", row.split("|")[-2]).group()
+                          for key, row in rows}
+                self.assertEqual(levels, expected)
+        l2 = next(line for line in (root / "references" / "literature-policy.md").read_text().splitlines()
+                  if line.startswith("| **L2** |"))
+        self.assertIn("T8", l2)
+
+    def test_web_search_precedes_local_and_multisource_in_instruction_copies(self):
+        root = SCRIPTS.parent
+        for path in (root / "SKILL.md", root / "references" / "literature-policy.md"):
+            with self.subTest(path=path):
+                text = path.read_text()
+                self.assertLess(text.index("Step 0: 先尝试 web search"), text.index("Step 1:"))
+                self.assertLess(text.index("Step 1:"), text.index("Step 2:"))
+        phase = (root / "references" / "phase-r2-r5-field-mapping-retrieval.md").read_text()
+        self.assertLess(phase.index("## A0. 先尝试 web search"), phase.index("## A1."))
+        self.assertLess(phase.index("## A1."), phase.index("## A2."))
+        for relative in ("README.md", "references/phase-r3-r6-discovery.md"):
+            self.assertIn("先尝试 web search，再本地与多源", (root / relative).read_text())
+
+    def test_refresh_queries_all_sources_and_expansion_rounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            queries = ["mechanism bottleneck", "analogous constraint"]
+            adapters = {name: mock.Mock(hosts=[], search=mock.Mock(return_value=[{
+                "title": f"New method {name}", "doi": f"10.1234/{name}",
+                "year": 2026, "sources": [name]}]))
+                for name in ("arxiv", "openalex", "crossref")}
+            for name in adapters:
+                for query in queries:
+                    ls.cache_results(query, [{"title": "Old result", "doi": "10.1234/old"}],
+                                     root / "cache", 10, 2020, 2026, source=name)
+            with mock.patch.dict(src.REGISTRY, adapters, clear=True), \
+                    mock.patch.object(ls, "detect_proxy_environment",
+                                      return_value={"notes": [], "unresolved": []}), \
+                    mock.patch.object(ls, "read_cache", side_effect=AssertionError("stale cache used")):
+                outcome = ls.search_literature(queries[0], local_dir=root, max_results=10,
+                                    from_year=2020, to_year=2026, refresh=True,
+                                    also_queries=queries[1:], exhaustive=True,
+                                    sources=list(adapters))
+            for adapter in adapters.values():
+                self.assertEqual(adapter.search.call_count, 6)
+            self.assertTrue(outcome["saturation"]["saturated"])
+            self.assertEqual({record["doi"] for record in outcome["results"]},
+                             {f"10.1234/{name}" for name in adapters})
+            self.assertFalse(any(step["step"] == "cache" for step in outcome["steps"]))
+
+    def test_failed_refresh_does_not_report_cached_results_as_online_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ls.cache_results("bottleneck", [{"title": "Old result"}], root / "cache", 10,
+                             source="arxiv")
+            adapter = mock.Mock(hosts=[], search=mock.Mock(side_effect=OSError("offline")))
+            with mock.patch.dict(src.REGISTRY, {"arxiv": adapter}, clear=True), \
+                    mock.patch.object(ls, "detect_proxy_environment",
+                                      return_value={"notes": [], "unresolved": []}):
+                outcome = ls.search_literature("bottleneck", local_dir=root, max_results=10,
+                                    refresh=True, exhaustive=True, level="L2", sources=["arxiv"])
+            self.assertEqual(outcome["sources_state"]["arxiv"]["state"], "unavailable")
+            self.assertFalse(outcome["saturation"]["saturated"])
+            self.assertFalse(outcome["level_report"]["achieved"])
+            self.assertEqual(outcome["results"], [])
+
+    def test_cli_source_degradation_is_independent_of_saturation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            records = [{"title": f"Method {i}", "doi": f"10.1234/method{i}",
+                        "year": 2026, "sources": ["arxiv"]} for i in range(30)]
+            adapters = {
+                "arxiv": mock.Mock(hosts=[], search=mock.Mock(return_value=records)),
+                "openalex": mock.Mock(hosts=[], search=mock.Mock(side_effect=OSError("offline"))),
+            }
+            out = io.StringIO()
+            with mock.patch.dict(src.REGISTRY, adapters, clear=True), \
+                    mock.patch.object(ls, "_env_gate", return_value=None), \
+                    mock.patch.object(ls, "detect_proxy_environment",
+                                      return_value={"notes": [], "unresolved": []}), \
+                    contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = ls.main(["-q", "mechanism", "--local-dir", directory,
+                                "--sources", "arxiv,openalex", "--max", "30",
+                                "--refresh", "--exhaustive", "--level", "L2", "--json",
+                                "--also-query", "constraint", "--also-query", "analogy",
+                                "--also-query", "failure"])
+            payload = json.loads(out.getvalue())
+            self.assertEqual(code, ls.EXIT_SOURCE_DOWN)
+            self.assertTrue(payload["degraded"])
+            self.assertTrue(payload["saturation"]["saturated"])
+            self.assertTrue(payload["level_report"]["achieved"])
+            self.assertFalse(payload["level_report"]["source_coverage"]["complete"])
 
 class SourceStateTests(unittest.TestCase):
 

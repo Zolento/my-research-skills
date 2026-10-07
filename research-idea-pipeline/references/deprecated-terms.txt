@@ -71,7 +71,12 @@ mode=[ABCDE]
 Mode [ABCDE]
 templates/state\.template\.json
 
-# ── QD archive 的 niche（2026-10-06：niche 复用 N1—N10 preset 名，不用描述性旧名）──
+# ── QD archive 的 niche（描述性旧名 → 七轴冻结枚举 `*-shift`）──
+# 更正记录（HIGH-1）：这里曾写「niche 复用 N1—N10 preset 名」。那是错的，
+# 也是 Narrative ontology 泄漏进 Discovery 的起因。现行口径：QD niche 是七个
+# 科学结构轴（`assumption-shift` / `formulation-shift` / `representation-shift` /
+# `mechanism-shift` / `theory-shift` / `evaluation-shift` / `boundary-shift`），
+# 与 R12 的叙事 preset `N1`—`N10` **无关**。V6 强制，且有专门守卫测试。
 assumption-breaking
 new-formulation
 remote-theory-transfer

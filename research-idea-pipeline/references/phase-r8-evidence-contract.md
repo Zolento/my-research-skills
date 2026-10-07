@@ -212,6 +212,58 @@ R8 检测到 ≥ T2 反驳证据
 
 ---
 
+### R8.2.7 novelty claim 必须绑定 structural delta
+
+**R8 不重新判断 novelty。** R8 只负责让 central novelty claim 明确绑定：
+closest priors、minimal structural delta、differentiating consequence、
+discriminating experiment、structural-equivalence audit（SENA-1）。
+
+绑定到**既有** `claims[].contract` 键上，**不新增键**：
+
+| 要绑定的东西 | 落在哪个既有键 |
+|---|---|
+| closest priors | `nearest_alternative` |
+| minimal structural delta / differentiating consequence | `statement` + `expected_outcomes` |
+| discriminating experiment | `minimal_discriminating_experiment` |
+| collapse 杀死条件 | `kill_rule` |
+| 会反驳 delta 的证据 | `refuting` |
+
+**按 SENA-1 verdict 收窄 claim**（定义见
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §10.5）：
+
+| SENA verdict | R8 允许的 claim |
+|---|---|
+| `equivalent` / `subsumed-by-prior` / `reframing-only` | **不得**建立 paradigm novelty central claim |
+| `transfer-only` | 必须缩窄：contribution 是 transfer / application / legitimacy，**不是**新 paradigm |
+| `component-delta` | **不得**包装成 formulation / paradigm novelty |
+| `mechanism-delta` / `formulation-delta` / `boundary-delta` / `paradigm-candidate` | 允许更强 claim，但**必须**在 Evidence Contract 写明其 load-bearing delta |
+| `uncertain` | **不得**支撑强于 `uncertain` 的 claim；先补检索或补结构抽取 |
+
+**near_neighbor_verdict 决定 claim 上限**（见
+[structural-equivalence-policy.md](structural-equivalence-policy.md) §23.2；由 `NN12` 强制）：
+
+| `near_neighbor_verdict` | `claimed_novelty_level` 上限 |
+|---|---|
+| `duplicate-equivalent` / `reframing-neighbor` | `none` |
+| `transfer-neighbor` | `transfer-only` |
+| `component-neighbor` | `component-delta` |
+| `mechanism-neighbor` | `mechanism-delta` |
+| `structural-delta` | `boundary-delta` |
+| `structural-delta-strong` | `paradigm-candidate` |
+| `uncertain` | `component-delta` |
+
+**硬规则：**
+
+1. **强 novelty claim 必须能指回一份 SENA-1 artifact** —— 由
+   `scripts/structural_equivalence_check.py` 的 `EQ1` / `EQ12` 机械核对。
+2. **R8 仍不写 `assurance[]`**（那是 R7 的），也**不重新检索**、**不派 venue 角色** —— 既有边界不变。
+3. **`contract.kill_rule` 可以写坍缩杀死条件**：把 artifact 的 `counterfactual_collapse`
+   转成「若替换 `Δ` 后 assumptions / predictions / discriminating test 不变，则 paradigm-level novelty 失败」。
+4. **`minimal_discriminating_experiment` 仍不得留 `TBD` 进入 R9**；
+   SENA 需要的判别实验要在 R8 派生为 `planned` 条目。
+
+---
+
 ## R8.3 派遣
 
 **权威副本：[roles.md](roles.md) §4.2 派遣矩阵的 `R8（证据契约）` 列。**

@@ -117,8 +117,9 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 │
 └── .research-idea-pipeline/     # ★ 机器控制平面（**可忽略**，见 §11.1）
     ├── project/{contract.json,route-registry.json,constraints.json}
-    ├── routes/<R>/{research-state.json,history/,actions/,populations/,
-    │                assurance/,repairs/,reviews/,
+    ├── routes/<R>/{research-state.json,history/,actions/,
+    │                populations/{archive/,intermediates/,fingerprints/},
+    │                assurance/{structural-equivalence/},repairs/,reviews/,
     │                experiments/<XID>/{preregistration.json,state-delta.json}}
     ├── meta/{operator-stats.json,eig-calibration.json,
     │          recurring-failures.json,scheduler-history.jsonl}
@@ -130,11 +131,24 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 > `operator_stats`（见 [scheduler-policy.md](scheduler-policy.md) §4.1）。
 > 它同样**不入 state**，只记录「系统自己哪种算子有效」。
 >
-> **`populations/` 收两类 search artifact（都不是 `state` object）：**
+> **`populations/` 收三类 search artifact（都不是 `state` object）：**
 > `populations/archive/` 存 QD archive 重排记录；
 > `populations/intermediates/` 存 `P3` 的 `abstract_skeleton`（typed intermediate，
-> 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）。
-> **两者都不得被当作结论引用**，也不分配 `H` / `C` / `X` ID。
+> 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R3.0.1）；
+> `populations/fingerprints/` 存 R4 的 cheap structural fingerprint（`<H>.json`，
+> 见 [phase-r3-r6-discovery.md](phase-r3-r6-discovery.md) §R4.4）。
+> **三者都不得被当作结论引用**，也不分配 `H` / `C` / `X` ID。
+>
+> `populations/near-neighbor-telemetry.json` 存 population 级 near-neighbor telemetry
+> （`StructuralCoverage` / `PairwiseStructuralDistance` / `CrossIslandRedundancy` /
+> `LocalCollapseRate` / `RemoteConversionRate`；见
+> [structural-equivalence-policy.md](structural-equivalence-policy.md) §28）。
+> **它不进 state，也不得作为任何 reward** —— 否则会诱导「为了距离而胡思乱想」。
+>
+> **`assurance/structural-equivalence/`** 存 Structural Equivalence 的完整审计 artifact
+> （`<H>.json` = SENA-1，`<H>.sena2.json` = SENA-2）——它是 **Control Plane artifact**，
+> **不是第九类 Research State 对象**；state 只保留 `assurance[].audit_ref` 这样的路径引用。
+> 定义见 [structural-equivalence-policy.md](structural-equivalence-policy.md) §9。
 
 **与上一版的关键差异：**
 

@@ -310,6 +310,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 
 ### 3.5 `experiments[]` — Experiment Graph（`X<n>`）
 
+`id` 是实验编号，可继续使用 `X7`、`X20`、`X100`。实验数量不限于六个。
+`stage` 是六类实验目的，可以重复。例如 `id: X20, stage: X4`。
+不得把 `EXPERIMENT_STAGES` 当作 id 上限。登记失败时保留校验器原始错误，核对具体字段。
+
 **结论：每个实验节点必须携带完整 provenance；`stage` 只能是六段之一，`X2` 不得承担 claim 判别。**
 
 | 字段 | 取值 / 类型（逐字） | 必填 | 说明 |
@@ -390,6 +394,10 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `assurance[]` | `kill_condition` | 字符串，非空 | ✅ | V9；什么结果会杀死该 claim / 假设 |
 | `assurance[]` | `discriminating_test` | 存在的 `X` id 或字面量 `TBD` | ✅ | V9 |
 | `assurance[]` | `verification_tier` | `T0` \| `T1` \| `T2` \| `T3` \| `T4` \| `T5` | ✅ | §2.5；**LLM reviewer 产物的上限是 `T0`** —— 不得据此升级任何 claim 状态 |
+| `assurance[]` | `target` | `H` id 或 `C` id | ❌ | 该 attack 攻击的对象（五元组的 `Target`）；形状由 [structural-equivalence-policy.md](structural-equivalence-policy.md) §12 的 `EQ2` 强制 |
+| `assurance[]` | `attack_type` | 字符串 | ❌ | attack 类别；结构等价审计用字面量 `structural-equivalence`。**不是**冻结枚举，其它类别如实书写 |
+| `assurance[]` | `literature` | `LIT` id 数组，可为 `[]` | ❌ | 该 attack 用作 alternative 的前作；形状由 `EQ3` 强制 |
+| `assurance[]` | `audit_ref` | 字符串路径 | ❌ | 指向 Control Plane audit artifact；结构等价审计的合法形状由 `EQ12` 强制 |
 | `repairs[]` | `flaw` | 字符串 | ✅ | V10；发现的缺陷（含 critical flaw） |
 | `repairs[]` | `disposition` | `REPAIR_CLAIM` \| `RUN_TEST` \| `FIX_IMPLEMENTATION` \| `NARROW_SCOPE` \| `KILL_BRANCH` | ✅ | V10；五值封冻 |
 | `repairs[]` | `state_delta` | 字符串 | ✅ | V10；**实际改动了哪些字段**，必须可核对 |
@@ -683,7 +691,8 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 **（`state_check.py` 忽略未知键；S1—S7 只校验本表已登记槽位的形状 —— 新增槽位必须同轮登记，否则形状不受保护）。
 
 旧表述「不得自加字段」的**准确含义是**：**新加字段必须同时改本表、模板与 `state_check.py`**，
-而不是「只准用八类对象」。
+而不是「只准用八类对象」。**例外：** 若新槽位属于某个专用检查器的契约，则形状由**该检查器**强制
+（下表最后一行即是），此时 `state_check.py` 按既有约定继续忽略未知键。
 
 | 槽位 | 位置 | 谁写 | 用途 |
 |---|---|---|---|
@@ -694,6 +703,7 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
 | `decision` | 顶层 | R14 | `continue` / `pivot` / `archive` / `submit` |
 | `assurance` | 顶层 | **R7** | attack 与 kill condition（**R0 不写**） |
 | `repairs` | 顶层 | R10 | 修复三元组（V10 强制） |
+| `assurance[].target` / `assurance[].attack_type` / `assurance[].literature` / `assurance[].audit_ref` | 挂在 assurance 条目下 | **R7** | 结构等价审计的 summary 引用（见 §3.9 与 [structural-equivalence-policy.md](structural-equivalence-policy.md) §9.2）；形状由 `scripts/structural_equivalence_check.py` 的 `EQ2` / `EQ3` / `EQ12` 强制 |
 
 ### 3.12 人读措辞 → 冻结枚举（映射表，**不是第二套枚举**）
 

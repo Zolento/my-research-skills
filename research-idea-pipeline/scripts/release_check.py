@@ -23,6 +23,8 @@
     4. 规则表逐字比对：policy §4.0 S1—S7 / §4.1 V1—V24 ↔ `state_check.py`
     5. 三方读写表逐格比对：SKILL §0 / policy §5 / 各 `phase-*.md`
     6. 文档里引用的每个 `scripts/*.py` 都真实存在
+    7. `structural_equivalence_check.py --selftest` + audit 模板 + 七份 fixture
+       —— Structural Equivalence 的 `EQ1`—`EQ13` + `NN1`—`NN14`（只查审计完整性，不宣判 novelty）
 
 退出码
 ------
@@ -167,6 +169,27 @@ def step_referenced_scripts_exist() -> Tuple[bool, str]:
     return True, f"{len(seen)} 个脚本引用全部命中"
 
 
+def step_structural_equivalence() -> Tuple[bool, str]:
+    """Structural Equivalence 检查器：自带自检 + 模板 + 四份 fixture 必须全绿。
+
+    这一项**必须**能被变异注入判红（见 `test_structural_equivalence.py` 的反例测试），
+    否则它就是一个恒真的空转闸门。
+    """
+    code, out = _run(["scripts/structural_equivalence_check.py", "--selftest"])
+    if code != 0:
+        return False, f"--selftest exit={code} {out.strip()[-120:]}"
+    targets = [ROOT / "templates" / "structural-equivalence-audit.template.json"]
+    targets += sorted((ROOT / "examples" / "structural-equivalence").glob("*.json"))
+    if len(targets) < 5:
+        return False, f"待校验 artifact 少于 5 份（实际 {len(targets)}）"
+    for path in targets:
+        rel = path.relative_to(ROOT)
+        code, out = _run(["scripts/structural_equivalence_check.py", "--artifact", str(rel)])
+        if code != 0:
+            return False, f"{rel} exit={code} {out.strip()[-120:]}"
+    return True, f"自检 + {len(targets)} 份 artifact 全绿"
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),
     ("state_check --selftest", step_selftest),
@@ -174,6 +197,7 @@ STEPS = (
     ("规则表逐字比对（S1—S7 + V1—V24）", step_rule_table_parity),
     ("三方读写表逐格比对", step_readwrite_parity),
     ("文档引用的脚本存在", step_referenced_scripts_exist),
+    ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
 )
 
 

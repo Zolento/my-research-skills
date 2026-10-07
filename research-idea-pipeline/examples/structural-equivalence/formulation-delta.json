@@ -1,0 +1,240 @@
+{
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "stage": "R7",
+  "candidate": "H17",
+  "closest_priors": [
+    "LIT42",
+    "LIT81"
+  ],
+  "retrieval_status": "sufficient",
+  "domain_terms": [
+    "MRI",
+    "k-space",
+    "source-free",
+    "Flow Matching",
+    "跨中心",
+    "重建"
+  ],
+  "domain_aware_alignment": {
+    "problem": "只能观测到间接测量时的分布落差校正",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "同一族可观测量",
+    "available_information": "目标总体只有间接观测",
+    "target_or_latent_quantity": "目标总体上的潜在目标量",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "同一优化或证明目标",
+    "mechanism": "用算子参数作为条件变量",
+    "information_flow": "间接观测 → 算子参数估计 → 条件先验 → 估计器",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "算子不可识别时退化为无适配 baseline"
+  },
+  "domain_stripped_alignment": {
+    "problem": "structural role: 只能观测到间接测量时的分布落差校正",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "同一族可观测量",
+    "available_information": "structural role: 目标总体只有间接观测",
+    "target_or_latent_quantity": "structural role: 目标总体上的潜在目标量",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "同一优化或证明目标",
+    "mechanism": "structural role: 用算子参数作为条件变量",
+    "information_flow": "structural role: 间接观测 → 算子参数估计 → 条件先验 → 估计器",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "structural role: 算子不可识别时退化为无适配 baseline"
+  },
+  "matched_core": [
+    "信息制度、承重假设、科学目标、干预对象与机制主路径均被保留",
+    "评价目标与失败制度未被改写"
+  ],
+  "candidate_only_elements": [
+    "表述与实现细节不同"
+  ],
+  "prior_only_elements": [
+    "prior 的实现顺序不同"
+  ],
+  "minimal_structural_delta": [
+    "目标量从离线标定的算子参数改为由目标间接观测在线估计"
+  ],
+  "load_bearing_analysis": {
+    "changed_information": "算子参数的信息来源改为目标间接观测本身",
+    "changed_assumptions": "新增承重假设：算子参数在目标总体内可识别",
+    "changed_mechanism": "unchanged",
+    "changed_predictions": "unchanged",
+    "changed_boundary": "unchanged"
+  },
+  "counterfactual_collapse": {
+    "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
+    "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
+  },
+  "differentiating_consequences": [
+    "新增可证伪预测：在线估计器在算子可识别的目标总体上优于离线标定"
+  ],
+  "discriminating_tests": [
+    "X21（stage=X3，claim_targeted=[C4]）：在线估计 vs 离线标定的预注册对照"
+  ],
+  "claimed_novelty_level": "formulation-delta",
+  "verdict": "formulation-delta",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（据本次检索未见结构等价前作，检索式见附录 X）。本判定只覆盖三路检索返回的前作。",
+  "blind_spots": [
+    "结构抽取由 LLM 辅助完成，facet 边界可能与人类判断不一致",
+    "检索未覆盖的相邻学科不构成反例也不构成支持"
+  ],
+  "evidence": [
+    "LIT42",
+    "LIT81"
+  ],
+  "near_neighbor_verdict": "structural-delta",
+  "correspondence": {
+    "problem": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[problem] 原文 §2 / eq.(3) / code path",
+      "note": "problem 的对应关系依据 span 逐项判定"
+    },
+    "setting": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[setting] 原文 §2 / eq.(3) / code path",
+      "note": "setting 的对应关系依据 span 逐项判定"
+    },
+    "observables": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[observables] 原文 §2 / eq.(3) / code path",
+      "note": "observables 的对应关系依据 span 逐项判定"
+    },
+    "available_information": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[available_information] 原文 §2 / eq.(3) / code path",
+      "note": "available_information 的对应关系依据 span 逐项判定"
+    },
+    "target_or_latent_quantity": {
+      "relation": "DIFFERENT",
+      "provenance": "DERIVED",
+      "evidence_span": "[target_or_latent_quantity] 原文 §2 / eq.(3) / code path",
+      "note": "target_or_latent_quantity 的对应关系依据 span 逐项判定"
+    },
+    "assumptions": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[assumptions] 原文 §2 / eq.(3) / code path",
+      "note": "assumptions 的对应关系依据 span 逐项判定"
+    },
+    "adaptation_or_intervention_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[adaptation_or_intervention_object] 原文 §2 / eq.(3) / code path",
+      "note": "adaptation_or_intervention_object 的对应关系依据 span 逐项判定"
+    },
+    "objective": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[objective] 原文 §2 / eq.(3) / code path",
+      "note": "objective 的对应关系依据 span 逐项判定"
+    },
+    "mechanism": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[mechanism] 原文 §2 / eq.(3) / code path",
+      "note": "mechanism 的对应关系依据 span 逐项判定"
+    },
+    "information_flow": {
+      "relation": "DIFFERENT",
+      "provenance": "DERIVED",
+      "evidence_span": "[information_flow] 原文 §2 / eq.(3) / code path",
+      "note": "information_flow 的对应关系依据 span 逐项判定"
+    },
+    "theory_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[theory_object] 原文 §2 / eq.(3) / code path",
+      "note": "theory_object 的对应关系依据 span 逐项判定"
+    },
+    "predictions_or_guarantees": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[predictions_or_guarantees] 原文 §2 / eq.(3) / code path",
+      "note": "predictions_or_guarantees 的对应关系依据 span 逐项判定"
+    },
+    "evaluation_target": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[evaluation_target] 原文 §2 / eq.(3) / code path",
+      "note": "evaluation_target 的对应关系依据 span 逐项判定"
+    },
+    "boundary_or_failure_regime": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[boundary_or_failure_regime] 原文 §2 / eq.(3) / code path",
+      "note": "boundary_or_failure_regime 的对应关系依据 span 逐项判定"
+    }
+  },
+  "load_bearing_facets": [
+    "target_or_latent_quantity",
+    "information_flow"
+  ],
+  "local_neighborhood_test": {
+    "near_prior": "LIT42",
+    "local_modification_kinds": [],
+    "neighbor_confirmed": false,
+    "rationale": "按 §16.3 逐条核对 problem / observables / assumptions / target / mechanism / prediction / boundary"
+  },
+  "removal_test": {
+    "removed_delta": "移除 candidate 声称的 Δ",
+    "returns_to_prior": "",
+    "unchanged_core": [
+      "problem",
+      "observables",
+      "assumptions"
+    ],
+    "conclusion": "load-bearing-delta"
+  },
+  "null_hypothesis": {
+    "statement": "candidate is structurally subsumed by an existing prior",
+    "strongest_subsumption_prior": "LIT42",
+    "mapping_completeness": "partial",
+    "unmapped_load_bearing_elements": [
+      "target_or_latent_quantity"
+    ]
+  },
+  "minimal_delta_set": {
+    "delta_set": [
+      "目标量从离线标定的算子参数改为由目标间接观测在线估计"
+    ],
+    "novel_consequence_kinds": [
+      "prediction"
+    ],
+    "sufficient_alone": true
+  },
+  "theory_stripping": {
+    "applicable": false,
+    "stripped_terms": [],
+    "residual_structure": "not-applicable",
+    "adds_new_structure": false,
+    "new_structure_kinds": [],
+    "conclusion": "not-applicable"
+  },
+  "remote_analogy_mapping": {
+    "applicable": false,
+    "object_mapping": "not-applicable",
+    "relation_mapping": "not-applicable",
+    "constraint_mapping": "not-applicable",
+    "failure_mode_mapping": "not-applicable",
+    "added_structure": false,
+    "conclusion": "not-applicable"
+  },
+  "trust_basis": [
+    "source-span",
+    "equation",
+    "literature"
+  ]
+}

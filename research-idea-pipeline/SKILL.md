@@ -40,6 +40,9 @@ metadata:
 
 ## 0. 入口：**语义入口优先**
 
+`continue-research` 区分建议与执行授权，见 [invocation-prompts.md](references/invocation-prompts.md) §2。
+持续执行时遵守 [scheduler-policy.md](references/scheduler-policy.md) §3.1，避免诊断长期替代方法探索。
+
 **用户不需要知道 `R` 编号。** 常态入口是四个语义入口；`phase=` 是专家 / 调试用的**覆盖入口**。
 
 **解析顺序（固定，命中即停 —— 这是唯一顺序，不得自行调整）：**
@@ -316,9 +319,12 @@ B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用�
 
 以下六条是硬约束，任何 R 阶段都不得违反。执行前先确认，输出时自检。
 
-### 1.1 文献检索：先本地，后多源 —— **但禁止只停留在本地**
+### 1.1 文献检索：先尝试 web search，再本地与多源
 
 ```
+Step 0: 先尝试 web search，打开论文、作者实现与官方资料
+        记录查询与发现 URL，核验原始页面，再用标题、标识符和机制术语驱动后续检索
+        工具不可用或失败 → 记录状态并继续；明确离线请求 → 跳过
 Step 1: 搜索本地文献库 ./docs/refs/
         命中 → 纳入结果，标注 sources=["local"] —— 但流程继续，不得在此返回
 Step 2: 调用全部启用源（arxiv / openalex / crossref）
@@ -328,6 +334,9 @@ Step 2: 调用全部启用源（arxiv / openalex / crossref）
 Step 3: 信息不足 → 仅补充缺失字段，不重复拉取已有内容
 Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 ```
+
+**web search 的执行与来源纪律见 [literature-policy.md](references/literature-policy.md) §1.1。**
+网页发现不替代多源核验。脚本不调用 web search，由 agent 前置执行。
 
 **⚠️ 强制扩检触发条件（命中任一即必须查**全部启用源**并扩大范围）：**
 
@@ -340,10 +349,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 | T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
 | T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
 | T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
+| T8 | 方法瓶颈：已观察到性能平台、候选反复失败，或诊断不再改变方法决定且缺少新干预 | L2 强化 |
 
 **遇到卡点时第一动作是检索，不是硬推：** 理论说不清、证不出来、不确定能不能做时，
 必须先检索 ① 该问题本身是否已有定理/反例/不可能性结果 ② 所用工具在其他领域的处理
-③ **负结果文献**。检索后仍无解，写入 `INDEX.md` 的 Warnings 并标注待核实。
+③ **负结果文献**。方法瓶颈按 [literature-policy.md](references/literature-policy.md) §2.3 与 R5.1 补检索并交接方法干预。检索后仍无解，写入 `INDEX.md` 的 Warnings 并标注待核实。
 
 **禁止推断：** 本地未命中 ≠ 不存在；arxiv 本轮未命中 ≠ 无人研究过；429 中断 ≠ 检索完整。
 未完成 L3 前，文档中只能写 **"据本次检索未见（检索式见附录）"**，
@@ -682,7 +692,7 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 顶会创新性标准 | [references/venue-standards.md](references/venue-standards.md) | CVPR / ICML / NeurIPS / MICCAI 四视角锚定标准 + 防复现标准 |
 | 叙事 preset 库 | [references/narrative-patterns.md](references/narrative-patterns.md) | **十套叙事 preset（N1—N10，非互斥、非创新等级）**、**(O,T,R) + anchor 选 preset**、**六槽位 S1—S6**、跨域 **Transfer Legitimacy Argument（L1/L2/L3）**、禁用表述、叙事自检 |
 | **Claim-first 政策** | [references/claim-first-policy.md](references/claim-first-policy.md) | **R12 现行（P0）**：总纲公式（`Claim strength × Evidence alignment × Reviewer comprehensibility`）、**证据台账 `epistemic_status`**、**Claim Graph `C0—C5` + `Ci ← Ej`**、**可证伪 central proposition**、**`(O,T,R)` 三轴**、**Anchor Eligibility Test**。**R3—R6 / R8 / R7 / R10 / R13 的接入登记为 P1**（见 `docs/claim-first-spec.md` §9） |
-| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T7 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
+| 文献检索规范 | [references/literature-policy.md](references/literature-policy.md) | 禁止只停留在本地、T1—T8 强制扩检、L1/L2/L3 尽职调查、饱和判据、429 退避、代理环境识别、缓存 |
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **Wave 6 目录规范**：**八条 DI invariant**、`routes/` 聚合、**`README`/`STATUS`/`INDEX` 三文件职责分离**、**`STATUS.md = f(research-state.json)` 投影**、`XID` 贯穿、`experiments/` 与 `results/` 分离、`docs/decisions/DEC`、**三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、锚点变更单、route fork 门槛、Git 边界、`AGENTS.md` 优先与可达性校验、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **两层**：**硬门禁 `G1—G5`（不聚合、不打分）** + **排序六维**（**R12 主用**）；1—5 标尺；极性归一化（**仅 R7 / R10 / R13 仍用**）；逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五类共享政策**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述；**§3 认知状态 ↔ 措辞等级映射**（各 R 阶段 不再各自定义） |
@@ -701,6 +711,9 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | **存量项目接管** | [references/project-intake.md](references/project-intake.md) | 在**已有代码 / 实验 / 文献 / 结论**的项目里启动本 Skill 时的接管清单：9 个盘点维度、落盘映射、集中提问上限 |
 | **调用契约（四个用户入口）** | [references/invocation-prompts.md](references/invocation-prompts.md) | `start-project` / `continue-research` / `explore` / `audit`：固定用户调用契约，**用户不需要知道 `R` 编号**；防止实际使用时绕过新哲学（一上手就发散、编造状态） |
 | **跨阶段调度（Meta-Controller）** | [references/scheduler-policy.md](references/scheduler-policy.md) | `R0`—`R14` 是**能力**不是 workflow：八级 `next_action_policy` + `EIG ÷ cost`；telemetry 落 [scheduler.template.json](templates/scheduler.template.json)，**不进 state** |
+| **Structural Equivalence 政策** | [references/structural-equivalence-policy.md](references/structural-equivalence-policy.md) | **跨阶段保证服务（不是第 16 个阶段）**：canonical scientific structure（十四个 facet + 十一个 typed relation）、domain-aware / domain-stripped 两套表示、load-bearing delta、Counterfactual Collapse Test、verdict 十值（含 `paradigm-candidate`）、audit artifact 契约、SENA-1（R7）/ SENA-2（R13）、无 score 纪律、`EQ1`—`EQ13` 机械闸门；**§15 起为 near-neighbor 判断层**：`near_neighbor_verdict` 八值、Preserved Core / Structural Delta、Local Neighborhood Test、Removal Test、Theory-Stripping（P5）、Structure-Preservation（P4）、provenance 四值 + 三值 relation、Null Hypothesis + Minimal Delta、claim-strength gate（不是 idea-kill）、population telemetry、对称不确定性闸门（未知证据既不膨胀也不塌缩）、禁 scalar 决定 novelty、`NN1`—`NN14` |
+| **Structural Equivalence 模板** | [templates/structural-equivalence-audit.template.json](templates/structural-equivalence-audit.template.json) | Minimal Structural Delta Certificate 骨架（schema `@2` = §8 基础键 + §24 near-neighbor 必填键）；**模板自身必须通过 artifact 侧 `EQ4`—`EQ13` 与 `NN1`—`NN14`**（`--route` 侧的 `EQ1` / `EQ2` / `EQ3` / `EQ12` 需要真实 state，模板不跑） |
+| **Structural Equivalence 检查器** | [scripts/structural_equivalence_check.py](scripts/structural_equivalence_check.py) | **机械闸门**：只查「审计做没做完整 / 引用是否存在 / schema 是否满足 / claim 强弱是否与 verdict 或 near_neighbor_verdict 相容」，**不宣判 novelty**，**不决定 H 与 P 是否结构等价**；两层规则 `EQ1`—`EQ13` + `NN1`—`NN14`；`--artifact` / `--route` / `--selftest` / `--list-rules`；退出码 0 / 1 / 3 / 4 |
 | 路线级索引模板 | [templates/INDEX.md](templates/INDEX.md) | `routes/<R>/INDEX.md` 骨架（**资产目录 + 时间线**：Route Overview / Key Documents / Experiments / Decisions / Reviews / Milestones / Recent Research Changes / Archive；**不含已证实/已证伪/TODO/Bugs/Warnings**） |
 | 路线级状态模板 | [templates/STATUS.md](templates/STATUS.md) | `routes/<R>/STATUS.md` 骨架（`research-state.json` 的投影；**由 `render_status.py` 生成**） |
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
@@ -953,9 +966,9 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
       不具备时，已**显式告知回退**（未静默降级、未假装使用 Team）。
 - [ ] **已读项目 `AGENTS.md` 与目标路线的 `INDEX.md`**，并遵循其约定；
       **`AGENTS.md` 引用的文件已逐个校验存在性**，缺失项已记入根 `INDEX.md` 的 Warnings。
-- [ ] 文献检索：**先本地后 arxiv，且没有只停留在本地**——本地命中后仍执行了 arxiv
-      检索（除非用户显式 `--local-only`）。
-- [ ] 已判定触发条件（T1—T7）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
+- [ ] 文献检索：**先尝试 web search，再本地与多源**；网页发现有来源记录。
+      不可用或失败已记录；明确离线时跳过。网页与本地命中均没有替代多源核验。
+- [ ] 已判定触发条件（T1—T8）并达到对应尽职调查等级（L1/L2/L3）与饱和判据。
 - [ ] 每条文献结果标注了 `source`；结果集是本地 + 多源 的并集。
 - [ ] 若发生 429，输出了等待日志，且退避符合 `10→20→40→80→160s`、上限 5 次。
 - [ ] **每个启用源都有状态**（`ok` / `partial` / `unavailable` / `skipped`）；任一源降级已在输出中显式说明，且**退出码为 2**。
@@ -1042,8 +1055,8 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 1. **为什么用 R 阶段而非单一流程？** 科研搜索需要 Discovery 与 Assurance 两条循环
    **并行且互相牵制**，不是一条流水线。R0—R14 让每步有清晰输入输出、并把结果**写回同一个
    Research State**；读到 `R<n>` 就知道它在双循环的哪一侧。**旧 A—E 顺序流水线已作废**。
-2. **为什么文献检索"先本地后 arxiv"，但禁止停在本地？** 顺序上先本地是为了省成本、
-   省延迟、避开 429；但本地库是历史缓存的子集、天然有偏，**不能作为"不存在"的证据**。
+2. **为什么先尝试 web search，再本地与多源？** 网页搜索可以发现新术语、原论文和实现资料。
+   本地库用于复用已有资料，多源用于核验和扩检。网页无命中与本地无命中都不能证明工作不存在。
    凡是支撑创新性声明、理论判断、可行性判断的检索，必须扩到 arxiv 并达到饱和。
    把工具的局限当成世界的性质，是本流水线要防的最主要错误。
 3. **为什么 429 要指数退避？** 429 通常意味着短时限流；指数退避比固定等待更高效，
@@ -1222,7 +1235,20 @@ done
 #    见 writing-policy.md §0
 #    这里固定跑**默认档**：examples/ 与 templates/ 是存量样例，不按 asd-ste100 追溯改写。
 #    asd-ste100 是**当次调用**的可选档（--max-chars 25），不是仓库级闸门。
+
+# 7) Structural Equivalence 检查器 —— 自检 + 模板 + 四份 fixture 必须全绿
+python3 scripts/structural_equivalence_check.py --selftest
+python3 scripts/structural_equivalence_check.py --artifact templates/structural-equivalence-audit.template.json
+for f in examples/structural-equivalence/*.json; do
+  python3 scripts/structural_equivalence_check.py --artifact "$f" || exit 1
+done
+#    真实项目里还要跑路线级交叉校验：
+#    python3 scripts/structural_equivalence_check.py --route .research-idea-pipeline/routes/<R>
 ```
+
+> **唯一的发布判据是 `scripts/release_check.py` 的最后一行**（`PASS` / `FAIL`）。
+> 上面的逐条命令只用于**诊断**；其中 1—7 项已全部收进那一个闸门。
+> 手动逐条跑不能替代 `release_check.py`（AGENTS.md Rule 10）。
 
 > **D4 的"已废弃措辞"清单要持续维护**：每次改规则时，把**被替换掉的旧表述**
 > 追加进来。这份 grep 清单是防漂移最省力的一道闸。

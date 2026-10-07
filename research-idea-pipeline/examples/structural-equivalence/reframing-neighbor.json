@@ -1,0 +1,228 @@
+{
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "stage": "R7",
+  "candidate": "H2",
+  "closest_priors": [
+    "LIT2"
+  ],
+  "retrieval_status": "sufficient",
+  "domain_terms": [
+    "MRI",
+    "k-space",
+    "source-free",
+    "Flow Matching",
+    "跨中心",
+    "重建"
+  ],
+  "domain_aware_alignment": {
+    "problem": "把同一问题重新写成一个新理论的故事",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "同一族可观测量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "同一潜在目标量",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "同一优化或证明目标",
+    "mechanism": "同一作用路径，换了一套说法",
+    "information_flow": "同一信息流",
+    "theory_object": "换了一个 theory brand，结构与预测不变",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "同一失败制度"
+  },
+  "domain_stripped_alignment": {
+    "problem": "structural role: 把同一问题重新写成一个新理论的故事",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "同一族可观测量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "同一潜在目标量",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "同一优化或证明目标",
+    "mechanism": "structural role: 同一作用路径，换了一套说法",
+    "information_flow": "同一信息流",
+    "theory_object": "structural role: 换了一个 theory brand，结构与预测不变",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "同一失败制度"
+  },
+  "matched_core": [
+    "信息制度、承重假设、科学目标、干预对象与机制主路径均被保留",
+    "评价目标与失败制度未被改写"
+  ],
+  "candidate_only_elements": [
+    "表述与实现细节不同"
+  ],
+  "prior_only_elements": [
+    "prior 的实现顺序不同"
+  ],
+  "minimal_structural_delta": [],
+  "load_bearing_analysis": {
+    "changed_information": "unchanged",
+    "changed_assumptions": "unchanged",
+    "changed_mechanism": "unchanged",
+    "changed_predictions": "unchanged",
+    "changed_boundary": "unchanged"
+  },
+  "counterfactual_collapse": {
+    "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
+    "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
+    "collapse_result": "collapses",
+    "verification_status": "predicted"
+  },
+  "differentiating_consequences": [],
+  "discriminating_tests": [],
+  "claimed_novelty_level": "none",
+  "verdict": "reframing-only",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（据本次检索未见结构等价前作，检索式见附录 X）。本判定只覆盖三路检索返回的前作。",
+  "blind_spots": [
+    "结构抽取由 LLM 辅助完成，facet 边界可能与人类判断不一致",
+    "检索未覆盖的相邻学科不构成反例也不构成支持"
+  ],
+  "evidence": [
+    "LIT2"
+  ],
+  "near_neighbor_verdict": "reframing-neighbor",
+  "correspondence": {
+    "problem": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[problem] 原文 §2 / eq.(3) / code path",
+      "note": "problem 的对应关系依据 span 逐项判定"
+    },
+    "setting": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[setting] 原文 §2 / eq.(3) / code path",
+      "note": "setting 的对应关系依据 span 逐项判定"
+    },
+    "observables": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[observables] 原文 §2 / eq.(3) / code path",
+      "note": "observables 的对应关系依据 span 逐项判定"
+    },
+    "available_information": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[available_information] 原文 §2 / eq.(3) / code path",
+      "note": "available_information 的对应关系依据 span 逐项判定"
+    },
+    "target_or_latent_quantity": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[target_or_latent_quantity] 原文 §2 / eq.(3) / code path",
+      "note": "target_or_latent_quantity 的对应关系依据 span 逐项判定"
+    },
+    "assumptions": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[assumptions] 原文 §2 / eq.(3) / code path",
+      "note": "assumptions 的对应关系依据 span 逐项判定"
+    },
+    "adaptation_or_intervention_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[adaptation_or_intervention_object] 原文 §2 / eq.(3) / code path",
+      "note": "adaptation_or_intervention_object 的对应关系依据 span 逐项判定"
+    },
+    "objective": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[objective] 原文 §2 / eq.(3) / code path",
+      "note": "objective 的对应关系依据 span 逐项判定"
+    },
+    "mechanism": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[mechanism] 原文 §2 / eq.(3) / code path",
+      "note": "mechanism 的对应关系依据 span 逐项判定"
+    },
+    "information_flow": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[information_flow] 原文 §2 / eq.(3) / code path",
+      "note": "information_flow 的对应关系依据 span 逐项判定"
+    },
+    "theory_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[theory_object] 原文 §2 / eq.(3) / code path",
+      "note": "theory_object 的对应关系依据 span 逐项判定"
+    },
+    "predictions_or_guarantees": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[predictions_or_guarantees] 原文 §2 / eq.(3) / code path",
+      "note": "predictions_or_guarantees 的对应关系依据 span 逐项判定"
+    },
+    "evaluation_target": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[evaluation_target] 原文 §2 / eq.(3) / code path",
+      "note": "evaluation_target 的对应关系依据 span 逐项判定"
+    },
+    "boundary_or_failure_regime": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[boundary_or_failure_regime] 原文 §2 / eq.(3) / code path",
+      "note": "boundary_or_failure_regime 的对应关系依据 span 逐项判定"
+    }
+  },
+  "load_bearing_facets": [
+    "information_flow",
+    "assumptions"
+  ],
+  "local_neighborhood_test": {
+    "near_prior": "LIT2",
+    "local_modification_kinds": [],
+    "neighbor_confirmed": true,
+    "rationale": "按 §16.3 逐条核对 problem / observables / assumptions / target / mechanism / prediction / boundary"
+  },
+  "removal_test": {
+    "removed_delta": "移除 candidate 声称的 Δ",
+    "returns_to_prior": "LIT2",
+    "unchanged_core": [
+      "problem",
+      "observables",
+      "assumptions"
+    ],
+    "conclusion": "component-local-delta"
+  },
+  "null_hypothesis": {
+    "statement": "candidate is structurally subsumed by an existing prior",
+    "strongest_subsumption_prior": "LIT2",
+    "mapping_completeness": "full",
+    "unmapped_load_bearing_elements": []
+  },
+  "minimal_delta_set": {
+    "delta_set": [],
+    "novel_consequence_kinds": [],
+    "sufficient_alone": false
+  },
+  "theory_stripping": {
+    "applicable": true,
+    "stripped_terms": [
+      "partial identification",
+      "decision-theory 品牌词"
+    ],
+    "residual_structure": "stripping 后与 LIT2 的 assumptions / observables / predictions 逐项一致",
+    "adds_new_structure": false,
+    "new_structure_kinds": [],
+    "conclusion": "theory-relabeling-risk"
+  },
+  "remote_analogy_mapping": {
+    "applicable": false,
+    "object_mapping": "not-applicable",
+    "relation_mapping": "not-applicable",
+    "constraint_mapping": "not-applicable",
+    "failure_mode_mapping": "not-applicable",
+    "added_structure": false,
+    "conclusion": "not-applicable"
+  },
+  "trust_basis": [
+    "source-span",
+    "literature"
+  ]
+}

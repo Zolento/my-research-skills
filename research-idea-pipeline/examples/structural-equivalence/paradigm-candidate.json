@@ -1,0 +1,249 @@
+{
+  "_schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "schema": "research-idea-pipeline/structural-equivalence-audit@2",
+  "stage": "R7",
+  "candidate": "H23",
+  "closest_priors": [
+    "LIT42",
+    "LIT96"
+  ],
+  "retrieval_status": "sufficient",
+  "domain_terms": [
+    "MRI",
+    "k-space",
+    "source-free",
+    "Flow Matching",
+    "跨中心",
+    "重建"
+  ],
+  "domain_aware_alignment": {
+    "problem": "目标量本身的定义能否被识别，而不只是被估计",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "算子参数族的充分统计量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "算子参数的后验（而非图像分布）",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "最大化识别条件下界",
+    "mechanism": "先识别算子参数，再据其定义可解性",
+    "information_flow": "观测 → 充分统计量 → 识别条件下界 → 可解题判定",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "算子参数不可识别时不存在任何可解方法"
+  },
+  "domain_stripped_alignment": {
+    "problem": "structural role: 目标量本身的定义能否被识别，而不只是被估计",
+    "setting": "同一观测与干预条件下的同类设定",
+    "observables": "structural role: 算子参数族的充分统计量",
+    "available_information": "同量级的可用信息",
+    "target_or_latent_quantity": "structural role: 算子参数的后验（而非图像分布）",
+    "assumptions": "同一组承重假设",
+    "adaptation_or_intervention_object": "同一被干预对象",
+    "objective": "structural role: 最大化识别条件下界",
+    "mechanism": "structural role: 先识别算子参数，再据其定义可解性",
+    "information_flow": "structural role: 观测 → 充分统计量 → 识别条件下界 → 可解题判定",
+    "theory_object": "同一数学对象",
+    "predictions_or_guarantees": "同一族可证伪预测",
+    "evaluation_target": "同一评价目标",
+    "boundary_or_failure_regime": "structural role: 算子参数不可识别时不存在任何可解方法"
+  },
+  "matched_core": [
+    "信息制度、承重假设、科学目标、干预对象与机制主路径均被保留",
+    "评价目标与失败制度未被改写"
+  ],
+  "candidate_only_elements": [
+    "表述与实现细节不同"
+  ],
+  "prior_only_elements": [
+    "prior 的实现顺序不同"
+  ],
+  "minimal_structural_delta": [
+    "目标量改为算子参数后验",
+    "目标改为最大化识别条件下界"
+  ],
+  "load_bearing_analysis": {
+    "changed_information": "目标量的可观测量改为算子参数的充分统计量",
+    "changed_assumptions": "新增承重假设：算子参数族满足可识别性条件",
+    "changed_mechanism": "信息流改为先识别算子参数再据其定义可解性",
+    "changed_predictions": "新增可证伪预测：识别条件下界预测跨总体落差上限",
+    "changed_boundary": "新增不可能性结论：不可识别时不存在任何可解方法"
+  },
+  "counterfactual_collapse": {
+    "replacement": "把 candidate 声称的 Δ 换回 closest prior 的对应结构",
+    "predicted_consequence": "逐项检查目标、信息结构、假设、机制、预测与失败制度",
+    "collapse_result": "does-not-collapse",
+    "verification_status": "derived"
+  },
+  "differentiating_consequences": [
+    "新增不可能性结论：算子不可识别时任何条件分解都不可解",
+    "判别实验的预测方向与 prior 相反"
+  ],
+  "discriminating_tests": [
+    "X31（stage=X3，claim_targeted=[C9]）：测量识别条件下界与跨总体落差的关系",
+    "X32（stage=X4）：构造不可识别算子族检验不可能性结论"
+  ],
+  "claimed_novelty_level": "paradigm-candidate",
+  "verdict": "paradigm-candidate",
+  "novelty_boundary": "against the retrieved literature, no structural equivalent was identified（据本次检索未见结构等价前作，检索式见附录 X）。本判定只覆盖三路检索返回的前作。",
+  "blind_spots": [
+    "结构抽取由 LLM 辅助完成，facet 边界可能与人类判断不一致",
+    "检索未覆盖的相邻学科不构成反例也不构成支持"
+  ],
+  "evidence": [
+    "LIT42",
+    "LIT96"
+  ],
+  "near_neighbor_verdict": "structural-delta-strong",
+  "correspondence": {
+    "problem": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[problem] 原文 §2 / eq.(3) / code path",
+      "note": "problem 的对应关系依据 span 逐项判定"
+    },
+    "setting": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[setting] 原文 §2 / eq.(3) / code path",
+      "note": "setting 的对应关系依据 span 逐项判定"
+    },
+    "observables": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[observables] 原文 §2 / eq.(3) / code path",
+      "note": "observables 的对应关系依据 span 逐项判定"
+    },
+    "available_information": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[available_information] 原文 §2 / eq.(3) / code path",
+      "note": "available_information 的对应关系依据 span 逐项判定"
+    },
+    "target_or_latent_quantity": {
+      "relation": "DIFFERENT",
+      "provenance": "DERIVED",
+      "evidence_span": "[target_or_latent_quantity] 原文 §2 / eq.(3) / code path",
+      "note": "target_or_latent_quantity 的对应关系依据 span 逐项判定"
+    },
+    "assumptions": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[assumptions] 原文 §2 / eq.(3) / code path",
+      "note": "assumptions 的对应关系依据 span 逐项判定"
+    },
+    "adaptation_or_intervention_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[adaptation_or_intervention_object] 原文 §2 / eq.(3) / code path",
+      "note": "adaptation_or_intervention_object 的对应关系依据 span 逐项判定"
+    },
+    "objective": {
+      "relation": "DIFFERENT",
+      "provenance": "DERIVED",
+      "evidence_span": "[objective] 原文 §2 / eq.(3) / code path",
+      "note": "objective 的对应关系依据 span 逐项判定"
+    },
+    "mechanism": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[mechanism] 原文 §2 / eq.(3) / code path",
+      "note": "mechanism 的对应关系依据 span 逐项判定"
+    },
+    "information_flow": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[information_flow] 原文 §2 / eq.(3) / code path",
+      "note": "information_flow 的对应关系依据 span 逐项判定"
+    },
+    "theory_object": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[theory_object] 原文 §2 / eq.(3) / code path",
+      "note": "theory_object 的对应关系依据 span 逐项判定"
+    },
+    "predictions_or_guarantees": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[predictions_or_guarantees] 原文 §2 / eq.(3) / code path",
+      "note": "predictions_or_guarantees 的对应关系依据 span 逐项判定"
+    },
+    "evaluation_target": {
+      "relation": "MATCH",
+      "provenance": "EXPLICIT",
+      "evidence_span": "[evaluation_target] 原文 §2 / eq.(3) / code path",
+      "note": "evaluation_target 的对应关系依据 span 逐项判定"
+    },
+    "boundary_or_failure_regime": {
+      "relation": "DIFFERENT",
+      "provenance": "DERIVED",
+      "evidence_span": "[boundary_or_failure_regime] 原文 §2 / eq.(3) / code path",
+      "note": "boundary_or_failure_regime 的对应关系依据 span 逐项判定"
+    }
+  },
+  "load_bearing_facets": [
+    "target_or_latent_quantity",
+    "objective",
+    "boundary_or_failure_regime"
+  ],
+  "local_neighborhood_test": {
+    "near_prior": "LIT42",
+    "local_modification_kinds": [],
+    "neighbor_confirmed": false,
+    "rationale": "按 §16.3 逐条核对 problem / observables / assumptions / target / mechanism / prediction / boundary"
+  },
+  "removal_test": {
+    "removed_delta": "移除 candidate 声称的 Δ",
+    "returns_to_prior": "",
+    "unchanged_core": [
+      "problem",
+      "observables",
+      "assumptions"
+    ],
+    "conclusion": "load-bearing-delta"
+  },
+  "null_hypothesis": {
+    "statement": "candidate is structurally subsumed by an existing prior",
+    "strongest_subsumption_prior": "LIT42",
+    "mapping_completeness": "failed",
+    "unmapped_load_bearing_elements": [
+      "target_or_latent_quantity",
+      "objective",
+      "boundary_or_failure_regime"
+    ]
+  },
+  "minimal_delta_set": {
+    "delta_set": [
+      "目标量改为算子参数后验",
+      "目标改为最大化识别条件下界"
+    ],
+    "novel_consequence_kinds": [
+      "boundary",
+      "experiment"
+    ],
+    "sufficient_alone": true
+  },
+  "theory_stripping": {
+    "applicable": false,
+    "stripped_terms": [],
+    "residual_structure": "not-applicable",
+    "adds_new_structure": false,
+    "new_structure_kinds": [],
+    "conclusion": "not-applicable"
+  },
+  "remote_analogy_mapping": {
+    "applicable": false,
+    "object_mapping": "not-applicable",
+    "relation_mapping": "not-applicable",
+    "constraint_mapping": "not-applicable",
+    "failure_mode_mapping": "not-applicable",
+    "added_structure": false,
+    "conclusion": "not-applicable"
+  },
+  "trust_basis": [
+    "source-span",
+    "equation",
+    "algorithm",
+    "discriminating-experiment"
+  ]
+}
