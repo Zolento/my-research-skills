@@ -85,6 +85,25 @@ proof, Experimental design, Claim and conclusion validity first. Scientific repa
 options name text-only/reanalysis/new-experiment/new-theory requirements. No agent
 performs a scientific correction merely to make an invariance check pass.
 
+## Architect mode steering
+
+The user subsequently expanded the core object to Scientific Argument. Three core
+modes are Audit, Architect and Revise; Suggest remains the default editorial output
+within Audit, and an explicit analysis-only request stays analysis-only. Architect
+normalizes source materials with epistemic types, checks sufficiency, searches
+supported theses/hierarchies, then creates Compact or Full paragraph blueprints.
+The same graph and local scientific audits run before generation and on the resulting
+plan. Planned or hypothesized evidence never counts as an established result.
+Incomplete materials permit bounded plans with SCIENTIFIC GAP TO RESOLVE markers.
+
+Research-material map, blueprint, outline audit and section-draft audit are separate
+source-bound artifacts. The software checks references/statuses/coverage and honors
+semantic verdicts, rather than claiming regex can generate or certify an argument.
+Scientific critical/major findings must propagate to blueprint gaps. Blueprint
+approval is explicit before optional section-by-section drafting. New evidence in
+Revise establishes a versioned baseline with author resolution, not permission to
+silently change original claims under an “equivalent” label.
+
 ## Stage validation log
 
 - Baseline research release PASS (501 tests, 4 existing skips); figure tests 47 PASS.
@@ -98,3 +117,7 @@ performs a scientific correction merely to make an invariance check pass.
   preservation is separate from complete original/revised fact coverage and global
   semantic judgments. Missing audit is NEEDS_REVIEW; failed semantic verdicts are
   honored. Behavioral scientific judgments are not claimed as regex detections.
+- Scientific coherence: 47 tests PASS, including located graph/provenance,
+  structural orphan/cycle/untested diagnostics, local verdict fixtures for twenty
+  scientific counterexamples, Critical leakage, proof unknowns and aggregation
+  provenance. These test audit contracts, not autonomous LLM error-detection accuracy.
