@@ -1226,7 +1226,7 @@ def qualify_evidence(
                 tamper.append(diagnostic.detail)
     if tamper:
         checks.append(_qualification_check(
-            "PQ8", "temporal_order", tamper,
+            "PQ8", "temporal_order", tamper + temporal,
             path=f"experiments[{experiment_id}].preregistration.amended"))
     else:
         checks.append(_qualification_check(
@@ -1344,7 +1344,10 @@ def assess_experiment(
                 f"{failure['id']} 证据资格未通过（{failure['severity']}）：{failure['detail']}"))
         diagnostic_class = assessment["diagnostic_outcome_class"]
         if assessment["evidence_eligible"] or diagnostic_class not in WORLD_CLAIMING_CLASSES:
-            if assessment["outcome_class"] not in ("INVALID_EXECUTION", "EXPLORATORY_ANOMALY"):
+            if assessment["outcome_class"] not in ("INVALID_EXECUTION", "EXPLORATORY_ANOMALY") \
+                    and diagnostic_class is not None:
+                # A path with no adjudication at all (missing experiment, malformed packet) has
+                # no comparison to copy; its own class stands instead of being replaced by None.
                 assessment["outcome_class"] = diagnostic_class
         else:
             assessment["outcome_class"] = "UNTESTABLE"

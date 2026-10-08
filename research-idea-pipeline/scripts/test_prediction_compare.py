@@ -528,6 +528,19 @@ class TestEvidenceQualificationGate(unittest.TestCase):
             self.assertFalse(assessment["evidence_eligible"], field)
             self.assertFalse(allowed, field)
 
+    def test_a_malformed_packet_fails_closed_without_crashing(self):
+        """Found in review: a non-object packet produced `outcome_class: null`."""
+        for garbage in ([], "not a packet", 42, None, {}, {"experiment_id": "X1"}):
+            assessment, _ = pc.assess_experiment(self.state, garbage)
+            self.assertIn(assessment["outcome_class"], pc.OUTCOME_CLASSES, repr(garbage))
+            self.assertFalse(assessment["evidence_eligible"], repr(garbage))
+            self.assertIn(assessment["evidence_class"], pc.EVIDENCE_CLASSES, repr(garbage))
+            allowed, reasons = pc.evidence_transition_allowed(self.state, assessment)
+            self.assertFalse(allowed, repr(garbage))
+            self.assertTrue(reasons, repr(garbage))
+            block = pc.qualify_evidence(self.state, garbage)
+            self.assertFalse(block["eligible"], repr(garbage))
+
     def test_unknown_validity_keeps_the_comparison_but_not_the_evidence(self):
         packet = clone(self.complete)
         packet["execution"]["validity"] = "UNKNOWN"
@@ -568,6 +581,20 @@ class TestEvidenceQualificationGate(unittest.TestCase):
         self.assertFalse(allowed)
         self.assertTrue(any("时间" in reason or "泄漏" in reason for reason in reasons), reasons)
         self.assertFalse(assessment["evidence_eligible"])
+
+    def test_a_tamper_and_a_time_leak_are_both_reported(self):
+        state = clone(self.state)
+        state["experiments"][0]["preregistration"]["frozen_at_state_version"] = 99
+        state["experiments"][0]["preregistration"]["amended"] = [
+            {"at_state_version": 6, "reason": "看到结果之后调整判据"}]
+        assessment, allowed, _ = self._evaluate(state=state)
+        self.assertFalse(allowed)
+        check = next(item for item in assessment["qualification"]["checks"]
+                     if item["id"] == "PQ8")
+        self.assertEqual(check["severity"], pc.BLOCKING)
+        self.assertTrue(any("泄漏" in item for item in check["failures"]), check["failures"])
+        self.assertTrue(any("事后" in item or "后修订" in item for item in check["failures"]),
+                        check["failures"])
 
     def test_a_post_hoc_amendment_blocks_the_gate(self):
         state = clone(self.state)
@@ -692,6 +719,33 @@ class TestEvidenceQualificationGate(unittest.TestCase):
         self.assertEqual(standalone, integrated["qualification"])
         clean = pc.qualify_evidence(self.state, self.complete)
         self.assertTrue(clean["eligible"])
+
+    def test_every_reported_evidence_class_is_in_the_frozen_vocabulary(self):
+        """`evidence_class` is a frozen three-value vocabulary, not a free-text verdict."""
+        packets = []
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["source"]
+        packets.append(packet)
+        packet = clone(self.complete)
+        packet["execution"]["validity"] = "UNKNOWN"
+        packets.append(packet)
+        packet = clone(self.complete)
+        packet["execution"]["validity"] = "INVALID"
+        packets.append(packet)
+        packet = clone(self.complete)
+        packet["outcomes"] = [packet["outcomes"][0]]
+        packets.append(packet)
+        packets.append([])
+        unfinished = clone(self.state)
+        unfinished["experiments"][0]["status"] = "running"
+        for index, mutated in enumerate(packets):
+            assessment, _ = pc.assess_experiment(
+                unfinished if index == len(packets) - 1 else self.state, mutated)
+            self.assertIn(assessment["evidence_class"], pc.EVIDENCE_CLASSES)
+            self.assertIn(assessment["scientific_status"], pc.SCIENTIFIC_STATUSES)
+            self.assertIn(assessment["outcome_class"], pc.OUTCOME_CLASSES)
+        self.assertIn(pc.qualify_evidence(self.state, self.complete)["evidence_class"],
+                      pc.EVIDENCE_CLASSES)
 
     def test_a_partial_submission_is_reported_as_an_incomplete_decision_set(self):
         packet = clone(self.complete)
@@ -1341,6 +1395,37 @@ class TestInsightCards(unittest.TestCase):
             unsupported = clone(state)
             unsupported["assurance"] = []
             self.assertEqual(pc.load_audits(unsupported, root)[0], {})
+
+    def test_every_certification_failure_names_a_declared_check(self):
+        """Each failure must name the single missing step, not a generic refusal."""
+        scenarios = []
+        card, state, audits = self._certified()
+        card["novel_prediction"]["observation"]["experiment_id"] = "X2"
+        scenarios.append((card, state, audits))
+        card, state, audits = self._certified()
+        state["evidence"][0]["supports"] = []
+        scenarios.append((card, state, audits))
+        card, state, audits = self._certified()
+        audits["A1"]["artifact"] = {**audits["A1"]["artifact"], "verdict": "equivalent"}
+        scenarios.append((card, state, audits))
+        card, state, audits = self._certified()
+        state["evidence"][0]["prediction_ref"] = "X1:O2"
+        scenarios.append((card, state, audits))
+        card, state, audits = self._certified()
+        state["experiments"][0]["outcome_analysis"] = None
+        scenarios.append((card, state, audits))
+        for index, (candidate, scenario_state, scenario_audits) in enumerate(scenarios):
+            derived, reasons = pc.classify_insight(candidate, scenario_state, scenario_audits)
+            certification = reasons["certification"]
+            self.assertNotEqual(derived, "evidence_supported_insight", index)
+            # Every attempt must name what is missing, and every *violation* must name the
+            # check it failed; a generic refusal would not tell the researcher what to fix.
+            self.assertTrue(certification["missing"] or certification["failures"], index)
+            self.assertTrue(reasons["missing"], index)
+            for failure in certification["failures"]:
+                self.assertTrue(
+                    any(failure.startswith(check_id)
+                        for check_id in pc.CERTIFICATION_CHECKS), failure)
 
     def test_a_certification_attempt_without_provenance_is_reported(self):
         card, state, _ = self._certified()

@@ -144,7 +144,7 @@ python3 scripts/release_check.py
 
 ## 8. Verification status
 
-Verified offline and mechanically, by the fifteen-step release gate and 1248 unit tests:
+Verified offline and mechanically, by the fifteen-step release gate and 1252 unit tests:
 
 * the canonical state, scheduler template and the four schemas are unchanged, and
   `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
