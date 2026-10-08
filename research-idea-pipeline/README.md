@@ -205,6 +205,37 @@ against a fresh rebuild and fails on drift. See the
 [cognitive memory policy](references/cognitive-memory-policy.md) and the
 [architecture note](docs/cognitive-insight-engine.md).
 
+Predictions become decidable through a frozen `criterion` inside the existing
+`preregistration.outcomes[]`. An observation is compared with it and classified as held,
+deviated, within tolerance, exploratory, invalid or untestable. Two mechanisms compete only
+when each owns a frozen prediction with a different criterion; rewording is not a
+distinction. See the
+[prediction and competition contract](references/prediction-anomaly-competition.md).
+
+```sh
+python3 scripts/prediction_compare.py compare --state <state.json> --packet observation.json
+python3 scripts/prediction_compare.py compete --state <state.json> --competition CP1
+python3 scripts/prediction_compare.py switch  --state <state.json>
+```
+
+## Taking over an existing project
+
+A project that already has a canonical `research-state.json` is **initialized**. Loading a
+newer skill must not look like a fresh start, so the entry stays `continue-research` and no
+Bootstrap runs. The takeover is read-only: state, scheduler and the execution ledger are
+byte-identical afterwards, versions, claim statuses, experiment ids, the anchor and the
+diagnostic budget are untouched, and no prediction is invented for an experiment that never
+froze one. Cognitive memory is reconstructed from canonical evidence and every
+reconstructed entry is marked retrospective.
+
+```sh
+python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/A/research-state.json
+```
+
+A severe compatibility error writes nothing and exits 3. Rebuilding a new Research State to
+work around it is not an option. See the [handoff contract](references/legacy-handoff.md).
+
 ## Examples
 
 | Example | What it demonstrates |

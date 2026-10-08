@@ -67,6 +67,7 @@ EXIT_ENV = 4
 COGNITION_DIRNAME = "cognition"
 INDEX_NAME = "index.json"
 REVISIONS_NAME = "model-revisions.jsonl"
+INSIGHT_CARDS_NAME = "insight-cards.jsonl"
 BRIEF_NAME = "context-brief.md"
 
 STATE_NAME = "research-state.json"
@@ -141,12 +142,55 @@ MECHANISM_FIELDS: Tuple[str, ...] = (
     "pending_predictions", "competes_with", "merged_into", "dormant", "note",
 )
 
+#: Structural fields a revision payload may carry, per event kind. A payload key that
+#: is not listed for that kind is a shape error, not a silently ignored extra. This
+#: replaces the earlier flat allow-list so that a new kind cannot inherit fields it has
+#: no meaning for.
+ANOMALY_FIELDS: Tuple[str, ...] = (
+    "observation", "frozen_prediction", "importance", "reproduced", "open_question",
+    "related_mechanisms", "exploratory", "outcome_class", "experiment_id", "assessment",
+)
+COMPETITION_FIELDS: Tuple[str, ...] = (
+    "mechanisms", "shared_explanation", "conflicting_predictions", "predictions",
+    "discriminating_intervention", "decidable", "decision_impact", "conclusion", "winner",
+)
+PREDICTION_FIELDS: Tuple[str, ...] = (
+    "freeze_digest", "outcomes", "criteria_present", "prediction_id", "experiment_id",
+    "outcome_class", "assessment", "observed", "reason", "note",
+)
+STRATEGY_FIELDS: Tuple[str, ...] = (
+    "note", "priors", "operator", "action", "evidence", "observations",
+)
+
 REF_KEYS: Tuple[str, ...] = (
     "claims", "evidence", "assumptions", "hypotheses", "experiments",
     "literature", "failures", "uncertainties",
 )
 
 EMPTY_REFS: Dict[str, List[str]] = {key: [] for key in REF_KEYS}
+
+#: Where a projected entry came from. `legacy_derivation` means it was reconstructed from
+#: canonical state because no revision event covers it; it is a projection, never a
+#: fabricated history, and it disappears once a revision covers the same object.
+LEGACY_ORIGIN = "legacy_derivation"
+REVISION_ORIGIN = "revision_log"
+
+LEGACY_MECHANISM_PREFIX = "LM-"
+LEGACY_ALTERNATIVE_PREFIX = "LM-ALT-"
+LEGACY_ANOMALY_PREFIX = "LAN-"
+LEGACY_COMPETITION_PREFIX = "LCP-"
+
+#: Allowed payload keys per revision kind. `declared_support` is accepted for mechanism
+#: kinds only so that a self-rating can be recorded as a conflict (`CM7`).
+PAYLOAD_KEYS: Dict[str, Tuple[str, ...]] = {
+    **{kind: MECHANISM_FIELDS + ("declared_support",) for kind in MECHANISM_KINDS},
+    "anomaly_record": ANOMALY_FIELDS,
+    "competition_open": COMPETITION_FIELDS,
+    "competition_resolve": COMPETITION_FIELDS,
+    "prediction_freeze": PREDICTION_FIELDS,
+    "prediction_assessment": PREDICTION_FIELDS,
+    "strategy_update": STRATEGY_FIELDS,
+}
 
 #: Id prefixes per canonical array, taken from state_check.py S2.
 ID_PREFIX: Dict[str, str] = {
@@ -223,6 +267,45 @@ def load_state(path: Path) -> Dict[str, Any]:
     if not isinstance(doc, dict):
         raise CognitionError(f"state root must be an object: {path}")
     return doc
+
+
+def load_insight_cards(path: Path) -> Tuple[List[Dict[str, Any]], List[Diagnostic]]:
+    """Read insight cards through the module that owns their schema.
+
+    The import is deliberately local: `prediction_compare` imports this module for the
+    canonical view, so a module-level import would be circular.
+    """
+    import prediction_compare as pc
+    return pc.load_cards(path)
+
+
+def project_insights(
+    state: Dict[str, Any],
+    cards: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Classify insight cards from canonical facts, never from their own label."""
+    if not cards:
+        return {"insights": [], "diagnostics": []}
+    import prediction_compare as pc
+    insights: List[Dict[str, Any]] = []
+    diagnostics: List[Diagnostic] = []
+    for card in cards:
+        derived, reasons = pc.classify_insight(card, state)
+        diagnostics.extend(pc.insight_card_errors(card, state))
+        insights.append({
+            "id": card.get("id"),
+            "declared_class": card.get("declared_class"),
+            "derived_class": derived,
+            "observation": card.get("observation", ""),
+            "proposed_mechanism": card.get("proposed_mechanism", ""),
+            "novel_prediction": card.get("novel_prediction"),
+            "discriminating_intervention": card.get("discriminating_intervention"),
+            "scope_boundary": card.get("scope_boundary", ""),
+            "reasons": reasons,
+            "retrospective": not bool(card.get("refs")),
+        })
+    insights.sort(key=lambda item: str(item.get("id")))
+    return {"insights": insights, "diagnostics": diagnostics}
 
 
 def load_revisions(path: Path) -> Tuple[List[Dict[str, Any]], List[Diagnostic]]:
@@ -605,8 +688,8 @@ class _Builder:
                 # never adopted as the mechanism's support level.
                 continue
             if key not in MECHANISM_FIELDS:
-                self.diagnostics.append(Diagnostic(
-                    "CM1", path, f"未知的机制字段：{key}"))
+                # Reported by `validate_revisions` under the per-kind contract; the
+                # builder only ignores what it has no place for.
                 continue
         for field in ("statement", "scope", "note"):
             if isinstance(payload.get(field), str) and payload[field].strip():
@@ -654,6 +737,7 @@ class _Builder:
                 "frozen_prediction": None,
                 "reproduced": None,
                 "importance": "medium",
+                "exploratory": False,
                 "open_question": "",
                 "related_mechanisms": [],
                 "refs": {key: [] for key in REF_KEYS},
@@ -671,6 +755,8 @@ class _Builder:
                     entry[field] = after.get(field)
             if isinstance(after.get("reproduced"), bool):
                 entry["reproduced"] = after["reproduced"]
+            if isinstance(after.get("exploratory"), bool):
+                entry["exploratory"] = after["exploratory"]
             if isinstance(after.get("related_mechanisms"), list):
                 entry["related_mechanisms"] = [m for m in after["related_mechanisms"]
                                                if isinstance(m, str)]
@@ -688,6 +774,8 @@ class _Builder:
                 "shared_explanation": "",
                 "conflicting_predictions": [],
                 "discriminating_intervention": "TBD",
+                "predictions": [],
+                "decision_impact": "unknown",
                 "status": "open",
                 "conclusion": "",
                 "decidable": None,
@@ -708,6 +796,11 @@ class _Builder:
                     entry[field] = after[field]
             if isinstance(after.get("conflicting_predictions"), list):
                 entry["conflicting_predictions"] = list(after["conflicting_predictions"])
+            if isinstance(after.get("predictions"), list):
+                entry["predictions"] = [item for item in after["predictions"]
+                                        if isinstance(item, dict)]
+            if isinstance(after.get("decision_impact"), str):
+                entry["decision_impact"] = after["decision_impact"]
             if isinstance(after.get("decidable"), bool):
                 entry["decidable"] = after["decidable"]
         if kind == "competition_open":
@@ -786,6 +879,7 @@ class _Builder:
             "frozen_prediction": entry["frozen_prediction"],
             "reproduced": entry["reproduced"],
             "importance": entry["importance"],
+            "exploratory": entry["exploratory"],
             "open_question": entry["open_question"],
             "related_mechanisms": entry["related_mechanisms"],
             "canonical_refs": {key: list(entry["refs"].get(key, [])) for key in REF_KEYS},
@@ -809,7 +903,9 @@ class _Builder:
             "mechanisms": entry["mechanisms"],
             "shared_explanation": entry["shared_explanation"],
             "conflicting_predictions": entry["conflicting_predictions"],
+            "predictions": entry["predictions"],
             "discriminating_intervention": entry["discriminating_intervention"],
+            "decision_impact": entry["decision_impact"],
             "status": entry["status"],
             "conclusion": entry["conclusion"],
             "decidable": entry["decidable"],
@@ -833,7 +929,7 @@ class _Builder:
 
 def _id_order(table: Dict[str, Any]) -> List[str]:
     """Deterministic order: numeric id suffix, then registration sequence."""
-    def key(ident: str) -> Tuple[int, int, str]:
+    def key(ident: str) -> Tuple[int, int, int, str]:
         digits = "".join(ch for ch in ident if ch.isdigit())
         try:
             number = int(digits) if digits else 0
@@ -841,7 +937,8 @@ def _id_order(table: Dict[str, Any]) -> List[str]:
             number = 0
         entry = table[ident]
         seq = entry.get("first_seq") if isinstance(entry, dict) else None
-        return (number, seq if isinstance(seq, int) else 0, ident)
+        origin_rank = 1 if isinstance(entry, dict) and entry.get("origin") == LEGACY_ORIGIN else 0
+        return (origin_rank, number, seq if isinstance(seq, int) else 0, ident)
     return sorted(table, key=key)
 
 
@@ -860,17 +957,417 @@ def _mechanism_status(entry: Dict[str, Any], level: str) -> str:
     return "active"
 
 
+def _projection(origin: str, retrospective: bool, derived_from: List[str],
+                missing: Optional[List[str]] = None) -> Dict[str, Any]:
+    return {"origin": origin, "retrospective": retrospective,
+            "derived_from": derived_from, "missing": list(missing or [])}
+
+
+def derive_legacy_structures(
+    view: CanonicalView,
+    covered_claims: set,
+    covered_hypotheses: set,
+    covered_experiments: set,
+) -> Dict[str, Any]:
+    """Reconstruct mechanisms, competitions, anomalies and boundaries from canonical state.
+
+    This is what makes a legacy takeover possible without inventing history. Every entry
+    cites the canonical object it was derived from, is marked `retrospective`, and never
+    claims a prediction that was not frozen at the time. A `done` experiment without a
+    preregistration yields no prediction and no verdict; it yields an `unknown` marker.
+    """
+    mechanisms: List[Dict[str, Any]] = []
+    anomalies: List[Dict[str, Any]] = []
+    competitions: List[Dict[str, Any]] = []
+    boundaries: List[Dict[str, Any]] = []
+    diagnostics: List[Diagnostic] = []
+
+    claim_mechanism: Dict[str, str] = {}
+    for claim in view.state.get("claims", []) or []:
+        if not isinstance(claim, dict):
+            continue
+        claim_id = claim.get("id")
+        if not isinstance(claim_id, str) or claim_id in covered_claims:
+            continue
+        contract = claim.get("contract") if isinstance(claim.get("contract"), dict) else {}
+        assumptions = [ident for ident in _as_list(contract.get("critical_assumptions"))
+                       if view.contains("assumptions", ident)]
+        evidence = [ident for ident in (_as_list(claim.get("supporting_evidence"))
+                                        + _as_list(claim.get("refuting_evidence")))
+                    if view.contains("evidence", ident)]
+        failures = [ident for ident in _as_list(claim.get("known_flaws"))
+                    if view.contains("failures", ident)]
+        refs = {"claims": [claim_id], "evidence": evidence,
+                "assumptions": assumptions, "failures": failures,
+                "hypotheses": [], "experiments": [], "literature": [], "uncertainties": []}
+        stale, missing = _resolve_refs(view, refs, f"mechanisms[{claim_id}]", diagnostics)
+        # `known_flaws` is a *link* required by V4, not a recorded refutation of this
+        # claim. Inferring `refuted` from it would be over-reach, so the reconstruction
+        # derives support without the failure anchors but still cites them for
+        # traceability, and surfaces them through `boundaries` as forbidden repeats.
+        level, reasons, _ = derive_support(view, _without_failures(refs))
+        mechanism_id = LEGACY_MECHANISM_PREFIX + claim_id
+        claim_mechanism[claim_id] = mechanism_id
+        mechanisms.append({
+            "id": mechanism_id,
+            "statement": _text_or(contract.get("statement"), claim.get("statement")),
+            "scope": _text_or(contract.get("scope"), claim.get("scope")),
+            "structure": {
+                "core_variables": [],
+                "dependencies": [],
+                "necessary_conditions": assumptions,
+                "boundaries": [claim.get("scope")] if _text_or(claim.get("scope")) else [],
+                "invariants": [],
+                "counterexamples": evidence if claim.get("refuting_evidence") else [],
+                "pending_predictions": _pending_predictions(view, contract),
+                "competes_with": [],
+            },
+            "support_level": level,
+            "support_reasons": reasons,
+            "status": "refuted" if level == "refuted" else "active",
+            "stale": bool(stale) or bool(missing),
+            "stale_reasons": stale,
+            "missing_refs": missing,
+            "canonical_refs": {key: list(refs[key]) for key in REF_KEYS},
+            "revision_ids": [],
+            "fingerprint": stagnation_fingerprint(view, refs),
+            "lost_competitions": [],
+            "won_competitions": [],
+            "declared_intents": [],
+            "provenance": _projection(LEGACY_ORIGIN, True, [f"claims:{claim_id}"], missing),
+        })
+        # A named alternative becomes a *competing mechanism* only when the claim also
+        # carries an evidence contract naming a real discriminating experiment. Without
+        # that, `nearest_alternative` is a noted caveat, and deriving a second mechanism
+        # from it would manufacture a competition that the project never declared.
+        experiment_id = contract.get("minimal_discriminating_experiment")
+        alternative = claim.get("nearest_alternative")
+        if (isinstance(alternative, str) and alternative.strip()
+                and isinstance(experiment_id, str)
+                and view.contains("experiments", experiment_id)):
+            alternative_id = LEGACY_ALTERNATIVE_PREFIX + claim_id
+            alt_refs = {key: [] for key in REF_KEYS}
+            alt_refs["claims"] = [claim_id]
+            mechanisms.append({
+                "id": alternative_id,
+                "statement": alternative,
+                "scope": claim.get("scope", ""),
+                "structure": {**_empty_structure(), "competes_with": [mechanism_id]},
+                "support_level": "hypothesis",
+                "support_reasons": ["canonical 的 nearest_alternative 指定的替代解释"],
+                "status": "active",
+                "stale": bool(stale) or bool(missing),
+                "stale_reasons": stale,
+                "missing_refs": missing,
+                "canonical_refs": {key: list(alt_refs[key]) for key in REF_KEYS},
+                "revision_ids": [],
+                "fingerprint": stagnation_fingerprint(view, alt_refs),
+                "lost_competitions": [],
+                "won_competitions": [],
+                "declared_intents": [],
+                "provenance": _projection(
+                    LEGACY_ORIGIN, True,
+                    [f"claims:{claim_id}", "claims[].nearest_alternative"], missing),
+            })
+            if True:
+                conflicting, unknown_predictions = _frozen_prediction_refs(view, experiment_id)
+                competitions.append({
+                    "id": LEGACY_COMPETITION_PREFIX + claim_id,
+                    "mechanisms": [mechanism_id, alternative_id],
+                    "shared_explanation": "claim 与其 canonical nearest_alternative 都能解释同一批观察",
+                    "conflicting_predictions": conflicting,
+                    "predictions": [],
+                    "discriminating_intervention": experiment_id,
+                    "status": "open",
+                    "conclusion": "",
+                    "decidable": None,
+                    "decision_impact": "unknown",
+                    "canonical_refs": {"claims": [claim_id], "experiments": [experiment_id],
+                                       **_empty_ref_tail()},
+                    "revision_ids": [],
+                    "stale": bool(stale) or bool(missing),
+                    "stale_reasons": stale,
+                    "missing_refs": missing,
+                    "has_distinguishing_power": False,
+                    "provenance": _projection(
+                        LEGACY_ORIGIN, True,
+                        [f"claims:{claim_id}", f"experiments:{experiment_id}"], unknown_predictions),
+                })
+                if unknown_predictions:
+                    diagnostics.append(Diagnostic(
+                        "CM10", f"competitions[{LEGACY_COMPETITION_PREFIX + claim_id}]",
+                        "历史竞争无法判定区分力："
+                        + "；".join(unknown_predictions)))
+
+    for hypothesis in view.state.get("hypotheses", []) or []:
+        if not isinstance(hypothesis, dict):
+            continue
+        hypothesis_id = hypothesis.get("id")
+        if not isinstance(hypothesis_id, str) or hypothesis_id in covered_hypotheses:
+            continue
+        refs = {key: [] for key in REF_KEYS}
+        refs["hypotheses"] = [hypothesis_id]
+        refs["assumptions"] = [ident for ident in _as_list(hypothesis.get("depends_on"))
+                               if view.contains("assumptions", ident)]
+        refs["literature"] = ([hypothesis["nearest_prior"]]
+                              if view.contains("literature", hypothesis.get("nearest_prior")) else [])
+        stale, missing = _resolve_refs(view, refs, f"mechanisms[{hypothesis_id}]", diagnostics)
+        level, reasons, _ = derive_support(view, refs)
+        mechanisms.append({
+            "id": LEGACY_MECHANISM_PREFIX + hypothesis_id,
+            "statement": _text_or(hypothesis.get("statement")),
+            "scope": _text_or(hypothesis.get("scientific_scope")),
+            "structure": {
+                "core_variables": [],
+                "dependencies": [],
+                "necessary_conditions": refs["assumptions"],
+                "boundaries": [hypothesis.get("scientific_scope")]
+                              if _text_or(hypothesis.get("scientific_scope")) else [],
+                "invariants": [],
+                "counterexamples": [],
+                "pending_predictions": [],
+                "competes_with": [],
+            },
+            "support_level": level,
+            "support_reasons": reasons,
+            "status": "refuted" if level == "refuted" else (
+                "dormant" if hypothesis.get("status") in ("archived", "killed") else "active"),
+            "stale": bool(stale) or bool(missing),
+            "stale_reasons": stale,
+            "missing_refs": missing,
+            "canonical_refs": {key: list(refs[key]) for key in REF_KEYS},
+            "revision_ids": [],
+            "fingerprint": stagnation_fingerprint(view, refs),
+            "lost_competitions": [],
+            "won_competitions": [],
+            "declared_intents": [],
+            "provenance": _projection(LEGACY_ORIGIN, True, [f"hypotheses:{hypothesis_id}"], missing),
+        })
+
+    for experiment in view.state.get("experiments", []) or []:
+        if not isinstance(experiment, dict):
+            continue
+        experiment_id = experiment.get("id")
+        if not isinstance(experiment_id, str) or experiment_id in covered_experiments:
+            continue
+        unexpected = [item for item in _as_list(experiment.get("unexpected"))
+                      if isinstance(item, str) and item.strip()]
+        failed = experiment.get("status") == "failed"
+        if not unexpected and not failed:
+            continue
+        preregistered = isinstance(experiment.get("preregistration"), dict)
+        refs = {key: [] for key in REF_KEYS}
+        refs["experiments"] = [experiment_id]
+        evidence = [ident for ident in _as_list(experiment.get("known_flaws"))
+                    if view.contains("failures", ident)]
+        refs["failures"] = evidence
+        refs["claims"] = [ident for ident in _as_list(experiment.get("claim_targeted"))
+                          if view.contains("claims", ident)]
+        stale, missing = _resolve_refs(view, refs, f"anomalies[{experiment_id}]", diagnostics)
+        unknown: List[str] = []
+        if not preregistered:
+            unknown.append("该实验没有预注册：历史观察只能标为探索性异常，不得反推预测成功或失败")
+        observation = "；".join(unexpected) if unexpected else f"{experiment_id} 以 failed 结束"
+        anomalies.append({
+            "id": LEGACY_ANOMALY_PREFIX + experiment_id,
+            "observation": observation,
+            "frozen_prediction": None,
+            "reproduced": None,
+            "importance": "high" if failed else "medium",
+            "open_question": _text_or(experiment.get("interpretation")),
+            "related_mechanisms": [],
+            "exploratory": not preregistered,
+            "canonical_refs": {key: list(refs[key]) for key in REF_KEYS},
+            "revision_ids": [],
+            "stale": bool(stale) or bool(missing),
+            "stale_reasons": stale,
+            "missing_refs": missing,
+            "provenance": _projection(LEGACY_ORIGIN, True, [f"experiments:{experiment_id}"],
+                                      missing + unknown),
+        })
+
+    boundaries.extend(_legacy_boundaries(view))
+    return {"mechanisms": mechanisms, "anomalies": anomalies,
+            "competitions": competitions, "boundaries": boundaries,
+            "diagnostics": diagnostics}
+
+
+def _without_failures(refs: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    pruned = {key: list(refs.get(key, [])) for key in REF_KEYS}
+    pruned["failures"] = []
+    return pruned
+
+
+def _empty_ref_tail() -> Dict[str, List[str]]:
+    return {key: [] for key in REF_KEYS if key != "claims"}
+
+
+def _text_or(value: Any, fallback: Any = "") -> str:
+    if isinstance(value, str) and value.strip():
+        return value
+    if isinstance(fallback, str):
+        return fallback
+    return ""
+
+
+def _pending_predictions(view: CanonicalView, contract: Dict[str, Any]) -> List[str]:
+    """Frozen prediction references only. A legacy experiment without a preregistration
+    and a criterion contributes nothing; the gap is recorded as `unknown` instead."""
+    experiment_id = contract.get("minimal_discriminating_experiment")
+    if not isinstance(experiment_id, str):
+        return []
+    refs, _ = _frozen_prediction_refs(view, experiment_id)
+    return refs
+
+
+def _frozen_prediction_refs(view: CanonicalView, experiment_id: str) -> Tuple[List[str], List[str]]:
+    experiment = view.get("experiments", experiment_id)
+    if not isinstance(experiment, dict):
+        return [], [f"{experiment_id} 不存在"]
+    preregistration = experiment.get("preregistration")
+    if not isinstance(preregistration, dict):
+        return [], [f"{experiment_id} 历史上没有预注册"]
+    refs: List[str] = []
+    unknown: List[str] = []
+    for outcome in preregistration.get("outcomes") or []:
+        if not isinstance(outcome, dict):
+            continue
+        outcome_id = outcome.get("id")
+        if not isinstance(outcome_id, str):
+            continue
+        if isinstance(outcome.get("criterion"), dict):
+            refs.append(f"{experiment_id}:{outcome_id}")
+        else:
+            unknown.append(f"{experiment_id}:{outcome_id} 没有可判定判据")
+    return refs, unknown
+
+
+def _resolve_refs(
+    view: CanonicalView,
+    refs: Dict[str, List[str]],
+    path: str,
+    diagnostics: List[Diagnostic],
+) -> Tuple[List[str], List[str]]:
+    """Shared provenance resolution for legacy derivation."""
+    stale: List[str] = []
+    missing: List[str] = []
+    for key, ident in iter_refs(refs):
+        if not view.contains(key, ident):
+            missing.append(f"{key}:{ident}")
+            diagnostics.append(Diagnostic("CM3", path,
+                                          f"引用的 canonical 对象不存在：{key}[{ident}]"))
+            continue
+        status, reason = view.validity_of(key, ident)
+        if status in ("invalid", "stale", "pending"):
+            stale.append(f"{key}[{ident}].validity={status}" + (f"（{reason}）" if reason else ""))
+        elif status == "unknown":
+            stale.append(f"{key}[{ident}] 缺少 validity.status")
+    return stale, missing
+
+
+def _legacy_boundaries(view: CanonicalView) -> List[Dict[str, Any]]:
+    """失效边界与禁止重复方向：从 failure memory 与 narrowing repair 投影出来。"""
+    boundaries: List[Dict[str, Any]] = []
+    for failure in view.state.get("failures", []) or []:
+        if not isinstance(failure, dict):
+            continue
+        for rule in _as_list(failure.get("stop_rules")):
+            if not isinstance(rule, dict):
+                continue
+            boundaries.append({
+                "kind": "stop_rule",
+                "target": failure.get("id"),
+                "scope": rule.get("scope", ""),
+                "rule": rule.get("rule", ""),
+                "revisit_conditions": rule.get("revisit_conditions", ""),
+                "origin": LEGACY_ORIGIN,
+            })
+        for entry in _as_list(failure.get("negative_knowledge")):
+            if not isinstance(entry, dict) or entry.get("retry_allowed") is not False:
+                continue
+            boundaries.append({
+                "kind": "retry_forbidden",
+                "target": entry.get("target_id") or failure.get("id"),
+                "scope": failure.get("why", ""),
+                "rule": entry.get("finding", ""),
+                "revisit_conditions": entry.get("revisit_conditions", ""),
+                "origin": LEGACY_ORIGIN,
+            })
+    for failure in view.state.get("failures", []) or []:
+        if not isinstance(failure, dict):
+            continue
+        if failure.get("kind") not in REPEAT_BLOCKING_KINDS:
+            continue
+        boundaries.append({
+            "kind": "failed_repeat",
+            "target": failure.get("id"),
+            "scope": failure.get("what", ""),
+            "rule": f"该方向已被证否或无法复现（kind={failure.get('kind')}）："
+                    "不得原样重复，也不得仅换 seed 放行",
+            "revisit_conditions": "只有在新的判别证据或明确的 regime 改变下才重开",
+            "origin": LEGACY_ORIGIN,
+        })
+    for repair in view.repairs:
+        if not isinstance(repair, dict):
+            continue
+        if repair.get("disposition") in ("NARROW_SCOPE", "KILL_BRANCH"):
+            boundaries.append({
+                "kind": "scope_boundary",
+                "target": ", ".join(str(t) for t in _as_list(repair.get("targets"))),
+                "scope": repair.get("state_delta", ""),
+                "rule": repair.get("flaw", ""),
+                "revisit_conditions": "",
+                "origin": LEGACY_ORIGIN,
+            })
+    for key in REF_KEYS:
+        for ident, entry in sorted(view.by_key.get(key, {}).items()):
+            status = (entry.get("validity") or {}).get("status")
+            if status in ("invalid", "stale"):
+                boundaries.append({
+                    "kind": "invalidated_object",
+                    "target": f"{key}:{ident}",
+                    "scope": (entry.get("validity") or {}).get("reason", ""),
+                    "rule": f"{key}[{ident}].validity={status}",
+                    "revisit_conditions": "",
+                    "origin": LEGACY_ORIGIN,
+                })
+    boundaries.sort(key=lambda item: (item["kind"], str(item["target"]), item["rule"]))
+    return boundaries
+
+
 def build_index(
     state: Dict[str, Any],
     revisions: Sequence[Dict[str, Any]],
     route: str = "",
+    insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
-    """Build the cognitive index. Pure: no I/O, no mutation of `state`."""
+    """Build the cognitive index. Pure: no I/O, no mutation of `state`.
+
+    Two sources feed the projection. The revision log carries structure the agent
+    recorded while researching; the **legacy derivation** reconstructs the same
+    structures from canonical state alone for a project that predates this layer. The
+    derivation is a projection, not a fabricated history: entries carry
+    `origin: legacy_derivation` and `retrospective: true`, and they disappear as soon as
+    a revision covers the same canonical object.
+    """
     view = CanonicalView(state)
     builder = _Builder(view, revisions)
     builder.fold()
     mechanisms, anomalies, competitions = builder.project()
     diagnostics = builder.diagnostics
+
+    covered_claims = {ident for mechanism in mechanisms
+                      for ident in mechanism["canonical_refs"].get("claims", [])}
+    covered_hypotheses = {ident for mechanism in mechanisms
+                          for ident in mechanism["canonical_refs"].get("hypotheses", [])}
+    covered_experiments = {ident for anomaly in anomalies
+                           for ident in anomaly["canonical_refs"].get("experiments", [])}
+    legacy = derive_legacy_structures(view, covered_claims, covered_hypotheses,
+                                      covered_experiments)
+    mechanisms = mechanisms + legacy["mechanisms"]
+    anomalies = anomalies + legacy["anomalies"]
+    competitions = competitions + legacy["competitions"]
+    diagnostics.extend(legacy["diagnostics"])
 
     duplicates: Dict[str, List[str]] = {}
     for mechanism in mechanisms:
@@ -882,21 +1379,43 @@ def build_index(
                 f"机制 {ids} 的 canonical 锚点集合完全相同（fingerprint {fingerprint[:19]}…）；"
                 "实质等价的解释不得当作独立进展"))
 
+    legacy_count = sum(
+        1 for mechanism in mechanisms
+        if (mechanism.get("provenance") or {}).get("origin") == LEGACY_ORIGIN)
+    if not revisions and legacy_count:
+        mode = "legacy_derivation"
+    elif legacy_count:
+        mode = "mixed"
+    else:
+        mode = "revision_log"
+
     index = {
         "_schema": SCHEMA_INDEX,
         "route": route,
         "state_version": view.state_version,
+        "provenance_mode": mode,
         "digest": {
             "state": digest_of(state),
             "revisions": digest_of_lines([_strip_internal(r) for r in revisions]),
+            "insight_cards": digest_of_lines(
+                [_strip_internal(c) for c in (insight_cards or [])]),
         },
         "mechanisms": mechanisms,
         "anomalies": anomalies,
         "competitions": competitions,
+        "insights": project_insights(state, insight_cards or [])["insights"],
+        "boundaries": legacy["boundaries"],
         "counts": {
             "mechanisms": len(mechanisms),
+            "legacy_mechanisms": legacy_count,
             "anomalies": len(anomalies),
             "competitions": len(competitions),
+            "boundaries": len(legacy["boundaries"]),
+            "insights": sum(1 for item in project_insights(state, insight_cards or [])["insights"]
+                            if item.get("derived_class") == "predictive_insight_candidate"),
+            "evidence_supported_insights": sum(
+                1 for item in project_insights(state, insight_cards or [])["insights"]
+                if item.get("derived_class") == "evidence_supported_insight"),
             "stale_mechanisms": sum(1 for m in mechanisms if m["stale"]),
             "refuted_mechanisms": sum(1 for m in mechanisms if m["status"] == "refuted"),
         },
@@ -914,14 +1433,16 @@ def full_index(
     state: Dict[str, Any],
     revisions: Sequence[Dict[str, Any]],
     route: str = "",
+    insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """The index as written to disk: projection plus the complete diagnostic set.
 
     A single entry point, so `build`, `validate`, `check`, `brief` and `recall`
     can never disagree about what the index should contain.
     """
-    index, build_diagnostics = build_index(state, revisions, route)
+    index, build_diagnostics = build_index(state, revisions, route, insight_cards)
     diagnostics = _dedupe(list(build_diagnostics) + validate_revisions(state, revisions))
+    diagnostics.extend(project_insights(state, insight_cards or [])["diagnostics"])
     index["diagnostics"] = [d.as_dict() for d in sorted(
         diagnostics, key=lambda d: (d.rule, d.path, d.detail))]
     return index, diagnostics
@@ -1002,24 +1523,22 @@ def validate_revisions(
             if not isinstance(payload, dict):
                 diagnostics.append(Diagnostic("CM1", path, f"{field} 必须是对象"))
                 continue
-            for key, value in payload.items():
+            allowed = PAYLOAD_KEYS.get(kind if isinstance(kind, str) else "", ())
+            for key in payload:
                 if key in FORBIDDEN_REVISION_KEYS:
                     diagnostics.append(Diagnostic(
                         "CM2", path,
                         f"{field}.{key} 被禁止：认知修订不得声明支持等级、Claim 状态或研究锚点"))
-                elif key not in MECHANISM_FIELDS and key not in (
-                        "observation", "importance", "reproduced", "open_question",
-                        "frozen_prediction", "related_mechanisms", "mechanisms",
-                        "shared_explanation", "conflicting_predictions",
-                        "discriminating_intervention", "decidable", "winner",
-                        "conclusion", "assessment", "outcome_class",
-                        "prediction_id", "observed", "tolerance", "declared_support"):
-                    diagnostics.append(Diagnostic("CM1", path, f"{field} 含未知字段：{key}"))
                 elif key == "declared_support":
                     diagnostics.append(Diagnostic(
                         "CM7", path,
                         "declared_support 只是自评；支持等级一律由 canonical 事实推出，"
                         "该字段会被记录为冲突而不被采用"))
+                elif key not in allowed:
+                    diagnostics.append(Diagnostic(
+                        "CM1", path,
+                        f"{field} 含事件类型 {kind!r} 不接受的字段：{key}；"
+                        f"该类型允许 {list(allowed)}"))
     return diagnostics
 
 
@@ -1027,6 +1546,7 @@ def validate_index(
     state: Dict[str, Any],
     revisions: Sequence[Dict[str, Any]],
     index: Dict[str, Any],
+    insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> List[Diagnostic]:
     """Recompute the index and compare. Any drift is a hard violation."""
     diagnostics: List[Diagnostic] = []
@@ -1046,8 +1566,12 @@ def validate_index(
             [_strip_internal(r) for r in revisions]):
         diagnostics.append(Diagnostic(
             "CM3", INDEX_NAME, "索引的 revisions 摘要与当前 model-revisions.jsonl 不一致；必须重建"))
+    if digest.get("insight_cards") != digest_of_lines(
+            [_strip_internal(c) for c in (insight_cards or [])]):
+        diagnostics.append(Diagnostic(
+            "CM3", INDEX_NAME, "索引的 insight_cards 摘要与当前 insight-cards.jsonl 不一致；必须重建"))
     expected, build_diagnostics = full_index(
-        state, revisions, str(index.get("route", "")))
+        state, revisions, str(index.get("route", "")), insight_cards)
     # Diagnostics are advisory output, not projected science: compare the
     # projection itself, so a torn log line cannot masquerade as index drift.
     left = {k: v for k, v in expected.items() if k != "diagnostics"}
@@ -1154,6 +1678,10 @@ def recall(
             "scope": mechanism.get("scope", ""),
             "refs": mechanism.get("canonical_refs", {}),
             "stale": mechanism.get("stale", False),
+            "origin": (mechanism.get("provenance") or {}).get("origin", REVISION_ORIGIN),
+            "retrospective": bool((mechanism.get("provenance") or {}).get("retrospective")),
+            "pending_predictions": list((mechanism.get("structure") or {})
+                                        .get("pending_predictions") or []),
         }
         if mechanism.get("stale"):
             entry["stale_reasons"] = mechanism.get("stale_reasons", [])
@@ -1178,6 +1706,7 @@ def recall(
         "cold": {"mechanisms": cold},
         "failure_constraints": failure_constraints(state),
         "open_obligations": open_obligations(state),
+        "boundaries": list(index.get("boundaries") or []),
         "budget": budget,
     }
 
@@ -1273,12 +1802,16 @@ def render_brief(
     lines.append("This file is a rebuildable projection. It is not evidence and not a state.")
     lines.append("Every mechanism line carries its derived support level; a mechanism without")
     lines.append("canonical support appears as `speculative`, never as an established fact.")
+    lines.append("Entries marked [RETROSPECTIVE] were reconstructed from canonical state, not")
+    lines.append("recorded while researching; they carry no prediction that was never frozen.")
     lines.append("")
     lines.append(f"- route: `{index.get('route', '')}`")
     lines.append(f"- state_version: {index.get('state_version')}")
     lines.append(f"- mechanisms: {index.get('counts', {}).get('mechanisms', 0)}"
                  f"（stale {index.get('counts', {}).get('stale_mechanisms', 0)}）")
     lines.append(f"- competition: {index.get('counts', {}).get('competitions', 0)}")
+    lines.append(f"- provenance_mode: {index.get('provenance_mode', 'revision_log')}"
+                 f"（legacy 投影 {index.get('counts', {}).get('legacy_mechanisms', 0)} 条）")
     lines.append("")
 
     lines.append("## Research contract (read-only, human-owned)")
@@ -1293,8 +1826,8 @@ def render_brief(
         lines.append("- (no mechanism is anchored to the current focus)")
     for entry in hot["mechanisms"]:
         lines.append(
-            f"- `{entry['id']}` [{entry['support_level']}/{entry['status']}] "
-            f"{_clip(entry['statement'])} ← {_refs(entry['refs'])}")
+            f"- `{entry['id']}` [{entry['support_level']}/{entry['status']}]"
+            f"{_origin_tag(entry)} {_clip(entry['statement'])} ← {_refs(entry['refs'])}")
     for anomaly in hot["anomalies"]:
         lines.append(f"- anomaly `{anomaly['id']}` [{anomaly.get('importance')}] "
                      f"{_clip(anomaly.get('observation', ''))} ← {_refs(anomaly.get('canonical_refs', {}))}")
@@ -1309,8 +1842,8 @@ def render_brief(
     if not selection["warm"]["mechanisms"]:
         lines.append("- (none)")
     for entry in selection["warm"]["mechanisms"]:
-        lines.append(f"- `{entry['id']}` [{entry['support_level']}/{entry['status']}] "
-                     f"{_clip(entry['statement'])} ← {_refs(entry['refs'])}")
+        lines.append(f"- `{entry['id']}` [{entry['support_level']}/{entry['status']}]"
+                     f"{_origin_tag(entry)} {_clip(entry['statement'])} ← {_refs(entry['refs'])}")
     lines.append("")
 
     lines.append("## Cold memory — index only")
@@ -1320,6 +1853,31 @@ def render_brief(
     for entry in cold:
         reason = "; ".join(entry.get("stale_reasons", []) or []) or entry.get("status", "")
         lines.append(f"- `{entry['id']}` [{entry['support_level']}] {_clip(reason)}")
+    lines.append("")
+
+    lines.append("## Insight candidates")
+    insights = index.get("insights") or []
+    if not insights:
+        lines.append("- (no insight card is registered)")
+    for item in insights:
+        lines.append(f"- `{item.get('id')}` [derived={item.get('derived_class')}"
+                     f" / declared={item.get('declared_class')}] "
+                     f"{_clip(item.get('observation', ''))} "
+                     f"| prediction: {_clip((item.get('novel_prediction') or {}).get('ref'), 30)} "
+                     f"| intervention: {_clip(item.get('discriminating_intervention'), 30)}")
+    lines.append("")
+
+    lines.append("## Boundaries — invalidation and forbidden repeats")
+    boundaries = selection["boundaries"]
+    if not boundaries:
+        lines.append("- (no invalidation boundary is recorded)")
+    for item in boundaries[:20]:
+        lines.append(f"- [{item.get('kind')}] `{item.get('target')}` "
+                     f"{_clip(item.get('rule', ''))}")
+        if item.get("revisit_conditions"):
+            lines.append(f"  - revisit only if: {_clip(item['revisit_conditions'])}")
+    if len(boundaries) > 20:
+        lines.append(f"- …还有 {len(boundaries) - 20} 条，见 `index.json` 的 boundaries")
     lines.append("")
 
     lines.append("## Failure memory — what must not be repeated")
@@ -1387,6 +1945,13 @@ def next_action_hint(view: CanonicalView, index: Dict[str, Any]) -> str:
     return "无未决高价值问题；按 scheduler 的 next_action_policy 选择下一动作。"
 
 
+def _origin_tag(entry: Dict[str, Any]) -> str:
+    """Make a reconstructed projection visible; it is never presented as a live record."""
+    if entry.get("retrospective"):
+        return " [RETROSPECTIVE]"
+    return ""
+
+
 def _refs(refs: Any) -> str:
     if not isinstance(refs, dict):
         return "—"
@@ -1439,13 +2004,14 @@ def state_fingerprint(path: Path) -> str:
 def _load_inputs(state_path: Path, cognition_dir: Path):
     state = load_state(state_path)
     revisions, parse_diagnostics = load_revisions(cognition_dir / REVISIONS_NAME)
-    return state, revisions, parse_diagnostics
+    cards, card_diagnostics = load_insight_cards(cognition_dir / INSIGHT_CARDS_NAME)
+    return state, revisions, parse_diagnostics + card_diagnostics, cards
 
 
 def op_build(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path))
+    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards)
     diagnostics = _dedupe(list(parse_diagnostics) + list(index_diagnostics))
     index["diagnostics"] = [d.as_dict() for d in sorted(
         diagnostics, key=lambda d: (d.rule, d.path, d.detail))]
@@ -1468,7 +2034,7 @@ def op_build(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_validate(state_path: Path, cognition_dir: Path) -> int:
-    state, revisions, parse_diagnostics = _load_inputs(state_path, cognition_dir)
+    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
     diagnostics = list(parse_diagnostics) + validate_revisions(state, revisions)
     index_path = cognition_dir / INDEX_NAME
     if not index_path.is_file():
@@ -1480,7 +2046,7 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
             index = None
         if isinstance(index, dict):
-            diagnostics.extend(validate_index(state, revisions, index))
+            diagnostics.extend(validate_index(state, revisions, index, cards))
     diagnostics = _dedupe(diagnostics)
     for diagnostic in diagnostics:
         print(diagnostic.render())
@@ -1489,8 +2055,8 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget: int) -> int:
-    state, revisions, _ = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path))
+    state, revisions, _, cards = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards)
     text = render_brief(index, state, budget)
     target = out or (cognition_dir / BRIEF_NAME)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -1500,23 +2066,23 @@ def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget:
 
 
 def op_recall(state_path: Path, cognition_dir: Path, budget: int) -> int:
-    state, revisions, _ = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path))
+    state, revisions, _, cards = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards)
     print(json.dumps(recall(index, state, budget), ensure_ascii=False, indent=2))
     return EXIT_OK
 
 
 def op_check(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path))
+    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards)
     diagnostics = list(parse_diagnostics) + list(index_diagnostics)
     index_path = cognition_dir / INDEX_NAME
     if index_path.is_file():
         try:
             stored = json.loads(index_path.read_text(encoding="utf-8"))
             if isinstance(stored, dict):
-                diagnostics.extend(validate_index(state, revisions, stored))
+                diagnostics.extend(validate_index(state, revisions, stored, cards))
         except json.JSONDecodeError as exc:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
     else:

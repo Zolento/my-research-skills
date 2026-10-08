@@ -60,7 +60,8 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | Capability | Mechanism | Attachment |
 |---|---|---|
 | Persistent cognitive memory | four memory classes, derived support ladder, hot/warm/cold recall | session start; R3—R6 read; R6/R8/R9.O/R10/R11 write |
-| Prediction, anomaly, mechanism competition | freeze digest, prediction–observation comparator, insight card, distinguishability test | R3—R6 candidate, R8 freeze, R9.O compare, R10 disposition |
+| Prediction, anomaly, mechanism competition | frozen `criterion`, freeze digest, prediction–observation comparator, insight card, distinguishability test | R3—R6 candidate, R8 freeze, R9.O compare, R10 disposition |
+| Legacy takeover | read-only audit `LH1`—`LH16`, legacy derivation, report, rollback | first `continue-research` on an initialized project |
 | Scientific value and adaptive discovery | per-dimension value assessment, calibrated preference memory, strategy update | R3—R6 plus Meta-Controller; `scheduler.json` read-only |
 | Discovery replay and verification | offline replay harness with a leak guard, metrics, ablation, adversarial cases | tooling plus a `release_check.py` step |
 
@@ -80,6 +81,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | R11 | rebuild trigger | `mechanism_merge`, `mechanism_revise` | `state_version` +1, invalidation fixpoint |
 | R12 / R13 | read-only view | — | narrative and review stay state views |
 | R14 | brief, strategy priors | — | `continue`/`pivot`/`archive`/`submit`; no claim status |
+| takeover | canonical state, scheduler, ledger, docs, code | `cognition/` derived layer only | state, scheduler, versions, ids, anchor, budget |
 
 ## 6. Design decisions and trade-offs
 
@@ -98,14 +100,21 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | Artifact | Purpose |
 |---|---|
 | [cognitive-memory-policy.md](../references/cognitive-memory-policy.md) | memory classes, layers, rules `CM1`—`CM9`, lifecycle, write prohibitions |
+| [prediction-anomaly-competition.md](../references/prediction-anomaly-competition.md) | frozen criteria, comparison classes, competition verdicts, behaviour switch, insight cards |
+| [legacy-handoff.md](../references/legacy-handoff.md) | detection, audit `LH1`—`LH16`, reconstruction, retrospection rules, rollback |
 | [scripts/cognition.py](../scripts/cognition.py) | builder, validator, recall and context brief |
+| [scripts/prediction_compare.py](../scripts/prediction_compare.py) | comparator, competition and insight checks |
+| [scripts/legacy_handoff.py](../scripts/legacy_handoff.py) | takeover, report and rollback |
 | [scripts/test_cognition.py](../scripts/test_cognition.py) | offline tests |
+| [scripts/test_prediction_compare.py](../scripts/test_prediction_compare.py), [scripts/test_legacy_handoff.py](../scripts/test_legacy_handoff.py) | offline tests |
 | [examples/cognition/](../examples/cognition/README.md) | synthetic fixture |
 
 ```sh
 python3 scripts/cognition.py build --state <state.json>
 python3 scripts/cognition.py check --state <state.json>
 python3 scripts/cognition.py brief --state <state.json> --budget 4000
+python3 scripts/prediction_compare.py compare --state <state.json> --packet observation.json
+python3 scripts/legacy_handoff.py take --state <state.json>
 python3 scripts/release_check.py
 ```
 
@@ -115,3 +124,8 @@ Structural checks establish provenance, determinism and authority boundaries. Th
 establish that a mechanism is true, that a competition is scientifically the most important
 one, or that a recall selection is the most useful. Index entries are summaries of canonical
 records; when they disagree with the state, the state wins and the index must be rebuilt.
+
+A reconstructed legacy mechanism is a projection of canonical state, not a recovered memory
+of what the previous session thought. The takeover cannot recover a judgement the state never
+recorded, which is why those items are reported as `unknown` or `retrospective` instead of
+being filled in.

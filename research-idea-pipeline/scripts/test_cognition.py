@@ -199,13 +199,28 @@ class TestBackwardCompatibility(unittest.TestCase):
             self.assertEqual(quiet(cg.op_check, state_path, cognition_dir), cg.EXIT_OK)
             index = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
             self.assertEqual(index["diagnostics"], [])
-            self.assertEqual(index["mechanisms"], [])
+            # A project with no revision log still projects its canonical claims and
+            # candidates. Everything reconstructed this way must be marked retrospective.
+            self.assertTrue(index["mechanisms"], "a legacy state projects no mechanism at all")
+            for mechanism in index["mechanisms"]:
+                self.assertEqual(mechanism["provenance"]["origin"], cg.LEGACY_ORIGIN)
+                self.assertTrue(mechanism["provenance"]["retrospective"])
+                self.assertEqual(mechanism["revision_ids"], [])
+            self.assertEqual(index["provenance_mode"], "legacy_derivation")
 
     def test_state_without_a_cognition_directory_is_readable(self):
         doc = cg.load_state(TEMPLATE)
         index, diagnostics = cg.build_index(doc, [], "A")
         self.assertEqual(diagnostics, [])
-        self.assertEqual(index["counts"]["mechanisms"], 0)
+        self.assertEqual(index["counts"]["legacy_mechanisms"],
+                         index["counts"]["mechanisms"])
+        self.assertEqual(index["counts"]["mechanisms"],
+                         len([claim for claim in doc["claims"]])
+                         + len([hypothesis for hypothesis in doc["hypotheses"]])
+                         + len([claim for claim in doc["claims"]
+                                if isinstance(claim.get("contract"), dict)
+                                and claim["contract"].get("minimal_discriminating_experiment")
+                                in {x["id"] for x in doc["experiments"]}]))
 
     def test_old_state_shape_is_not_modified_by_validation(self):
         doc = json.loads(TEMPLATE.read_text(encoding="utf-8"))
@@ -473,7 +488,7 @@ class TestRevisionAuthority(unittest.TestCase):
             state_path, cognition_dir = write_fixture(root, state(), base_revisions())
             with (cognition_dir / cg.REVISIONS_NAME).open("a", encoding="utf-8") as handle:
                 handle.write('{"_schema": "x", "id": "REV9", "seq": 9,\n')
-            doc, revisions, diagnostics = cg._load_inputs(state_path, cognition_dir)
+            doc, revisions, diagnostics, _cards = cg._load_inputs(state_path, cognition_dir)
             self.assertEqual(len(revisions), 4)
             self.assertTrue(any(d.rule == "CM1" for d in diagnostics))
 

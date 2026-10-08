@@ -56,15 +56,33 @@
 
 ## 2. `continue-research` — 按用户授权继续研究
 
+**前置：先判断这是不是已有项目。** 入口**只有四个**，接管不新增第五个。
+检测到 canonical `research-state.json` 时，它就是一个**已初始化项目**：
+**不得执行全新 Bootstrap（`B0`—`B6`）**，只能走 Legacy Research Handoff。
+
+```sh
+python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/<R>/research-state.json
+```
+
+`detect` 判定 `bootstrap_forbidden`；`take` 执行**只读**兼容性审计并重建认知记忆，
+然后写接管报告。**严重兼容性错误一律不写回**（退出码 3），
+**不得通过重建一份新 Research State 绕过问题**。规则见
+[legacy-handoff.md](legacy-handoff.md)。
+
 **先区分意图。**「下一步建议是什么」只要求建议。「接着做」「继续探索方法」授权执行。
 用户明确要求只给建议时，给出建议后停止。不得把执行请求默认改成咨询。
 
 执行请求下，在已授权范围内循环：
 
 1. 核对 state、scheduler 与最新实验产物。记录尚未核实的差异。
-2. 按 [scheduler-policy.md](scheduler-policy.md) §3 选择当前可执行动作。
-3. 执行动作，核验产物，按对应阶段契约回写 state。
-4. 用新增证据重选动作。已有授权不因跨越阶段而失效。
+2. 读认知记忆 `cognition/context-brief.md`（默认路径，无需用户指定）：
+   恢复机制、未解异常、未收口竞争、禁止重复方向与上一轮决策。
+3. 按 [scheduler-policy.md](scheduler-policy.md) §3 选择当前可执行动作。
+4. 执行动作，核验产物，按对应阶段契约回写 state。
+5. 用新增证据重选动作；收尾时重建认知记忆
+   （`python3 scripts/cognition.py build --state <state.json>`，并让 `check` 退出 0）。
+   已有授权不因跨越阶段而失效。
 
 停止条件是用户指定边界、预算耗尽、必要授权缺失，或确无可执行动作。
 若修复尚未闭环，停止不代表阶段完成。报告阻塞，保留有效状态和未完成产物；不得伪造 closure。

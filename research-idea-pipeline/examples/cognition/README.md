@@ -8,6 +8,8 @@ offline, through the same gates as the ordinary pipeline.
 |---|---|
 | [state.json](state.json) | A canonical Research State that passes S1—S7 and V1—V24 |
 | [model-revisions.jsonl](model-revisions.jsonl) | The append-only cognitive revision log for that state |
+| [prediction-observation.json](prediction-observation.json) | A source-bound observation packet for `X1` |
+| [insight-cards.jsonl](insight-cards.jsonl) | One insight card, whose class is derived rather than declared |
 
 The state is a legacy project: it carries **no** `contract.outcome_policy`, so it also
 carries no outcome-policy records. That is deliberate — it demonstrates that the cognitive
@@ -27,6 +29,23 @@ python3 scripts/cognition.py check --state /tmp/cie/research-state.json
 `build` writes `cognition/index.json` and `cognition/context-brief.md` next to the state.
 `check` rebuilds both in memory and fails when they drift. Neither command writes the state.
 
+The prediction comparator, the competition check and the insight classification run against
+the same fixture:
+
+```sh
+cp examples/cognition/insight-cards.jsonl /tmp/cie/cognition/
+python3 scripts/prediction_compare.py compare --state /tmp/cie/research-state.json \
+  --packet examples/cognition/prediction-observation.json
+python3 scripts/prediction_compare.py compete --state /tmp/cie/research-state.json \
+  --cognition /tmp/cie/cognition --competition CP1
+python3 scripts/prediction_compare.py insight --state /tmp/cie/research-state.json \
+  --cognition /tmp/cie/cognition
+```
+
+The same fixture without its revision log is also a legacy project: deleting
+`model-revisions.jsonl` and `insight-cards.jsonl` leaves a state that
+`scripts/legacy_handoff.py take` reconstructs from canonical evidence alone.
+
 ## What it demonstrates
 
 | Situation in the fixture | Expected cognitive result |
@@ -36,8 +55,11 @@ python3 scripts/cognition.py check --state /tmp/cie/research-state.json
 | `M3` is anchored to `F2`, a `failed-to-reproduce` failure | support level `refuted`, lifecycle `refuted` |
 | `CP1` names two mechanisms with conflicting predictions and intervention `X2` | an open competition with distinguishing power |
 | `AN1` records a direction reversal against a frozen prediction, `reproduced: false` | a high-importance, non-reproduced anomaly |
-| `F2` is a repeat-blocking failure kind | failure memory shown with `retry=blocked` |
+| `F2` is a repeat-blocking failure kind | failure memory shown with `retry=blocked` and a `failed_repeat` boundary |
 | No revision declares its own support level | the brief labels every mechanism from canonical facts |
+| `X1:O1` is frozen with a quantitative criterion, `X2` carries M1's and M2's predictions | `CP1` is `DISTINGUISHABLE`; the packet `{O1: 0.8}` gives `PREDICTION_HELD` |
+| `X2:O2` restates `X2:O1` with the same criterion | swapping it in makes the competition `NOT_DISTINGUISHABLE_EQUIVALENT_PREDICTIONS` |
+| `IC1` declares `predictive_insight_candidate` and has a real intervention | the index derives the same class; declaring `evidence_supported_insight` would raise `PC7` |
 
 ## Negative examples, not shipped here
 

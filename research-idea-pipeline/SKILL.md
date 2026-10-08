@@ -771,6 +771,51 @@ python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/re
 退出码同仓库约定：`0` 通过 / `1` 参数错误 / `3` 硬违规 / `4` 环境不满足。
 **不新增 state 槽位**：S1—S7 / V1—V24、state 模板与 `state_check.py` 一律不变。
 
+**预测必须可判定（Phase 2）。** `preregistration.outcomes[].criterion` 把「什么算预测成立」
+在冻结时写成机器可读判据（`quantitative` / `directional` / `discrete`）。
+没有判据的结果只能返回 `UNTESTABLE`，**不得宣告预测成立或失败**；
+执行无效只能返回 `INVALID_EXECUTION`，不是异常；没有预注册的观察只能是
+`EXPLORATORY_ANOMALY`。机制竞争要求每个机制**各自拥有**一条冻结预测，且判据不同——
+**改写措辞不算区分力**。行为切换与 Insight Card 规则见
+[prediction-anomaly-competition.md](references/prediction-anomaly-competition.md)。
+
+---
+
+### 1.9 旧项目接管：Legacy Research Handoff
+
+> **已有 canonical `research-state.json` ＝ 已初始化项目。** 载入新版 Skill **不是**新项目，
+> **不得跑全新 Bootstrap（`B0`—`B6`）**。
+
+入口**仍然是 `continue-research`**（只有四个入口，接管不新增第五个）。
+首次接管执行**只读**兼容性审计并重建认知记忆：
+
+```sh
+python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/<R>/research-state.json
+```
+
+**五条硬约束：**
+
+1. **不重置** `state_version` / `claims[].status` / `evidence` / 实验 ID / 锚点 /
+   诊断预算 / 历史决策；`research-state.json`、`scheduler.json` 与 `.execution` ledger
+   在接管前后**逐字节相同**。
+2. **不补造历史。** 历史上没有预注册的终态实验是**阻塞级兼容性错误**（`LH7`），
+   不得事后补一份冻结预测；没有可判定判据的冻结结果标 `retrospective`，
+   契约 / 失败条件 / 文档缺失标 `unknown`。
+3. **可从 canonical 重建认知记忆**：机制 / 异常 / 竞争 / 失效边界全部由 `claims[]` /
+   `hypotheses[]` / `experiments[]` / `failures[]` 投影得到，每条带
+   `origin: legacy_derivation` + `retrospective: true`，并在 Context Brief 标
+   `[RETROSPECTIVE]`。有修订记录覆盖同一对象时，重建条目自动让位。
+4. **严重兼容性错误一律不写回**（退出码 3，什么都不写），
+   **不得通过重建一份新 Research State 绕过问题**。`LH1`—`LH16` 见
+   [legacy-handoff.md](references/legacy-handoff.md)。
+5. **可重复、可追溯、可回滚。** 同样输入产出逐字节相同的文件；第二次接管只报
+   `already_initialized`；`rollback` 只删本层创建的文件，遇到未知文件即拒绝。
+
+接管产生 `cognition/handoff-report.md`（已恢复 / 未恢复 / 重要机制 / 未解异常 /
+禁止重复方向 / 进行中实验 / 下一条有价值动作）。接管后进入正常 `continue-research`，
+默认读取 `cognition/context-brief.md`，**不需要用户指定记忆文件**。
+
 ---
 
 ## 2. 共享资源索引
@@ -813,6 +858,10 @@ python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/re
 | **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM9` 规则、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
 | **认知记忆脚本** | [scripts/cognition.py](scripts/cognition.py) | Memory Builder + Validator + Recall / Context Brief；`build` / `check` / `brief` / `recall` / `--selftest` / `--list-kinds`；**只读 canonical，从不写 `research-state.json`** |
 | 认知记忆测试与示例 | [scripts/test_cognition.py](scripts/test_cognition.py)、[examples/cognition/](examples/cognition/README.md) | 离线测试（兼容性 / 可重建性 / 支持度推导 / 写入禁止 / 失效过滤 / CLI / fixture）+ 合成 fixture（**不是真实科研证据**） |
+| **预测 / 异常 / 机制竞争（CIE Phase 2）** | [references/prediction-anomaly-competition.md](references/prediction-anomaly-competition.md) | 可判定判据 `criterion`、观测包来源绑定、六类结果、竞争区分力（`PC1`—`PC9`）、诊断→干预行为切换、Insight Card 与推导类别；**不得自我认证创新性** |
+| **预测比较器脚本** | [scripts/prediction_compare.py](scripts/prediction_compare.py) | `freeze` / `compare` / `compete` / `switch` / `insight` / `--selftest`；判据形状、来源绑定、冻结完整性（`PC4`/`PC5`）、区分力与行为切换 |
+| **旧项目接管（Legacy Handoff）** | [references/legacy-handoff.md](references/legacy-handoff.md)、[scripts/legacy_handoff.py](scripts/legacy_handoff.py) | 已初始化项目**禁止重新 Bootstrap**；只读兼容性审计 `LH1`—`LH16`、`canonical` 无损、重建认知记忆、`unknown`/`retrospective` 标注、接管报告、幂等与回滚；**严重错误阻止写回** |
+| 接管回归测试 | [scripts/test_legacy_handoff.py](scripts/test_legacy_handoff.py) | 无损接管 / 跨会话重启 / 重复接管 / 缺失历史 / 失效传播 / 预测时间泄漏 / 多路线隔离 / 下一轮复用旧知识 / 严重错误阻止写回 |
 
 ---
 

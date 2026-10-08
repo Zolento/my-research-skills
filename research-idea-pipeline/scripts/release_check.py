@@ -33,6 +33,10 @@
         —— 漏掉容量对照必须拒绝正式执行；启动路径仅用 mock/dry-run 测试
     11. Cognitive Insight Engine 的合成 fixture
         —— 构建 → 校验 → 重建必须一致，且 canonical state 逐字节不变
+    12. 预测比较器：判据、冻结完整性、区分力、来源绑定
+        —— 判据变异必须让闸门判红；无效执行不得变成预测判定
+    13. Legacy Research Handoff：无损接管 + 严重错误阻止写回
+        —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
 
 退出码
 ------
@@ -287,6 +291,92 @@ def step_cognitive_memory() -> Tuple[bool, str]:
                   f"mechanisms={len(index['mechanisms'])}, state byte-identical")
 
 
+def step_prediction_comparator() -> Tuple[bool, str]:
+    """Predictions must be decidable, frozen, and never self-certified.
+
+    The step mutates a valid packet and a valid criterion: a gate that cannot be made red
+    by a mutation is not a gate.
+    """
+    import prediction_compare as pc
+    fixture = ROOT / "examples" / "cognition"
+    state = json.loads((fixture / "state.json").read_text(encoding="utf-8"))
+    packet = json.loads((fixture / "prediction-observation.json").read_text(encoding="utf-8"))
+    assessment, diagnostics = pc.assess_experiment(state, packet)
+    if assessment["outcome_class"] != "PREDICTION_HELD" or diagnostics:
+        return False, f"fixture observation did not compare cleanly: {assessment['outcome_class']}"
+    for outcome in state["experiments"][0]["preregistration"]["outcomes"]:
+        if pc.criterion_errors(outcome.get("criterion"), "criterion"):
+            return False, "fixture criterion is malformed"
+    forged = json.loads(json.dumps(state))
+    forged["experiments"][0]["preregistration"]["outcomes"][0]["criterion"]["expected_range"] = [0.95, 3.0]
+    changed, _ = pc.assess_experiment(forged, packet)
+    if changed["outcome_class"] == "PREDICTION_HELD":
+        return False, "a mutated criterion escaped the comparator"
+    crippled = json.loads(json.dumps(state))
+    del crippled["experiments"][0]["preregistration"]["outcomes"][0]["criterion"]
+    legacy, legacy_diagnostics = pc.assess_experiment(crippled, packet)
+    if legacy["predictions"][0]["verdict"] != "UNTESTABLE":
+        return False, "an outcome without a criterion produced a verdict"
+    if not any(d.rule == "PC1" for d in legacy_diagnostics):
+        return False, "a missing criterion was not reported"
+    invalid = json.loads(json.dumps(packet))
+    invalid["execution"]["validity"] = "INVALID"
+    broken, _ = pc.assess_experiment(state, invalid)
+    if broken["outcome_class"] != "INVALID_EXECUTION":
+        return False, "an invalid execution became a scientific verdict"
+    card = json.loads((fixture / pc.INSIGHT_CARDS_NAME).read_text(encoding="utf-8"))
+    if pc.insight_card_errors(card, state):
+        return False, "the fixture insight card does not validate"
+    self_certified = json.loads(json.dumps(card))
+    self_certified["declared_class"] = "evidence_supported_insight"
+    if not any(d.rule == "PC7" for d in pc.insight_card_errors(self_certified, state)):
+        return False, "a self-certified insight card escaped PC7"
+    return True, "criterion mutation + missing criterion + invalid run + self-certification 全部判红"
+
+
+def step_legacy_handoff() -> Tuple[bool, str]:
+    """Takeover of an initialized project: lossless, idempotent, no fabricated history."""
+    import cognition as cg
+    import legacy_handoff as lh
+    fixture = ROOT / "examples" / "cognition"
+    with tempfile.TemporaryDirectory() as temp:
+        route = pathlib.Path(temp) / ".research-idea-pipeline" / "routes" / "A"
+        route.mkdir(parents=True)
+        state_path = route / cg.STATE_NAME
+        shutil.copy(fixture / "state.json", state_path)
+        scheduler = route / "scheduler.json"
+        scheduler.write_text(json.dumps({"state_version": 5, "next_actions": [],
+                                         "eig_calibration": {"records": []}}), encoding="utf-8")
+        state_before = state_path.read_bytes()
+        scheduler_before = scheduler.read_bytes()
+        if lh.detect(state_path)["bootstrap_forbidden"] is not True:
+            return False, "an initialized project did not refuse a fresh Bootstrap"
+        code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
+        if code != 0:
+            return False, f"take exit={code} {out.strip()[-160:]}"
+        if state_path.read_bytes() != state_before:
+            return False, "takeover modified the canonical state"
+        if scheduler.read_bytes() != scheduler_before:
+            return False, "takeover reset scheduler telemetry"
+        cognition_dir = route / cg.COGNITION_DIRNAME
+        first = {name: (cognition_dir / name).read_bytes() for name in lh.OWNED_FILES}
+        code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
+        if code != 0:
+            return False, f"second take exit={code}"
+        if {name: (cognition_dir / name).read_bytes() for name in lh.OWNED_FILES} != first:
+            return False, "repeated takeover is not idempotent"
+        if not json.loads(out)["already_initialized"]:
+            return False, "repeated takeover was not reported"
+        unregistered = json.loads(state_before.decode("utf-8"))
+        unregistered["experiments"][0]["preregistration"] = None
+        state_path.write_text(json.dumps(unregistered, ensure_ascii=False), encoding="utf-8")
+        shutil.rmtree(cognition_dir)
+        code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
+        if code != 3 or cognition_dir.exists():
+            return False, "a terminal experiment without a preregistration did not block"
+    return True, "无损接管 + 幂等 + Bootstrap 拒绝 + 缺失预注册阻止写回"
+
+
 def step_execution_identifiability() -> Tuple[bool, str]:
     import execution_gate as eg
     case = json.loads((ROOT/'examples/preflight-identifiability/ct-mri.json').read_text(encoding='utf-8'))
@@ -316,6 +406,8 @@ STEPS = (
     ("Evidence Outcome 来源/回写/Assurance/决策", step_evidence_outcome),
     ("PEIG/AALG schemas/templates/CT→MRI mutation", step_execution_identifiability),
     ("Cognitive Insight Engine 合成 fixture（构建/校验/重建/状态不变）", step_cognitive_memory),
+    ("预测比较器（判据/冻结/区分力/来源绑定变异）", step_prediction_comparator),
+    ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
 )
 
 

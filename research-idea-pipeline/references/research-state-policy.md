@@ -338,6 +338,35 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `preregistration` | 对象 或 `null` | 见 V21 | **结果冻结前**写下的「观察 → state delta」映射；R8 冻结、R9 执行、R13 逐条核 |
 | `result_at_state_version` | 整数 ≥ 0 或 `null` | ✅ | 结果写入时的 `state_version`；未产生结果为 `null`；**V21** |
 
+**`preregistration.outcomes[].criterion`（可选加性槽位，2026-10 CIE Phase 2 登记）**
+
+`outcomes[].observation` 是给人读的预测陈述；**机器无法从自由文本判定预测是否成立**。
+因此允许每个预注册结果带一个 `criterion` 对象，把「什么算预测成立」在**冻结时**写成
+可机械判定的判据。它不改变 `outcomes[].id` / `observation` / `update` 的语义，也不新增
+state 集合。
+
+| 字段 | 取值 / 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `kind` | `quantitative` \| `directional` \| `discrete` | ✅ | 判据类型；与 `observation` 措辞无关 |
+| `quantity` | 非空字符串 | ✅ | 被测量的量，含单位口径 |
+| `expected_range` | `[下界, 上界]`（数值） | 仅 `quantitative` | 落入区间 = 预测成立 |
+| `tolerance` | 数值 ≥ 0 | `quantitative` / `directional` | 测量噪声容差；超出区间但在容差内 = 未决而非失败 |
+| `direction` | `increase` \| `decrease` \| `no_change` | 仅 `directional` | |
+| `held_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测成立 |
+| `failed_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测失败 |
+| `rule` | 字符串 | ❌ | 给人读的判据说明；**不参与判定** |
+
+**硬规则：**
+
+1. **无 `criterion` 不得宣告预测成立或失败。** 比较器对该结果只能返回 `UNTESTABLE`，
+   并要求补判据；旧 state 保持兼容，**不做追溯判定**。
+2. **判据必须与冻结同轮写入。** `criterion` 属于 `preregistration`，写入时机由 V21 的
+   `frozen_at_state_version` 约束；冻结之后修改必须走 `preregistration.amended[]`。
+3. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion` 的形状与判定由
+   `scripts/prediction_compare.py`（规则 `PC1`—`PC9`）强制，`state_check.py` 继续忽略
+   未知键，**S1—S7 / V1—V24 不改号、不改义**。规则见
+   [prediction-anomaly-competition.md](prediction-anomaly-competition.md)。
+
 **实验树六段（固定，`stage` 取值，逐字）：**
 
 | `stage` | 含义 |

@@ -5,10 +5,16 @@
   "contract": {
     "goal": "判断跨中心性能落差是否由 coil 敏感度估计与数据一致性项的结构耦合造成（SYNTHETIC FIXTURE）",
     "primary_anchor": "phenomenon",
-    "constraints": ["单卡，≤ 40 GPU·小时（SYNTHETIC FIXTURE）"],
-    "resources": ["一份公开多中心重建数据集（SYNTHETIC FIXTURE）"],
+    "constraints": [
+      "单卡，≤ 40 GPU·小时（SYNTHETIC FIXTURE）"
+    ],
+    "resources": [
+      "一份公开多中心重建数据集（SYNTHETIC FIXTURE）"
+    ],
     "provisional_anchor_rationale": "现象锚点先固定，证据到位后复核（SYNTHETIC FIXTURE）",
-    "out_of_scope": ["临床部署评估（SYNTHETIC FIXTURE）"]
+    "out_of_scope": [
+      "临床部署评估（SYNTHETIC FIXTURE）"
+    ]
   },
   "claims": [
     {
@@ -17,13 +23,20 @@
       "parent": null,
       "subclaims": [],
       "status": "partially-supported",
-      "supporting_evidence": ["E1"],
+      "supporting_evidence": [
+        "E1"
+      ],
       "refuting_evidence": [],
       "nearest_alternative": "落差来自训练集域偏移，而不是目标函数里的结构耦合（SYNTHETIC FIXTURE）",
       "falsifier": "在固定中心内做解耦消融后，跨中心落差不变或扩大（SYNTHETIC FIXTURE）",
       "scope": "brain MRI / acceleration=4 / 1.5T—3T（SYNTHETIC FIXTURE）",
-      "known_flaws": ["F1", "F2"],
-      "depends_on": ["AS1"],
+      "known_flaws": [
+        "F1",
+        "F2"
+      ],
+      "depends_on": [
+        "AS1"
+      ],
       "validity": {
         "status": "valid",
         "reason": "E1 与 AS1 均未失效（SYNTHETIC FIXTURE）",
@@ -32,8 +45,12 @@
       "contract": {
         "statement": "跨中心落差主要来自结构耦合（SYNTHETIC FIXTURE）",
         "scope": "brain MRI / acceleration=4 / 1.5T—3T（SYNTHETIC FIXTURE）",
-        "critical_assumptions": ["AS1"],
-        "supporting_required": ["E1"],
+        "critical_assumptions": [
+          "AS1"
+        ],
+        "supporting_required": [
+          "E1"
+        ],
         "refuting": "固定中心内解耦消融后落差不变或扩大（SYNTHETIC FIXTURE）",
         "nearest_alternative": "训练集域偏移（SYNTHETIC FIXTURE）",
         "minimal_discriminating_experiment": "X2",
@@ -69,14 +86,18 @@
     {
       "id": "E1",
       "kind": "experiment",
-      "supports": ["C1"],
+      "supports": [
+        "C1"
+      ],
       "contradicts": [],
       "strength": "strong",
       "scope": "brain MRI / acceleration=4 / 中心内训练 + 跨中心测试（SYNTHETIC FIXTURE）",
       "epistemic_status": "Observed",
       "source_ref": "X1（seed=0）的跨中心对照结果（SYNTHETIC FIXTURE，不是真实实验）",
       "verification_tier": "T2",
-      "depends_on": ["X1"],
+      "depends_on": [
+        "X1"
+      ],
       "validity": {
         "status": "valid",
         "reason": "X1 已 done 且结果已写入（SYNTHETIC FIXTURE）",
@@ -93,7 +114,9 @@
       "epistemic_status": "Supported",
       "source_ref": "[Synthetic Survey, Fixture/2024]（SYNTHETIC FIXTURE）",
       "verification_tier": "T1",
-      "depends_on": ["LIT1"],
+      "depends_on": [
+        "LIT1"
+      ],
       "validity": {
         "status": "valid",
         "reason": "文献节点未撤回（SYNTHETIC FIXTURE）",
@@ -129,7 +152,9 @@
       "id": "AS1",
       "statement": "各中心采集协议可比，且重建指标测量无系统偏差（SYNTHETIC FIXTURE）",
       "status": "explicit",
-      "challenged_by": ["H1"],
+      "challenged_by": [
+        "H1"
+      ],
       "if_false": "落差不可归因到目标函数结构，C1 降级为相关性主张（SYNTHETIC FIXTURE）",
       "depends_on": [],
       "validity": {
@@ -161,7 +186,9 @@
       "generation": 0,
       "operator": "assumption_breaker",
       "parents": [],
-      "depends_on": ["AS1"],
+      "depends_on": [
+        "AS1"
+      ],
       "validity": {
         "status": "valid",
         "reason": "AS1 未被推翻（SYNTHETIC FIXTURE）",
@@ -220,8 +247,12 @@
       "island": "P2",
       "generation": 1,
       "operator": "mutation",
-      "parents": ["H1"],
-      "depends_on": ["AS1"],
+      "parents": [
+        "H1"
+      ],
+      "depends_on": [
+        "AS1"
+      ],
       "validity": {
         "status": "valid",
         "reason": "父候选 H1 未失效（SYNTHETIC FIXTURE）",
@@ -236,17 +267,30 @@
       "id": "X1",
       "parent": null,
       "stage": "X4",
-      "claim_targeted": ["C1"],
-      "alternative_targeted": ["ALT-1", "ALT-2"],
+      "claim_targeted": [
+        "C1"
+      ],
+      "alternative_targeted": [
+        "ALT-1",
+        "ALT-2"
+      ],
       "code_commit": "syntheticfixture0000",
       "data_split": "brain MRI 公开集 / 中心内训练 + 跨中心测试（SYNTHETIC FIXTURE）",
       "seed": 0,
       "metric": "跨中心 PSNR 差（dB，SYNTHETIC FIXTURE）",
       "result": "落差 0.8 dB；中心 C 上方向相反（SYNTHETIC FIXTURE，不是真实结果）",
       "interpretation": "落差存在，但中心 C 的反向观察尚未解释（SYNTHETIC FIXTURE）",
-      "unexpected": ["中心 C 上落差方向与其余中心相反（SYNTHETIC FIXTURE）"],
-      "known_flaws": ["F1", "F2"],
-      "next_branches": ["X2", "X3"],
+      "unexpected": [
+        "中心 C 上落差方向与其余中心相反（SYNTHETIC FIXTURE）"
+      ],
+      "known_flaws": [
+        "F1",
+        "F2"
+      ],
+      "next_branches": [
+        "X2",
+        "X3"
+      ],
       "status": "done",
       "preregistration": {
         "frozen_at_state_version": 3,
@@ -254,12 +298,42 @@
           {
             "id": "O1",
             "observation": "解耦后跨中心落差 ≥ 0.5 dB 下降（SYNTHETIC FIXTURE）",
-            "update": [{"target": "C1", "op": "strengthen"}]
+            "update": [
+              {
+                "target": "C1",
+                "op": "strengthen"
+              }
+            ],
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "跨中心 PSNR 差（dB）",
+              "expected_range": [
+                0.5,
+                3.0
+              ],
+              "tolerance": 0.1,
+              "rule": "落差 ≥ 0.5 dB 视为「落差存在」（SYNTHETIC FIXTURE）"
+            }
           },
           {
             "id": "O2",
             "observation": "解耦前后落差差 < 0.1 dB（SYNTHETIC FIXTURE）",
-            "update": [{"target": "C1", "op": "retain-with-alternative"}]
+            "update": [
+              {
+                "target": "C1",
+                "op": "retain-with-alternative"
+              }
+            ],
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "跨中心 PSNR 差（dB）",
+              "expected_range": [
+                0.0,
+                0.1
+              ],
+              "tolerance": 0.1,
+              "rule": "落差 < 0.1 dB 视为「无差异」（SYNTHETIC FIXTURE）"
+            }
           }
         ]
       },
@@ -277,8 +351,12 @@
       "id": "X2",
       "parent": "X1",
       "stage": "X3",
-      "claim_targeted": ["C1"],
-      "alternative_targeted": ["ALT-1"],
+      "claim_targeted": [
+        "C1"
+      ],
+      "alternative_targeted": [
+        "ALT-1"
+      ],
       "code_commit": "TBD",
       "data_split": "brain MRI 公开集 / 固定中心内解耦消融（SYNTHETIC FIXTURE）",
       "seed": 0,
@@ -289,12 +367,78 @@
       "known_flaws": [],
       "next_branches": [],
       "status": "planned",
-      "preregistration": null,
+      "preregistration": {
+        "frozen_at_state_version": 3,
+        "outcomes": [
+          {
+            "id": "O1",
+            "observation": "固定中心内解耦后落差下降 ≥ 0.5 dB（M1 的预测）",
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "解耦前后落差变化（dB）",
+              "expected_range": [
+                -3.0,
+                -0.5
+              ],
+              "tolerance": 0.1,
+              "rule": "M1 预测下降（SYNTHETIC FIXTURE）"
+            },
+            "update": [
+              {
+                "target": "C1",
+                "op": "strengthen"
+              }
+            ]
+          },
+          {
+            "id": "O2",
+            "observation": "解耦后落差下降（M2 的另一种措辞，判据与 O1 相同）",
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "解耦前后落差变化（dB）",
+              "expected_range": [
+                -3.0,
+                -0.5
+              ],
+              "tolerance": 0.1,
+              "rule": "M2 的判据与 O1 完全相同（SYNTHETIC FIXTURE）"
+            },
+            "update": [
+              {
+                "target": "C1",
+                "op": "retain"
+              }
+            ]
+          },
+          {
+            "id": "O3",
+            "observation": "解耦前后落差变化 < 0.1 dB（M2 的预测）",
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "解耦前后落差变化（dB）",
+              "expected_range": [
+                -0.1,
+                0.1
+              ],
+              "tolerance": 0.1,
+              "rule": "M2 预测无变化（SYNTHETIC FIXTURE）"
+            },
+            "update": [
+              {
+                "target": "C1",
+                "op": "retain-with-alternative"
+              }
+            ]
+          }
+        ]
+      },
       "result_at_state_version": null,
-      "depends_on": ["X1"],
+      "depends_on": [
+        "X1"
+      ],
       "validity": {
-        "status": "pending",
-        "reason": "尚未运行（SYNTHETIC FIXTURE）",
+        "status": "valid",
+        "reason": "预注册已冻结，尚未运行（SYNTHETIC FIXTURE）",
         "since_state_version": 3
       },
       "outcome_analysis": null,
@@ -304,8 +448,12 @@
       "id": "X3",
       "parent": "X1",
       "stage": "X5",
-      "claim_targeted": ["C2"],
-      "alternative_targeted": ["ALT-3"],
+      "claim_targeted": [
+        "C2"
+      ],
+      "alternative_targeted": [
+        "ALT-3"
+      ],
       "code_commit": "TBD",
       "data_split": "brain MRI 公开集 / 1.5T 与 3T 分层（SYNTHETIC FIXTURE）",
       "seed": 0,
@@ -318,10 +466,12 @@
       "status": "planned",
       "preregistration": null,
       "result_at_state_version": null,
-      "depends_on": ["X1"],
+      "depends_on": [
+        "X1"
+      ],
       "validity": {
-        "status": "pending",
-        "reason": "尚未运行（SYNTHETIC FIXTURE）",
+        "status": "valid",
+        "reason": "预注册尚未冻结，等待 R8（SYNTHETIC FIXTURE）",
         "since_state_version": 3
       },
       "outcome_analysis": null,
@@ -358,7 +508,10 @@
       "kind": "inconclusive",
       "what": "X1 未能把跨中心落差单独归因到结构耦合（SYNTHETIC FIXTURE）",
       "why": "单中心训练 + 单一 acceleration，域偏移替代解释未排除（SYNTHETIC FIXTURE）",
-      "referenced_by": ["C1", "X1"],
+      "referenced_by": [
+        "C1",
+        "X1"
+      ],
       "depends_on": [],
       "validity": {
         "status": "valid",
@@ -371,7 +524,9 @@
           "type": "identifiability_failure",
           "confidence": "medium",
           "evidence": "X1（SYNTHETIC FIXTURE）",
-          "alternatives": ["statistical_power_failure"],
+          "alternatives": [
+            "statistical_power_failure"
+          ],
           "what_would_disambiguate": "固定中心内的解耦消融 X2（SYNTHETIC FIXTURE）"
         }
       ]
@@ -381,7 +536,10 @@
       "kind": "failed-to-reproduce",
       "what": "「提高正则强度即可消除落差」这一协议在两中心均未复现（SYNTHETIC FIXTURE）",
       "why": "两次独立复现均为零效应，且实现已核对（SYNTHETIC FIXTURE）",
-      "referenced_by": ["C1", "X1"],
+      "referenced_by": [
+        "C1",
+        "X1"
+      ],
       "depends_on": [],
       "validity": {
         "status": "valid",
@@ -445,7 +603,10 @@
       "discriminating_test": "X2",
       "verification_tier": "T0",
       "attack_type": "structural-equivalence",
-      "literature": ["LIT1", "LIT2"]
+      "literature": [
+        "LIT1",
+        "LIT2"
+      ]
     }
   ],
   "repairs": [
@@ -454,7 +615,9 @@
       "disposition": "RUN_TEST",
       "state_delta": "新增 X2（stage=X3, claim_targeted=[C1], parent=X1）；U1.cheapest_discriminating_test→X2（SYNTHETIC FIXTURE）",
       "closure": "RESOLVED",
-      "targets": ["C1"],
+      "targets": [
+        "C1"
+      ],
       "source_review": null
     },
     {
@@ -462,14 +625,21 @@
       "disposition": "NARROW_SCOPE",
       "state_delta": "C2.status 保持 ungrounded；X3 保持 planned；U2 保持 open（SYNTHETIC FIXTURE）",
       "closure": "ACCEPTED_LIMITATION",
-      "targets": ["C2"],
+      "targets": [
+        "C2"
+      ],
       "source_review": null
     }
   ],
   "narrative_view": {
     "presets_selected": [],
-    "rendered_claims": ["C1"],
-    "failed_experiments_kept": ["F1", "F2"],
+    "rendered_claims": [
+      "C1"
+    ],
+    "failed_experiments_kept": [
+      "F1",
+      "F2"
+    ],
     "note": "叙事是 Research State 的视图，不是独立 artifact（SYNTHETIC FIXTURE）"
   },
   "reviews": [
