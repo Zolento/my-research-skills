@@ -825,6 +825,19 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 禁止重复方向 / 进行中实验 / 下一条有价值动作）。接管后进入正常 `continue-research`，
 默认读取 `cognition/context-brief.md`，**不需要用户指定记忆文件**。
 
+**发现能力必须可验证（Phase 4）。** 历史回放用**当时可见的信息**重放一次研究决策，
+再拿系统从未见过的隐藏答案评分：七个维度**各自独立**，**不做加权总分**；
+`null` 表示该 case 不可评，不得当作 0。消融四个 arm（baseline / memory_only /
+memory_prediction / full_cie）只报实测值与不确定性，**样本不足时明确声明不得宣称提升**；
+两个 arm 在所有维度上无法区分时也要写明。novelty **只认独立标签或文献近邻**，
+agent 自评被拒绝。回放前必须证明隐藏信息不可达（`RP2`）。
+规则见 [discovery-replay.md](references/discovery-replay.md)。
+
+```sh
+python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2
+python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
+```
+
 ---
 
 ## 2. 共享资源索引
@@ -873,6 +886,8 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 | 接管回归测试 | [scripts/test_legacy_handoff.py](scripts/test_legacy_handoff.py) | 无损接管 / 跨会话重启 / 重复接管 / 缺失历史 / 失效传播 / 预测时间泄漏 / 多路线隔离 / 下一轮复用旧知识 / 严重错误阻止写回 |
 | **科学价值与自适应发现（CIE Phase 3）** | [references/scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md) | Decision Value / Discovery Potential 分维判断（**无总分**，`SV1`—`SV8`）、Taste Memory 双层权限、八种探索菜单到既有算子的映射、防锁死规则、`P4` 上下文隔离 |
 | **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
+| **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
+| **回放脚本与 fixture** | [scripts/research_replay.py](scripts/research_replay.py)、[examples/replay/](examples/replay/README.md) | `validate` / `show` / `run` / `suite` / `ablate` / `adversarial` / `smoke`；可插拔 `--runner module:function`；fixture 为**合成**，不是真实科研证据 |
 
 ---
 

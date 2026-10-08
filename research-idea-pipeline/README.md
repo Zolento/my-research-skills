@@ -256,6 +256,24 @@ is scoped to the problem structure where they happened, and always carries react
 conditions. `scheduler.json` stays read-only. See the
 [value and strategy contract](references/scientific-value-adaptive-discovery.md).
 
+## Replay and verification
+
+Claims about better discovery are easy to make, so the repository ships the means to check
+them offline. Replay cases carry the state, revisions and observations as they were, plus a
+hidden answer that never reaches the runner — a leak is detected rather than assumed away.
+Seven dimensions are scored independently with no weighted total, four ablation arms are
+compared, and an undersized sample reports that no improvement may be claimed. The ten
+adversarial cases reward correct stopping as much as correct continuing.
+
+```sh
+python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2
+python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
+```
+
+**No real Agent A/B test has been run.** The fixtures are synthetic, no model is called, and
+the ablation deltas are properties of the offline runner. See the
+[replay contract](references/discovery-replay.md).
+
 ## Examples
 
 | Example | What it demonstrates |

@@ -11,7 +11,7 @@ Scope: `research-idea-pipeline/` only. No push, no merge, no PR.
 | 1b | Legacy Research Handoff (Phase 1 extension, requested mid-flight) | done — commit 2 |
 | 2 | Prediction, anomaly, mechanism competition | done — commit 2 |
 | 3 | Scientific value and adaptive discovery | done — commit 3 |
-| 4 | Discovery replay and verification | pending |
+| 4 | Discovery replay and verification | done — commit 4 |
 
 ## Phase 1 record
 
@@ -141,6 +141,44 @@ Test results
 - `unittest discover -s scripts -p 'test_*.py'` → 1107 tests, OK, 3 skipped.
 - `strategy_memory.py --selftest` → PASS (0 failures).
 
+## Phase 4 record
+
+New files
+
+- `scripts/research_replay.py` — case schema, leak guard, offline runner, seven metrics,
+  ablation, ten adversarial cases, end-to-end smoke, CLI, selftest (`RP1`—`RP5`).
+- `scripts/test_research_replay.py` — 57 offline tests.
+- `references/discovery-replay.md`, `examples/replay/README.md`,
+  `examples/replay/adversarial/adv1..adv10.json`.
+
+Modified files
+
+- `SKILL.md` §1.8/§2, `README.md`, `docs/cognitive-insight-engine.md` (rule namespaces,
+  interface map, verification status), root `README.md`.
+- `scripts/release_check.py` — step 15.
+
+Key findings worth carrying forward
+
+1. `mechanistic_understanding` scored *higher* for the baseline than for the full arm on the
+   first run, because the baseline dumped a whole claim statement while the runner articulated
+   only the first hot mechanism's statement. The articulation basis was widened to every
+   recalled mechanism's statement, conditions and boundaries, plus anomaly and boundary text.
+   This is a recorded measurement artefact, not a tuned metric.
+2. `memory_prediction` and `full_cie` are indistinguishable on all seven dimensions; the
+   report lists them under `undifferentiated_arms` instead of implying the strategy layer was
+   measured.
+3. `expected_behaviour` labels were removed from the leak-marker set: they are evaluation
+   instructions, not hidden research content. Cases that need extra markers list them in
+   `must_not_appear`.
+4. `load_cases` sorts by a natural key so `ADV2` precedes `ADV10`; the shipped fixtures and the
+   in-code generator are asserted equal.
+
+Test results
+
+- `python3 scripts/release_check.py` → `PASS`, 15 steps.
+- `unittest discover -s scripts -p 'test_*.py'` → 1164 tests, OK, 3 skipped.
+- `research_replay.py --selftest` → PASS (0 failures).
+
 ## Open items carried into Phase 2
 
 - (resolved in Phase 2) `<XID>:<OID>` references resolve and validate against
@@ -148,5 +186,7 @@ Test results
   `outcome_class` and an `experiment_id`; distinguishability is mechanical.
 - (resolved in Phase 3) `boundaries` now exclude blocked menus; the strategy layer consumes
   `insights` classifications through the value/objection record.
-- Carried into Phase 4: replay harness, metrics, ablation, adversarial cases, full
-  regression report.
+- (resolved in Phase 4) replay harness, metrics, ablation, adversarial cases and the full
+  regression record are shipped.
+- Remaining debt is listed in `.dev/phase-report.md` §6; the durable parts are in
+  `docs/cognitive-insight-engine.md` §8 and `references/discovery-replay.md` §8.

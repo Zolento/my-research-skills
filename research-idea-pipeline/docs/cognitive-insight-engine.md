@@ -83,6 +83,22 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | R12 / R13 | read-only view | — | narrative and review stay state views |
 | R14 | brief, strategy priors | — | `continue`/`pivot`/`archive`/`submit`; no claim status |
 | takeover | canonical state, scheduler, ledger, docs, code | `cognition/` derived layer only | state, scheduler, versions, ids, anchor, budget |
+| replay | visible section of a replay case | — | nothing in the live route; runs on a synthetic tree |
+
+### Rule namespaces
+
+| Namespace | Owner | Meaning |
+|---|---|---|
+| `S1`—`S7`, `V1`—`V24` | `scripts/state_check.py` | shape gate and reference integrity of the canonical state |
+| `EO1`, `EX1` | `evidence_outcome.py`, `execution_gate.py` | additive outcome and execution gates |
+| `CM0`—`CM10` | `scripts/cognition.py` | cognitive projection, provenance, revision authority |
+| `PC1`—`PC9` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, competition, insight cards |
+| `LH1`—`LH16` | `scripts/legacy_handoff.py` | takeover compatibility audit |
+| `SV1`—`SV8` | `scripts/strategy_memory.py` | value judgment, taste authority, anti-lock-in, isolation |
+| `RP1`—`RP5` | `scripts/research_replay.py` | case schema, leak guard, decision schema, independent novelty |
+
+No namespace collides with the canonical id prefixes `C` / `E` / `AS` / `H` / `X` / `LIT` /
+`F` / `U`, with `S` / `V`, or with `DI` / `T` / `G` / `N` / `P`.
 
 ## 6. Design decisions and trade-offs
 
@@ -105,12 +121,14 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | [prediction-anomaly-competition.md](../references/prediction-anomaly-competition.md) | frozen criteria, comparison classes, competition verdicts, behaviour switch, insight cards |
 | [legacy-handoff.md](../references/legacy-handoff.md) | detection, audit `LH1`—`LH16`, reconstruction, retrospection rules, rollback |
 | [scientific-value-adaptive-discovery.md](../references/scientific-value-adaptive-discovery.md) | value dimensions, taste memory, menu ordering, anti-lock-in rules, `P4` isolation |
+| [discovery-replay.md](../references/discovery-replay.md) | replay cases, leak guard, metrics, ablation, what has not been verified |
 | [scripts/cognition.py](../scripts/cognition.py) | builder, validator, recall and context brief |
 | [scripts/prediction_compare.py](../scripts/prediction_compare.py) | comparator, competition and insight checks |
 | [scripts/legacy_handoff.py](../scripts/legacy_handoff.py) | takeover, report and rollback |
 | [scripts/strategy_memory.py](../scripts/strategy_memory.py) | value model, taste memory, operator priors, menu ordering |
+| [scripts/research_replay.py](../scripts/research_replay.py) | replay harness, metrics, ablation, adversarial suite, smoke test |
 | [scripts/test_cognition.py](../scripts/test_cognition.py) | offline tests |
-| [scripts/test_prediction_compare.py](../scripts/test_prediction_compare.py), [scripts/test_legacy_handoff.py](../scripts/test_legacy_handoff.py), [scripts/test_strategy_memory.py](../scripts/test_strategy_memory.py) | offline tests |
+| [scripts/test_prediction_compare.py](../scripts/test_prediction_compare.py), [scripts/test_legacy_handoff.py](../scripts/test_legacy_handoff.py), [scripts/test_strategy_memory.py](../scripts/test_strategy_memory.py), [scripts/test_research_replay.py](../scripts/test_research_replay.py) | offline tests |
 | [examples/cognition/](../examples/cognition/README.md) | synthetic fixture |
 
 ```sh
@@ -119,10 +137,33 @@ python3 scripts/cognition.py check --state <state.json>
 python3 scripts/cognition.py brief --state <state.json> --budget 4000
 python3 scripts/prediction_compare.py compare --state <state.json> --packet observation.json
 python3 scripts/legacy_handoff.py take --state <state.json>
+python3 scripts/strategy_memory.py recommend --state <state.json>
+python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2
 python3 scripts/release_check.py
 ```
 
-## 8. Known limits
+## 8. Verification status
+
+Verified offline and mechanically, by the fifteen-step release gate and 1164 unit tests:
+
+* the canonical state, scheduler template and the four schemas are unchanged, and
+  `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
+* a cognitive build never writes the state, and the index rebuilds to identical bytes;
+* support levels come from canonical facts, and a self-declared level is recorded as a
+  conflict instead of being adopted;
+* a rewritten frozen criterion is detected, and an amendment after the result is rejected;
+* an invalid execution is never a prediction verdict and never a mechanism refutation;
+* a takeover leaves the state, scheduler and execution ledger byte-identical;
+* no value judgment or strategy update contains an aggregate score, and no operator is banned;
+* the offline ablation reproduces the capability ladder, and the ten adversarial cases are
+  satisfied by the full arm and not by the baseline.
+
+**Not verified:** real Agent A/B discovery performance. No model was called and no real
+literature library was used. Every fixture is synthetic and marked as such. The ablation
+deltas are properties of the offline runner, and two arms are indistinguishable on all seven
+dimensions — the report says so rather than implying the extra capability was measured.
+
+## 9. Known limits
 
 Structural checks establish provenance, determinism and authority boundaries. They do not
 establish that a mechanism is true, that a competition is scientifically the most important

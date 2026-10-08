@@ -39,6 +39,8 @@
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
     14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
         —— 注入聚合分数或删除探索下限必须让闸门判红
+    15. 历史回放：十个对抗 case、泄漏防护、消融与端到端 smoke
+        —— 注入未来信息必须让回放拒绝执行
 
 退出码
 ------
@@ -420,6 +422,50 @@ def step_scientific_value() -> Tuple[bool, str]:
     return True, "per-dimension value + no aggregate + floor kept + no ban + telemetry read-only"
 
 
+def step_discovery_replay() -> Tuple[bool, str]:
+    """Replay fixtures, the leak guard, the ablation ladder and the end-to-end smoke."""
+    import research_replay as rr
+    cases = rr.load_cases(ROOT / "examples" / "replay" / "adversarial")
+    if len(cases) != 10:
+        return False, f"expected 10 adversarial cases, found {len(cases)}"
+    generated = rr.adversarial_cases()
+    if [case["id"] for case in cases] != [case["id"] for case in generated]:
+        return False, "shipped cases drifted from the generator"
+    for case in cases:
+        visible = rr.visible_view(case)
+        if rr.leak_scan(case, visible):
+            return False, f"{case['id']}: hidden content is reachable from the visible view"
+        if rr.case_errors(case):
+            return False, f"{case['id']}: {rr.case_errors(case)[0].render()}"
+    leaking = json.loads(json.dumps(cases[0]))
+    leaking["visible"]["known_conditions"].append(leaking["hidden"]["later_results"][0])
+    try:
+        rr.run_case(leaking)
+        return False, "a leaking case ran instead of being refused"
+    except Exception:
+        pass
+    report = rr.run_suite(cases, runs=1)
+    if report["per_arm"]["baseline"]["pass_rate"] != 0.0:
+        return False, "the baseline arm passed the adversarial suite"
+    if report["per_arm"]["full_cie"]["pass_rate"] != 1.0:
+        return False, "the full arm failed the adversarial suite"
+    if report["per_arm"]["baseline"]["dimensions"]["prediction_quality"]["mean"] is not None:
+        return False, "an arm without the comparator produced prediction quality"
+    tiny = rr.run_suite(cases[:1], runs=1)
+    if tiny["sufficient_sample"] or "不得宣称提升" not in tiny["claim"]:
+        return False, "an undersized sample claimed an improvement"
+    if not report["undifferentiated_arms"]:
+        return False, "indistinguishable arms were not reported"
+    with tempfile.TemporaryDirectory() as temp:
+        smoke = rr.smoke(pathlib.Path(temp))
+        if not smoke["passed"]:
+            return False, f"smoke failed: {[s for s in smoke['steps'] if not s['ok']]}"
+        if not smoke["canonical_untouched"]:
+            return False, "the smoke test modified the canonical state"
+    return True, (f"{len(cases)} cases leak-checked; baseline 0% vs full 100%; "
+                  "comparator capability visible; undersized sample claims nothing; smoke green")
+
+
 def step_execution_identifiability() -> Tuple[bool, str]:
     import execution_gate as eg
     case = json.loads((ROOT/'examples/preflight-identifiability/ct-mri.json').read_text(encoding='utf-8'))
@@ -452,6 +498,7 @@ STEPS = (
     ("预测比较器（判据/冻结/区分力/来源绑定变异）", step_prediction_comparator),
     ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
     ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
+    ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
 )
 
 
