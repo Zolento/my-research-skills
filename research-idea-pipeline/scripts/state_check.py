@@ -523,7 +523,7 @@ class Report:
             return (f"[shape] 共 {len(self.shape)} 处形状错误（{breakdown}）；"
                     f"V1—V24 未执行（先修形状）；{counts}")
         if self.outcome:
-            return f"[outcome] {len(self.outcome)} 处 EO1 硬违规；state 不合规；{counts}"
+            return f"[outcome] {len(self.outcome)} 处 EO1/EX1 硬违规；state 不合规；{counts}"
         if not self.violations:
             return f"[ok] 0 处硬违规：V1—V{RULE_ORDER[-1][1:]} 全部通过；{counts}"
         breakdown = "、".join(f"{rule}×{count}" for rule, count in self.rule_counts().items())
@@ -1763,6 +1763,12 @@ def check_state(doc: Any, source: str = "<memory>") -> Report:
     except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
         outcome_errors = ["invalid outcome state: " + str(exc)]
     outcome = [Violation("EO1", "experiments[].outcome_analysis", detail) for detail in outcome_errors]
+    import execution_gate
+    try:
+        execution_errors = execution_gate.state_errors(effective)
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        execution_errors = ["invalid execution extension: " + str(exc)]
+    outcome.extend(Violation("EX1", "experiments[].execution_protocol", detail) for detail in execution_errors)
 
     checked = {
         "claims": len(ctx.claims),

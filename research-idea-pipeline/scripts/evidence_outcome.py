@@ -57,6 +57,10 @@ def index(state, key):
 
 def protocol_signature(experiment):
     """Seed and implementation commit do not turn an unchanged scientific design into a new design."""
+    if experiment.get('execution_protocol'):
+        import execution_gate
+        return digest({'targets': sorted(experiment['claim_targeted'] + experiment.get('hypothesis_targeted', [])),
+                       'design': execution_gate.design_projection(experiment['execution_protocol'])})
     design = {k: experiment.get(k) for k in ('stage', 'data_split', 'metric', 'claim_targeted',
                                              'hypothesis_targeted', 'alternative_targeted', 'outcome_protocol')}
     preregistration = experiment.get('preregistration')
@@ -568,7 +572,14 @@ def check_plan(state, experiment_id):
     report = state_check.check_state(state)
     if not report.ok:
         return {'status': 'FAIL', 'errors': ['Research State must pass before a plan can be executed'], 'state_report': report.as_dict()}
-    return _check_plan(state, experiment_id)
+    result = _check_plan(state, experiment_id)
+    experiment = index(state, 'experiments').get(experiment_id, {})
+    if result['status'] == 'PASS' and experiment.get('execution_protocol'):
+        import execution_gate
+        peig = execution_gate.peig(state, experiment_id)
+        result['peig'] = peig
+        if peig['status'] == 'HOLD': result['status'] = 'FAIL'
+    return result
 
 
 def decision_gate(state, experiment_id, assurance=None):
@@ -699,6 +710,7 @@ def main(argv=None):
         p = sub.add_parser(command)
         for arg in ('state', 'packet', 'analysis'): p.add_argument('--' + arg, type=Path, required=True)
         p.add_argument('--audit', type=Path)
+        p.add_argument('--execution-ledger', type=Path)
         if command == 'apply': p.add_argument('--output', type=Path, required=True)
     for command in ('constraints', 'check-plan', 'decision'):
         p = sub.add_parser(command); p.add_argument('--state', type=Path, required=True)
@@ -709,6 +721,10 @@ def main(argv=None):
     try:
         state = read(args.state)
         if args.command in ('validate', 'apply'):
+            if any(x.get('execution_protocol') and x['status'] != 'planned' for x in state['experiments']):
+                import experiment_execute
+                execution_errors = experiment_execute.verify_result_execution(state, experiment_execute.Ledger(args.execution_ledger or args.state.parent / '.execution'))
+                if execution_errors: raise ValueError('; '.join(execution_errors))
             packet, analysis, audit = read(args.packet), read(args.analysis), read(args.audit)
             result = validate(state, packet, analysis, audit) if args.command == 'validate' else apply(state, packet, analysis, audit)
             if args.command == 'apply' and result['status'] == 'PASS':
