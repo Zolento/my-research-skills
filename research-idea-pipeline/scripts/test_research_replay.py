@@ -45,9 +45,9 @@ class TestCaseSchema(unittest.TestCase):
 
     def test_the_generated_suite_is_complete(self):
         cases = rr.adversarial_cases()
-        self.assertEqual(len(cases), 10)
+        self.assertEqual(len(cases), 12)
         self.assertEqual([case["id"] for case in cases],
-                         [f"ADV{n}" for n in range(1, 11)])
+                         [f"ADV{n}" for n in range(1, 13)])
 
     def test_every_case_validates(self):
         for case in rr.adversarial_cases():
@@ -77,7 +77,7 @@ class TestCaseSchema(unittest.TestCase):
 
     def test_the_shipped_cases_load_and_match_the_generator(self):
         shipped = rr.load_cases(CASES)
-        self.assertEqual(len(shipped), 10)
+        self.assertEqual(len(shipped), 12)
         generated = rr.adversarial_cases()
         self.assertEqual([case["id"] for case in shipped],
                          [case["id"] for case in generated])
@@ -327,7 +327,8 @@ class TestAdversarialCoverage(unittest.TestCase):
     def test_the_ten_required_situations_are_present(self):
         titles = " ".join(case["title"] for case in rr.adversarial_cases())
         for fragment in ("机制解释了历史", "等价", "实现错误", "再次提出", "EIG 很低",
-                         "表面相似", "证据失效", "新会话", "事后修改", "连续几轮诊断"):
+                         "表面相似", "证据失效", "新会话", "事后修改", "连续几轮诊断",
+                         "只提交其中一项", "执行有效性未知"):
             self.assertIn(fragment, titles, msg=fragment)
 
     def test_every_case_forbids_at_least_one_bad_behaviour_or_names_one(self):
@@ -356,6 +357,43 @@ class TestAdversarialCoverage(unittest.TestCase):
         self.assertIn("treat_post_hoc_as_prediction",
                       case["evaluation_only"]["forbidden_behaviours"])
         self.assertEqual(rr.leak_scan(case, rr.visible_view(case)), [])
+
+    def test_a_partial_submission_is_not_reported_as_held(self):
+        """P0-1 end to end: the frozen set decides, not the submitted subset."""
+        case = next(case for case in rr.adversarial_cases() if case["id"] == "ADV11")
+        result = rr.run_case(case, "full_cie")
+        self.assertEqual(result["decision"]["predicted_outcome_class"], "PARTIALLY_ASSESSED")
+        self.assertNotEqual(result["decision"]["predicted_outcome_class"], "PREDICTION_HELD")
+        self.assertFalse(result["decision"]["evidence_eligible"])
+        self.assertTrue(result["evaluation"]["passed"])
+        self.assertNotIn("report_unqualified_result_as_held",
+                         result["evaluation"]["violations"])
+
+    def test_an_unknown_execution_keeps_only_the_diagnostic_result(self):
+        """P0-2 end to end: the comparison survives, the scientific claim does not."""
+        case = next(case for case in rr.adversarial_cases() if case["id"] == "ADV12")
+        result = rr.run_case(case, "full_cie")
+        self.assertEqual(result["decision"]["diagnostic_outcome_class"], "PREDICTION_HELD")
+        self.assertEqual(result["decision"]["predicted_outcome_class"], "UNTESTABLE")
+        self.assertFalse(result["decision"]["evidence_eligible"])
+        self.assertFalse(result["decision"]["transition_allowed"])
+        self.assertTrue(result["evaluation"]["passed"])
+
+    def test_an_unqualified_comparison_is_not_scored_as_evidence(self):
+        case = next(case for case in rr.adversarial_cases() if case["id"] == "ADV12")
+        result = rr.run_case(case, "full_cie")
+        metric = result["evaluation"]["metrics"]["prediction_quality"]
+        self.assertIsNone(metric["value"])
+        self.assertIn("诊断性比较", metric["reason"])
+
+    def test_reporting_an_unqualified_result_as_held_is_forbidden(self):
+        case = next(case for case in rr.adversarial_cases() if case["id"] == "ADV11")
+        result = rr.run_case(case, "full_cie")
+        forged = clone(result["decision"])
+        forged["predicted_outcome_class"] = "PREDICTION_HELD"
+        self.assertTrue(rr._behaviour_present("report_unqualified_result_as_held", forged, case))
+        forged["evidence_eligible"] = True
+        self.assertFalse(rr._behaviour_present("report_unqualified_result_as_held", forged, case))
 
     def test_correct_stopping_counts_as_success(self):
         case = next(case for case in rr.adversarial_cases() if case["id"] == "ADV4")
@@ -433,13 +471,13 @@ class TestCLI(unittest.TestCase):
             proc = self.run_cli(command, "--dir", str(CASES), "--runs", "1")
             self.assertEqual(proc.returncode, rr.EXIT_OK, proc.stdout + proc.stderr)
             report = json.loads(proc.stdout)
-            self.assertEqual(report["cases"], 10)
+            self.assertEqual(report["cases"], 12)
 
     def test_adversarial_writes_the_cases(self):
         with tempfile.TemporaryDirectory() as temp:
             proc = self.run_cli("adversarial", "--write", temp)
             self.assertEqual(proc.returncode, rr.EXIT_OK, proc.stdout + proc.stderr)
-            self.assertEqual(len(list(pathlib.Path(temp).glob("*.json"))), 10)
+            self.assertEqual(len(list(pathlib.Path(temp).glob("*.json"))), 12)
 
     def test_smoke_runs(self):
         with tempfile.TemporaryDirectory() as temp:

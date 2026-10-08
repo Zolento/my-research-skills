@@ -57,8 +57,10 @@ The same fixture without its revision log is also a legacy project: deleting
 | `AN1` records a direction reversal against a frozen prediction, `reproduced: false` | a high-importance, non-reproduced anomaly |
 | `F2` is a repeat-blocking failure kind | failure memory shown with `retry=blocked` and a `failed_repeat` boundary |
 | No revision declares its own support level | the brief labels every mechanism from canonical facts |
-| `X1:O1` is frozen with a quantitative criterion, `X2` carries M1's and M2's predictions | `CP1` is `DISTINGUISHABLE`; the packet `{O1: 0.8}` gives `PREDICTION_HELD` |
-| `X2:O2` restates `X2:O1` with the same criterion | swapping it in makes the competition `NOT_DISTINGUISHABLE_EQUIVALENT_PREDICTIONS` |
+| `X1:O1` is frozen with a quantitative criterion, `X2` carries M1's and M2's predictions, and `CP1` declares a `discrimination_rule` | `CP1` is `DISTINGUISHABLE` (`discrimination_rule_satisfied`); the packet selects branch `O1` and gives `PREDICTION_HELD` |
+| `X1` freezes two mutually exclusive branches `O1`/`O2` | the packet declares `observed_outcome: "O1"`, so only that branch is adjudicated; a second branch that also holds makes the freeze `UNTESTABLE` |
+| `X2:O2` restates `X2:O1` with the same criterion | swapping it in makes the competition `NOT_DISTINGUISHABLE` (`identical_criteria`) |
+| Only `O1` is submitted without a branch selection | the result is `PARTIALLY_ASSESSED` with `evidence_eligible: false` — never `PREDICTION_HELD` |
 | `IC1` declares `predictive_insight_candidate` and has a real intervention | the index derives the same class; declaring `evidence_supported_insight` would raise `PC7` |
 
 ## Negative examples, not shipped here

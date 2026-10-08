@@ -16,5 +16,7 @@
         "digest": "11de1bb264dcddc3111ffc945a86106e27b455c0c1473e611842d375b5f84060"
       }
     }
-  ]
+  ],
+  "observed_outcome": "O1",
+  "_note": "Branch mode: X1 的 O1/O2 是同一次观测的互斥分支，因此声明 observed_outcome 而不要求逐个提交（SYNTHETIC FIXTURE）"
 }

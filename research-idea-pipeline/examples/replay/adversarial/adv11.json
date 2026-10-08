@@ -1,8 +1,8 @@
 {
   "_schema": "research-idea-pipeline/replay-case@1",
-  "id": "ADV7",
-  "title": "关键证据失效引发下游认知记忆失效",
-  "question": "证据失效后哪些机制仍然可用？",
+  "id": "ADV11",
+  "title": "两项冻结预测只提交其中一项",
+  "question": "只提交有利的那一支是否等于预测成立？",
   "visible": {
     "state": {
       "state_version": 4,
@@ -24,8 +24,10 @@
           "statement": "机制 A 解释目标现象",
           "parent": null,
           "subclaims": [],
-          "status": "ungrounded",
-          "supporting_evidence": [],
+          "status": "partially-supported",
+          "supporting_evidence": [
+            "E1"
+          ],
           "refuting_evidence": [],
           "nearest_alternative": "机制 B 解释同一现象",
           "falsifier": "干预后现象不变",
@@ -73,8 +75,8 @@
             "X1"
           ],
           "validity": {
-            "status": "invalid",
-            "reason": "源实验作废",
+            "status": "valid",
+            "reason": "X1 已完成",
             "since_state_version": 4
           }
         }
@@ -125,8 +127,8 @@
           "code_commit": "abc",
           "data_split": "A/train",
           "seed": 0,
-          "metric": "效应量",
-          "result": "0.8",
+          "metric": "落差变化",
+          "result": "-0.8",
           "interpretation": "初步",
           "unexpected": [],
           "known_flaws": [],
@@ -137,7 +139,7 @@
             "outcomes": [
               {
                 "id": "O1",
-                "observation": "落差下降 ≥ 0.5",
+                "observation": "落差下降 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
                 "criterion": {
                   "kind": "quantitative",
                   "quantity": "落差变化（dB）",
@@ -152,6 +154,26 @@
                   {
                     "target": "C1",
                     "op": "strengthen"
+                  }
+                ]
+              },
+              {
+                "id": "O2",
+                "observation": "落差上升 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
+                "criterion": {
+                  "kind": "quantitative",
+                  "quantity": "落差变化（dB）",
+                  "expected_range": [
+                    0.5,
+                    3.0
+                  ],
+                  "tolerance": 0.1,
+                  "rule": "上升"
+                },
+                "update": [
+                  {
+                    "target": "C1",
+                    "op": "weaken"
                   }
                 ]
               }
@@ -245,13 +267,12 @@
       "[Synthetic, Fixture/2024]"
     ],
     "known_conditions": [
-      "single centre training",
-      "one acceleration"
+      "one of two frozen outcomes submitted"
     ]
   },
   "hidden": {
     "later_results": [
-      "失效证据的上游被替换后，机制结论被重审"
+      "补交第二项后才发现另一支预测并未成立"
     ],
     "answer": {
       "mechanism_terms": [
@@ -261,7 +282,7 @@
       "boundary_terms": [
         "数据集 A"
       ],
-      "true_outcome_class": "PREDICTION_HELD",
+      "true_outcome_class": "PARTIALLY_ASSESSED",
       "discriminating_intervention": "X2",
       "human_novelty_label": "unknown"
     }
@@ -270,7 +291,6 @@
     "expected_behaviour": "design_intervention",
     "expected_decision_changed": true,
     "forbidden_behaviours": [
-      "claim_prediction_without_criterion",
       "report_unqualified_result_as_held"
     ]
   }

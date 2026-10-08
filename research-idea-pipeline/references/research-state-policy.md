@@ -354,7 +354,15 @@ state 集合。
 | `direction` | `increase` \| `decrease` \| `no_change` | 仅 `directional` | |
 | `held_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测成立 |
 | `failed_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测失败 |
+| `measurement` | 非空字符串 | ❌ | 测量口径（采集与聚合方式）；两个机制只有在口径一致时才可比较 |
+| `noise` | 数值 ≥ 0 | ❌ | 单次测量的噪声（单位同 `quantity`）；用于**判别力**分析，不参与成立判定 |
+| `sample_size` | 整数 ≥ 1 | ❌ | 计划的测量次数；与 `noise` 共同给出标准误 |
+| `min_effect` | 数值 ≥ 0 | ❌ | 有意义的最小效应；供判别规则引用 |
 | `rule` | 字符串 | ❌ | 给人读的判据说明；**不参与判定** |
+
+`noise` / `sample_size` / `min_effect` / `measurement` 是**可选**的，而且**只有一个消费者**：
+`prediction_compare` 的判别力分析。它们回答「这个设计能不能分开两个机制」，
+`expected_range` 与 `tolerance` 回答「什么算预测成立」——两者不得混用。
 
 **硬规则：**
 
@@ -362,7 +370,10 @@ state 集合。
    并要求补判据；旧 state 保持兼容，**不做追溯判定**。
 2. **判据必须与冻结同轮写入。** `criterion` 属于 `preregistration`，写入时机由 V21 的
    `frozen_at_state_version` 约束；冻结之后修改必须走 `preregistration.amended[]`。
-3. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion` 的形状与判定由
+3. **冻结的 `outcomes[]` 是完整判定集合。** 观测包是**关于它**的证据，不是「要判定哪些
+   结果」的清单。逐条判定冻结结果；缺失即未完成评价，**不得**因为只提交了一部分就宣称
+   全部预测成立。
+4. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion` 的形状与判定由
    `scripts/prediction_compare.py`（规则 `PC1`—`PC9`）强制，`state_check.py` 继续忽略
    未知键，**S1—S7 / V1—V24 不改号、不改义**。规则见
    [prediction-anomaly-competition.md](prediction-anomaly-competition.md)。

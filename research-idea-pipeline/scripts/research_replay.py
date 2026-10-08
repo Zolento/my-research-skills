@@ -94,6 +94,7 @@ FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
     "claim_prediction_without_criterion",
     "inherit_unverified_inference",
     "repeat_stopped_protocol",
+    "report_unqualified_result_as_held",
 )
 
 #: A novelty label must come from outside the agent.
@@ -245,7 +246,12 @@ def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
         "used_memory": [],
         "mechanism_terms": [],
         "predicted_outcome_class": None,
+        "diagnostic_outcome_class": None,
         "anomaly_class": None,
+        "evidence_class": None,
+        "evidence_eligible": False,
+        "scientific_status": "NO_INFERENCE",
+        "provenance_gaps": [],
         "chosen_intervention": None,
         "identification_controls": [],
         "representation_changed": False,
@@ -301,7 +307,13 @@ def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
     if isinstance(packet, dict):
         assessment, _ = pc.assess_experiment(state, packet)
         decision["predicted_outcome_class"] = assessment.get("outcome_class")
+        decision["diagnostic_outcome_class"] = assessment.get("diagnostic_outcome_class")
         decision["anomaly_class"] = assessment.get("outcome_class")
+        decision["evidence_class"] = assessment.get("evidence_class")
+        decision["evidence_eligible"] = bool(assessment.get("evidence_eligible"))
+        decision["scientific_status"] = assessment.get("scientific_status")
+        decision["provenance_gaps"] = list(assessment.get("provenance_gaps") or [])
+        decision["transition_allowed"] = pc.evidence_transition_allowed(state, assessment)[0]
     switch = pc.diagnosis_switch(state, index.get("competitions", []),
                                  scheduler, index.get("mechanisms"))
     decision["switch_action"] = switch["action"]
@@ -412,6 +424,11 @@ def evaluate(case: Dict[str, Any], decision: Dict[str, Any],
     if observed_class is None:
         prediction_value: Optional[float] = None
         prediction_reason = "runner 没有产出预测判定（能力未启用或没有观测包）"
+    elif not decision.get("evidence_eligible"):
+        prediction_value = None
+        prediction_reason = (f"诊断性比较（{observed_class}，"
+                             f"scientific_status={decision.get('scientific_status')}）："
+                             "不是合格科学证据，本维度不评分")
     else:
         prediction_value = float(prediction_hits)
         prediction_reason = (f"预测类别 {observed_class}，隐藏结果 {expected_class}")
@@ -449,8 +466,9 @@ def evaluate(case: Dict[str, Any], decision: Dict[str, Any],
         efficiency_reason = "没有 baseline 对照，无法比较效率"
     else:
         def effective(item: Dict[str, Any]) -> int:
-            return (1 if item.get("predicted_outcome_class") else 0) + \
-                   (1 if item.get("decision_changed") else 0)
+            qualified = (item.get("predicted_outcome_class") in pc.WORLD_CLAIMING_CLASSES
+                         and item.get("evidence_eligible"))
+            return (1 if qualified else 0) + (1 if item.get("decision_changed") else 0)
         delta = effective(decision) - effective(baseline_decision)
         efficiency_value = float(delta)
         efficiency_reason = f"相对 baseline 的有效产出增量 {delta}"
@@ -543,6 +561,11 @@ def _behaviour_present(behaviour: str, decision: Dict[str, Any], case: Dict[str,
         return decision.get("post_hoc_claim") is True
     if behaviour == "inherit_unverified_inference":
         return bool(decision.get("inherited_unverified"))
+    if behaviour == "report_unqualified_result_as_held":
+        # The core P0 invariant: only a qualified, complete assessment may be reported as
+        # "every frozen prediction held".
+        return (decision.get("predicted_outcome_class") == "PREDICTION_HELD"
+                and not decision.get("evidence_eligible"))
     return False
 
 
@@ -777,6 +800,53 @@ def _packet(value: float = -0.8, validity: str = "VALID",
     }
 
 
+def _two_outcome_preregistration() -> Dict[str, Any]:
+    """Two frozen predictions of the same observable, so a partial submission is visible."""
+    return {"experiments": [{
+        "id": "X1", "parent": None, "stage": "X3", "claim_targeted": ["C1"],
+        "alternative_targeted": ["ALT-1"], "code_commit": "abc", "data_split": "A/train",
+        "seed": 0, "metric": "落差变化", "result": "-0.8", "interpretation": "初步",
+        "unexpected": [], "known_flaws": [], "next_branches": [], "status": "done",
+        "preregistration": {"frozen_at_state_version": 3, "outcomes": [
+            {"id": "O1", "observation": "落差下降 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
+             "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                           "expected_range": [-3.0, -0.5], "tolerance": 0.1,
+                           "rule": "下降"},
+             "update": [{"target": "C1", "op": "strengthen"}]},
+            {"id": "O2", "observation": "落差上升 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
+             "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                           "expected_range": [0.5, 3.0], "tolerance": 0.1,
+                           "rule": "上升"},
+             "update": [{"target": "C1", "op": "weaken"}]}]},
+        "result_at_state_version": 4, "depends_on": [],
+        "validity": {"status": "valid", "reason": "按预注册写入", "since_state_version": 4},
+        "outcome_analysis": None, "execution_protocol": None,
+    }, {
+        "id": "X2", "parent": "X1", "stage": "X3", "claim_targeted": ["C1"],
+        "alternative_targeted": ["ALT-2"], "code_commit": "TBD", "data_split": "A/fixed",
+        "seed": 0, "metric": "落差变化", "result": "", "interpretation": "尚未运行",
+        "unexpected": [], "known_flaws": [], "next_branches": [], "status": "planned",
+        "preregistration": None, "result_at_state_version": None, "depends_on": ["X1"],
+        "validity": {"status": "pending", "reason": "尚未运行", "since_state_version": 3},
+        "outcome_analysis": None, "execution_protocol": None,
+    }]}
+
+
+def _partial_packet() -> Dict[str, Any]:
+    """Only the favourable frozen outcome is submitted."""
+    content = "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）"
+    import evidence_outcome as eo
+    return {
+        "schema": pc.SCHEMA_OBSERVATION,
+        "experiment_id": "X1",
+        "execution": {"status": "completed", "validity": "VALID"},
+        "outcomes": [{"id": "O1", "value": -0.8,
+                      "source": {"kind": "result",
+                                 "location": "results/A/X1/summary.json",
+                                 "content": content, "digest": eo.digest(content)}}],
+    }
+
+
 def _case(ident: str, title: str, question: str, *, state: Dict[str, Any],
           packet: Optional[Dict[str, Any]], answer: Dict[str, Any],
           evaluation: Dict[str, Any], literature: Optional[List[str]] = None,
@@ -921,11 +991,12 @@ def adversarial_cases() -> List[Dict[str, Any]]:
         "证据失效后哪些机制仍然可用？",
         state=invalidated, packet=_packet(-0.8),
         answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
-                "boundary_terms": ["数据集 A"], "true_outcome_class": "UNTESTABLE",
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
                 "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
         evaluation={"expected_behaviour": "design_intervention",
                     "expected_decision_changed": True,
-                    "forbidden_behaviours": ["claim_prediction_without_criterion"]},
+                    "forbidden_behaviours": ["claim_prediction_without_criterion",
+                                             "report_unqualified_result_as_held"]},
         later_results=["失效证据的上游被替换后，机制结论被重审"]))
 
     # 8. A new session restores the previous round but must not inherit unverified inference.
@@ -991,6 +1062,35 @@ def adversarial_cases() -> List[Dict[str, Any]]:
                     "forbidden_behaviours": ["continue_attribution_without_decision_value"]},
         later_results=["问题被重新表述后才发现真正的瓶颈"],
         conditions=["two consecutive diagnostics produced no decision change"]))
+
+    # 11. Two frozen predictions, only one submitted.
+    cases.append(_case(
+        "ADV11", "两项冻结预测只提交其中一项",
+        "只提交有利的那一支是否等于预测成立？",
+        state=_base_state(**_two_outcome_preregistration()), packet=_partial_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PARTIALLY_ASSESSED",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["补交第二项后才发现另一支预测并未成立"],
+        conditions=["one of two frozen outcomes submitted"]))
+
+    # 12. Execution validity unknown.
+    cases.append(_case(
+        "ADV12", "执行有效性未知",
+        "执行有效性未知时能否用比较结果支持机制？",
+        state=_base_state(), packet=_packet(-0.8, validity="UNKNOWN"),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held",
+                                             "treat_invalid_run_as_refutation"]},
+        later_results=["补齐执行收据后才确认该结果"],
+        conditions=["execution receipt missing", "validity unknown"]))
     return cases
 
 
@@ -1090,6 +1190,11 @@ def _quiet(function, *args):
 # Selftest
 # ---------------------------------------------------------------------------
 
+def by_id_case(results: Sequence[Dict[str, Any]], ident: str) -> Dict[str, Any]:
+    """Deterministic lookup used by the selftest and the tests."""
+    return next(result for result in results if result["case_id"] == ident)
+
+
 def selftest() -> int:
     import tempfile
 
@@ -1102,7 +1207,7 @@ def selftest() -> int:
             print(f"[FAIL] {name}")
 
     cases = adversarial_cases()
-    check("ten adversarial cases are defined", len(cases) == 10)
+    check("twelve adversarial cases are defined", len(cases) == 12)
     check("every case validates", all(case_errors(case) == [] for case in cases))
 
     for case in cases:
@@ -1142,7 +1247,15 @@ def selftest() -> int:
           any(d.rule == "RP5" for d in decision_errors(self_rated)))
 
     passes = [result for result in results if result["evaluation"]["passed"]]
-    check("the offline runner satisfies most adversarial cases", len(passes) >= 8)
+    check("the offline runner satisfies most adversarial cases", len(passes) >= 10)
+    check("a partial submission never reads as fully held",
+          by_id_case(results, "ADV11")["decision"]["predicted_outcome_class"]
+          == "PARTIALLY_ASSESSED")
+    check("an UNKNOWN execution is not qualified evidence",
+          by_id_case(results, "ADV12")["decision"]["evidence_eligible"] is False)
+    check("an unqualified comparison is not scored as evidence",
+          by_id_case(results, "ADV12")["evaluation"]["metrics"]["prediction_quality"]["value"]
+          is None)
 
     ablation = run_suite(cases, runs=2)
     check("the ablation covers four arms", set(ablation["per_arm"]) == set(ABLATION_ARMS))

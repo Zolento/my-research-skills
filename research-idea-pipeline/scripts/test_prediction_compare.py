@@ -197,9 +197,81 @@ class TestAssessment(unittest.TestCase):
 
     def test_all_predictions_held_holds_the_experiment(self):
         packet = clone(self.observation)
-        packet["outcomes"] = [packet["outcomes"][0]]
+        packet["outcomes"] = [
+            {"id": "O1", "value": 0.8, "source": bound_source("落差 0.8 dB")},
+            {"id": "O2", "value": 0.05, "source": bound_source("落差 0.05 dB")},
+        ]
         assessment, _ = pc.assess_experiment(self.state, packet)
         self.assertEqual(assessment["outcome_class"], "PREDICTION_HELD")
+
+    def test_a_partial_submission_is_never_held(self):
+        """P0-1: submitting only the favourable outcome is not 'all predictions held'."""
+        packet = clone(self.observation)
+        packet["outcomes"] = [packet["outcomes"][0]]
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        self.assertEqual(assessment["outcome_class"], "PARTIALLY_ASSESSED")
+        missing = [entry for entry in assessment["predictions"]
+                   if entry.get("reason") == "missing_observation"]
+        self.assertEqual([entry["outcome_id"] for entry in missing], ["O2"])
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertIn("PC8", {d.rule for d in diagnostics})
+        allowed, reasons = pc.evidence_transition_allowed(self.state, assessment)
+        self.assertFalse(allowed)
+        self.assertTrue(reasons)
+
+    def test_a_duplicated_outcome_is_undecidable(self):
+        packet = clone(self.observation)
+        packet["outcomes"] = [packet["outcomes"][0], clone(packet["outcomes"][0]),
+                              packet["outcomes"][1]]
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        entry = next(e for e in assessment["predictions"] if e["outcome_id"] == "O1")
+        self.assertEqual(entry["reason"], "duplicate_observation")
+        self.assertIn("PC2", {d.rule for d in diagnostics})
+        self.assertNotIn(assessment["outcome_class"], ("PREDICTION_HELD",))
+
+    def test_an_unfrozen_outcome_never_enters_the_verdict_set(self):
+        packet = clone(self.observation)
+        packet["outcomes"] = list(packet["outcomes"]) + [
+            {"id": "O9", "value": 0.8, "source": bound_source("未冻结")}]
+        assessment, _ = pc.assess_experiment(self.state, packet)
+        self.assertEqual(assessment["unexpected_observations"], ["O9"])
+        self.assertTrue(all(entry["outcome_id"] in ("O1", "O2")
+                            for entry in assessment["predictions"]))
+        self.assertFalse(assessment["evidence_eligible"])
+
+    def test_the_frozen_set_is_the_decision_set(self):
+        assessment, _ = pc.assess_experiment(self.state, self.observation)
+        self.assertEqual(assessment["frozen_outcome_ids"], ["O1", "O2"])
+        self.assertEqual([entry["outcome_id"] for entry in assessment["predictions"]],
+                         ["O1", "O2"])
+
+    def test_branch_mode_adjudicates_only_the_selected_branch(self):
+        packet = clone(self.observation)
+        packet["observed_outcome"] = "O1"
+        packet["outcomes"] = [packet["outcomes"][0]]
+        assessment, _ = pc.assess_experiment(self.state, packet)
+        self.assertEqual(assessment["mode"], "branch")
+        self.assertEqual(assessment["outcome_class"], "PREDICTION_HELD")
+        self.assertEqual(assessment["not_selected"], ["O2"])
+        self.assertTrue(assessment["evidence_eligible"])
+
+    def test_two_satisfied_branches_make_the_freeze_undecidable(self):
+        packet = clone(self.observation)
+        packet["observed_outcome"] = "O1"
+        packet["outcomes"] = [
+            {"id": "O1", "value": 0.8, "source": bound_source("a")},
+            {"id": "O2", "value": 0.05, "source": bound_source("b")},
+        ]
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
+        self.assertTrue(assessment["branch_conflicts"])
+        self.assertIn("PC8", {d.rule for d in diagnostics})
+
+    def test_a_selected_branch_must_be_frozen(self):
+        packet = clone(self.observation)
+        packet["observed_outcome"] = "O9"
+        _, diagnostics = pc.assess_experiment(self.state, packet)
+        self.assertIn("PC3", {d.rule for d in diagnostics})
 
     def test_an_invalid_execution_is_never_a_prediction_verdict(self):
         packet = clone(self.observation)
@@ -210,10 +282,51 @@ class TestAssessment(unittest.TestCase):
         self.assertEqual(assessment["predictions"], [])
 
     def test_an_unknown_execution_still_compares_but_is_marked(self):
+        """P0-2: the diagnostic comparison is kept, the scientific status is not."""
         packet = clone(self.observation)
         packet["execution"]["validity"] = "UNKNOWN"
-        assessment, _ = pc.assess_experiment(self.state, packet)
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
         self.assertNotEqual(assessment["outcome_class"], "INVALID_EXECUTION")
+        self.assertEqual(assessment["evidence_class"], "DIAGNOSTIC_ONLY")
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertEqual(assessment["scientific_status"], "DIAGNOSTIC_ONLY")
+        self.assertIn("PC7", {d.rule for d in diagnostics})
+        allowed, reasons = pc.evidence_transition_allowed(self.state, assessment)
+        self.assertFalse(allowed)
+        self.assertTrue(any("UNKNOWN" in reason for reason in reasons), reasons)
+
+    def test_incomplete_provenance_is_diagnostic_only(self):
+        state = clone(self.state)
+        state["experiments"][0]["status"] = "running"
+        state["experiments"][0]["result_at_state_version"] = None
+        assessment, diagnostics = pc.assess_experiment(state, self.observation)
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertTrue(assessment["provenance_gaps"])
+        self.assertIn("PC7", {d.rule for d in diagnostics})
+
+    def test_a_time_leak_blocks_the_transition(self):
+        state = clone(self.state)
+        state["experiments"][0]["preregistration"]["frozen_at_state_version"] = 99
+        assessment, _ = pc.assess_experiment(state, self.observation)
+        allowed, reasons = pc.evidence_transition_allowed(state, assessment)
+        self.assertFalse(allowed)
+        self.assertTrue(any("时间" in reason or "泄漏" in reason for reason in reasons))
+
+    def test_only_a_qualified_assessment_may_inform_a_transition(self):
+        complete, _ = pc.assess_experiment(self.state, self.observation)
+        allowed, reasons = pc.evidence_transition_allowed(self.state, complete)
+        self.assertTrue(allowed, reasons)
+        self.assertEqual(reasons, [])
+        partial_packet = clone(self.observation)
+        partial_packet["outcomes"] = [partial_packet["outcomes"][0]]
+        partial, _ = pc.assess_experiment(self.state, partial_packet)
+        blocked, blockers = pc.evidence_transition_allowed(self.state, partial)
+        self.assertFalse(blocked)
+        self.assertTrue(blockers)
+        invalid_packet = clone(self.observation)
+        invalid_packet["execution"]["validity"] = "INVALID"
+        invalid, _ = pc.assess_experiment(self.state, invalid_packet)
+        self.assertFalse(pc.evidence_transition_allowed(self.state, invalid)[0])
 
     def test_no_preregistration_means_exploratory_only(self):
         state = clone(self.state)
@@ -236,7 +349,8 @@ class TestAssessment(unittest.TestCase):
         packet = clone(self.observation)
         packet["outcomes"][0]["id"] = "O9"
         assessment, diagnostics = pc.assess_experiment(self.state, packet)
-        self.assertIn("PC3", {d.rule for d in diagnostics})
+        self.assertEqual(assessment["unexpected_observations"], ["O9"])
+        self.assertIn("PC2", {d.rule for d in diagnostics})
 
     def test_a_duplicate_observation_id_is_rejected(self):
         packet = clone(self.observation)
@@ -352,12 +466,99 @@ class TestCompetition(unittest.TestCase):
                             {"mechanism": "M2", "ref": "X2:O3"}],
             "discriminating_intervention": "X2",
             "decision_impact": "method_decision_differs",
+            "discrimination_rule": {"statistic": "difference_of_means",
+                                    "min_separation": 0.2},
         }
 
     def test_a_real_gap_is_distinguishable(self):
         verdict, _ = pc.distinguishability(self.state, self.competition, self.mechanisms)
         self.assertEqual(verdict["verdict"], "DISTINGUISHABLE")
-        self.assertEqual(len(set(verdict["signatures"].values())), 2)
+        self.assertEqual(verdict["reason"], "discrimination_rule_satisfied")
+        self.assertTrue(verdict["has_distinguishing_power"])
+        self.assertEqual(verdict["witness_pair"]["left_ref"], "X2:O1")
+
+    def test_without_a_pre_declared_rule_the_pair_is_only_conditional(self):
+        """P0-3: conflicting ranges alone do not fix which mechanism won."""
+        blind = clone(self.competition)
+        blind.pop("discrimination_rule")
+        verdict, diagnostics = pc.distinguishability(self.state, blind, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "CONDITIONALLY_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "no_discrimination_rule")
+        self.assertFalse(verdict["has_distinguishing_power"])
+        self.assertIn("PC6", {d.rule for d in diagnostics})
+
+    def test_different_observables_are_not_a_competition(self):
+        state = clone(self.state)
+        state["experiments"][1]["preregistration"]["outcomes"][2]["criterion"][
+            "quantity"] = "另一个指标（ms）"
+        verdict, _ = pc.distinguishability(state, self.competition, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "different_observables")
+
+    def test_different_measurement_bases_are_not_comparable(self):
+        state = clone(self.state)
+        state["experiments"][1]["preregistration"]["outcomes"][0]["criterion"][
+            "measurement"] = "single centre"
+        state["experiments"][1]["preregistration"]["outcomes"][2]["criterion"][
+            "measurement"] = "mean over centres"
+        verdict, _ = pc.distinguishability(state, self.competition, self.mechanisms)
+        self.assertEqual(verdict["reason"], "different_measurement")
+
+    def test_overlapping_intervals_have_no_separating_power(self):
+        state = clone(self.state)
+        state["experiments"][1]["preregistration"]["outcomes"][2]["criterion"][
+            "expected_range"] = [-0.6, 0.4]
+        verdict, _ = pc.distinguishability(state, self.competition, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "overlapping_intervals")
+
+    def test_statistical_uncertainty_can_swallow_the_gap(self):
+        state = clone(self.state)
+        state["experiments"][1]["preregistration"]["outcomes"][0]["criterion"].update(
+            {"noise": 4.0, "sample_size": 4})
+        verdict, diagnostics = pc.distinguishability(state, self.competition, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "within_uncertainty")
+        self.assertIn("PC6", {d.rule for d in diagnostics})
+
+    def test_a_gap_below_the_declared_resolution_is_not_distinguishable(self):
+        strict = dict(self.competition,
+                      discrimination_rule={"statistic": "difference_of_means",
+                                           "min_separation": 0.9})
+        verdict, _ = pc.distinguishability(self.state, strict, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "below_declared_min_separation")
+
+    def test_a_finished_experiment_is_not_an_actionable_intervention(self):
+        state = clone(self.state)
+        state["experiments"][1]["status"] = "done"
+        verdict, _ = pc.distinguishability(state, self.competition, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "intervention_not_actionable")
+
+    def test_prose_and_self_ratings_do_not_decide_distinguishability(self):
+        verbose = dict(self.competition, note="两个机制语义上高度相似",
+                       similarity=0.91, confidence=0.99)
+        verdict, _ = pc.distinguishability(self.state, verbose, self.mechanisms)
+        self.assertEqual(verdict["verdict"], "DISTINGUISHABLE")
+
+    def test_every_pair_must_separate_when_there_are_three_mechanisms(self):
+        three = {"id": "CP3", "status": "open", "mechanisms": ["M1", "M2", "M3"],
+                 "conflicting_predictions": ["X2:O1", "X2:O3", "X2:O2"],
+                 "predictions": [{"mechanism": "M1", "ref": "X2:O1"},
+                                 {"mechanism": "M2", "ref": "X2:O3"},
+                                 {"mechanism": "M3", "ref": "X2:O2"}],
+                 "discriminating_intervention": "X2",
+                 "decision_impact": "method_decision_differs",
+                 "discrimination_rule": {"statistic": "difference_of_means",
+                                         "min_separation": 0.2}}
+        mechanisms = [{"id": "M1", "structure": {"pending_predictions": ["X2:O1"]}},
+                      {"id": "M2", "structure": {"pending_predictions": ["X2:O3"]}},
+                      {"id": "M3", "structure": {"pending_predictions": ["X2:O2"]}}]
+        verdict, _ = pc.distinguishability(self.state, three, mechanisms)
+        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "identical_criteria")
+        self.assertEqual(len(verdict["pairs"]), 3)
 
     def test_a_rewording_is_not_a_competing_prediction(self):
         equivalent = clone(self.competition)
@@ -365,34 +566,39 @@ class TestCompetition(unittest.TestCase):
         equivalent["predictions"] = [{"mechanism": "M1", "ref": "X2:O1"},
                                      {"mechanism": "M2", "ref": "X2:O2"}]
         verdict, diagnostics = pc.distinguishability(self.state, equivalent, self.mechanisms)
-        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE_EQUIVALENT_PREDICTIONS")
+        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE")
+        self.assertEqual(verdict["reason"], "identical_criteria")
         self.assertIn("PC6", {d.rule for d in diagnostics})
 
     def test_without_an_intervention_the_competition_is_not_decidable(self):
         blind = clone(self.competition)
         blind["discriminating_intervention"] = "TBD"
         verdict, _ = pc.distinguishability(self.state, blind, self.mechanisms)
-        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE_NO_INTERVENTION")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "no_intervention")
 
     def test_without_a_prediction_gap_there_is_no_competition(self):
         flat = clone(self.competition)
         flat["conflicting_predictions"] = []
         flat["predictions"] = []
         verdict, _ = pc.distinguishability(self.state, flat, self.mechanisms)
-        self.assertEqual(verdict["verdict"], "NOT_DISTINGUISHABLE_NO_PREDICTION_GAP")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "no_prediction_gap")
 
     def test_unattributed_predictions_are_insufficient_structure(self):
         unowned = clone(self.competition)
         unowned.pop("predictions")
         verdict, diagnostics = pc.distinguishability(self.state, unowned, None)
-        self.assertEqual(verdict["verdict"], "INSUFFICIENT_STRUCTURE")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "no_ownership")
         self.assertTrue(any("归属" in d.detail for d in diagnostics))
 
     def test_a_single_mechanism_is_insufficient(self):
         solo = clone(self.competition)
         solo["mechanisms"] = ["M1"]
         verdict, _ = pc.distinguishability(self.state, solo, self.mechanisms)
-        self.assertEqual(verdict["verdict"], "INSUFFICIENT_STRUCTURE")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "insufficient_mechanisms")
 
     def test_a_prediction_on_another_experiment_cannot_be_separated(self):
         elsewhere = clone(self.competition)
@@ -400,7 +606,8 @@ class TestCompetition(unittest.TestCase):
                                     {"mechanism": "M2", "ref": "X1:O2"}]
         elsewhere["conflicting_predictions"] = ["X2:O1", "X1:O2"]
         verdict, _ = pc.distinguishability(self.state, elsewhere, self.mechanisms)
-        self.assertEqual(verdict["verdict"], "INSUFFICIENT_STRUCTURE")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_INFORMATION")
+        self.assertEqual(verdict["reason"], "predictions_on_other_experiments")
 
     def test_ownership_can_come_from_the_mechanism_structure(self):
         declared = dict(self.competition)
@@ -436,6 +643,8 @@ class TestDiagnosisSwitch(unittest.TestCase):
                             {"mechanism": "M2", "ref": "X2:O3"}],
             "discriminating_intervention": "X2",
             "decision_impact": "method_decision_differs",
+            "discrimination_rule": {"statistic": "difference_of_means",
+                                    "min_separation": 0.2},
         }
         base.update(overrides)
         return base

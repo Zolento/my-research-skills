@@ -92,7 +92,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | `S1`—`S7`, `V1`—`V24` | `scripts/state_check.py` | shape gate and reference integrity of the canonical state |
 | `EO1`, `EX1` | `evidence_outcome.py`, `execution_gate.py` | additive outcome and execution gates |
 | `CM0`—`CM10` | `scripts/cognition.py` | cognitive projection, provenance, revision authority |
-| `PC1`—`PC9` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, competition, insight cards |
+| `PC1`—`PC9` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, evidence eligibility (`PC7`), adjudication completeness (`PC8`), competition, insight cards |
 | `LH1`—`LH16` | `scripts/legacy_handoff.py` | takeover compatibility audit |
 | `SV1`—`SV8` | `scripts/strategy_memory.py` | value judgment, taste authority, anti-lock-in, isolation |
 | `RP1`—`RP5` | `scripts/research_replay.py` | case schema, leak guard, decision schema, independent novelty |
@@ -153,6 +153,13 @@ Verified offline and mechanically, by the fifteen-step release gate and 1164 uni
   conflict instead of being adopted;
 * a rewritten frozen criterion is detected, and an amendment after the result is rejected;
 * an invalid execution is never a prediction verdict and never a mechanism refutation;
+* the frozen preregistration is the complete decision set, so a partial submission yields
+  `PARTIALLY_ASSESSED` with `evidence_eligible: false` and never `PREDICTION_HELD`;
+* an `UNKNOWN` execution keeps its diagnostic comparison but cannot occupy the scientific
+  verdict slot, and `evidence_transition_allowed` blocks the transition;
+* distinguishability requires a comparable observable, a conflicting prediction, enough
+  resolution against `tolerance + noise/√n`, and a pre-declared `discrimination_rule`; free
+  text and self-ratings cannot move the verdict;
 * a takeover leaves the state, scheduler and execution ledger byte-identical;
 * no value judgment or strategy update contains an aggregate score, and no operator is banned;
 * the offline ablation reproduces the capability ladder, and the ten adversarial cases are

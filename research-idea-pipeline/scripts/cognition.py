@@ -154,6 +154,7 @@ ANOMALY_FIELDS: Tuple[str, ...] = (
 COMPETITION_FIELDS: Tuple[str, ...] = (
     "mechanisms", "shared_explanation", "conflicting_predictions", "predictions",
     "discriminating_intervention", "decidable", "decision_impact", "conclusion", "winner",
+    "discrimination_rule",
 )
 PREDICTION_FIELDS: Tuple[str, ...] = (
     "freeze_digest", "outcomes", "criteria_present", "prediction_id", "experiment_id",
@@ -777,6 +778,7 @@ class _Builder:
                 "discriminating_intervention": "TBD",
                 "predictions": [],
                 "decision_impact": "unknown",
+                "discrimination_rule": None,
                 "status": "open",
                 "conclusion": "",
                 "decidable": None,
@@ -802,6 +804,8 @@ class _Builder:
                                         if isinstance(item, dict)]
             if isinstance(after.get("decision_impact"), str):
                 entry["decision_impact"] = after["decision_impact"]
+            if isinstance(after.get("discrimination_rule"), dict):
+                entry["discrimination_rule"] = after["discrimination_rule"]
             if isinstance(after.get("decidable"), bool):
                 entry["decidable"] = after["decidable"]
         if kind == "competition_open":
@@ -907,6 +911,7 @@ class _Builder:
             "predictions": entry["predictions"],
             "discriminating_intervention": entry["discriminating_intervention"],
             "decision_impact": entry["decision_impact"],
+            "discrimination_rule": entry.get("discrimination_rule"),
             "status": entry["status"],
             "conclusion": entry["conclusion"],
             "decidable": entry["decidable"],
@@ -915,16 +920,22 @@ class _Builder:
             "stale": bool(stale) or bool(missing),
             "stale_reasons": stale,
             "missing_refs": missing,
+            # Structural presence only: the scientific verdict comes from
+            # `prediction_compare.distinguishability`, which checks comparability,
+            # conflict, resolution and the pre-declared rule.
             "has_distinguishing_power": bool(
                 entry["conflicting_predictions"]
-                and entry["discriminating_intervention"] not in ("", "TBD", None)),
+                and entry["discriminating_intervention"] not in ("", "TBD", None)
+                and entry.get("discrimination_rule")),
+            "discrimination_rule_present": bool(entry.get("discrimination_rule")),
         }
         if entry.get("winner"):
             payload["winner"] = entry["winner"]
         if not payload["has_distinguishing_power"] and entry["status"] == "open":
             self.diagnostics.append(Diagnostic(
                 "CM8", path,
-                "开放竞争尚未给出「冲突预测 + 判别干预」；仅并列多个可能原因不算机制竞争"))
+                "开放竞争尚未给出「冲突预测 + 可执行判别干预 + 预先声明的判别规则」；"
+                "仅并列多个可能原因不算机制竞争"))
         return payload
 
 
@@ -2252,7 +2263,9 @@ def _selftest_revisions() -> List[Dict[str, Any]]:
                {"claims": ["C1"], "evidence": ["E1"]},
                {"mechanisms": ["M1", "M2"], "shared_explanation": "两者都能解释数据集 A 的落差",
                 "conflicting_predictions": ["PR1 在数据集 B 预测增益", "PR2 在数据集 B 预测无增益"],
-                "discriminating_intervention": "X2"}, actor="R6"),
+                "discriminating_intervention": "X1",
+                "discrimination_rule": {"statistic": "difference_of_means",
+                                        "min_separation": 0.2}}, actor="R6"),
         record("REV4", 4, "anomaly_record", "AN1",
                {"experiments": ["X1"], "evidence": ["E1"]},
                {"observation": "数据集 B 上落差反转", "importance": "high",

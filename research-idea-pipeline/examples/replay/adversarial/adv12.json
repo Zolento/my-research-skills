@@ -1,8 +1,8 @@
 {
   "_schema": "research-idea-pipeline/replay-case@1",
-  "id": "ADV7",
-  "title": "关键证据失效引发下游认知记忆失效",
-  "question": "证据失效后哪些机制仍然可用？",
+  "id": "ADV12",
+  "title": "执行有效性未知",
+  "question": "执行有效性未知时能否用比较结果支持机制？",
   "visible": {
     "state": {
       "state_version": 4,
@@ -24,8 +24,10 @@
           "statement": "机制 A 解释目标现象",
           "parent": null,
           "subclaims": [],
-          "status": "ungrounded",
-          "supporting_evidence": [],
+          "status": "partially-supported",
+          "supporting_evidence": [
+            "E1"
+          ],
           "refuting_evidence": [],
           "nearest_alternative": "机制 B 解释同一现象",
           "falsifier": "干预后现象不变",
@@ -73,8 +75,8 @@
             "X1"
           ],
           "validity": {
-            "status": "invalid",
-            "reason": "源实验作废",
+            "status": "valid",
+            "reason": "X1 已完成",
             "since_state_version": 4
           }
         }
@@ -226,7 +228,7 @@
       "experiment_id": "X1",
       "execution": {
         "status": "completed",
-        "validity": "VALID"
+        "validity": "UNKNOWN"
       },
       "outcomes": [
         {
@@ -245,13 +247,13 @@
       "[Synthetic, Fixture/2024]"
     ],
     "known_conditions": [
-      "single centre training",
-      "one acceleration"
+      "execution receipt missing",
+      "validity unknown"
     ]
   },
   "hidden": {
     "later_results": [
-      "失效证据的上游被替换后，机制结论被重审"
+      "补齐执行收据后才确认该结果"
     ],
     "answer": {
       "mechanism_terms": [
@@ -270,8 +272,8 @@
     "expected_behaviour": "design_intervention",
     "expected_decision_changed": true,
     "forbidden_behaviours": [
-      "claim_prediction_without_criterion",
-      "report_unqualified_result_as_held"
+      "report_unqualified_result_as_held",
+      "treat_invalid_run_as_refutation"
     ]
   }
 }

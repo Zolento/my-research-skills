@@ -93,6 +93,15 @@ def state(version: int = 4) -> dict:
                  "update": [{"target": "C1", "op": "strengthen"}]}]},
             "result_at_state_version": 4, "depends_on": [], "validity": validity("按预注册写入"),
             "outcome_analysis": None, "execution_protocol": None,
+        }, {
+            "id": "X2", "parent": "X1", "stage": "X3", "claim_targeted": ["C1"],
+            "alternative_targeted": ["ALT-1"], "code_commit": "TBD",
+            "data_split": "A/fixed-centre", "seed": 0, "metric": "落差变化",
+            "result": "", "interpretation": "尚未运行", "unexpected": [], "known_flaws": [],
+            "next_branches": [], "status": "planned", "preregistration": None,
+            "result_at_state_version": None, "depends_on": ["X1"],
+            "validity": validity("尚未运行", 4, status="pending"),
+            "outcome_analysis": None, "execution_protocol": None,
         }],
         "literature": [{
             "id": "LIT1", "ref": "[Author, Venue/Year]", "relation": "shares-structure",
@@ -159,7 +168,9 @@ def base_revisions() -> list:
                  {"mechanisms": ["M1", "M2"],
                   "shared_explanation": "两者都能解释数据集 A 的落差",
                   "conflicting_predictions": ["PR1 预测数据集 B 有增益", "PR2 预测无增益"],
-                  "discriminating_intervention": "X2"}, actor="R6"),
+                  "discriminating_intervention": "X2",
+                  "discrimination_rule": {"statistic": "difference_of_means",
+                                          "min_separation": 0.2}}, actor="R6"),
         revision("REV4", 4, "anomaly_record", "AN1",
                  {"experiments": ["X1"], "evidence": ["E1"]},
                  {"observation": "数据集 B 上落差反转", "importance": "high",
@@ -518,6 +529,27 @@ class TestMemoryLifecycle(unittest.TestCase):
         cold_ids = {m["id"] for m in selection["cold"]["mechanisms"]}
         self.assertIn("M2", cold_ids)
 
+    def test_invalidation_reaches_anomalies_and_competitions(self):
+        """Phase 1 end-to-end: one dead source must expire every derived view of it."""
+        doc = state()
+        doc["evidence"][0]["validity"] = validity("源实验作废", version=1, status="invalid")
+        index, _ = cg.build_index(doc, base_revisions(), "A")
+        mechanism = next(m for m in index["mechanisms"] if m["id"] == "M2")
+        anomaly = next(a for a in index["anomalies"] if a["id"] == "AN1")
+        competition = next(c for c in index["competitions"] if c["id"] == "CP1")
+        for entry in (mechanism, anomaly, competition):
+            self.assertTrue(entry["stale"], msg=entry["id"])
+            self.assertTrue(entry["stale_reasons"], msg=entry["id"])
+        selection = cg.recall(index, doc)
+        hot_ids = {item["id"] for item in selection["hot"]["mechanisms"]}
+        hot_ids |= {item["id"] for item in selection["hot"]["anomalies"]}
+        hot_ids |= {item["id"] for item in selection["hot"]["competitions"]}
+        self.assertNotIn("M2", hot_ids)
+        self.assertNotIn("AN1", hot_ids)
+        self.assertNotIn("CP1", hot_ids)
+        self.assertTrue(any(item["kind"] == "invalidated_object"
+                            for item in index["boundaries"]))
+
     def test_missing_reference_marks_the_entry_unresolved(self):
         doc = state()
         doc["claims"] = []
@@ -635,6 +667,88 @@ class TestContextBrief(unittest.TestCase):
         text = self.brief()
         self.assertTrue(text.startswith("# Cognitive Context Brief"))
         self.assertNotIn(".research-idea-pipeline/routes/", text.splitlines()[0])
+
+
+# ---------------------------------------------------------------------------
+# Cross-session: a refuted mechanism must not be re-proposed
+# ---------------------------------------------------------------------------
+
+class TestCrossSessionAvoidsRefutedMechanism(unittest.TestCase):
+    """Recovering understanding includes recovering what is already dead.
+
+    A restart that brings back the mechanism model but loses the refutation will re-propose
+    the same explanation, which is the duplication the engine exists to prevent. The test
+    therefore drives a full restart from disk and checks the recovered *behaviour*, not just
+    the presence of a field.
+    """
+
+    def refuted_revisions(self):
+        revisions = base_revisions()
+        revisions.append(revision(
+            "REV9", 9, "mechanism_create", "M9",
+            {"hypotheses": ["H1"], "failures": ["F1"]},
+            {"statement": "已被判别实验否证的机制（不得重提）"}))
+        return revisions
+
+    def test_the_refuted_mechanism_is_recovered_as_refuted(self):
+        index, diagnostics = cg.full_index(state(), self.refuted_revisions(), "A")
+        mechanism = next(m for m in index["mechanisms"] if m["id"] == "M9")
+        self.assertEqual(mechanism["support_level"], "refuted")
+        self.assertEqual(mechanism["status"], "refuted")
+        self.assertTrue(any("failures[F1]" in reason
+                            for reason in mechanism["support_reasons"]))
+        self.assertFalse([d for d in diagnostics if d.rule in ("CM7", "CM9")])
+
+    def test_a_restart_keeps_it_out_of_hot_memory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, state(), self.refuted_revisions())
+            self.assertEqual(quiet(cg.op_build, state_path, cognition_dir), cg.EXIT_OK)
+            # New session: everything is re-read from disk, nothing is carried in memory.
+            reloaded = cg.load_state(state_path)
+            revisions, _ = cg.load_revisions(cognition_dir / cg.REVISIONS_NAME)
+            index, _ = cg.full_index(reloaded, revisions, "A")
+            selection = cg.recall(index, reloaded)
+            hot_ids = {m["id"] for m in selection["hot"]["mechanisms"]}
+            warm_ids = {m["id"] for m in selection["warm"]["mechanisms"]}
+            self.assertNotIn("M9", hot_ids)
+            self.assertIn("M9", warm_ids)
+            self.assertEqual(quiet(cg.op_check, state_path, cognition_dir), cg.EXIT_OK)
+
+    def test_the_restart_recovers_the_repeat_prohibition(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, state(), self.refuted_revisions())
+            quiet(cg.op_build, state_path, cognition_dir)
+            reloaded = cg.load_state(state_path)
+            constraints = cg.failure_constraints(reloaded)
+            self.assertEqual(constraints[0]["retry"], "blocked")
+            index, _ = cg.full_index(reloaded, base_revisions(), "A")
+            self.assertTrue(any(item["kind"] == "failed_repeat" for item in index["boundaries"]))
+            brief = (cognition_dir / cg.BRIEF_NAME).read_text(encoding="utf-8")
+            self.assertIn("refuted", brief)
+            self.assertIn("retry=blocked", brief)
+
+    def test_re_proposing_the_same_explanation_is_flagged(self):
+        """The refuted anchors are remembered, so a restatement is not new progress."""
+        revisions = self.refuted_revisions() + [revision(
+            "REV10", 10, "mechanism_create", "M10",
+            {"hypotheses": ["H1"], "failures": ["F1"]},
+            {"statement": "同一机制换一种措辞重新提出"})]
+        index, _ = cg.full_index(state(), revisions, "A")
+        duplicates = [d for d in index["diagnostics"] if d["rule"] == "CM9"]
+        self.assertTrue(duplicates, "a restatement of a refuted mechanism was not flagged")
+
+    def test_the_next_action_does_not_revive_the_refuted_direction(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, state(), self.refuted_revisions())
+            quiet(cg.op_build, state_path, cognition_dir)
+            index, _ = cg.full_index(cg.load_state(state_path),
+                                     self.refuted_revisions(), "A")
+            hint = cg.next_action_hint(cg.CanonicalView(cg.load_state(state_path)), index)
+            self.assertNotIn("M9", hint)
+            self.assertTrue(hint.strip())
 
 
 # ---------------------------------------------------------------------------

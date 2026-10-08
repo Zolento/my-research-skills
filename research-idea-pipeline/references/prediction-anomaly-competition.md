@@ -52,6 +52,8 @@ ability to *decide* them:
 {"id": "O1", "observation": "解耦后落差下降 ≥ 0.5 dB",
  "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
                "expected_range": [-3.0, -0.5], "tolerance": 0.1,
+               "measurement": "cross-centre PSNR difference, mean over centres",
+               "noise": 0.4, "sample_size": 9, "min_effect": 0.5,
                "rule": "给人读的说明；不参与判定"},
  "update": [{"target": "C1", "op": "strengthen"}]}
 ```
@@ -62,9 +64,82 @@ ability to *decide* them:
 | `directional` | `direction`, or a signed `value` | the observed direction equals `direction`; for `no_change`, `abs(value) <= tolerance` |
 | `discrete` | `label` | the label is in `held_labels`; in `failed_labels` → deviated; in neither → `UNTESTABLE` |
 
-`rule` is documentation for humans and never influences the verdict. A criterion whose
-`held_labels` and `failed_labels` overlap, whose range is inverted, or whose kind is unknown
-is a hard violation (`PC1`).
+`rule` is documentation for humans and never influences the verdict. `measurement`, `noise`,
+`sample_size` and `min_effect` are optional and have exactly one consumer: the
+distinguishability analysis in §4. `expected_range` and `tolerance` answer *what counts as
+held*; the statistical fields answer *whether a design can tell two mechanisms apart*. Mixing
+the two is a category error.
+
+### The frozen set is the complete decision set
+
+The observation packet is evidence **about** the preregistration, not a list of things to
+decide. `assess_experiment` walks `preregistration.outcomes[]` and looks each one up in the
+packet:
+
+| Situation | Result |
+|---|---|
+| A frozen outcome has no observation | verdict `UNTESTABLE`, reason `missing_observation`; the experiment cannot exceed `PARTIALLY_ASSESSED` |
+| The same outcome id appears twice | that outcome is undecidable (`duplicate_observation`); the packet is not qualified |
+| The packet carries an id that was never frozen | excluded from the verdict set, recorded in `unexpected_observations`, and the packet is not qualified |
+| The criterion is absent or malformed | `UNTESTABLE`; no success or failure may be claimed |
+
+Submitting only the favourable branch is therefore **not** a way to obtain
+`PREDICTION_HELD`: an incomplete submission caps the result at `PARTIALLY_ASSESSED` and loses
+evidence eligibility.
+
+### Branch mode
+
+A preregistration often enumerates *mutually exclusive branches* of one decision, not several
+independent measurements. The packet says which branch it matched:
+
+```json
+{"experiment_id": "X1", "observed_outcome": "O1", "outcomes": [ "... only O1 ..." ]}
+```
+
+* `observed_outcome` must name a **frozen** outcome; an unknown id is `PC3`.
+* Only the selected branch is adjudicated. A non-selected branch is `not_selected`, **not** a
+  failed prediction.
+* If a non-selected branch that the packet also reports evaluates to `HELD` as well, the
+  freeze is not exclusive: the result is `UNTESTABLE`, reason `ambiguous_preregistration`
+  (`PC8`). One observation cannot say which branch happened.
+
+Without `observed_outcome` the comparator uses **completeness mode**: every frozen outcome is
+an independent adjudication and all of them must be decided before `PREDICTION_HELD`.
+
+### Evidence eligibility
+
+A comparison is always computed when it is possible; whether it may be used as science is a
+separate field.
+
+| Field | Values | Meaning |
+|---|---|---|
+| `outcome_class` | the scientific verdict slot | carries `PREDICTION_HELD` / `PREDICTION_DEVIATED` / `WITHIN_TOLERANCE` **only** on qualified evidence |
+| `diagnostic_outcome_class` | any class | the comparison result, always available for the researcher |
+| `evidence_class` | `QUALIFIED_EVIDENCE` / `DIAGNOSTIC_ONLY` / `INSUFFICIENT_PROVENANCE` | what the result is worth |
+| `evidence_eligible` | boolean | shorthand for `QUALIFIED_EVIDENCE` |
+| `scientific_status` | `MAY_INFORM_TRANSITION` / `DIAGNOSTIC_ONLY` / `NO_INFERENCE` | what a consumer may do with it |
+| `outcome_class_downgraded_from` | class or absent | set when a world-claiming result was demoted to `UNTESTABLE` |
+
+Rules:
+
+* `execution.validity == "INVALID"` → `INVALID_EXECUTION`, no comparison, `NO_INFERENCE`.
+* `execution.validity == "UNKNOWN"` → the comparison is kept, but a world claim may not occupy
+  `outcome_class`: it is downgraded to `UNTESTABLE` and recorded in
+  `diagnostic_outcome_class`. A `PC7` diagnostic is emitted.
+* Incomplete provenance (experiment not terminal, missing `result_at_state_version`, missing
+  `frozen_at_state_version`, or a freeze later than the result) → `DIAGNOSTIC_ONLY`.
+* Missing, duplicated, extra or ambiguous outcomes → `DIAGNOSTIC_ONLY`.
+* `PARTIALLY_ASSESSED` and `UNTESTABLE` are statements about the *adjudication*, not about the
+  world, so they remain in the scientific slot even when the evidence is not qualified: "we
+  could not finish evaluating" is itself the correct conclusion.
+
+```sh
+python3 scripts/prediction_compare.py compare --state S --packet P --for-transition
+```
+
+exits 3 and prints the blockers unless `evidence_transition_allowed` is true. That is the
+comparator-side precondition only: the authority for a claim-status change remains R8's
+single-direction upgrade or R10, enforced by `evidence_outcome.py` and `state_check.py`.
 
 ## 3. Anomaly detection
 
@@ -89,6 +164,7 @@ same one `execution_gate` applies to `evidence[].diagnostic_observation`.
 | `PREDICTION_HELD` | every frozen prediction held |
 | `PREDICTION_DEVIATED` | at least one prediction failed its criterion |
 | `WITHIN_TOLERANCE` | no failure, but at least one result sits outside its range within tolerance |
+| `PARTIALLY_ASSESSED` | some frozen predictions were decided and others were not; never reported as "all held" |
 | `EXPLORATORY_ANOMALY` | there was no frozen preregistration: the observation is recorded, and may **not** be called a prediction success or failure |
 | `INVALID_EXECUTION` | execution, protocol, measurement or evaluation cannot support inference — this is R9.O's `INVALID_EXPERIMENT`, not an anomaly |
 | `UNTESTABLE` | a criterion is missing or the observation cannot decide it |
@@ -112,22 +188,46 @@ list of possible causes is not a competition.
  "decision_impact": "method_decision_differs"}
 ```
 
-`distinguishability` returns one of:
+`distinguishability` runs four operational checks, in this order, on **every pair** of
+mechanisms. With more than two mechanisms the experiment must separate all of them, so the
+overall verdict is the weakest pair verdict and the weakest pair is reported as the witness.
 
-| Verdict | Condition |
+| # | Check | Failure verdict and reason |
+|---|---|---|
+| 1 | **Comparability** — same observed variable, and the same declared measurement basis | `INSUFFICIENT_INFORMATION` / `different_observables`, `different_measurement` |
+| 2 | **Conflict** — the declared ranges (or directions, or label sets) cannot both be satisfied by one observation | `NOT_DISTINGUISHABLE` / `identical_criteria`, `overlapping_intervals`, `non_conflicting_predictions` |
+| 3 | **Resolution** — the ranges, widened by `tolerance + noise / sqrt(sample_size)`, stay disjoint, and the raw gap meets the declared `min_separation` | `NOT_DISTINGUISHABLE` / `within_uncertainty`, `below_declared_min_separation` |
+| 4 | **Pre-declared rule** — a `discrimination_rule` fixes the threshold before the run | `CONDITIONALLY_DISTINGUISHABLE` / `no_discrimination_rule` |
+
+| Verdict | Meaning |
 |---|---|
-| `DISTINGUISHABLE` | every mechanism owns a frozen prediction on the intervention, and at least two criterion signatures differ |
-| `NOT_DISTINGUISHABLE_EQUIVALENT_PREDICTIONS` | the criteria are identical once the wording is removed |
-| `NOT_DISTINGUISHABLE_NO_INTERVENTION` | the declared intervention is missing or not a real experiment |
-| `NOT_DISTINGUISHABLE_NO_PREDICTION_GAP` | no conflicting predictions are declared |
-| `INSUFFICIENT_STRUCTURE` | fewer than two mechanisms, fewer than two resolvable predictions, or ownership cannot be established |
-| `UNDECIDABLE_ON_CURRENT_DATA` | reserved for a competition explicitly declared undecidable |
+| `DISTINGUISHABLE` | comparable, conflicting, resolvable, and the decision rule was declared in advance |
+| `CONDITIONALLY_DISTINGUISHABLE` | the predictions do conflict, but the decision rule is missing; declaring it is the single remaining step |
+| `NOT_DISTINGUISHABLE` | on the declared design the two mechanisms cannot be separated; another run of the same design will not change that |
+| `INSUFFICIENT_INFORMATION` | the comparison is not even defined: different observables, no ownership, no usable intervention |
+
+```json
+{"discrimination_rule": {"statistic": "difference_of_means",
+                         "min_separation": 0.2, "alpha": 0.05,
+                         "requires": "fixed-centre ablation"}}
+```
+
+The intervention must also be **actionable**: `planned` or `running`. A finished experiment
+cannot separate mechanisms, so it yields `INSUFFICIENT_INFORMATION` /
+`intervention_not_actionable`.
+
+**No prose and no self-rating enters.** Adding a `note`, a `similarity` value or a
+`confidence` to a competition changes nothing; the inputs are frozen numbers, label sets and
+declared design parameters. The `discrimination_rule_satisfied` and
+`labels_mutually_exclusive` reasons are the only two ways to reach `DISTINGUISHABLE`, and a
+test asserts that free text cannot move the verdict.
 
 **Ownership is required.** Predictions come from the competition's `predictions[]`, falling
 back to each mechanism's `structure.pending_predictions`. A prediction that cannot be
-attributed to a mechanism is `INSUFFICIENT_STRUCTURE`, not a distinction. Rewording a
-prediction is not a new prediction: `criterion_signature` compares the decidable content, so
-`rule` text is deliberately excluded.
+attributed to a mechanism is `INSUFFICIENT_INFORMATION` / `no_ownership`, not a distinction.
+Rewording a prediction is not a new prediction: `criterion_signature` compares the decidable
+content, so `rule` text, `measurement` and the statistical fields are deliberately excluded
+from it and handled by checks 1 and 3 instead.
 
 Keeping a declared-but-undecidable competition is legal. Generating new explanations to save
 an old mechanism is not: `CM8` reports an open competition with no distinguishing power, and
@@ -141,8 +241,8 @@ budget rule; it routes into the dispositions that already exist.
 | Action | When |
 |---|---|
 | `CONTINUE_ATTRIBUTION` | every open competition is distinguishable |
-| `FIND_DISCRIMINATING_INTERVENTION` | a competition is undecidable, has no intervention, or has no declared prediction gap — design the minimal experiment first |
-| `RECORD_BOUNDARY_AND_STOP` | the mechanisms are indistinguishable *and* the choice does not change the method decision; record the unresolved boundary and stop attributing |
+| `FIND_DISCRIMINATING_INTERVENTION` | a competition is design-fixable (`no_intervention`, `no_prediction_gap`, `no_ownership`, `insufficient_predictions`, `predictions_on_other_experiments`, `intervention_not_actionable`) or only `CONDITIONALLY_DISTINGUISHABLE` (`no_discrimination_rule`) — complete the design before running anything |
+| `RECORD_BOUNDARY_AND_STOP` | the mechanisms are structurally indistinguishable (`overlapping_intervals`, `identical_criteria`, `within_uncertainty`, `different_observables`, …) *and* the choice does not change the method decision; record the unresolved boundary and stop attributing |
 | `REDESIGN_QUESTION` | consecutive diagnostics rated `actual_information_gain: zero` reached the threshold and nothing above applies — route through T8, then R5.1 and R3/R6 |
 | `EXPLORE_METHOD_UNDER_UNCERTAINTY` | complete attribution is not needed for the method decision: keep the mechanism as a hypothesis and test mechanism and benefit with one intervention |
 

@@ -33,8 +33,9 @@
         —— 漏掉容量对照必须拒绝正式执行；启动路径仅用 mock/dry-run 测试
     11. Cognitive Insight Engine 的合成 fixture
         —— 构建 → 校验 → 重建必须一致，且 canonical state 逐字节不变
-    12. 预测比较器：判据、冻结完整性、区分力、来源绑定
-        —— 判据变异必须让闸门判红；无效执行不得变成预测判定
+    12. 预测比较器：判据、冻结完整性、区分力、来源绑定、证据资格
+        —— 判据变异必须让闸门判红；部分提交不得读成全成立；
+           UNKNOWN 不得占据科学判定栏；不同指标/重叠区间/噪声过大不得判为可区分
     13. Legacy Research Handoff：无损接管 + 严重错误阻止写回
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
     14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
@@ -295,6 +296,14 @@ def step_cognitive_memory() -> Tuple[bool, str]:
                   f"mechanisms={len(index['mechanisms'])}, state byte-identical")
 
 
+def _outcomes_diagnostics(assessment):
+    """Turn an assessment's recorded diagnostics back into rule ids."""
+    class _Rule:
+        def __init__(self, name):
+            self.rule = name
+    return [_Rule(item.get("rule")) for item in assessment.get("diagnostics") or []]
+
+
 def step_prediction_comparator() -> Tuple[bool, str]:
     """Predictions must be decidable, frozen, and never self-certified.
 
@@ -328,6 +337,98 @@ def step_prediction_comparator() -> Tuple[bool, str]:
     broken, _ = pc.assess_experiment(state, invalid)
     if broken["outcome_class"] != "INVALID_EXECUTION":
         return False, "an invalid execution became a scientific verdict"
+
+    # P0-1: the frozen set is the decision set; a partial submission must not read as HELD.
+    measured = json.loads(json.dumps(packet))
+    measured.pop("observed_outcome", None)
+    measured["outcomes"] = [measured["outcomes"][0]]
+    measured_assessment, measured_diagnostics = pc.assess_experiment(state, measured)
+    if measured_assessment["outcome_class"] != "PARTIALLY_ASSESSED":
+        return False, ("a one-of-two submission did not become PARTIALLY_ASSESSED: "
+                       + str(measured_assessment["outcome_class"]))
+    if measured_assessment["evidence_eligible"]:
+        return False, "a partial submission was treated as qualified evidence"
+    if not any(d.rule == "PC8" for d in measured_diagnostics):
+        return False, "subset adjudication was not reported"
+    if not any(entry.get("reason") == "missing_observation"
+               for entry in measured_assessment["predictions"]):
+        return False, "the missing frozen outcome was not identified"
+
+    # Branch mode is the legitimate reading of a mutually exclusive preregistration, but it
+    # must verify the selection, and it must detect a freeze that is not exclusive.
+    branch = json.loads(json.dumps(packet))
+    branch["observed_outcome"] = "O1"
+    branch["outcomes"] = [branch["outcomes"][0]]
+    branch_assessment, _ = pc.assess_experiment(state, branch)
+    if branch_assessment["outcome_class"] != "PREDICTION_HELD" \
+            or not branch_assessment["evidence_eligible"]:
+        return False, "a valid branch selection was not adjudicated"
+    ambiguous = json.loads(json.dumps(packet))
+    ambiguous["observed_outcome"] = "O1"
+    source = json.loads(json.dumps(ambiguous["outcomes"][0]["source"]))
+    ambiguous["outcomes"] = [{"id": "O1", "value": 0.8, "source": source},
+                             {"id": "O2", "value": 0.05,
+                              "source": json.loads(json.dumps(source))}]
+    ambiguous_assessment, ambiguous_diagnostics = pc.assess_experiment(state, ambiguous)
+    if ambiguous_assessment["outcome_class"] != "UNTESTABLE" \
+            or not any(d.rule == "PC8" for d in ambiguous_diagnostics):
+        return False, "a non-exclusive freeze was not detected"
+    extra = json.loads(json.dumps(packet))
+    extra["outcomes"] = list(extra["outcomes"]) + [
+        {"id": "O9", "value": 0.8, "source": extra["outcomes"][0]["source"]}]
+    extra_assessment, _ = pc.assess_experiment(state, extra)
+    if extra_assessment["evidence_eligible"] or extra_assessment["unexpected_observations"] != ["O9"]:
+        return False, "an unfrozen outcome entered the decision set"
+
+    # P0-2: UNKNOWN keeps the diagnostic result and loses the scientific verdict.
+    unknown = json.loads(json.dumps(packet))
+    unknown["execution"]["validity"] = "UNKNOWN"
+    unknown_assessment, unknown_diagnostics = pc.assess_experiment(state, unknown)
+    if unknown_assessment["evidence_eligible"]:
+        return False, "an UNKNOWN execution was treated as qualified evidence"
+    if unknown_assessment["outcome_class"] in pc.WORLD_CLAIMING_CLASSES:
+        return False, "an UNKNOWN execution occupied the scientific verdict slot"
+    if not unknown_assessment.get("diagnostic_outcome_class"):
+        return False, "the diagnostic comparison was discarded instead of being labelled"
+    if not any(d.rule == "PC7" for d in unknown_diagnostics):
+        return False, "the evidence-eligibility violation was not reported"
+    if pc.evidence_transition_allowed(state, unknown_assessment)[0]:
+        return False, "an UNKNOWN execution was allowed to inform a transition"
+
+    # P0-3: distinguishability must rest on comparability, conflict, resolution and a rule.
+    mechanisms = [{"id": "M1", "structure": {"pending_predictions": ["X2:O1"]}},
+                  {"id": "M2", "structure": {"pending_predictions": ["X2:O3"]}}]
+    rule = {"statistic": "difference_of_means", "min_separation": 0.2}
+    competition = {"id": "CPX", "status": "open", "mechanisms": ["M1", "M2"],
+                   "conflicting_predictions": ["X2:O1", "X2:O3"],
+                   "predictions": [{"mechanism": "M1", "ref": "X2:O1"},
+                                   {"mechanism": "M2", "ref": "X2:O3"}],
+                   "discriminating_intervention": "X2",
+                   "decision_impact": "method_decision_differs",
+                   "discrimination_rule": rule}
+    verdict, _ = pc.distinguishability(state, competition, mechanisms)
+    if verdict["verdict"] != "DISTINGUISHABLE":
+        return False, f"the fixture competition is not distinguishable: {verdict['reason']}"
+    for label, mutate, expected_reason in (
+            ("different metric", lambda s: s["experiments"][1]["preregistration"]["outcomes"][2]
+             ["criterion"].__setitem__("quantity", "另一个指标（ms）"), "different_observables"),
+            ("overlapping ranges", lambda s: s["experiments"][1]["preregistration"]["outcomes"][2]
+             ["criterion"].__setitem__("expected_range", [-0.6, 0.4]), "overlapping_intervals"),
+            ("noise swallows the gap", lambda s: s["experiments"][1]["preregistration"]["outcomes"][0]
+             ["criterion"].update({"noise": 4.0, "sample_size": 4}), "within_uncertainty")):
+        mutated_state = json.loads(json.dumps(state))
+        mutate(mutated_state)
+        mutated, _ = pc.distinguishability(mutated_state, competition, mechanisms)
+        if mutated["verdict"] == "DISTINGUISHABLE":
+            return False, f"{label}: still reported as distinguishable"
+        if mutated.get("reason") != expected_reason:
+            return False, f"{label}: reason={mutated.get('reason')!r}, expected {expected_reason!r}"
+    without_rule = json.loads(json.dumps(competition))
+    without_rule.pop("discrimination_rule")
+    conditional, _ = pc.distinguishability(state, without_rule, mechanisms)
+    if conditional["verdict"] != "CONDITIONALLY_DISTINGUISHABLE":
+        return False, "conflicting ranges without a declared rule were called distinguishable"
+
     card = json.loads((fixture / pc.INSIGHT_CARDS_NAME).read_text(encoding="utf-8"))
     if pc.insight_card_errors(card, state):
         return False, "the fixture insight card does not validate"
@@ -335,7 +436,9 @@ def step_prediction_comparator() -> Tuple[bool, str]:
     self_certified["declared_class"] = "evidence_supported_insight"
     if not any(d.rule == "PC7" for d in pc.insight_card_errors(self_certified, state)):
         return False, "a self-certified insight card escaped PC7"
-    return True, "criterion mutation + missing criterion + invalid run + self-certification 全部判红"
+    return True, ("criterion mutation + missing criterion + invalid run + partial submission "
+                  "+ UNKNOWN eligibility + comparability/conflict/resolution/rule + "
+                  "self-certification 全部判红")
 
 
 def step_legacy_handoff() -> Tuple[bool, str]:
@@ -426,8 +529,8 @@ def step_discovery_replay() -> Tuple[bool, str]:
     """Replay fixtures, the leak guard, the ablation ladder and the end-to-end smoke."""
     import research_replay as rr
     cases = rr.load_cases(ROOT / "examples" / "replay" / "adversarial")
-    if len(cases) != 10:
-        return False, f"expected 10 adversarial cases, found {len(cases)}"
+    if len(cases) != 12:
+        return False, f"expected 12 adversarial cases, found {len(cases)}"
     generated = rr.adversarial_cases()
     if [case["id"] for case in cases] != [case["id"] for case in generated]:
         return False, "shipped cases drifted from the generator"

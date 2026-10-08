@@ -775,8 +775,21 @@ python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/re
 在冻结时写成机器可读判据（`quantitative` / `directional` / `discrete`）。
 没有判据的结果只能返回 `UNTESTABLE`，**不得宣告预测成立或失败**；
 执行无效只能返回 `INVALID_EXECUTION`，不是异常；没有预注册的观察只能是
-`EXPLORATORY_ANOMALY`。机制竞争要求每个机制**各自拥有**一条冻结预测，且判据不同——
-**改写措辞不算区分力**。行为切换与 Insight Card 规则见
+`EXPLORATORY_ANOMALY`。
+
+**冻结的 `outcomes[]` 是完整判定集合**：观测包是「关于它」的证据，不是「要判定哪些结果」的
+清单。只提交一部分只能得到 `PARTIALLY_ASSESSED`，**永远不能读成「全部预测成立」**；
+`execution.validity=UNKNOWN` 时比较结果保留在 `diagnostic_outcome_class`，
+但**不占据科学判定栏**、不是合格证据，也不得触发 R10/R11 状态迁移
+（`evidence_transition_allowed`）。互斥分支用 `observed_outcome` 声明；若另一支也成立，
+则该预注册不可判定。
+
+机制竞争必须逐对检验**可比性 → 冲突 → 分辨率 → 预先声明的判别规则**：
+不同观测变量、不同测量口径、区间重叠、`noise/√n` 吃掉间隔、间隔小于 `min_separation`、
+没有 `discrimination_rule`，**都不能算可区分**。判别干预必须可执行（`planned` / `running`）。
+只有 `DISTINGUISHABLE` / `CONDITIONALLY_DISTINGUISHABLE` / `NOT_DISTINGUISHABLE` /
+`INSUFFICIENT_INFORMATION` 四值，且**不接受文本相似度或 LLM 自评分**。行为切换与
+Insight Card 规则见
 [prediction-anomaly-competition.md](references/prediction-anomaly-competition.md)。
 
 **科学价值不等于 EIG（Phase 3）。** 研究候选的**决策价值**与**发现潜力**分开判断，

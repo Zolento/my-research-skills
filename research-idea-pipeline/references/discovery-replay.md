@@ -66,7 +66,7 @@ let a good prediction compensate for an uncontrolled confound.
 | Dimension | Scored from |
 |---|---|
 | `mechanistic_understanding` | how much of the reference mechanism, assumption and boundary vocabulary the decision can articulate |
-| `prediction_quality` | the frozen-prediction class versus `true_outcome_class` |
+| `prediction_quality` | the frozen-prediction class versus `true_outcome_class`, and **only** for a qualified assessment; a diagnostic comparison is reported as unratable rather than scored |
 | `intervention_quality` | whether the chosen intervention is the discriminating one, plus identification-control coverage |
 | `scientific_novelty` | the independent label or literature neighbours only |
 | `search_efficiency` | effective outputs (a prediction class plus a decision change) relative to the baseline arm |
@@ -118,10 +118,18 @@ Ten cases, one per failure mode the specification names, all shipped under
 | `ADV8` | a new session resumes the previous round | recall cognition; do not inherit an unverified inference |
 | `ADV9` | the result exists and the expectation is edited | reject the post-hoc rewrite |
 | `ADV10` | several diagnostic rounds produce nothing new | change the question, do not keep diagnosing |
+| `ADV11` | two frozen predictions, only one submitted | `PARTIALLY_ASSESSED`, never `PREDICTION_HELD` |
+| `ADV12` | execution validity unknown | keep the diagnostic comparison, refuse the scientific claim |
 
 The suite deliberately rewards **correct stopping**, **preserved unknowns** and **changed
 direction**, not "more output". `ADV4` scores `intervention_quality = 1.0` for choosing no
 experiment at all, because stopping is the right answer there.
+
+`ADV11` and `ADV12` guard the two failure modes that would otherwise turn the comparator into
+a false-positive generator: reporting a partial submission as "all predictions held", and
+spending an unqualified comparison as evidence. Both are enforced by the single invariant
+`report_unqualified_result_as_held` — a decision may only claim `PREDICTION_HELD` when its own
+assessment is evidence-eligible.
 
 ## 6. End-to-end smoke test
 

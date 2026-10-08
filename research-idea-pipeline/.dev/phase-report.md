@@ -10,7 +10,8 @@ Scope: `research-idea-pipeline/` only. Nothing pushed, merged, tagged or release
 | 1 | `c6c446b` | Phase 1 — persistent cognitive memory |
 | 2 | `a411ebd` | Phase 2 — prediction / anomaly / mechanism competition, plus the Legacy Research Handoff (Phase 1 extension requested mid-flight) |
 | 3 | `3433687` | Phase 3 — scientific value and adaptive discovery |
-| 4 | (this commit) | Phase 4 — historical replay, metrics, ablation, adversarial cases, full verification |
+| 4 | `80fc873` | Phase 4 — historical replay, metrics, ablation, adversarial cases, full verification |
+| 5 | (this commit) | Scientific-correctness fixes: P0-1 adjudication completeness, P0-2 evidence eligibility, P0-3 real distinguishability |
 
 ## 2. Files changed relative to `1157d28`
 
@@ -66,7 +67,7 @@ exact identity, and the release gate still proves the rule tables are verbatim i
 | Gate | Result |
 |---|---|
 | `python3 scripts/release_check.py` | **PASS**, 15 steps |
-| `python3 -m unittest discover -s scripts -p 'test_*.py'` | **1164 tests, OK, 3 skipped** (baseline before this branch: 919 tests, 3 skipped) |
+| `python3 -m unittest discover -s scripts -p 'test_*.py'` | **1193 tests, OK, 3 skipped** (baseline before this branch: 919 tests, 3 skipped) |
 | `cognition.py --selftest` | PASS (0 failures) |
 | `prediction_compare.py --selftest` | PASS (0 failures) |
 | `legacy_handoff.py --selftest` | PASS (0 failures) |
@@ -75,9 +76,10 @@ exact identity, and the release gate still proves the rule tables are verbatim i
 | `state_check.py --check examples/cognition/state.json` | exit 0 |
 | `state_check.py --check templates/research-state.template.json` | exit 0 |
 
-New tests by file: `test_cognition.py` 67, `test_prediction_compare.py` 79,
-`test_legacy_handoff.py` 45, `test_strategy_memory.py` 64, `test_research_replay.py` 57 —
-312 new tests, all offline, no GPU, no network, no model call.
+New tests by file (after the fix round): `test_cognition.py` 72,
+`test_prediction_compare.py` 98, `test_legacy_handoff.py` 45,
+`test_strategy_memory.py` 64, `test_research_replay.py` 61, plus the extended release-gate
+step — all offline, no GPU, no network, no model call.
 
 ### Existing-test compatibility
 
@@ -179,6 +181,92 @@ the strategy layer was measured.
 8. **`strategy_update` events are suggestions.** Nothing appends them automatically; a
    Discovery stage or the Meta-Controller must, with a real trigger. Until then the derived
    priors still change the recommendation, but the recorded history stays thin.
+
+## 6b. Scientific-correctness fix round (P0-1 / P0-2 / P0-3)
+
+### Root causes
+
+| # | Problem | Root cause |
+|---|---|---|
+| **P0-1** | A partial submission could read as `PREDICTION_HELD` | `assess_experiment` iterated the **packet** (`packet["outcomes"]`) instead of the **frozen preregistration**. The submitted subset silently became the decision set, so selective submission manufactured support. |
+| **P0-2** | `execution.validity = UNKNOWN` upgraded evidence | Only `INVALID` short-circuited. `UNKNOWN` fell through to the same code path as `VALID`, and the computed class occupied the single `outcome_class` field, so a downstream consumer could not tell a diagnostic comparison from qualified evidence. |
+| **P0-3** | Differing signatures were treated as separating power | `distinguishability` compared criterion **digests** only. It never checked that the two predictions concerned the same observable, the same measurement basis, actually conflicting ranges, or whether the design could resolve the difference — and it never required a pre-declared decision rule. |
+
+### Design decisions
+
+1. **The frozen set is the complete decision set.** Adjudication walks
+   `preregistration.outcomes[]` and looks each one up in the packet. Missing → `UNTESTABLE`
+   (`missing_observation`); duplicate → that outcome is undecidable; extra → excluded and
+   recorded in `unexpected_observations`. New class `PARTIALLY_ASSESSED` names "some decided,
+   some not"; `PREDICTION_HELD` requires every adjudicated outcome decided and held.
+2. **Branch mode is explicit, not implicit.** `observed_outcome` selects one frozen branch of
+   a mutually exclusive preregistration. Non-selected branches are `not_selected`, not failed
+   predictions; a second branch that also holds makes the freeze `UNTESTABLE`
+   (`ambiguous_preregistration`, `PC8`). Without the selector, completeness mode applies.
+3. **Two output slots, not one.** `outcome_class` is the *scientific verdict slot*;
+   `diagnostic_outcome_class` carries the comparison. A world-claiming class
+   (`PREDICTION_HELD` / `PREDICTION_DEVIATED` / `WITHIN_TOLERANCE`) may occupy the scientific
+   slot only on `QUALIFIED_EVIDENCE`. `PARTIALLY_ASSESSED` and `UNTESTABLE` describe the
+   adjudication, so they stay in the scientific slot even when the evidence is not qualified.
+4. **Evidence eligibility is a first-class field.** `evidence_class`
+   (`QUALIFIED_EVIDENCE` / `DIAGNOSTIC_ONLY` / `INSUFFICIENT_PROVENANCE`), `evidence_eligible`,
+   `scientific_status`, `provenance_gaps` and `outcome_class_downgraded_from`.
+   `evidence_transition_allowed()` is the comparator-side precondition; `compare
+   --for-transition` exits 3 with blockers. R8/R10 and `evidence_outcome.py` /
+   `state_check.py` keep their authority.
+5. **Discrimination is arithmetic, not wording.** Four checks — comparability, conflict,
+   resolution (`tolerance + noise/sqrt(n)`), pre-declared rule — over **every pair**, with the
+   weakest pair as the witness. Four verdicts and 19 machine-readable reasons. The
+   intervention must be actionable (`planned` / `running`). Free text and self-ratings are
+   proven inert by test.
+6. **Enum migration was checked first.** Verdict strings are consumed by
+   `diagnosis_switch`, `prediction_compare`'s own CLI/selftest, docs and tests only;
+   `cognition.py` keeps a deliberately *structural* `has_distinguishing_power` and now also
+   exposes `discrimination_rule_present`. `OUTCOME_CLASSES` gained one value.
+
+### Before / after, measured on the same inputs
+
+The pre-fix module was loaded from `80fc873` and run against the post-fix fixtures:
+
+| Scenario | Before | After |
+|---|---|---|
+| 2 frozen predictions, 1 submitted | `PREDICTION_HELD` | `PARTIALLY_ASSESSED`, `evidence_eligible: false` |
+| `execution.validity = UNKNOWN` | `PREDICTION_DEVIATED` (scientific slot) | `UNTESTABLE` + `diagnostic_outcome_class: PREDICTION_DEVIATED`, not eligible |
+| Two mechanisms on different metrics | `DISTINGUISHABLE` | `INSUFFICIENT_INFORMATION` / `different_observables` |
+| Partially overlapping ranges | `DISTINGUISHABLE` | `NOT_DISTINGUISHABLE` / `overlapping_intervals` |
+| `noise/sqrt(n)` swallows the gap | `DISTINGUISHABLE` | `NOT_DISTINGUISHABLE` / `within_uncertainty` |
+| Conflicting ranges, no declared rule | `DISTINGUISHABLE` | `CONDITIONALLY_DISTINGUISHABLE` / `no_discrimination_rule` |
+| Conflicting ranges + declared rule | `DISTINGUISHABLE` | `DISTINGUISHABLE` / `discrimination_rule_satisfied` |
+
+### New tests and fixtures
+
+* `test_prediction_compare.py`: 89 → 98+ tests covering partial submission, duplicates, extras,
+  branch selection, exclusive-branch detection, `UNKNOWN`, incomplete provenance, time leak,
+  the transition gate, different observables, different measurement bases, overlapping ranges,
+  statistical uncertainty, `min_separation`, non-actionable interventions, prose inertness and
+  the three-mechanism pairwise rule.
+* `test_cognition.py`: cross-session refutation (5 tests) and invalidation reaching anomalies
+  and competitions.
+* `research_replay.py`: `ADV11` (partial submission) and `ADV12` (unknown validity) — the
+  suite is now 12 cases; `prediction_quality` is unratable for a diagnostic comparison;
+  `report_unqualified_result_as_held` is the new enforced invariant.
+* `release_check.py` step 12 now injects: a one-of-two submission, a branch selection, a
+  non-exclusive freeze, an unfrozen extra outcome, an `UNKNOWN` execution, and the four
+  discrimination mutations.
+
+### Unverified risks (this round)
+
+1. **No real Agent A/B.** Unchanged: the fixes are verified offline; no model was called.
+2. **Branch vs measurement selection is a judgement.** The comparator can prove a freeze is
+   *not* exclusive; it cannot prove the analyst chose the right branch. A wrong but
+   self-consistent selection is still possible.
+3. **`provenance_gaps` is comparator-local.** It checks the fields the comparison depends on;
+   it is not a substitute for the R9.O audit, and it deliberately does not re-implement it.
+4. **`min_separation` is only meaningful for quantitative criteria.** For discrete label
+   pairs the rule is not applied, because a label read has no threshold; directional pairs
+   remain `CONDITIONALLY_DISTINGUISHABLE` because no effect size is declared.
+5. **`measurement` is a free-text basis comparison.** It is an equality check on a declared
+   string, not a semantic unit analysis.
 
 ## 7. `.dev/` disposition
 
