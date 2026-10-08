@@ -24,6 +24,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import re
 import sys
 import tempfile
@@ -39,6 +40,7 @@ sys.path.insert(0, str(SCRIPTS))
 import env_probe  # noqa: E402
 import literature_search as ls  # noqa: E402
 import literature_sources as src  # noqa: E402
+import zotero_client  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +438,7 @@ class BottleneckRetrievalTests(unittest.TestCase):
                     ls.cache_results(query, [{"title": "Old result", "doi": "10.1234/old"}],
                                      root / "cache", 10, 2020, 2026, source=name)
             with mock.patch.dict(src.REGISTRY, adapters, clear=True), \
+                    mock.patch.object(zotero_client, "probe", return_value=None), \
                     mock.patch.object(ls, "detect_proxy_environment",
                                       return_value={"notes": [], "unresolved": []}), \
                     mock.patch.object(ls, "read_cache", side_effect=AssertionError("stale cache used")):
@@ -457,6 +460,7 @@ class BottleneckRetrievalTests(unittest.TestCase):
                              source="arxiv")
             adapter = mock.Mock(hosts=[], search=mock.Mock(side_effect=OSError("offline")))
             with mock.patch.dict(src.REGISTRY, {"arxiv": adapter}, clear=True), \
+                    mock.patch.object(zotero_client, "probe", return_value=None), \
                     mock.patch.object(ls, "detect_proxy_environment",
                                       return_value={"notes": [], "unresolved": []}):
                 outcome = ls.search_literature("bottleneck", local_dir=root, max_results=10,
@@ -476,6 +480,7 @@ class BottleneckRetrievalTests(unittest.TestCase):
             }
             out = io.StringIO()
             with mock.patch.dict(src.REGISTRY, adapters, clear=True), \
+                    mock.patch.object(zotero_client, "probe", return_value=None), \
                     mock.patch.object(ls, "_env_gate", return_value=None), \
                     mock.patch.object(ls, "detect_proxy_environment",
                                       return_value={"notes": [], "unresolved": []}), \
@@ -546,6 +551,150 @@ class LevelReportTests(unittest.TestCase):
         r = ls._level_report("L3", 2, 5, {"arxiv": {"state": "ok"}}, True)
         self.assertIn("queries", r["gaps"])
         self.assertIn("results", r["gaps"])
+
+
+# ---------------------------------------------------------------------------
+# 5. 本地源：Zotero 优先，不可用回落 docs/refs/
+# ---------------------------------------------------------------------------
+
+#: Zotero Local API 原始条目：一条命中 + 一条无关 + 一条 PDF 子条目（应被过滤）
+_ZOTERO_ITEMS: List[Dict[str, Any]] = [
+    {"key": "ZOTKEY01", "version": 1, "data": {
+        "itemType": "journalArticle",
+        "title": "MRI Reconstruction with Diffusion Models",
+        "creators": [{"firstName": "Ada", "lastName": "Lovelace"}],
+        "abstractNote": "Diffusion priors for accelerated MRI reconstruction.",
+        "date": "2023-05-01",
+        "publicationTitle": "Medical Image Analysis",
+        "url": "https://example.org/mri",
+        "DOI": "10.1000/mri.2023",
+        "tags": [{"tag": "MRI"}, {"tag": "diffusion"}],
+    }},
+    {"key": "ZOTKEY02", "version": 1, "data": {
+        "itemType": "journalArticle",
+        "title": "Unrelated Topic About Birds",
+        "date": "1999",
+    }},
+    {"key": "ATTACH1", "version": 1, "data": {
+        "itemType": "attachment", "contentType": "application/pdf",
+        "parentItem": "ZOTKEY01",
+    }},
+]
+
+
+def _write_refs_paper(papers: Path, name: str, record: Dict[str, Any]) -> None:
+    papers.mkdir(parents=True, exist_ok=True)
+    (papers / f"{name}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+class ZoteroLocalBackendTests(unittest.TestCase):
+    """不依赖真实 Zotero：probe / fetch_items 全部用 stub。"""
+
+    def test_zotero_registered_but_not_a_default_online_source(self):
+        self.assertIn("zotero", src.REGISTRY)
+        self.assertNotIn("zotero", src.DEFAULT_SOURCES)
+        adapter = src.REGISTRY["zotero"]
+        self.assertEqual(adapter.hosts, ())
+        self.assertEqual(adapter.requires, ())
+        self.assertEqual(adapter.polite_delay, 0.0)
+        self.assertEqual(adapter.name, "zotero")
+
+    def test_zotero_url_resolution_order(self):
+        self.assertEqual(ls._zotero_base_url("http://x:1/api"),
+                         ("http://x:1/api", "--zotero-url"))
+        with mock.patch.dict(os.environ, {ls.ZOTERO_ENV_VAR: "http://env:2/api"}):
+            self.assertEqual(ls._zotero_base_url(None),
+                             ("http://env:2/api", ls.ZOTERO_ENV_VAR))
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(ls._zotero_base_url(None),
+                             (zotero_client.DEFAULT_LOCAL_API, "默认地址"))
+
+    def test_zotero_unreachable_falls_back_to_refs_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _write_refs_paper(root / "papers", "classic", {
+                "title": "MRI Reconstruction Retrospective", "year": 2019,
+                "abstract": "A classic MRI reconstruction approach.",
+            })
+            with mock.patch.object(zotero_client, "probe", return_value=None) as probe:
+                outcome = ls.search_literature(
+                    "MRI reconstruction", local_dir=root, local_only=True)
+            self.assertEqual(probe.call_count, 1)
+            self.assertEqual(outcome["local_backend"], "refs")
+            self.assertIsNotNone(outcome["local_warning"])
+            self.assertIn("Zotero", outcome["local_warning"])
+            self.assertEqual([r["title"] for r in outcome["results"]],
+                             ["MRI Reconstruction Retrospective"])
+            self.assertEqual(outcome["results"][0]["source"], "local")
+
+    def test_zotero_reachable_uses_zotero_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _write_refs_paper(root / "papers", "classic", {
+                "title": "MRI Reconstruction Retrospective", "year": 2019,
+            })
+            with mock.patch.object(zotero_client, "probe", return_value="SID"), \
+                    mock.patch.object(zotero_client, "fetch_items",
+                                      return_value=_ZOTERO_ITEMS) as fetch:
+                outcome = ls.search_literature(
+                    "MRI reconstruction diffusion", local_dir=root, local_only=True)
+            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(outcome["local_backend"], "zotero")
+            self.assertIsNone(outcome["local_warning"])
+            titles = [r["title"] for r in outcome["results"]]
+            self.assertIn("MRI Reconstruction with Diffusion Models", titles)
+            self.assertNotIn("MRI Reconstruction Retrospective", titles)
+            self.assertNotIn("Unrelated Topic About Birds", titles)
+            self.assertEqual(outcome["results"][0]["sources"], ["local"])
+
+    def test_local_format_refs_skips_zotero_even_when_reachable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _write_refs_paper(root / "papers", "classic", {
+                "title": "MRI Reconstruction Retrospective", "year": 2019,
+            })
+            with mock.patch.object(zotero_client, "probe",
+                                   side_effect=AssertionError("probe must not run")), \
+                    mock.patch.object(zotero_client, "fetch_items",
+                                      side_effect=AssertionError("fetch must not run")):
+                outcome = ls.search_literature(
+                    "MRI reconstruction", local_dir=root, local_only=True,
+                    local_format="refs")
+            self.assertEqual(outcome["local_backend"], "refs")
+            self.assertEqual([r["title"] for r in outcome["results"]],
+                             ["MRI Reconstruction Retrospective"])
+
+    def test_local_format_zotero_when_down_is_a_clear_nonzero_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            err = io.StringIO()
+            with mock.patch.object(zotero_client, "probe", return_value=None), \
+                    mock.patch.object(ls, "_env_gate", return_value=None), \
+                    contextlib.redirect_stderr(err), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                code = ls.main(["-q", "MRI reconstruction", "--local-only",
+                                "--local-dir", directory, "--local-format", "zotero"])
+            self.assertEqual(code, ls.EXIT_ERROR)
+            self.assertNotEqual(code, ls.EXIT_OK)
+            self.assertIn("Zotero", err.getvalue())
+
+    def test_zotero_source_search_filters_year_and_ranks_overlap(self):
+        source = src.REGISTRY["zotero"]
+        with mock.patch.object(zotero_client, "probe", return_value="SID"), \
+                mock.patch.object(zotero_client, "fetch_items",
+                                  return_value=_ZOTERO_ITEMS):
+            hits = source.search("diffusion MRI", max_results=10, from_year=2020,
+                                 to_year=2024, log=lambda _m: None)
+        self.assertEqual([h["title"] for h in hits],
+                         ["MRI Reconstruction with Diffusion Models"])
+        self.assertEqual(hits[0]["sources"], ["local"])
+        self.assertTrue(hits[0]["matched_terms"])
+
+    def test_zotero_source_raises_unavailable_when_probe_fails(self):
+        source = src.REGISTRY["zotero"]
+        with mock.patch.object(zotero_client, "probe", return_value=None):
+            with self.assertRaises(zotero_client.ZoteroUnavailable):
+                source.search("mri", max_results=5, from_year=None, to_year=None,
+                              log=lambda _m: None)
 
 
 if __name__ == "__main__":

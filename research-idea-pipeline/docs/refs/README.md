@@ -100,6 +100,23 @@ with verified metadata before using it as evidence.
 }
 ```
 
+## Populating from Zotero
+
+If a local Zotero library is available, `scripts/zotero_refs.py` exports it into this
+layout. It writes metadata sidecars only, by default:
+
+```sh
+python3 scripts/zotero_refs.py                 # sidecars into docs/refs/papers/
+python3 scripts/zotero_refs.py --link-pdfs     # also symlink PDFs and rebuild index.json
+python3 scripts/zotero_refs.py --check         # report drift without writing (exit 3)
+```
+
+`--link-pdfs` symlinks the original files from the Zotero storage directory rather than
+copying them, and indexes only the PDFs that exist on disk. Pass `--zotero-url` or set
+`ZOTERO_LOCAL_API` to point at a non-default Zotero server. Literature search reads
+Zotero directly by default and falls back to this directory when the Zotero local API
+is unreachable.
+
 ## Library rules
 
 Rebuild the index after adding, replacing or deleting PDFs. Retrieval that downloads

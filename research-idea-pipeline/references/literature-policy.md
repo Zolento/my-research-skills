@@ -35,10 +35,17 @@ Step 0: 先尝试 web search（执行方式见 §1.1）
   记录检索式、查询日期、结果 URL、已核验来源和工具可用性
   将标题、DOI / arXiv ID、机制术语作为后续检索与引文追溯的种子
 
-Step 1: 本地检索
-  路径 ./docs/refs/（可配置，见 §8）
-  匹配：标题、摘要、关键词、全文（若为 Markdown/JSON）
+Step 1: 本地检索（默认由 Zotero 本地 API 提供）
+  地址解析顺序：`--zotero-url` → 环境变量 `ZOTERO_LOCAL_API` → 默认
+    `http://127.0.0.1:23119/api`；探测可达即用 Zotero（**默认行为**）
+  `--local-format auto`（默认）/ `zotero`（强制 Zotero，不可用即报错）/
+    `refs`（强制跳过 Zotero，直接用旧 docs/refs 格式）
+  探测失败（Zotero 未运行 / 地址不通 / 超时）→ **自动回落** `./docs/refs/papers/*.json`，
+    打印警告，**不因此失败**（退出码与结果不因此变化）
+  匹配：标题、摘要、关键词、全文（refs 模式下同名 .md 作全文）
   命中：纳入结果集，标注 sources=["local"] —— 但流程继续，不得在此返回
+  ★ Zotero 是本地库的**实现后端，不是新源**：命中 provenance 仍是 `local`，
+    源枚举 `local|arxiv|openalex|crossref` 不变，不得把 Zotero 计入在线源
 
 Step 2: 在线源检索（**默认执行**；§2 的触发条件决定的是“要扩检到什么等级”，不是“要不要查”）
   默认启用全部已实现源（见 §9.1）：
@@ -536,6 +543,11 @@ python3 scripts/refs_index.py --check     # 迁移后确认一致
 | `openalex` | **关系** | 否 | 引文图（前向 `cites:` / 后向 `referenced_works`）+ venue 过滤；建议带 `--mailto` |
 | `crossref` | **出处** | 否 | 正式 venue 权威（`container-title`）；建议带 `--mailto` |
 
+> **本地源不在 `--sources` 的默认清单里。** 本地检索（§1 检索优先级 Step 1）默认由
+> **Zotero 本地 API** 提供，不可用时自动回落 `docs/refs/papers/*.json`；命中一律标
+> `sources=["local"]`。Zotero 也注册为源名 `zotero`（便于 `--sources zotero` 显式调用），
+> 但它**不是在线源**，不参与 "尽可能多" 的在线源计数。
+
 **已排除的源及实测原因：** DBLP（上线 Anubis JS 反爬，带浏览器 UA 也挡，程序化不可用）；
 Semantic Scholar（无 key 时直接 429；用户提供 key 后可加）。
 
@@ -580,6 +592,13 @@ python3 scripts/literature_search.py -q "..." --sources arxiv,crossref
 
 # 离线：不查任何在线源（会打印规则违反提示；不得支撑创新性声明）
 python3 scripts/literature_search.py -q "..." --local-only    # 或 --offline
+
+# 本地源选择（默认 auto：Zotero 优先，不可用自动回落 docs/refs/）
+python3 scripts/literature_search.py -q "..." --local-format auto
+python3 scripts/literature_search.py -q "..." --local-format refs      # 强制旧 docs/refs 格式
+python3 scripts/literature_search.py -q "..." --local-format zotero    # 强制 Zotero，不可用即报错
+python3 scripts/literature_search.py -q "..." --zotero-url http://127.0.0.1:23119/api
+# 也可用环境变量 ZOTERO_LOCAL_API 指定地址（--zotero-url 优先于它）
 ```
 
 **退出码：**

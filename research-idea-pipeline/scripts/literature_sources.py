@@ -592,6 +592,155 @@ class CrossrefSource(Source):
 
 
 # ---------------------------------------------------------------------------
+# Zotero —— 本地库（离线；默认本地源，不可用时由调用方回落 docs/refs/）
+# ---------------------------------------------------------------------------
+
+#: 查询分词用。语义与 `literature_search.tokenize` 一致，但**不能** import 它：
+#: `literature_search` 会 import 本模块，反向 import 即循环导入。
+_QUERY_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9\-]+", re.IGNORECASE)
+_QUERY_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]+")
+_QUERY_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "with",
+    "via", "using", "use", "from", "by", "is", "are", "be", "as", "at",
+    "we", "our", "this", "that", "these", "those", "it", "its",
+})
+
+_ZOTERO_CLIENT: Any = None
+
+
+def _zotero_client() -> Any:
+    """惰性导入同目录的冻结模块 `zotero_client`（HTTP 逻辑只实现一处）。"""
+    global _ZOTERO_CLIENT
+    if _ZOTERO_CLIENT is None:
+        try:
+            import zotero_client
+        except ImportError:  # 以文件路径单独加载本模块时（scripts/ 不在 sys.path）
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import zotero_client
+        _ZOTERO_CLIENT = zotero_client
+    return _ZOTERO_CLIENT
+
+
+def _query_tokens(text: Optional[str]) -> List[str]:
+    """小写拉丁词 + 中文「整段 + 二元组」，并去停用词。"""
+    if not text:
+        return []
+    low = str(text).lower()
+    tokens = [t for t in _QUERY_TOKEN_RE.findall(low) if t not in _QUERY_STOPWORDS]
+    for run in _QUERY_CJK_RE.findall(low):
+        tokens.append(run)
+        if len(run) > 2:
+            tokens.extend(run[i:i + 2] for i in range(len(run) - 1))
+    return tokens
+
+
+def _keywords_text(value: Any) -> str:
+    """keywords 既可能是数组也可能是字符串；字符串不能被逐字符 join。"""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        return " ".join(str(v) for v in value if v)
+    return ""
+
+
+def zotero_entries(base_url: Optional[str] = None, *, log=None) -> List[Dict[str, Any]]:
+    """拉取 Zotero 本地库的全部**可引用**条目，映射为合并层 record。
+
+    `sources` 固定为 `["local"]`（见 `zotero_client.item_to_record`）：
+    Zotero 就是本地库，`literature-policy` §1.1 Step 1 规定本地命中标 `local`。
+
+    Raises:
+        zotero_client.ZoteroUnavailable: 地址不通 / Zotero 未运行 / 超时 / 返回非 JSON。
+        调用方**必须**捕获并回落 `docs/refs/papers/*.json`，不得硬失败。
+    """
+    client = _zotero_client()
+    items = client.fetch_items(base_url)
+    records: List[Dict[str, Any]] = []
+    for item in client.bibliographic_items(items):
+        record = client.item_to_record(item)
+        record["source"] = "local"
+        if not record.get("paper_id"):
+            record["paper_id"] = item.get("key")
+        records.append(record)
+    if log is not None:
+        log(f"[zotero] 可引用条目 {len(records)} / 原始条目 {len(items)}")
+    return records
+
+
+class ZoteroSource(Source):
+    """Zotero 本地库检索源（离线、无速率限制、无 hosts，不走代理探测）。"""
+
+    name = "zotero"
+    label = "Zotero（本地文献库）"
+    hosts = ()
+    requires = ()
+    polite_delay = 0.0
+
+    def __init__(self, base_url: Optional[str] = None) -> None:
+        self.base_url = base_url
+
+    @property
+    def url(self) -> str:
+        return self.base_url or _zotero_client().DEFAULT_LOCAL_API
+
+    def entries(self, *, base_url: Optional[str] = None, log=None) -> List[Dict[str, Any]]:
+        return zotero_entries(base_url or self.base_url, log=log)
+
+    def search(self, query, *, max_results, from_year, to_year, log,
+               mailto=None, venue_id=None):
+        """探测 Zotero → 拉取条目 → 年份过滤 + 查询词重合排序。
+
+        Raises:
+            zotero_client.ZoteroUnavailable: 不可达。
+            ★ 与既有源一致：抛出后由 `literature_search.query_source` 捕获，
+              该源记为 `unavailable`，**不终止**整体检索。本地步骤由
+              `literature_search.resolve_local_entries` 负责回落 `docs/refs/`。
+        """
+        client = _zotero_client()
+        try:
+            server_id = client.probe(self.url)
+            if not server_id:
+                raise client.ZoteroUnavailable(f"Zotero 本地 API 不可达：{self.url}")
+            records = self.entries(log=log)
+        except client.ZoteroUnavailable as exc:
+            log(f"[zotero] 本地库不可用：{exc}")
+            raise
+
+        q_tokens = set(_query_tokens(query))
+        if not q_tokens:
+            return []
+
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for record in records:
+            if not _in_range(_year(record.get("year")), from_year, to_year):
+                continue
+            score = 0.0
+            matched: set = set()
+            for text, weight in (
+                (record.get("title") or "", 3.0),
+                (_keywords_text(record.get("keywords")), 2.5),
+                (record.get("abstract") or "", 1.5),
+            ):
+                overlap = q_tokens & set(_query_tokens(str(text)))
+                if overlap:
+                    matched |= overlap
+                    score += weight * len(overlap)
+            if score <= 0:
+                continue
+            hit = dict(record)
+            hit["_score"] = round(score, 3)
+            hit["matched_terms"] = sorted(matched)
+            scored.append((score, hit))
+
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        if max_results is not None and max_results >= 0:
+            scored = scored[:max_results]
+        return [hit for _, hit in scored]
+
+
+# ---------------------------------------------------------------------------
 # 注册表
 # ---------------------------------------------------------------------------
 
@@ -599,6 +748,9 @@ REGISTRY: Dict[str, Source] = {
     "arxiv": ArxivSource(),
     "openalex": OpenAlexSource(),
     "crossref": CrossrefSource(),
+    # 本地源：注册以便 `--sources zotero` 可用；**不**加入 DEFAULT_SOURCES
+    # （那是"在线源"清单）。默认本地检索由 literature_search 的本地步骤接入。
+    "zotero": ZoteroSource(),
 }
 
 

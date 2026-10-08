@@ -29,6 +29,12 @@
     # 离线：显式只用本地（会打印规则违反提示，不得支撑创新性声明）
     python literature_search.py --query "..." --local-only
 
+本地源：默认由 Zotero 本地 API 提供（http://127.0.0.1:23119/api）。
+地址解析顺序为 `--zotero-url` → 环境变量 `ZOTERO_LOCAL_API` → 默认地址。
+Zotero 不可达时自动回落到 `docs/refs/papers/*.json` 并打印警告，**不失败**；
+`--local-format refs` 强制跳过 Zotero，`--local-format zotero` 强制使用并在不可用时
+以退出码 1 清晰报错。
+
 退出码：
     0  正常（本地库与 arxiv 均成功）
     1  硬错误（参数错误、本地库不可读、渲染失败等）
@@ -50,11 +56,12 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import env_probe  # noqa: E402  （同目录模块，用于确认工作解释器）
 import literature_sources  # noqa: E402  （同目录模块，多源适配器）
+import zotero_client  # noqa: E402  （同目录模块，Zotero 本地库只读客户端）
 
 # ---------------------------------------------------------------------------
 # 常量（与 literature-policy.md 保持一致）
@@ -73,6 +80,11 @@ EXIT_ENV = 4           # 环境不满足：依赖缺失 / 找不到可用解释�
 ENV_REEXEC_FLAG = "RESEARCH_IDEA_PIPELINE_REEXEC"
 DEFAULT_LOCAL_DIR = os.environ.get("RESEARCH_LOCAL_LITERATURE", "./docs/refs")
 DEFAULT_CACHE_DIR = os.environ.get("RESEARCH_LIT_CACHE")  # 为空则由 <local-dir>/cache 决定
+
+#: Zotero 本地 API 环境变量（解析顺序中位于 --zotero-url 之后、默认地址之前）
+ZOTERO_ENV_VAR = "ZOTERO_LOCAL_API"
+#: --local-format 的合法取值
+LOCAL_FORMATS = ("auto", "zotero", "refs")
 ALL_SOURCES_DOWN_NOTE = "所有在线源均不可用，以下结果仅来自本地库"
 PARTIAL_SOURCE_NOTE = (
     "部分在线源不可用，结果不完整（含成功源的命中）；检索未达饱和"
@@ -214,6 +226,76 @@ def _read_paper_entries(papers_dir: Path) -> List[Dict[str, Any]]:
             entries.append(record)
 
     return entries
+
+
+def _zotero_base_url(zotero_url: Optional[str]) -> Tuple[str, str]:
+    """按「显式参数 → 环境变量 → 默认地址」解析 Zotero 地址。返回 (url, 来源)。"""
+    if zotero_url:
+        return zotero_url, "--zotero-url"
+    env_url = os.environ.get(ZOTERO_ENV_VAR)
+    if env_url:
+        return env_url, ZOTERO_ENV_VAR
+    return zotero_client.DEFAULT_LOCAL_API, "默认地址"
+
+
+def resolve_local_entries(
+    local_dir: Path,
+    *,
+    local_format: str = "auto",
+    zotero_url: Optional[str] = None,
+    log: Log = _noop_log,
+) -> Tuple[List[Dict[str, Any]], str, Optional[str]]:
+    """解析本地文献源。返回 `(entries, backend, warning)`。
+
+    解析顺序（literature-policy.md §1.1 Step 1）：
+
+    1. `--local-format refs` → 直接读 `docs/refs/papers/*.json`，**不探测 Zotero**。
+    2. 地址：`--zotero-url` → 环境变量 `ZOTERO_LOCAL_API` → `zotero_client.DEFAULT_LOCAL_API`。
+    3. 探测成功 → 用 Zotero（**默认行为**）。
+    4. 探测/拉取失败 → `auto` 回落 `docs/refs/` 并告警（**不失败**）；
+       `zotero` 抛 `ZoteroUnavailable`，由 `main` 转成清晰错误与非零退出码。
+
+    Raises:
+        zotero_client.ZoteroUnavailable: 仅当 `--local-format zotero` 且不可用时。
+    """
+    refs_entries: Optional[List[Dict[str, Any]]] = None
+
+    def refs() -> List[Dict[str, Any]]:
+        nonlocal refs_entries
+        if refs_entries is None:      # 惰性读取：Zotero 可用时不必扫磁盘
+            refs_entries = _read_paper_entries(local_dir / "papers")
+        return refs_entries
+
+    if local_format == "refs":
+        log("[local] --local-format refs：跳过 Zotero，使用 docs/refs/papers/*.json")
+        return refs(), "refs", None
+
+    base_url, origin = _zotero_base_url(zotero_url)
+    failure: Optional[str] = None
+    server_id = zotero_client.probe(base_url)
+
+    if server_id:
+        try:
+            entries = literature_sources.zotero_entries(base_url, log=log)
+        except zotero_client.ZoteroUnavailable as exc:
+            failure = str(exc)
+        else:
+            log(f"[local] 本地源：Zotero（{base_url}，Server-ID {server_id}，"
+                f"来源：{origin}）—— 可引用条目 {len(entries)}")
+            return entries, "zotero", None
+    else:
+        failure = "探测未返回 Zotero-Server-ID"
+
+    if local_format == "zotero":
+        raise zotero_client.ZoteroUnavailable(
+            f"--local-format zotero 要求使用 Zotero，但本地 API 不可用"
+            f"（{base_url}，来源：{origin}；{failure}）"
+        )
+
+    warning = (f"Zotero 本地 API 不可用（{base_url}，来源：{origin}；{failure}），"
+               f"已自动回落到 docs/refs/papers/*.json")
+    log(f"[warn] {warning}")
+    return refs(), "refs", warning
 
 
 def search_local(
@@ -630,6 +712,8 @@ def search_literature(
     venue: Optional[str] = None,
     cited_by: Optional[str] = None,
     references: Optional[str] = None,
+    local_format: str = "auto",
+    zotero_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """本地 + 多源在线检索（每源状态、退避、缓存、引文追溯、扩检与饱和判定）。
 
@@ -643,6 +727,8 @@ def search_literature(
         venue: 会议/期刊名，经 OpenAlex 解析后过滤（A3 第 ③ 级自动化）。
         cited_by: 前向引文种子（谁引用了它）——DOI / arXiv ID / OpenAlex ID。
         references: 后向引文种子（它引用了谁）。
+        local_format: 本地源选择 auto / zotero / refs（默认 auto，Zotero 优先）。
+        zotero_url: Zotero 本地 API 地址；None = 环境变量 ZOTERO_LOCAL_API → 默认地址。
 
     Returns:
         {
@@ -652,6 +738,7 @@ def search_literature(
           "degraded": bool, "total_results_before_limit": int, "truncated": int,
           "negative_search_record": [...], "escalations": [...],
           "saturation": {...}, "level_report": {...}, "proxy_env": {...},
+          "local_backend": "zotero" | "refs", "local_warning": str | None,
         }
     """
     cache_dir = cache_dir or (local_dir / "cache")
@@ -745,12 +832,16 @@ def search_literature(
         return hits
 
     # --- Step 1: 本地检索（纳入结果，但不作为终点） ---
-    # 本地库只读一次，在所有检索式之间复用（避免 O(检索式 × 文件数) 的重复 IO）
-    entries = _read_paper_entries(local_dir / "papers")
+    # 本地源默认走 Zotero 本地 API，不可用时自动回落 docs/refs/papers/*.json；
+    # 条目只读一次，在所有检索式之间复用（避免 O(检索式 × 文件数) 的重复 IO）。
+    local_entries, local_backend, local_warning = resolve_local_entries(
+        local_dir, local_format=local_format, zotero_url=zotero_url, log=log,
+    )
     for q in queries:
         hits = [_with_sources(h, "local")
-                for h in search_local(q, local_dir, from_year, to_year, entries=entries)]
-        steps.append({"step": "local", "query": q, "hits": len(hits)})
+                for h in search_local(q, local_dir, from_year, to_year, entries=local_entries)]
+        steps.append({"step": "local", "query": q, "hits": len(hits),
+                      "backend": local_backend})
         local_by_query[q].extend(hits)
 
     local_hits = [hit for q in queries for hit in local_by_query[q]]
@@ -764,6 +855,7 @@ def search_literature(
             escalations=[],
             saturation={"saturated": False, "reason": "local-only 模式下不做饱和判定"},
             level=level, limit=limit, escalation_attempted=False,
+            local_backend=local_backend, local_warning=local_warning,
         )
 
     # --- 代理环境检查（覆盖所有启用源的域名）---
@@ -909,6 +1001,7 @@ def search_literature(
         saturation={"saturated": saturated, "reason": saturation_reason},
         level=level, limit=limit, escalation_attempted=bool(escalations),
         proxy_env=proxy_env,
+        local_backend=local_backend, local_warning=local_warning,
     )
 
 
@@ -927,6 +1020,8 @@ def _finish(
     limit: Optional[int],
     escalation_attempted: bool,
     proxy_env: Optional[Dict[str, Any]] = None,
+    local_backend: Optional[str] = None,
+    local_warning: Optional[str] = None,
 ) -> Dict[str, Any]:
     """组装返回值：套用 --limit、生成负检索记录与等级报告。"""
     total_before_limit = len(merged)
@@ -955,6 +1050,8 @@ def _finish(
         "saturation": saturation,
         "level_report": gaps_level,
         "proxy_env": proxy_env,
+        "local_backend": local_backend,
+        "local_warning": local_warning,
     }
 
 
@@ -1071,6 +1168,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--local-dir", default=DEFAULT_LOCAL_DIR,
         help=f"本地文献库根目录（默认 {DEFAULT_LOCAL_DIR}，亦可用 RESEARCH_LOCAL_LITERATURE）",
+    )
+    parser.add_argument(
+        "--local-format", choices=list(LOCAL_FORMATS), default="auto",
+        help="本地源：auto（默认，Zotero 优先，不可用自动回落 docs/refs/）/ "
+             "zotero（强制 Zotero，不可用即报错）/ refs（强制跳过 Zotero，用旧 docs/refs 格式）",
+    )
+    parser.add_argument(
+        "--zotero-url", default=None, metavar="URL",
+        help=f"Zotero 本地 API 地址（默认环境变量 {ZOTERO_ENV_VAR}，"
+             f"再默认 {zotero_client.DEFAULT_LOCAL_API}）",
     )
     parser.add_argument(
         "--cache-dir", default=DEFAULT_CACHE_DIR,
@@ -1235,7 +1342,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             venue=args.venue,
             cited_by=args.cited_by,
             references=args.references,
+            local_format=args.local_format,
+            zotero_url=args.zotero_url,
         )
+    except zotero_client.ZoteroUnavailable as exc:
+        # --local-format zotero 强制使用 Zotero 但不可用：清晰报错 + 非零退出码
+        log(f"[error] Zotero 不可用（本地文献源）：{exc}")
+        return EXIT_ERROR
     except Exception as exc:  # noqa: BLE001
         log(f"[error] 检索失败：{exc}")
         return EXIT_ERROR
@@ -1257,6 +1370,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "level_report": outcome["level_report"],
         "note": outcome["note"],
         "proxy_env": outcome.get("proxy_env"),
+        "local_backend": outcome.get("local_backend"),
+        "local_warning": outcome.get("local_warning"),
     }
     exit_code = EXIT_SOURCE_DOWN if outcome["degraded"] else EXIT_OK
 
@@ -1267,6 +1382,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # 渲染阶段同样要防脏数据：本地库可能有 null 字段
     try:
         print(f"# 检索：{args.query}")
+        print(f"# 本地源：{payload.get('local_backend') or '未使用'}"
+              + (f"（{payload['local_warning']}）" if payload.get("local_warning") else ""))
         print(f"# 命中：{payload['count']} 条"
               + (f"（截断自 {payload['total_results_before_limit']} 条）"
                  if payload["truncated"] else "") + "\n")
