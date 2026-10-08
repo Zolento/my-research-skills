@@ -488,7 +488,7 @@ class TestRevisionAuthority(unittest.TestCase):
             state_path, cognition_dir = write_fixture(root, state(), base_revisions())
             with (cognition_dir / cg.REVISIONS_NAME).open("a", encoding="utf-8") as handle:
                 handle.write('{"_schema": "x", "id": "REV9", "seq": 9,\n')
-            doc, revisions, diagnostics, _cards = cg._load_inputs(state_path, cognition_dir)
+            doc, revisions, diagnostics = cg._load_inputs(state_path, cognition_dir)[:3]
             self.assertEqual(len(revisions), 4)
             self.assertTrue(any(d.rule == "CM1" for d in diagnostics))
 

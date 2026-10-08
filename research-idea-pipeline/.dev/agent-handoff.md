@@ -10,7 +10,7 @@ Scope: `research-idea-pipeline/` only. No push, no merge, no PR.
 | 1 | Persistent cognitive memory | done — commit 1 |
 | 1b | Legacy Research Handoff (Phase 1 extension, requested mid-flight) | done — commit 2 |
 | 2 | Prediction, anomaly, mechanism competition | done — commit 2 |
-| 3 | Scientific value and adaptive discovery | pending |
+| 3 | Scientific value and adaptive discovery | done — commit 3 |
 | 4 | Discovery replay and verification | pending |
 
 ## Phase 1 record
@@ -103,10 +103,50 @@ Test results
 - `prediction_compare.py --selftest` → PASS (0 failures).
 - `legacy_handoff.py --selftest` → PASS (0 failures).
 
+## Phase 3 record
+
+New files
+
+- `scripts/strategy_memory.py` — value model, taste memory, operator priors, menu ordering,
+  `P4` context isolation, CLI, selftest (`SV1`—`SV8`).
+- `scripts/test_strategy_memory.py` — 64 offline tests.
+- `references/scientific-value-adaptive-discovery.md`.
+
+Modified files
+
+- `scripts/cognition.py` — `project_strategy`, optional `scheduler` in
+  `build_index`/`full_index`/`validate_index`, `load_scheduler`, scheduler digest, brief
+  strategy section.
+- `SKILL.md` §1.8/§2, `README.md`, `docs/cognitive-insight-engine.md`, root `README.md`.
+- `scripts/release_check.py` — step 14.
+
+Decisions taken
+
+1. `scheduler.json` stays read-only. Strategy decisions are recorded as `strategy_update`
+   revision events in the cognitive layer, so telemetry never becomes a decision store and
+   the eight-level ordering is untouched.
+2. No aggregate anywhere. `SV1` rejects `score`/`total`/`overall`/`composite`/`weighted`/
+   `aggregate`/`rating`; menu selection is lexicographic with no weights.
+3. The exploration floor is mandatory and validated (`SV7`); a downgrade needs two
+   independent failures, a scope and reactivation conditions (`SV5`).
+4. `STRATEGY_MENUS` maps to *operator* names, not island names. The first draft used islands
+   and the ranking silently treated every operator as neutral; an import-time assertion plus
+   a selftest check now prevent that class of bug.
+5. `P4` may read typed skeletons only; candidate content, domain terms and other islands'
+   answers are refused (`SV6`).
+
+Test results
+
+- `python3 scripts/release_check.py` → `PASS`, 14 steps.
+- `unittest discover -s scripts -p 'test_*.py'` → 1107 tests, OK, 3 skipped.
+- `strategy_memory.py --selftest` → PASS (0 failures).
+
 ## Open items carried into Phase 2
 
 - (resolved in Phase 2) `<XID>:<OID>` references resolve and validate against
   `experiments[].preregistration.outcomes`; `frozen_prediction` is now accompanied by an
   `outcome_class` and an `experiment_id`; distinguishability is mechanical.
-- Carried into Phase 3: the derived `insights` section is not yet consumed by the strategy
-  layer, and `boundaries` is not yet used to order exploration.
+- (resolved in Phase 3) `boundaries` now exclude blocked menus; the strategy layer consumes
+  `insights` classifications through the value/objection record.
+- Carried into Phase 4: replay harness, metrics, ablation, adversarial cases, full
+  regression report.

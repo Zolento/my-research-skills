@@ -71,6 +71,7 @@ INSIGHT_CARDS_NAME = "insight-cards.jsonl"
 BRIEF_NAME = "context-brief.md"
 
 STATE_NAME = "research-state.json"
+SCHEDULER_NAME = "scheduler.json"
 
 # ---------------------------------------------------------------------------
 # Frozen vocabularies
@@ -1335,11 +1336,31 @@ def _legacy_boundaries(view: CanonicalView) -> List[Dict[str, Any]]:
     return boundaries
 
 
+def project_strategy(
+    state: Dict[str, Any],
+    index: Dict[str, Any],
+    scheduler: Optional[Dict[str, Any]],
+    revisions: Sequence[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Derived scientific-value and strategy view. Telemetry stays labelled as telemetry."""
+    if scheduler is None:
+        return None
+    import strategy_memory as sm
+    operators = sm.operator_priors(state, index, scheduler)
+    return {
+        "source": "derived from state + scheduler.json (telemetry, never evidence)",
+        "operators": operators,
+        "taste": sm.calibrated_preferences(state, index, scheduler),
+        "recommendation": sm.recommend_strategy(state, index, scheduler, revisions),
+    }
+
+
 def build_index(
     state: Dict[str, Any],
     revisions: Sequence[Dict[str, Any]],
     route: str = "",
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
+    scheduler: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """Build the cognitive index. Pure: no I/O, no mutation of `state`.
 
@@ -1399,6 +1420,7 @@ def build_index(
             "revisions": digest_of_lines([_strip_internal(r) for r in revisions]),
             "insight_cards": digest_of_lines(
                 [_strip_internal(c) for c in (insight_cards or [])]),
+            "scheduler": digest_of(scheduler) if scheduler is not None else "",
         },
         "mechanisms": mechanisms,
         "anomalies": anomalies,
@@ -1422,6 +1444,10 @@ def build_index(
         "diagnostics": [d.as_dict() for d in sorted(
             diagnostics, key=lambda d: (d.rule, d.path, d.detail))],
     }
+    strategy = project_strategy(state, index, scheduler, revisions)
+    if strategy is not None:
+        index["strategy"] = strategy
+        index["counts"]["discouraged_operators"] = len(strategy["operators"]["discouraged"])
     return index, diagnostics
 
 
@@ -1434,13 +1460,14 @@ def full_index(
     revisions: Sequence[Dict[str, Any]],
     route: str = "",
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
+    scheduler: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """The index as written to disk: projection plus the complete diagnostic set.
 
     A single entry point, so `build`, `validate`, `check`, `brief` and `recall`
     can never disagree about what the index should contain.
     """
-    index, build_diagnostics = build_index(state, revisions, route, insight_cards)
+    index, build_diagnostics = build_index(state, revisions, route, insight_cards, scheduler)
     diagnostics = _dedupe(list(build_diagnostics) + validate_revisions(state, revisions))
     diagnostics.extend(project_insights(state, insight_cards or [])["diagnostics"])
     index["diagnostics"] = [d.as_dict() for d in sorted(
@@ -1547,6 +1574,7 @@ def validate_index(
     revisions: Sequence[Dict[str, Any]],
     index: Dict[str, Any],
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
+    scheduler: Optional[Dict[str, Any]] = None,
 ) -> List[Diagnostic]:
     """Recompute the index and compare. Any drift is a hard violation."""
     diagnostics: List[Diagnostic] = []
@@ -1570,8 +1598,11 @@ def validate_index(
             [_strip_internal(c) for c in (insight_cards or [])]):
         diagnostics.append(Diagnostic(
             "CM3", INDEX_NAME, "索引的 insight_cards 摘要与当前 insight-cards.jsonl 不一致；必须重建"))
+    if digest.get("scheduler") != (digest_of(scheduler) if scheduler is not None else ""):
+        diagnostics.append(Diagnostic(
+            "CM3", INDEX_NAME, "索引的 scheduler 摘要与当前 scheduler.json 不一致；必须重建"))
     expected, build_diagnostics = full_index(
-        state, revisions, str(index.get("route", "")), insight_cards)
+        state, revisions, str(index.get("route", "")), insight_cards, scheduler)
     # Diagnostics are advisory output, not projected science: compare the
     # projection itself, so a torn log line cannot masquerade as index drift.
     left = {k: v for k, v in expected.items() if k != "diagnostics"}
@@ -1855,6 +1886,29 @@ def render_brief(
         lines.append(f"- `{entry['id']}` [{entry['support_level']}] {_clip(reason)}")
     lines.append("")
 
+    strategy = index.get("strategy")
+    if strategy:
+        recommendation = strategy.get("recommendation") or {}
+        lines.append("## Scientific value and adaptive discovery")
+        lines.append(f"- menu: `{recommendation.get('menu')}` "
+                     f"(operator {recommendation.get('operator')}) — "
+                     f"{_clip(recommendation.get('reason', ''))}")
+        lines.append(f"- alternatives: {', '.join(recommendation.get('alternatives') or [])}")
+        lines.append(f"- discouraged operators (admissible, with reactivation conditions): "
+                     f"{', '.join(strategy['operators'].get('discouraged') or []) or '(none)'}")
+        lines.append(f"- exploration floor: "
+                     f"{', '.join(item.get('operator', '') for item in strategy['operators'].get('exploration_floor') or [])}")
+        preferences = strategy.get("taste", {}).get("evidence_calibrated") or []
+        for item in preferences:
+            lines.append(f"- `{item.get('id')}` [{item.get('confidence')}] "
+                         f"{_clip(item.get('statement', ''))} ← "
+                         f"{_clip(', '.join(item.get('basis') or []), 60)}")
+        lines.append(f"- anchor: {_clip((strategy.get('taste') or {}).get('human_specified', {}).get('primary_anchor'))}"
+                     "（用户所有，策略学习不得修改）")
+        lines.append("")
+        lines.append("Telemetry is labelled: this section is derived from state plus scheduler.json and is never evidence.")
+        lines.append("")
+
     lines.append("## Insight candidates")
     insights = index.get("insights") or []
     if not insights:
@@ -2001,17 +2055,31 @@ def state_fingerprint(path: Path) -> str:
 # Operations
 # ---------------------------------------------------------------------------
 
+def load_scheduler(path: Path) -> Optional[Dict[str, Any]]:
+    """Read scheduler telemetry. Absent is legal; unparseable is an environment error."""
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise CognitionError(f"scheduler is not valid JSON: {path} ({exc})") from exc
+    if not isinstance(payload, dict):
+        raise CognitionError(f"scheduler root must be an object: {path}")
+    return payload
+
+
 def _load_inputs(state_path: Path, cognition_dir: Path):
     state = load_state(state_path)
     revisions, parse_diagnostics = load_revisions(cognition_dir / REVISIONS_NAME)
     cards, card_diagnostics = load_insight_cards(cognition_dir / INSIGHT_CARDS_NAME)
-    return state, revisions, parse_diagnostics + card_diagnostics, cards
+    scheduler = load_scheduler(state_path.parent / SCHEDULER_NAME)
+    return state, revisions, parse_diagnostics + card_diagnostics, cards, scheduler
 
 
 def op_build(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards)
+    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler)
     diagnostics = _dedupe(list(parse_diagnostics) + list(index_diagnostics))
     index["diagnostics"] = [d.as_dict() for d in sorted(
         diagnostics, key=lambda d: (d.rule, d.path, d.detail))]
@@ -2034,7 +2102,7 @@ def op_build(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_validate(state_path: Path, cognition_dir: Path) -> int:
-    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
+    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
     diagnostics = list(parse_diagnostics) + validate_revisions(state, revisions)
     index_path = cognition_dir / INDEX_NAME
     if not index_path.is_file():
@@ -2046,7 +2114,7 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
             index = None
         if isinstance(index, dict):
-            diagnostics.extend(validate_index(state, revisions, index, cards))
+            diagnostics.extend(validate_index(state, revisions, index, cards, scheduler))
     diagnostics = _dedupe(diagnostics)
     for diagnostic in diagnostics:
         print(diagnostic.render())
@@ -2055,8 +2123,8 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget: int) -> int:
-    state, revisions, _, cards = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path), cards)
+    state, revisions, _, cards, scheduler = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler)
     text = render_brief(index, state, budget)
     target = out or (cognition_dir / BRIEF_NAME)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -2066,23 +2134,23 @@ def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget:
 
 
 def op_recall(state_path: Path, cognition_dir: Path, budget: int) -> int:
-    state, revisions, _, cards = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path), cards)
+    state, revisions, _, cards, scheduler = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler)
     print(json.dumps(recall(index, state, budget), ensure_ascii=False, indent=2))
     return EXIT_OK
 
 
 def op_check(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics, cards = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards)
+    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler)
     diagnostics = list(parse_diagnostics) + list(index_diagnostics)
     index_path = cognition_dir / INDEX_NAME
     if index_path.is_file():
         try:
             stored = json.loads(index_path.read_text(encoding="utf-8"))
             if isinstance(stored, dict):
-                diagnostics.extend(validate_index(state, revisions, stored, cards))
+                diagnostics.extend(validate_index(state, revisions, stored, cards, scheduler))
         except json.JSONDecodeError as exc:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
     else:

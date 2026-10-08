@@ -37,6 +37,8 @@
         —— 判据变异必须让闸门判红；无效执行不得变成预测判定
     13. Legacy Research Handoff：无损接管 + 严重错误阻止写回
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
+    14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
+        —— 注入聚合分数或删除探索下限必须让闸门判红
 
 退出码
 ------
@@ -377,6 +379,47 @@ def step_legacy_handoff() -> Tuple[bool, str]:
     return True, "无损接管 + 幂等 + Bootstrap 拒绝 + 缺失预注册阻止写回"
 
 
+def step_scientific_value() -> Tuple[bool, str]:
+    """Per-dimension value, read-only anchors, and no permanent operator ban."""
+    import cognition as cg
+    import strategy_memory as sm
+    state, revisions, scheduler = sm._fixture()
+    index, _ = cg.full_index(state, revisions, "A", None, scheduler)
+    assessment = sm.value_assessment(state, index, "H1", scheduler)
+    if sm.validate_value(assessment):
+        return False, "the fixture value assessment does not validate"
+    for key in sm.BANNED_AGGREGATE_KEYS:
+        if key in assessment:
+            return False, f"an aggregate score was produced: {key}"
+    scored = dict(assessment, score=0.9)
+    if not any(d.rule == "SV1" for d in sm.validate_value(scored)):
+        return False, "an injected aggregate escaped SV1"
+    baseless = json.loads(json.dumps(assessment))
+    baseless["decision_value"]["changes_route"]["basis"] = []
+    if not any(d.rule == "SV2" for d in sm.validate_value(baseless)):
+        return False, "a dimension without a source escaped SV2"
+    priors = sm.operator_priors(state, index, scheduler)
+    if sm.validate_priors(priors):
+        return False, "the fixture operator priors do not validate"
+    stripped = json.loads(json.dumps(priors))
+    stripped["exploration_floor"] = []
+    if not any(d.rule == "SV7" for d in sm.validate_priors(stripped)):
+        return False, "removing the exploration floor escaped SV7"
+    banned = json.loads(json.dumps(priors))
+    banned["by_operator"]["theory_lens"] = {"status": "forbidden", "failures": [], "successes": []}
+    if not any(d.rule == "SV5" for d in sm.validate_priors(banned)):
+        return False, "a permanent operator ban escaped SV5"
+    before = json.dumps(scheduler, sort_keys=True)
+    recommendation = sm.recommend_strategy(state, index, scheduler, revisions)
+    if json.dumps(scheduler, sort_keys=True) != before:
+        return False, "strategy learning wrote into scheduler telemetry"
+    if recommendation["exploration_rounds_delta"] != 0:
+        return False, "the recommendation added exploration rounds unconditionally"
+    if state["contract"]["primary_anchor"] != "phenomenon":
+        return False, "a strategy computation changed the research anchor"
+    return True, "per-dimension value + no aggregate + floor kept + no ban + telemetry read-only"
+
+
 def step_execution_identifiability() -> Tuple[bool, str]:
     import execution_gate as eg
     case = json.loads((ROOT/'examples/preflight-identifiability/ct-mri.json').read_text(encoding='utf-8'))
@@ -408,6 +451,7 @@ STEPS = (
     ("Cognitive Insight Engine 合成 fixture（构建/校验/重建/状态不变）", step_cognitive_memory),
     ("预测比较器（判据/冻结/区分力/来源绑定变异）", step_prediction_comparator),
     ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
+    ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
 )
 
 

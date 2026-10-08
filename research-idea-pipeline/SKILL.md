@@ -779,6 +779,15 @@ python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/re
 **改写措辞不算区分力**。行为切换与 Insight Card 规则见
 [prediction-anomaly-competition.md](references/prediction-anomaly-competition.md)。
 
+**科学价值不等于 EIG（Phase 3）。** 研究候选的**决策价值**与**发现潜力**分开判断，
+每个维度都带 canonical 依据与不确定性，**没有总分**（`SV1` 拒绝任何聚合分数）。
+科学品味分成**用户所有**（`contract`，agent 只读）与**证据校准**（从真实结果归纳，
+可修订）两部分；自动学习**只影响探索建议**，不得改锚点（`SV3`）。
+探索策略复用既有 `P1`—`P6` / `local` 与 QD archive：算子只能 `encouraged` /
+`neutral` / `discouraged` / `dormant`，**没有永久封禁**，降级必须有范围与重启条件，
+且至少两次独立失败（`SV5`）。规则见
+[scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md)。
+
 ---
 
 ### 1.9 旧项目接管：Legacy Research Handoff
@@ -862,6 +871,8 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 | **预测比较器脚本** | [scripts/prediction_compare.py](scripts/prediction_compare.py) | `freeze` / `compare` / `compete` / `switch` / `insight` / `--selftest`；判据形状、来源绑定、冻结完整性（`PC4`/`PC5`）、区分力与行为切换 |
 | **旧项目接管（Legacy Handoff）** | [references/legacy-handoff.md](references/legacy-handoff.md)、[scripts/legacy_handoff.py](scripts/legacy_handoff.py) | 已初始化项目**禁止重新 Bootstrap**；只读兼容性审计 `LH1`—`LH16`、`canonical` 无损、重建认知记忆、`unknown`/`retrospective` 标注、接管报告、幂等与回滚；**严重错误阻止写回** |
 | 接管回归测试 | [scripts/test_legacy_handoff.py](scripts/test_legacy_handoff.py) | 无损接管 / 跨会话重启 / 重复接管 / 缺失历史 / 失效传播 / 预测时间泄漏 / 多路线隔离 / 下一轮复用旧知识 / 严重错误阻止写回 |
+| **科学价值与自适应发现（CIE Phase 3）** | [references/scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md) | Decision Value / Discovery Potential 分维判断（**无总分**，`SV1`—`SV8`）、Taste Memory 双层权限、八种探索菜单到既有算子的映射、防锁死规则、`P4` 上下文隔离 |
+| **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
 
 ---
 

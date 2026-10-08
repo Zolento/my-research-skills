@@ -61,6 +61,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 |---|---|---|
 | Persistent cognitive memory | four memory classes, derived support ladder, hot/warm/cold recall | session start; R3—R6 read; R6/R8/R9.O/R10/R11 write |
 | Prediction, anomaly, mechanism competition | frozen `criterion`, freeze digest, prediction–observation comparator, insight card, distinguishability test | R3—R6 candidate, R8 freeze, R9.O compare, R10 disposition |
+| Scientific value and adaptive discovery | per-dimension value, taste memory, lexicographic menu ordering | R3—R6 plus the Meta-Controller; `scheduler.json` read-only |
 | Legacy takeover | read-only audit `LH1`—`LH16`, legacy derivation, report, rollback | first `continue-research` on an initialized project |
 | Scientific value and adaptive discovery | per-dimension value assessment, calibrated preference memory, strategy update | R3—R6 plus Meta-Controller; `scheduler.json` read-only |
 | Discovery replay and verification | offline replay harness with a leak guard, metrics, ablation, adversarial cases | tooling plus a `release_check.py` step |
@@ -93,6 +94,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | Revision log carries structure plus pointers only | prevents a second authoritative source | storing conclusions in the log |
 | `cognition/` in the control plane | matches `populations/` and `assurance/`; keeps `docs/` flat and human | a route document per revision |
 | Value judgements are per-dimension, never one score | the repository already refuses a third numeric scoring system | a composite "insight score" |
+| Strategy priors stay out of `scheduler.json` | writing them back would change the scheduler's authority, which the phase forbids | extending telemetry into a decision store |
 | Anomalies require a named prediction source | prevents an exploratory observation from being renamed a prediction failure | free-text anomalies |
 
 ## 7. Documents and commands
@@ -102,11 +104,13 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | [cognitive-memory-policy.md](../references/cognitive-memory-policy.md) | memory classes, layers, rules `CM1`—`CM9`, lifecycle, write prohibitions |
 | [prediction-anomaly-competition.md](../references/prediction-anomaly-competition.md) | frozen criteria, comparison classes, competition verdicts, behaviour switch, insight cards |
 | [legacy-handoff.md](../references/legacy-handoff.md) | detection, audit `LH1`—`LH16`, reconstruction, retrospection rules, rollback |
+| [scientific-value-adaptive-discovery.md](../references/scientific-value-adaptive-discovery.md) | value dimensions, taste memory, menu ordering, anti-lock-in rules, `P4` isolation |
 | [scripts/cognition.py](../scripts/cognition.py) | builder, validator, recall and context brief |
 | [scripts/prediction_compare.py](../scripts/prediction_compare.py) | comparator, competition and insight checks |
 | [scripts/legacy_handoff.py](../scripts/legacy_handoff.py) | takeover, report and rollback |
+| [scripts/strategy_memory.py](../scripts/strategy_memory.py) | value model, taste memory, operator priors, menu ordering |
 | [scripts/test_cognition.py](../scripts/test_cognition.py) | offline tests |
-| [scripts/test_prediction_compare.py](../scripts/test_prediction_compare.py), [scripts/test_legacy_handoff.py](../scripts/test_legacy_handoff.py) | offline tests |
+| [scripts/test_prediction_compare.py](../scripts/test_prediction_compare.py), [scripts/test_legacy_handoff.py](../scripts/test_legacy_handoff.py), [scripts/test_strategy_memory.py](../scripts/test_strategy_memory.py) | offline tests |
 | [examples/cognition/](../examples/cognition/README.md) | synthetic fixture |
 
 ```sh

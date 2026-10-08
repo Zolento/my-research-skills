@@ -236,6 +236,26 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 A severe compatibility error writes nothing and exits 3. Rebuilding a new Research State to
 work around it is not an option. See the [handoff contract](references/legacy-handoff.md).
 
+## Scientific value and adaptive discovery
+
+Ordering by `EIG ÷ cost` alone rewards cheap diagnostics that change no decision. Decision
+value and discovery potential are therefore judged separately, per dimension, each with a
+canonical source and an explicit uncertainty — and with no aggregate score by design. Taste
+memory splits into what the user owns (`contract`, read-only) and what outcomes calibrated,
+and the discovery menus reuse the existing `P1`—`P6` operators rather than adding an
+Exploration Agent.
+
+```sh
+python3 scripts/strategy_memory.py value     --state <state.json> --target H1
+python3 scripts/strategy_memory.py operators --state <state.json> --scheduler scheduler.json
+python3 scripts/strategy_memory.py recommend --state <state.json> --scheduler scheduler.json
+```
+
+No operator is ever permanently banned: a downgrade needs at least two independent failures,
+is scoped to the problem structure where they happened, and always carries reactivation
+conditions. `scheduler.json` stays read-only. See the
+[value and strategy contract](references/scientific-value-adaptive-discovery.md).
+
 ## Examples
 
 | Example | What it demonstrates |
