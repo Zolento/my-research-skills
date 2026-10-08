@@ -1,0 +1,36 @@
+{
+  "schema": "diagnostic-protocol@1",
+  "claim_ids": [
+    "C1"
+  ],
+  "risk_ids": [
+    "A-capacity"
+  ],
+  "hypothesis_id": "H1",
+  "experiment_id": "X3",
+  "difference": "Test the capacity explanation against mechanism",
+  "evidence_ids": [],
+  "testable_premise": "Matched capacity can remove the performance gain",
+  "origin": "exploratory",
+  "generating_evidence_ids": [],
+  "independent_confirmation": false,
+  "predictions": [
+    {
+      "hypothesis_id": "H1",
+      "observation": "Matched Psi improves Dice by >= 0.01",
+      "decision": "CONTINUE"
+    },
+    {
+      "hypothesis_id": "H2",
+      "observation": "Matched Psi does not improve Dice",
+      "decision": "REDESIGN"
+    }
+  ],
+  "fallback": "REDESIGN",
+  "scientific_review": {
+    "status": "UNKNOWN",
+    "reviewer": "Scientific reviewer required",
+    "reason": "Check that capacity and observable dose isolate the hypotheses",
+    "design_digest": "unreviewed"
+  }
+}

@@ -361,3 +361,19 @@ R8 只创建 `planned` 实验**条目**并冻结 `preregistration`。
 - [ ] `proposal.md` 第 5 节「证据契约摘要」未省略
 - [ ] `STATUS.md` 由 `render_status.py` 生成，非手工编辑
 - [ ] `state_check.py --check` 硬违规为 0
+
+## R8 pre-execution identifying design
+
+Populate experiments[].execution_protocol from
+[../templates/preflight-protocol.template.json](../templates/preflight-protocol.template.json).
+Follow [execution-identifiability.md](execution-identifiability.md). Freeze four
+outcome criteria against preregistration IDs, R7 risk controls, actual arms,
+capacity/training freedom/compute/tuning budgets, observable doses, optimizer and
+statistics. Bind the independent scientific review to the design digest. R8 still
+does not produce the R9 experiment-plan document.
+
+Use DESIGN_CONTROL, DISCRIMINATING_CONTROL, SCOPE_LIMIT or UNIDENTIFIABLE once per
+risk. SCOPE_LIMIT requires the existing R10 repair and scoped claim; UNIDENTIFIABLE
+gets finite HOLD or an explicit bounded pilot. Do not expand a control matrix to
+satisfy the gate indefinitely. The frozen route revision budget gives finite
+REDESIGN when exhausted. Legacy experiments are not retroactively certified.

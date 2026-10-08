@@ -337,3 +337,26 @@ R10 的处置**必须**映射到既有冻结枚举（`disposition` 五值 + `clo
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。
+
+## Managed R9 execution and bounded R10 followups
+
+Before dispatch, consume [PEIG/AALG](execution-identifiability.md), existing
+Failure Memory and current Scheduler telemetry. Use `scripts/experiment_execute.py`
+issue/run; PASS grants frozen formal budget, PILOT_ONLY grants only prospectively
+specified diagnostic budget, HOLD blocks the affected validation. R9.O keeps the
+returned execution_record with the source experiment and verifies receipt contents.
+Mock/dry-run dispatch is never scientific evidence.
+
+R10 RUN_TEST, FIX_IMPLEMENTATION and diagnostic NARROW_SCOPE repairs attach a
+source-bound diagnostic_protocol. Use `diagnose` before requesting a new receipt.
+The authorization is single use. Different observations must change an explicit
+candidate, intervention or resource decision. Rewording, adding U, narrowing scope
+or generating reports does not reset evidence-equivalent attempts. At the limit,
+STOP_DIAGNOSIS maps to existing REDESIGN and T8; PIVOT_RECOMMENDED goes to R14.
+R10/R14 enums remain unchanged. Existing R11 partial uncertainty reduction remains
+legal, but alone does not authorize another diagnostic. Scientific decisions and
+new source observations are the progress criterion.
+
+R11 records actual EIG from its immutable outcome transaction and invokes
+`scripts/experiment_execute.py scheduler-check`. The launch boundary checks the
+same telemetry and seals its digest. Do not invent deltas to upgrade the rating.

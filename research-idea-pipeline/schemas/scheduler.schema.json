@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "state_version",
+    "next_actions",
+    "eig_calibration"
+  ],
+  "properties": {
+    "_schema": {
+      "const": "research-idea-pipeline/scheduler@1"
+    },
+    "state_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "action",
+          "type",
+          "target",
+          "eig",
+          "cost"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eig": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "eig_calibration": {
+      "type": "object",
+      "required": [
+        "records"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "experiment",
+              "predicted_information_gain",
+              "observed_delta",
+              "actual_information_gain"
+            ],
+            "properties": {
+              "experiment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "predicted_information_gain": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "actual_information_gain": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "zero"
+                ]
+              },
+              "observed_delta": {
+                "type": "object",
+                "required": [
+                  "claim_status_changes",
+                  "uncertainty_changes",
+                  "hypothesis_status_changes",
+                  "new_uncertainties",
+                  "unexpected_observations"
+                ],
+                "properties": {
+                  "claim_status_changes": {
+                    "type": "array"
+                  },
+                  "uncertainty_changes": {
+                    "type": "array"
+                  },
+                  "hypothesis_status_changes": {
+                    "type": "array"
+                  },
+                  "new_uncertainties": {
+                    "type": "array"
+                  },
+                  "unexpected_observations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

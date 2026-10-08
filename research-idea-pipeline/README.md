@@ -214,3 +214,28 @@ For R12, hold Research State and claim hierarchy fixed, compare multiple express
 across reviewer models and retain all observations. Evaluate claim, evidence,
 novelty-delta and boundary recovery alongside sensitivity. Compare comprehension-based
 selection with a separate score-based evaluation without feeding scores into the selector.
+
+## Managed execution (PEIG/AALG)
+
+Use the [execution contract](references/execution-identifiability.md),
+[protocol template](templates/preflight-protocol.template.json),
+[diagnostic template](templates/diagnostic-protocol.template.json) and
+[manifest template](templates/execution-manifest.template.json).
+
+```sh
+python3 scripts/experiment_execute.py scheduler-check --state state.json --scheduler scheduler.json
+python3 scripts/experiment_execute.py diagnose --state state.json --diagnostic diagnostic.json
+python3 scripts/experiment_execute.py issue --state state.json --experiment X3 --scheduler scheduler.json --manifest manifest.json --output receipt.json
+python3 scripts/experiment_execute.py run --state state.json --experiment X3 --scheduler scheduler.json --manifest manifest.json --receipt receipt.json
+```
+
+Run defaults to dry-run and consumes the receipt. Add --execute only for authorized
+real execution. Development tests never run GPU training. Keep the route .execution
+ledger/key; budget reservations persist across rewritten cards and new IDs/seeds.
+PEIG revisions and equivalent diagnoses terminate at frozen project limits.
+
+Install/copy the complete package, including schemas, then run release_check.py in
+that copy. Historical states remain readable but require actual reviewed designs
+for new execution. Scope of interception: this runner only. Direct shell/SSH,
+notebooks, remote schedulers and existing jobs need site-specific integration.
+Hashes and local seals do not authenticate scientific judgments or unlisted files.

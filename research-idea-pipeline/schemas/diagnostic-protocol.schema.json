@@ -1,0 +1,158 @@
+{
+  "type": "object",
+  "required": [
+    "schema",
+    "claim_ids",
+    "risk_ids",
+    "hypothesis_id",
+    "experiment_id",
+    "difference",
+    "evidence_ids",
+    "testable_premise",
+    "origin",
+    "generating_evidence_ids",
+    "independent_confirmation",
+    "predictions",
+    "fallback",
+    "scientific_review"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "diagnostic-protocol@1"
+    },
+    "claim_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "risk_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "hypothesis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "difference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "testable_premise": {
+      "type": "string",
+      "minLength": 1
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "preregistered",
+        "exploratory"
+      ]
+    },
+    "generating_evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "independent_confirmation": {
+      "type": "boolean"
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "hypothesis_id",
+          "observation",
+          "decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "CONTINUE",
+              "REDESIGN",
+              "PIVOT",
+              "STOP",
+              "HOLD",
+              "RETRY"
+            ]
+          }
+        }
+      },
+      "minItems": 2
+    },
+    "fallback": {
+      "type": "string",
+      "enum": [
+        "STOP",
+        "REDESIGN",
+        "PIVOT"
+      ]
+    },
+    "scientific_review": {
+      "type": "object",
+      "required": [
+        "status",
+        "reviewer",
+        "reason",
+        "design_digest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN"
+          ]
+        },
+        "reviewer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "design_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -585,3 +585,11 @@ realized: component-delta
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。
+
+## R7 risk handoff to execution
+
+For affected experiments, assign assurance attack IDs and target/severity/risk_type.
+R8 must trace every relevant attack to a real control, explicit scope limitation
+or owned unidentifiable factor. The [PEIG contract](execution-identifiability.md)
+checks design values rather than accepting a discriminating_test ID alone. This
+handoff does not change the first-round R7 boundary or R10 disposition authority.

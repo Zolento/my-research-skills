@@ -215,3 +215,22 @@ Exit codes are 0 PASS, 3 FAIL, 4 NEEDS_REVIEW/environment input error. apply nev
 writes over the source state or an existing output file. Inspect and persist a passing copy through the existing
 R11 workflow. A decision without Assurance returns HOLD. Scripts do not call a model,
 execute experiments, infer causes by regex or perform arbitrary JSON patches.
+
+## Managed execution adoption
+
+See [execution identifiability](execution-identifiability.md). For an experiment
+with execution_protocol, R9 retains the runner's execution_record before parsing
+results. A formal protocol and all four criteria bind actual preregistration
+outcome IDs and exact criterion text. EO1 continues to validate the scientific
+transaction; EX1 checks receipt-bound design/preregistration contents. The
+outcome CLI requires a consumed, authenticated non-dry-run record from the route
+ledger (`--execution-ledger` overrides the default beside --state). In-memory
+library callers use `experiment_execute.verify_result_execution` explicitly.
+
+The existing protocol stop signature uses executable design projection for
+managed protocols; changing labels, seed, ID or preregistration wording cannot
+release it. Legacy signatures retain their original computation. Hypothesis
+statements and the full state remain bound by execution receipts. The managed
+launcher requires current scheduler input, bounded diagnosis after nonpositive
+results and source-grounded check-plan clearance. Outcome application grants no
+new execution permission.
