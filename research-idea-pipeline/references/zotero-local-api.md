@@ -84,6 +84,40 @@ DOI 检索没有独立的精确查询端点。
 `locale` 参数不受支持。
 需要稳定英文名时用 `GET /api/creatorFields`。
 
+### 3.1 全文与附件端点（实测行为）
+
+| 端点 | 返回 | 关键约束 |
+|---|---|---|
+| `GET /items/{attachmentKey}/fulltext` | `{content, indexedPages, totalPages}` | **`content` 是扁平文本，没有页码边界** |
+| `GET /fulltext?since=N` | `{attachmentKey: <int>}` | 增量快照；用于判断索引是否有更新 |
+| `GET /items/{key}/children` | 子条目数组 | 附件 / 笔记 / 标注 |
+| `GET /items/{attachmentKey}/file/view/url` | `Content-Type: text/plain` 的裸 `file://` URL | **不是 JSON**，用 JSON 解析会失败 |
+
+**页码纪律（强制）：**
+
+Zotero 全文索引只给 `content / indexedPages / totalPages`，**不提供页码边界**。
+因此：
+
+- 索引命中只能标注为 `indexed_fulltext`；
+- **不得**据索引文本推测页码；
+- **不得**把索引命中升级为 `page_verified`；
+- 页码级引用必须来自真实 PDF 的逐页解析。
+
+**检索命中必须归并：**
+
+`GET /items?q=...&qmode=everything` 会**同时**返回附件与其父条目
+（实测同一短语既命中 `attachment`，也命中其 `preprint` 父条目）。
+必须按 `data.parentItem` 归并回论文并去重。
+
+库中还存在**无父条目的孤立附件**（实测本机 68 个）。
+归并逻辑必须显式处理，不得静默丢弃或重复计数。
+
+**附件路径解析顺序：**
+
+1. 先用 `file/view/url`（用户可能用第三方云盘，PDF **不一定**在 `~/Zotero/storage/`）；
+2. 再回退 `storage/<attachmentKey>/<filename>`；
+3. 只接受 `file://`，**不跟随 http(s)**，避免附件地址触发非预期网络请求。
+
 ## 4. 写入授权
 
 Local API 支持 `POST`、`PATCH`、`PUT`、`DELETE`。
@@ -161,6 +195,25 @@ Server ID 不匹配返回 `412`。
 > `tags`、`collections` 等数组字段会被整体替换。
 > 提交时必须包含需要继续存在的**全部**成员。
 > 这是本仓库最容易出错的写入点。
+
+### 5.1 ⚠️ DELETE 是**永久抹除**，不是移入回收站
+
+已核对 Zotero 10.0.3 源码 `server_localAPI.js`：
+单对象删除与批量删除**都**调用 `obj.eraseTx()`（第 2335 行与第 2269 行）。
+
+- `eraseTx()` 是**永久擦除**；`deleteTx()` 才是移入回收站。
+- Local API 走的是前者。
+- 因此**不得**假定删除可恢复，也**不得**假定它只是"放进垃圾箱"。
+
+删除闸门（本项目强制，见 `zotero_crud.delete_paper`）：
+
+1. `dry_run=False` —— 显式要求真实删除（默认 `True`）；
+2. `confirm=True` —— 显式确认；
+3. 客户端**确实可写**；
+4. 未被 Research State 的 `LIT<n>` 引用（被引用则默认拒绝）。
+
+另外：**永不批量删除**；删除前必须能给出准确的 Item Key；
+只删除由测试自身创建的临时数据。
 
 ## 6. PDF 附件管理
 
@@ -275,18 +328,32 @@ Local API 一般无 Web API 式速率限制。
 
 ## 10. 本仓库的实现入口
 
-| 脚本 | 职责 |
-|---|---|
-| `scripts/zotero_client.py` | 只读客户端。`probe()` / `fetch_items()` / `item_to_record()` / `item_to_sidecar()` |
-| `scripts/zotero_refs.py` | 把 Zotero 导出为 `docs/refs/` 格式 |
-| `scripts/literature_search.py` | `resolve_local_entries()`：Zotero 优先，失败回落 refs |
+| 脚本 | 职责 | 默认语义 |
+|---|---|---|
+| `scripts/zotero_client.py` | 只读客户端：`probe` / `fetch_items` / `get_item` / `get_children` / `search_items` / `item_fulltext` / `file_view_url` / `local_attachment_path` / `item_to_record` / `item_to_sidecar` | 只读 |
+| `scripts/zotero_write.py` | 写通道：`WriteClient`（授权、能力状态 `ZOTERO_RW/RO/REFS_FALLBACK`、受控 `post/patch/delete`、`Zotero-Write-Token`）；同时委托全部只读原语 | **不发写请求，除非显式授权** |
+| `scripts/zotero_crud.py` | 文献 CRUD：`create_paper` / `update_paper` / `add_tags` / `remove_tags` / `add_to_collection` / `remove_from_collection` / `create_note` / `get_notes` / `delete_paper` | 写需显式调用；`delete_paper` 默认 dry-run |
+| `scripts/zotero_fulltext.py` | 原生全文检索、附件解析、PDF 逐页抽取、文本缓存、`search_two_layer` | 只读 |
+| `scripts/zotero_deepread.py` | `deep_read` / `compare_papers` / 证据锚点（六档 verification） | 只读 |
+| `scripts/zotero_refs.py` | 把 Zotero 导出为 `docs/refs/` 格式 | 只读 + 本地写文件 |
+| `scripts/literature_search.py` | `resolve_local_entries()`：Zotero 优先，失败回落 refs；`--zotero-fulltext` 启用第二层 | 只读 |
+
+**写入纪律（本项目强制）：**
+
+- 检索、全文、深读**全部只读**，且是四个语义入口的默认行为。
+- 任何写入都必须由用户明确请求触发。
+- 未授权时写方法抛 `ZoteroForbidden`，**不得**静默改到 refs 后端。
+- `delete_paper` 默认 `dry_run=True`；真实删除需 `dry_run=False` + `confirm=True` + 客户端确实可写，
+  且被 Research State 引用时默认拒绝。
 
 自检命令：
 
 ```sh
 python3 scripts/zotero_client.py --probe
 python3 scripts/zotero_client.py --dump-records 3
+python3 scripts/zotero_write.py                 # 能力状态（不授权、不写入）
 python3 scripts/zotero_refs.py --check
+python3 scripts/literature_search.py -q "..." --local-only --zotero-fulltext
 ```
 
 ## 11. 官方参考

@@ -21,6 +21,7 @@ CLI 自检：
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -36,6 +37,9 @@ PROBE_TIMEOUT = 2.0
 
 #: 拉取全库默认超时（秒）。2744 条约 20 秒。
 FETCH_TIMEOUT = 60.0
+
+#: 单对象读取默认超时（秒）。
+HTTP_TIMEOUT = 30.0
 
 #: 用户库（个人库）。0 等价于当前登录用户。
 DEFAULT_USER = "0"
@@ -230,6 +234,24 @@ def _get_json(url: str, *, timeout: float) -> Any:
         raise ZoteroUnavailable(f"{type(exc).__name__}: {exc}") from exc
 
 
+def _get_text(url: str, *, timeout: float) -> str:
+    """取纯文本响应。
+
+    `GET /items/{key}/file/view/url` 返回 `Content-Type: text/plain` 的裸 URL，
+    不是 JSON —— 用 `_get_json` 会失败。
+    """
+    request = urllib.request.Request(url, headers={
+        "Zotero-API-Version": "3", "User-Agent": UA,
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read().decode("utf-8", errors="replace").strip()
+    except urllib.error.HTTPError as exc:
+        raise ZoteroUnavailable(f"HTTP {exc.code} from {url}") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise ZoteroUnavailable(f"{type(exc).__name__}: {exc}") from exc
+
+
 def _base(base_url: Optional[str]) -> str:
     return (base_url or DEFAULT_LOCAL_API).rstrip("/")
 
@@ -268,6 +290,160 @@ def fetch_items(base_url: Optional[str] = None, *, timeout: float = FETCH_TIMEOU
     if not isinstance(payload, list):
         raise ZoteroUnavailable("Local API did not return a JSON array of items")
     return [item for item in payload if isinstance(item, dict) and isinstance(item.get("data"), dict)]
+
+
+# ---------------------------------------------------------------------------
+# 单对象读取原语（P3/P4 依赖；均为只读）
+# ---------------------------------------------------------------------------
+
+def api_root(base_url: Optional[str] = None, *, timeout: float = PROBE_TIMEOUT,
+             user: str = DEFAULT_USER) -> Optional[Dict[str, Any]]:
+    """`GET /api/` —— 返回 `{"api_version", "schema_version", "server_id"}`；不可达返回 None。"""
+    request = urllib.request.Request(
+        f"{_base(base_url)}/", headers={"Zotero-API-Version": "3", "User-Agent": UA})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            headers = dict(response.headers)
+            response.read()
+    except Exception:  # noqa: BLE001
+        return None
+    return {
+        "api_version": headers.get("Zotero-API-Version"),
+        "schema_version": headers.get("Zotero-Schema-Version"),
+        "server_id": headers.get(STATUS_HEADER),
+    }
+
+
+def get_item(key: str, *, base_url: Optional[str] = None, timeout: float = HTTP_TIMEOUT,
+             user: str = DEFAULT_USER) -> Optional[Dict[str, Any]]:
+    """按 key 读取单个条目；不存在返回 None。"""
+    if not key:
+        return None
+    try:
+        payload = _get_json(f"{_base(base_url)}/users/{user}/items/{key}", timeout=timeout)
+    except ZoteroUnavailable:
+        raise
+    return payload if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else None
+
+
+def get_children(key: str, *, base_url: Optional[str] = None, timeout: float = HTTP_TIMEOUT,
+                 user: str = DEFAULT_USER) -> List[Dict[str, Any]]:
+    """`GET /items/{key}/children` —— 子条目（附件 / 笔记 / 标注）。"""
+    payload = _get_json(f"{_base(base_url)}/users/{user}/items/{key}/children?format=json",
+                        timeout=timeout)
+    if not isinstance(payload, list):
+        return []
+    return [i for i in payload if isinstance(i, dict) and isinstance(i.get("data"), dict)]
+
+
+def search_items(query: str, *, base_url: Optional[str] = None, qmode: str = "everything",
+                 limit: Optional[int] = None, timeout: float = FETCH_TIMEOUT,
+                 user: str = DEFAULT_USER) -> List[Dict[str, Any]]:
+    """`GET /items?q=...&qmode=everything` —— Zotero 索引检索。
+
+    ★ 实测：同一命中会**同时**返回附件与其父条目。调用方必须按
+    `data.parentItem` 归并回论文，否则会重复计数。
+    """
+    params = {"q": query, "qmode": qmode, "format": "json"}
+    if limit:
+        params["limit"] = str(limit)
+    url = f"{_base(base_url)}/users/{user}/items?" + urllib.parse.urlencode(params)
+    payload = _get_json(url, timeout=timeout)
+    if not isinstance(payload, list):
+        return []
+    return [i for i in payload if isinstance(i, dict) and isinstance(i.get("data"), dict)]
+
+
+def item_fulltext(attachment_key: str, *, base_url: Optional[str] = None,
+                  timeout: float = HTTP_TIMEOUT,
+                  user: str = DEFAULT_USER) -> Optional[Dict[str, Any]]:
+    """`GET /items/{attachmentKey}/fulltext` → `{content, indexedPages, totalPages}`。
+
+    ★ `content` 是**扁平文本，没有页码边界**。它只能作为检索资料，
+    **不得**据此声称页码级证据（页码必须来自真实 PDF 解析）。
+    附件未建索引时返回 None。
+    """
+    if not attachment_key:
+        return None
+    try:
+        payload = _get_json(f"{_base(base_url)}/users/{user}/items/{attachment_key}/fulltext",
+                            timeout=timeout)
+    except ZoteroUnavailable:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return {
+        "content": payload.get("content") or "",
+        "indexedPages": payload.get("indexedPages"),
+        "totalPages": payload.get("totalPages"),
+    }
+
+
+def fulltext_versions(base_url: Optional[str] = None, *, since: int = 0,
+                      timeout: float = FETCH_TIMEOUT,
+                      user: str = DEFAULT_USER) -> Dict[str, int]:
+    """`GET /fulltext?since=N` → `{attachmentKey: <int>}`（索引版本快照）。
+
+    用于增量判断哪些附件全文索引发生了变化。不可达时返回空 dict。
+    """
+    url = f"{_base(base_url)}/users/{user}/fulltext?" + urllib.parse.urlencode(
+        {"since": str(since), "format": "json"})
+    try:
+        payload = _get_json(url, timeout=timeout)
+    except ZoteroUnavailable:
+        return {}
+    return {str(k): int(v) for k, v in payload.items()} if isinstance(payload, dict) else {}
+
+
+def file_view_url(attachment_key: str, *, base_url: Optional[str] = None,
+                  timeout: float = HTTP_TIMEOUT,
+                  user: str = DEFAULT_USER) -> Optional[str]:
+    """`GET /items/{attachmentKey}/file/view/url` → 本地 `file://` URL（不可用返回 None）。
+
+    只接受 `file://` 结果。**不跟随 http(s)**，避免附件地址触发非预期网络请求。
+    """
+    if not attachment_key:
+        return None
+    try:
+        text = _get_text(f"{_base(base_url)}/users/{user}/items/{attachment_key}/file/view/url",
+                         timeout=timeout)
+    except ZoteroUnavailable:
+        return None
+    return text if text.startswith("file://") else None
+
+
+def file_url_to_path(url: str) -> Optional[str]:
+    """`file://` URL → 本地路径。拒绝非 file 协议。"""
+    if not url or not url.startswith("file://"):
+        return None
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "file":
+        return None
+    return urllib.request.url2pathname(parsed.path)
+
+
+def local_attachment_path(attachment: Dict[str, Any], *, storage_dir: Optional[str] = None,
+                          base_url: Optional[str] = None) -> Optional[str]:
+    """解析附件的本地文件路径。
+
+    顺序：Local API 的 `file/view/url`（**优先**，因为用户可能用第三方云盘，
+    PDF 不一定在 `~/Zotero/storage/`）→ `storage/<key>/<filename>` 回退。
+    返回 None 表示文件不可访问。**不移动、不重命名、不删除任何文件。**
+    """
+    data = attachment.get("data") or {}
+    key = attachment.get("key") or data.get("key") or ""
+    url = file_view_url(key, base_url=base_url)
+    path = file_url_to_path(url) if url else None
+    if path and os.path.isfile(path):
+        return path
+
+    filename = data.get("filename")
+    if key and filename:
+        root = storage_dir or os.path.join(os.path.expanduser("~"), "Zotero", "storage")
+        candidate = os.path.join(root, key, filename)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -51,6 +51,19 @@ Step 1: 本地检索（默认由 Zotero 本地 API 提供）
     源枚举 `local|arxiv|openalex|crossref` 不变，不得把 Zotero 计入在线源
   ★ 端点、写入授权、错误码与附件协议见 [zotero-local-api.md](zotero-local-api.md)
 
+   Step 1b（可选第二层，`--zotero-fulltext`，默认关闭）：
+     用 Zotero 原生全文索引 `qmode=everything` 补充候选
+     命中必须按 `parentItem` 归并回论文；孤立附件不得静默丢弃
+     ★ 索引只给 `content / indexedPages / totalPages`，**没有页码边界**
+       ⇒ 命中只能标 `indexed_fulltext`，**不得**产生页码，**不得**升级为 `page_verified`
+     ★ 页码级引用必须来自真实 PDF 逐页解析（见 §7 与 [zotero-local-api.md](zotero-local-api.md) §3.1）
+     模块缺失 / Zotero 不可用 / 单式失败 → 降级并说明，**不失败**
+
+   ★ 读写边界：本地检索与深读**默认只读**。
+     任何写入（建条目 / 改元数据 / 加标签或分类 / 追加笔记 / 删除）都需用户明确请求，
+     并先取得 Zotero 授权（见 [zotero-local-api.md](zotero-local-api.md) §4、§8）。
+     未授权时**不得**把写入静默改到 refs 后端。
+
 Step 2: 在线源检索（**默认执行**；§2 的触发条件决定的是“要扩检到什么等级”，不是“要不要查”）
   默认启用全部已实现源（见 §9.1）：
     arxiv     管「新」  预印本，比索引快 6–12 个月；元数据**不含会议**

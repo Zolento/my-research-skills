@@ -346,6 +346,20 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 **web search 的执行与来源纪律见 [literature-policy.md](references/literature-policy.md) §1.1。**
 网页发现不替代多源核验。脚本不调用 web search，由 agent 前置执行。
 
+**Zotero 能力与读写边界（要点；细节按需读 [zotero-local-api.md](references/zotero-local-api.md)）：**
+
+| 能力 | 入口 | 默认语义 |
+|---|---|---|
+| 原生全文检索（第二层） | `literature_search.py --zotero-fulltext` | 只读；命中只能标 `indexed_fulltext` |
+| PDF 页码级抽取 | `zotero_fulltext.py` | 只读；`page_verified` 只来自真实 PDF 页面 |
+| 定向深读与证据锚点 | `zotero_deepread.py` | 只读 |
+| 文献 CRUD / 标签 / 分类 / 笔记 | `zotero_crud.py` | **写需用户明确请求** |
+| 删除文献 | `zotero_crud.delete_paper` | 默认 dry-run；Local API 的 DELETE 是**永久抹除** |
+
+四个语义入口（`start-project` / `continue-research` / `explore` / `audit`）**只读**。
+不得因为发现了一篇有价值的论文就自动改动真实 Zotero 库。
+未授权时写操作抛错，**不得**静默改到 refs 后端写入。
+
 **⚠️ 强制扩检触发条件（命中任一即必须查**全部启用源**并扩大范围）：**
 
 | # | 触发条件 | 最低等级 |

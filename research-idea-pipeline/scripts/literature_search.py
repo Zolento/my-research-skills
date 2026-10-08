@@ -298,6 +298,53 @@ def resolve_local_entries(
     return refs(), "refs", warning
 
 
+def _fulltext_layer(queries: List[str], *, zotero_url: Optional[str] = None,
+                    limit: Optional[int] = None, from_year: Optional[int] = None,
+                    to_year: Optional[int] = None, log: Log = _noop_log) -> Dict[str, Any]:
+    """第二层检索：Zotero 原生全文索引（按需启用）。
+
+    纪律：
+    - 只在显式要求时执行；默认关闭，保持原有只读检索语义。
+    - 索引命中只能标 `indexed_fulltext`，**不得**产生页码。
+    - 模块缺失 / Zotero 不可用 / 任何异常 → 降级并说明原因，**不失败**。
+    """
+    result: Dict[str, Any] = {"enabled": True, "available": False, "reason": None,
+                              "hits": [], "by_query": {}}
+    try:
+        import zotero_fulltext  # 惰性导入：未安装该模块时不影响既有检索
+    except ImportError as exc:  # pragma: no cover - 取决于模块是否存在
+        result["reason"] = f"全文检索模块不可用：{exc}"
+        log(f"[warn] {result['reason']}")
+        return result
+
+    try:
+        import zotero_client as zc
+        import zotero_write as zw
+        client = zw.WriteClient(zotero_url)
+        if client.server_id is None:
+            result["reason"] = "Zotero 本地 API 不可达，跳过全文层"
+            log(f"[warn] {result['reason']}")
+            return result
+        hits: List[Dict[str, Any]] = []
+        for q in queries:
+            try:
+                got = zotero_fulltext.search_indexed(
+                    client, q, limit=limit or 50, from_year=from_year, to_year=to_year)
+            except Exception as exc:  # noqa: BLE001 - 单式失败不拖垮整体
+                log(f"[warn] 全文层检索失败（{q}）：{type(exc).__name__}: {exc}")
+                continue
+            got = list(got or [])
+            result["by_query"][q] = got
+            hits.extend(got)
+        result["available"] = True
+        result["hits"] = hits
+        return result
+    except Exception as exc:  # noqa: BLE001
+        result["reason"] = f"全文层初始化失败：{type(exc).__name__}: {exc}"
+        log(f"[warn] {result['reason']}")
+        return result
+
+
 def search_local(
     query: str,
     local_dir: Path,
@@ -714,6 +761,7 @@ def search_literature(
     references: Optional[str] = None,
     local_format: str = "auto",
     zotero_url: Optional[str] = None,
+    fulltext: bool = False,
 ) -> Dict[str, Any]:
     """本地 + 多源在线检索（每源状态、退避、缓存、引文追溯、扩检与饱和判定）。
 
@@ -844,6 +892,20 @@ def search_literature(
                       "backend": local_backend})
         local_by_query[q].extend(hits)
 
+    # --- Step 1b: 可选的 Zotero 原生全文层 ---
+    fulltext_layer: Optional[Dict[str, Any]] = None
+    if fulltext:
+        fulltext_layer = _fulltext_layer(
+            queries, zotero_url=zotero_url, limit=max_results,
+            from_year=from_year, to_year=to_year, log=log)
+        for q, got in (fulltext_layer.get("by_query") or {}).items():
+            marked = [_with_sources(dict(h), "local") for h in got]
+            local_by_query.setdefault(q, []).extend(marked)
+        if fulltext_layer.get("available"):
+            steps.append({"step": "zotero-fulltext", "query": len(queries),
+                          "hits": len(fulltext_layer.get("hits") or []),
+                          "verification": "indexed_fulltext"})
+
     local_hits = [hit for q in queries for hit in local_by_query[q]]
 
     if local_only:
@@ -856,6 +918,7 @@ def search_literature(
             saturation={"saturated": False, "reason": "local-only 模式下不做饱和判定"},
             level=level, limit=limit, escalation_attempted=False,
             local_backend=local_backend, local_warning=local_warning,
+            fulltext_layer=fulltext_layer,
         )
 
     # --- 代理环境检查（覆盖所有启用源的域名）---
@@ -1002,6 +1065,7 @@ def search_literature(
         level=level, limit=limit, escalation_attempted=bool(escalations),
         proxy_env=proxy_env,
         local_backend=local_backend, local_warning=local_warning,
+        fulltext_layer=fulltext_layer,
     )
 
 
@@ -1022,6 +1086,7 @@ def _finish(
     proxy_env: Optional[Dict[str, Any]] = None,
     local_backend: Optional[str] = None,
     local_warning: Optional[str] = None,
+    fulltext_layer: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """组装返回值：套用 --limit、生成负检索记录与等级报告。"""
     total_before_limit = len(merged)
@@ -1051,6 +1116,7 @@ def _finish(
         "level_report": gaps_level,
         "proxy_env": proxy_env,
         "local_backend": local_backend,
+        "fulltext_layer": fulltext_layer,
         "local_warning": local_warning,
     }
 
@@ -1178,6 +1244,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--zotero-url", default=None, metavar="URL",
         help=f"Zotero 本地 API 地址（默认环境变量 {ZOTERO_ENV_VAR}，"
              f"再默认 {zotero_client.DEFAULT_LOCAL_API}）",
+    )
+    parser.add_argument(
+        "--zotero-fulltext", action="store_true",
+        help="额外启用 Zotero 原生全文索引层（第二层检索；命中只能标 indexed_fulltext，"
+             "不产生页码）。默认关闭，保持原有检索语义",
     )
     parser.add_argument(
         "--cache-dir", default=DEFAULT_CACHE_DIR,
@@ -1344,6 +1415,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             references=args.references,
             local_format=args.local_format,
             zotero_url=args.zotero_url,
+            fulltext=bool(getattr(args, "zotero_fulltext", False)),
         )
     except zotero_client.ZoteroUnavailable as exc:
         # --local-format zotero 强制使用 Zotero 但不可用：清晰报错 + 非零退出码
@@ -1371,6 +1443,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "note": outcome["note"],
         "proxy_env": outcome.get("proxy_env"),
         "local_backend": outcome.get("local_backend"),
+        "fulltext_layer": outcome.get("fulltext_layer"),
         "local_warning": outcome.get("local_warning"),
     }
     exit_code = EXIT_SOURCE_DOWN if outcome["degraded"] else EXIT_OK

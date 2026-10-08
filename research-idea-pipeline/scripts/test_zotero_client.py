@@ -7,9 +7,11 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -140,6 +142,156 @@ class ProbeTests(unittest.TestCase):
     def test_fetch_raises_zotero_unavailable(self) -> None:
         with self.assertRaises(zc.ZoteroUnavailable):
             zc.fetch_items("http://127.0.0.1:1/api", timeout=0.5)
+
+
+class _FakeResponse:
+    """最小可用的 urlopen 替身。"""
+
+    def __init__(self, body: bytes, headers=None, status: int = 200):
+        self._body = body
+        self.headers = headers or {}
+        self.status = status
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _patch_urlopen(payload, headers=None, status=200):
+    """把 urlopen 换成返回固定载荷的替身；返回 (patcher, captured)。"""
+    captured = {"url": None}
+
+    def fake_urlopen(request, timeout=None):
+        captured["url"] = getattr(request, "full_url", str(request))
+        body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+        return _FakeResponse(body, headers=headers, status=status)
+
+    return mock.patch.object(zc.urllib.request, "urlopen", fake_urlopen), captured
+
+
+class ReadPrimitiveTests(unittest.TestCase):
+    """P3/P4 依赖的只读原语。用替身隔离网络，不依赖运行中的 Zotero。"""
+
+    ITEM = {"key": "AAA", "version": 0, "data": {"itemType": "preprint", "title": "T"}}
+
+    def test_get_item_returns_none_for_empty_key(self) -> None:
+        self.assertIsNone(zc.get_item(""))
+
+    def test_get_item_builds_expected_url(self) -> None:
+        patcher, captured = _patch_urlopen(self.ITEM)
+        with patcher:
+            item = zc.get_item("AAA")
+        self.assertEqual(item["key"], "AAA")
+        self.assertTrue(captured["url"].endswith("/api/users/0/items/AAA"))
+
+    def test_get_children_returns_list(self) -> None:
+        patcher, _ = _patch_urlopen([self.ITEM])
+        with patcher:
+            self.assertEqual(len(zc.get_children("AAA")), 1)
+
+    def test_get_children_tolerates_non_list(self) -> None:
+        patcher, _ = _patch_urlopen({"nope": 1})
+        with patcher:
+            self.assertEqual(zc.get_children("AAA"), [])
+
+    def test_search_items_sends_qmode(self) -> None:
+        patcher, captured = _patch_urlopen([self.ITEM])
+        with patcher:
+            zc.search_items("mri", qmode="everything", limit=5)
+        self.assertIn("qmode=everything", captured["url"])
+        self.assertIn("q=mri", captured["url"])
+
+    def test_item_fulltext_shape(self) -> None:
+        patcher, _ = _patch_urlopen({"content": "hello", "indexedPages": 3, "totalPages": 4})
+        with patcher:
+            ft = zc.item_fulltext("ATT")
+        self.assertEqual(ft["content"], "hello")
+        self.assertEqual(ft["indexedPages"], 3)
+        self.assertEqual(ft["totalPages"], 4)
+
+    def test_item_fulltext_returns_none_when_unavailable(self) -> None:
+        with mock.patch.object(zc.urllib.request, "urlopen", side_effect=OSError("boom")):
+            self.assertIsNone(zc.item_fulltext("ATT"))
+
+    def test_fulltext_versions_parses_map(self) -> None:
+        patcher, _ = _patch_urlopen({"A1": 12, "A2": 0})
+        with patcher:
+            self.assertEqual(zc.fulltext_versions(since=7), {"A1": 12, "A2": 0})
+
+    def test_file_view_url_accepts_plain_text(self) -> None:
+        """该端点是 text/plain 的裸 URL，不是 JSON（曾用 _get_json 而失败）。"""
+        patcher, _ = _patch_urlopen(b"file:///tmp/x.pdf")
+        with patcher:
+            self.assertEqual(zc.file_view_url("ATT"), "file:///tmp/x.pdf")
+
+    def test_file_view_url_rejects_non_file_scheme(self) -> None:
+        patcher, _ = _patch_urlopen(b"https://example.com/x.pdf")
+        with patcher:
+            self.assertIsNone(zc.file_view_url("ATT"))
+
+    def test_file_url_to_path_roundtrip(self) -> None:
+        self.assertEqual(zc.file_url_to_path("file:///tmp/a%20b.pdf"), "/tmp/a b.pdf")
+        self.assertIsNone(zc.file_url_to_path("https://example.com/a.pdf"))
+
+    def test_local_attachment_path_prefers_api_then_storage(self) -> None:
+        """Local API 优先（用户可能用第三方云盘），storage 仅作回退。"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            real = os.path.join(tmp, "real.pdf")
+            open(real, "wb").close()
+            att = {"key": "ATT", "data": {"filename": "real.pdf"}}
+            patcher, _ = _patch_urlopen(f"file://{real}".encode())
+            with patcher:
+                self.assertEqual(zc.local_attachment_path(att), real)
+
+            fallback_root = os.path.join(tmp, "storage")
+            os.makedirs(os.path.join(fallback_root, "ATT"))
+            open(os.path.join(fallback_root, "ATT", "real.pdf"), "wb").close()
+            with mock.patch.object(zc.urllib.request, "urlopen", side_effect=OSError("down")):
+                got = zc.local_attachment_path(att, storage_dir=fallback_root)
+            self.assertEqual(got, os.path.join(fallback_root, "ATT", "real.pdf"))
+
+    def test_local_attachment_path_returns_none_when_missing(self) -> None:
+        att = {"key": "ATT", "data": {"filename": "nope.pdf"}}
+        with mock.patch.object(zc.urllib.request, "urlopen", side_effect=OSError("down")):
+            self.assertIsNone(zc.local_attachment_path(att, storage_dir="/nonexistent-root"))
+
+    def test_api_root_reads_version_headers(self) -> None:
+        headers = {"Zotero-API-Version": "3", "Zotero-Schema-Version": "44",
+                   "Zotero-Server-ID": "SID"}
+        patcher, _ = _patch_urlopen(b"Nothing to see here.", headers=headers)
+        with patcher:
+            info = zc.api_root()
+        self.assertEqual(info["api_version"], "3")
+        self.assertEqual(info["schema_version"], "44")
+        self.assertEqual(info["server_id"], "SID")
+
+    def test_api_root_returns_none_when_down(self) -> None:
+        with mock.patch.object(zc.urllib.request, "urlopen", side_effect=OSError("down")):
+            self.assertIsNone(zc.api_root())
+
+
+class OrphanAttachmentTests(unittest.TestCase):
+    """搜索命中里存在**无父条目的孤立附件**，归并逻辑必须能识别。"""
+
+    def test_orphan_attachment_detected(self) -> None:
+        items = [
+            {"key": "ORPHAN", "data": {"itemType": "attachment", "contentType": "application/pdf"}},
+            {"key": "CHILD", "data": {"itemType": "attachment", "parentItem": "PAPER"}},
+            {"key": "PAPER", "data": {"itemType": "preprint", "title": "P"}},
+        ]
+        bib = {i["key"] for i in zc.bibliographic_items(items)}
+        orphans = [i for i in items
+                   if (i["data"] or {}).get("itemType") == "attachment"
+                   and not (i["data"] or {}).get("parentItem")]
+        self.assertEqual([o["key"] for o in orphans], ["ORPHAN"])
+        self.assertIn("PAPER", bib)
+        self.assertNotIn("ORPHAN", bib)
 
 
 if __name__ == "__main__":

@@ -143,6 +143,26 @@ environment requirement. State and outcome gates use exit 0 for PASS, 3 for a fa
 gate and 4 for review or input/environment errors. The release gate requires exit 0
 and a final PASS. These commands have different contracts, so inspect each command's output.
 
+### Zotero local library
+
+The local literature source is served by the Zotero desktop Local API by default, and
+falls back to `docs/refs/` when that API is unreachable. Enable it in Zotero under
+`Settings → Advanced` (`Allow other applications on this computer to communicate with Zotero`).
+See [zotero-local-api.md](references/zotero-local-api.md) for the endpoint and authorization contract.
+
+```sh
+python3 scripts/zotero_client.py --probe                 # reachability and Server ID
+python3 scripts/zotero_write.py                          # capability only; never writes
+python3 scripts/literature_search.py -q "..." --local-only --zotero-fulltext
+python3 scripts/zotero_refs.py --check                   # drift against docs/refs/
+```
+
+Retrieval, full-text search and deep reading are read-only. Writes go through
+`scripts/zotero_crud.py` and require an explicit user request plus an authorization prompt.
+`delete_paper` defaults to dry-run; the Local API `DELETE` is a permanent erase, not trash.
+An index hit is reported as `indexed_fulltext` and never carries a page number; page-level
+evidence comes only from parsing the actual PDF.
+
 Mechanical checks cover structure, references, source binding, allowed transitions
 and audit completeness. Scientific validity, equivalence, attribution and scope
 coverage require source-grounded review. Digests bind artifacts but do not certify

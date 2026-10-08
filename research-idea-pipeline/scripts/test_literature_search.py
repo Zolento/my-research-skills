@@ -697,5 +697,75 @@ class ZoteroLocalBackendTests(unittest.TestCase):
                               log=lambda _m: None)
 
 
+class FulltextLayerTests(unittest.TestCase):
+    """第二层（Zotero 原生全文索引）接线。
+
+    纪律：默认关闭；模块缺失 / Zotero 不可用一律降级，**不失败**；
+    命中只能标 `indexed_fulltext`，不得据此产生页码。
+    """
+
+    def _client_stub(self, server_id="SID"):
+        fake = mock.MagicMock()
+        fake.server_id = server_id
+        return fake
+
+    def test_layer_disabled_returns_reason_or_disabled(self):
+        """未启用时不产生 fulltext_layer（保持原有输出结构）。
+
+        必须 hermetic：patch 掉本地源解析，避免依赖运行中的 Zotero。
+        """
+        with mock.patch.object(ls, "resolve_local_entries",
+                               return_value=([], "refs", None)), \
+                mock.patch.object(ls, "_fulltext_layer") as layer:
+            result = ls.search_literature(
+                "q", local_only=True, fulltext=False,
+                local_dir=Path(tempfile.mkdtemp()), log=lambda _m: None)
+        layer.assert_not_called()
+        self.assertIsNone(result.get("fulltext_layer"))
+
+    def test_layer_degrades_when_module_missing(self):
+        with mock.patch.dict(sys.modules, {"zotero_fulltext": None}):
+            out = ls._fulltext_layer(["q"], log=lambda _m: None)
+        self.assertFalse(out["available"])
+        self.assertIsNotNone(out["reason"])
+        self.assertEqual(out["hits"], [])
+
+    def test_layer_degrades_when_zotero_unreachable(self):
+        fake_module = mock.MagicMock()
+        with mock.patch.dict(sys.modules, {"zotero_fulltext": fake_module}), \
+                mock.patch("zotero_write.WriteClient") as wc:
+            wc.return_value = self._client_stub(server_id=None)
+            out = ls._fulltext_layer(["q"], log=lambda _m: None)
+        self.assertFalse(out["available"])
+        self.assertIn("不可达", out["reason"])
+
+    def test_layer_collects_hits_per_query_and_marks_verification(self):
+        hit = {"title": "T", "doi": "10.1/x", "zotero_key": "K",
+               "verification": "indexed_fulltext", "page": None}
+        fake_module = mock.MagicMock()
+        fake_module.search_indexed.return_value = [hit]
+        with mock.patch.dict(sys.modules, {"zotero_fulltext": fake_module}), \
+                mock.patch("zotero_write.WriteClient") as wc:
+            wc.return_value = self._client_stub()
+            out = ls._fulltext_layer(["a", "b"], log=lambda _m: None)
+        self.assertTrue(out["available"])
+        self.assertEqual(len(out["hits"]), 2, "每个检索式各命中一次")
+        self.assertIn("a", out["by_query"])
+        # 索引命中绝不带页码
+        self.assertIsNone(out["hits"][0]["page"])
+        self.assertEqual(out["hits"][0]["verification"], "indexed_fulltext")
+
+    def test_single_query_failure_does_not_abort_layer(self):
+        fake_module = mock.MagicMock()
+        fake_module.search_indexed.side_effect = [
+            RuntimeError("boom"), [{"title": "T2", "verification": "indexed_fulltext"}]]
+        with mock.patch.dict(sys.modules, {"zotero_fulltext": fake_module}), \
+                mock.patch("zotero_write.WriteClient") as wc:
+            wc.return_value = self._client_stub()
+            out = ls._fulltext_layer(["bad", "good"], log=lambda _m: None)
+        self.assertTrue(out["available"])
+        self.assertEqual(len(out["hits"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

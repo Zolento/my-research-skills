@@ -359,7 +359,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | 字段 | 取值 / 类型（逐字） | 必填 | 说明 |
 |---|---|---|---|
 | `id` | `LIT<n>` | ✅ | §2.1；**不得**写成 `L<n>` |
-| `ref` | 字符串（例 `[作者, 会议/年份]`） | ✅ | 元数据以 `docs/refs/index.json` 为准（[literature-policy.md](literature-policy.md) §7.1） |
+| `ref` | 字符串（例 `[作者, 会议/年份]`） | ✅ | 元数据按**活动文献后端**解析（Zotero Local API 可用时用 Zotero，否则回落 `docs/refs/index.json`）（[literature-policy.md](literature-policy.md) §7.1） |
 | `relation` | `supports` \| `contradicts` \| `shares-assumption` \| `shares-structure` \| `solves-analogous-problem` \| `uses-same-theory` | ✅ | 六值封冻，不得新增 |
 
 ### 3.7 `failures[]` — Failure Memory（`F<n>`）
