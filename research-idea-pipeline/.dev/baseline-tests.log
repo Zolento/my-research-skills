@@ -1,0 +1,11 @@
+[ok  ] 离线测试（含 golden path / parity / linter / deprecated / links） —— Ran 551 tests in 2.593s · OK (skipped=4)
+[ok  ] state_check --selftest —— selftest OK（exit=0）
+[ok  ] 模板自身通过校验 —— exit=0
+[ok  ] 规则表逐字比对（S1—S7 + V1—V24） —— 31 条（S+V）逐字一致
+[ok  ] 三方读写表逐格比对 —— 28 行逐格一致
+[ok  ] 文档引用的脚本存在 —— 16 个脚本引用全部命中
+[ok  ] Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture —— 自检 + 8 份 artifact 全绿
+[ok  ] Rhetorical Realization（RE1–RE5）来源与正文 —— 冻结来源 + 4 份实际正文全通过 RE 门禁
+[ok  ] Evidence Outcome 来源/回写/Assurance/决策 —— 5 份来源/状态/决策全通过 EO 门禁（科学判断为示例，不是模型准确率）
+
+PASS
