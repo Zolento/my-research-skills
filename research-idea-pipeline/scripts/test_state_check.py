@@ -2208,18 +2208,25 @@ class TestEigContract(unittest.TestCase):
         text = self._policy()
         self.assertNotIn("`actual_information_gain` 的对照记录。", text)
 
-    def test_report_is_honest_about_the_missing_validator(self) -> None:
-        # 契约不是闸门。必须写明，否则读者会以为它已机械闭环。
-        self.assertIn("没有机械校验器", self._policy())
+    def test_report_is_honest_about_validator_boundary(self) -> None:
+        self.assertIn("scheduler-check", self._policy())
+        self.assertIn("does not choose a scientific decision", " ".join(self._policy().split()))
 
     def test_actual_information_gain_has_a_mechanical_gate(self) -> None:
-        """已知缺口：`scheduler.json` 没有 schema，也没有校验器。
-
-        EIG 三件套目前只由 scheduler-policy §6.1 的**契约**与 R11 的自检保证。
-        把它变成闸门需要一份 scheduler schema（未实现）。**不要把契约说成闸门。**
-        """
-        self.skipTest("已知缺口：scheduler.json 无 schema/校验器；EIG 三件套只由 "
-                      "scheduler-policy §6.1 契约与 R11 自检保证，无机械闸门")
+        import execution_gate as eg
+        from test_evidence_outcome import fixture
+        import evidence_outcome as eo
+        result = eo.apply(*fixture(), timestamp='2026-10-08T00:00:00+00:00')
+        self.assertEqual(result['status'], 'PASS')
+        state = result['state']; x = state['experiments'][-1]
+        delta, rating = eg.actual_eig(x['outcome_analysis'])
+        scheduler = dict(state_version=state['state_version'], next_actions=[],
+                         eig_calibration=dict(records=[dict(experiment=x['id'],
+                         predicted_information_gain='high', observed_delta=delta,
+                         actual_information_gain=rating)]))
+        self.assertEqual(eg.scheduler_check(state, scheduler)['status'], 'PASS')
+        scheduler['eig_calibration']['records'][0]['observed_delta']['new_uncertainties'] = ['U999']
+        self.assertEqual(eg.scheduler_check(state, scheduler)['status'], 'FAIL')
 
     def test_r11_is_named_as_the_writer(self) -> None:
         text = (self.ROOT / "references" / "phase-r9-r11-experiment-loop.md").read_text(encoding="utf-8")

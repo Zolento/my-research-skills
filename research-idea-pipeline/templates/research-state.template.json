@@ -306,7 +306,8 @@
         "reason": "结果已按预注册写入（示例占位）",
         "since_state_version": 0
       },
-      "outcome_analysis": null
+      "outcome_analysis": null,
+      "execution_protocol": null
     },
     {
       "id": "X8",
@@ -339,7 +340,8 @@
         "reason": "尚未运行（示例占位）",
         "since_state_version": 0
       },
-      "outcome_analysis": null
+      "outcome_analysis": null,
+      "execution_protocol": null
     }
   ],
   "literature": [
@@ -456,7 +458,8 @@
       "state_delta": "C0.status: supported→partially-supported；新增 X8（stage=X3, claim_targeted=[C0], parent=X7）；U1.cheapest_discriminating_test→X8",
       "closure": "RESOLVED",
       "targets": [],
-      "source_review": null
+      "source_review": null,
+      "diagnostic_protocol": null
     },
     {
       "flaw": "C1（低场泛化）无证据且本轮无预算",
@@ -491,5 +494,6 @@
     "rationale": "（示例占位）",
     "next_phase": "R9"
   },
-  "_outcome_usage": "New R0 projects freeze contract.outcome_policy from templates/evidence-outcome-policy.template.json. This existing illustrative state remains a legacy example; do not pretend its terminal runs have outcome audits. Backfill actual artifacts before strict adoption. Schema and workflow are in references/evidence-outcome-contract.md."
+  "_outcome_usage": "New R0 projects freeze contract.outcome_policy from templates/evidence-outcome-policy.template.json. This existing illustrative state remains a legacy example; do not pretend its terminal runs have outcome audits. Backfill actual artifacts before strict adoption. Schema and workflow are in references/evidence-outcome-contract.md.",
+  "_execution_usage": "New managed runs attach experiments[].execution_protocol and optional repairs[].diagnostic_protocol; assurance risk carriers use id/target/severity/risk_type. Legacy runs receive no retrospective execution receipt. See references/execution-identifiability.md."
 }

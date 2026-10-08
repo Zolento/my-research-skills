@@ -790,3 +790,33 @@ claim lifecycle 或 QD 枚举。`hypotheses[].scientific_scope` 与 `central` �
 R9 只产 proposal。R10/R11 应用通过独立 audit 的副本，保留有效负证据与无效执行的区别，
 局部否证不改全局 claim，记录 immutable 历史后运行 state_check。Assurance 通过后才可
 释放逐目标实验决定。R14 四值与项目锚点授权纪律不变，R12 不得反向覆盖负证据。
+
+## Additive execution/diagnosis carriers (EX1)
+
+The [execution contract](execution-identifiability.md) is authoritative for PEIG
+and AALG. Preserve all eight collections, R0–R14 and existing S/V/EO rules.
+
+| Existing carrier | Additive field | Writer and meaning |
+|---|---|---|
+| `assurance[]` | `id`, `target`, `severity`, `risk_type` | R7 attack identity and affected scope |
+| `uncertainties[]` | `target`, `risk_type` | R7/R8 explicit high/critical scientific risk |
+| `experiments[]` | `execution_protocol` | R8 prospective identifying design, permission class and review |
+| `experiments[]` | `execution_record` | R9 returned managed launch receipt/seal; R9.O checks it |
+| `repairs[]` | `diagnostic_protocol` | R10 decision-bearing diagnostic proposal; Scheduler consumes AALG |
+| `evidence[]` | `diagnostic_observation` | R9/R11 source-bound independent observation: kind/location/content/digest |
+
+`execution_record` is exactly receipt/launch_seal/dry_run. A dry run is telemetry;
+it cannot populate a running/done scientific experiment. EX1 checks schema and
+content projection against the immutable receipt, not a local signing key. The
+managed runner and outcome CLI additionally authenticate issuance/consumption
+against the route ledger. Library callers must explicitly call
+`experiment_execute.verify_result_execution` before accepting managed result
+packets. Pure in-memory state checks cannot authenticate a local signing key.
+No retrospective PASS for legacy states. Schema-complete but scientifically incomplete planned designs may remain
+in state, but issue/run fail closed. Hypothesis-generating observations cannot
+independently confirm the new explanation. Post-hoc diagnoses are exploratory.
+
+Counters, policy and receipt registry are route telemetry at `.execution/` beside
+scheduler.json. Never cite them as scientific evidence. The scheduler schema is
+[../schemas/scheduler.schema.json](../schemas/scheduler.schema.json). No new state
+collection or R10/R14 enum is introduced.

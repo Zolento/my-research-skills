@@ -1,6 +1,6 @@
 {
   "_schema": "research-idea-pipeline/scheduler@1",
-  "_usage": "Scientific Meta-Controller 的 telemetry 骨架。它**不是** Research State 的一部分：不进 research-state.json，不是第九类一等对象，且其任何统计都不得被 evidence[].source_ref 引用或进入叙事。落盘路径 .research-idea-pipeline/routes/<R>/scheduler.json。R0—R14 是能力而不是 workflow：下一步做什么由 next_action_policy 的八级优先级加 EIG÷cost 决定。完整性故障先隔离并安排修复，只有确认不受污染的独立工作可继续；攻击和失效依赖只阻塞相关动作；普通未知不阻塞独立探索；诊断与方法探索按 policy §3.1 调度；叙事与 venue 校准固定在优先级 8。规则见 references/scheduler-policy.md，字段逐字定义见该文件 §3/§4，EIG 生产者/消费者与 observed_delta 结构见 §6.1。⚠️ 本文件没有机械校验器。",
+  "_usage": "Scientific Meta-Controller 的 telemetry 骨架。它**不是** Research State 的一部分：不进 research-state.json，不是第九类一等对象，且其任何统计都不得被 evidence[].source_ref 引用或进入叙事。落盘路径 .research-idea-pipeline/routes/<R>/scheduler.json。R0—R14 是能力而不是 workflow：下一步做什么由 next_action_policy 的八级优先级加 EIG÷cost 决定。完整性故障先隔离并安排修复，只有确认不受污染的独立工作可继续；攻击和失效依赖只阻塞相关动作；普通未知不阻塞独立探索；诊断与方法探索按 policy §3.1 调度；叙事与 venue 校准固定在优先级 8。规则见 references/scheduler-policy.md，字段逐字定义见该文件 §3/§4，EIG 生产者/消费者与 observed_delta 结构见 §6.1。Use experiment_execute.py scheduler-check for source-bound EIG and current-state eligibility; managed execution also enforces finite PEIG/AALG in the route ledger. Historical illustrative records are not receipts.",
   "state_version": 0,
   "next_action_policy": {
     "priority": [

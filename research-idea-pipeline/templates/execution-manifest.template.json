@@ -1,0 +1,31 @@
+{
+  "schema": "execution-manifest@1",
+  "argv": [
+    "python3",
+    "train.py"
+  ],
+  "cwd": "/project",
+  "env": {},
+  "requested_hours": 2,
+  "files": [
+    {
+      "kind": "code",
+      "path": "train.py"
+    },
+    {
+      "kind": "config",
+      "path": "config.json"
+    },
+    {
+      "kind": "data_split",
+      "path": "split.json"
+    },
+    {
+      "kind": "preregistration",
+      "path": "preregistration.json"
+    }
+  ],
+  "gpu_devices": [
+    "0"
+  ]
+}

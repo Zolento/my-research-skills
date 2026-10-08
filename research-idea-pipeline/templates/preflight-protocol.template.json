@@ -1,0 +1,184 @@
+{
+  "schema": "preflight-protocol@1",
+  "mode": "formal",
+  "claims": [
+    "C1"
+  ],
+  "competitors": [
+    "H1",
+    "H2"
+  ],
+  "risk_controls": [
+    {
+      "risk_id": "A-capacity",
+      "disposition": "DISCRIMINATING_CONTROL",
+      "comparison_ids": [
+        "CMP-capacity"
+      ],
+      "owner": "R8",
+      "reason": "Matched capacity excludes extra trainable parameters",
+      "limited_scope": "none",
+      "excluded_scope": "none",
+      "repair_index": -1
+    }
+  ],
+  "arms": [
+    {
+      "id": "Psi",
+      "role": "method",
+      "trainable_parameters": 1024,
+      "training_dof": [
+        "adapter"
+      ],
+      "compute_hours": 1,
+      "data_split": "MRI target held-out patients",
+      "optimization": {
+        "optimizer": "AdamW",
+        "lr": 0.001,
+        "schedule": "cosine",
+        "batch": 8,
+        "steps": 100,
+        "tuning_trials": 2,
+        "diagnostics": [
+          "loss",
+          "gradient norm"
+        ]
+      },
+      "intervention": {
+        "variable": "measurement SSL weight",
+        "dose": 1
+      }
+    },
+    {
+      "id": "matched",
+      "role": "control",
+      "trainable_parameters": 1024,
+      "training_dof": [
+        "adapter"
+      ],
+      "compute_hours": 1,
+      "data_split": "MRI target held-out patients",
+      "optimization": {
+        "optimizer": "AdamW",
+        "lr": 0.001,
+        "schedule": "cosine",
+        "batch": 8,
+        "steps": 100,
+        "tuning_trials": 2,
+        "diagnostics": [
+          "loss",
+          "gradient norm"
+        ]
+      },
+      "intervention": {
+        "variable": "measurement SSL weight",
+        "dose": 0
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "CMP-capacity",
+      "left": "Psi",
+      "right": "matched",
+      "controlled_variables": [
+        "trainable_parameters",
+        "training_dof",
+        "compute_hours",
+        "data_split",
+        "optimization"
+      ],
+      "contrast_variables": [
+        "intervention.dose"
+      ],
+      "measurement": "paired patient Dice",
+      "predictions": [
+        {
+          "hypothesis_id": "H1",
+          "observation": "Matched Psi improves Dice by >= 0.01",
+          "decision": "CONTINUE"
+        },
+        {
+          "hypothesis_id": "H2",
+          "observation": "Matched Psi does not improve Dice",
+          "decision": "REDESIGN"
+        }
+      ]
+    }
+  ],
+  "intervention": {
+    "definition": "Measurement-only SSL loss coefficient",
+    "frozen": true,
+    "dose_levels": [
+      0,
+      1
+    ],
+    "observable": "effective SSL gradient norm",
+    "manipulation_check": "Log realized coefficient and nonzero gradient norm before confirmation"
+  },
+  "evaluation": {
+    "data_split": "MRI target held-out patients",
+    "seeds": [
+      0,
+      1
+    ],
+    "metric": "Dice",
+    "min_effect": 0.01,
+    "statistics": "Paired patient bootstrap 95% CI"
+  },
+  "outcomes": {
+    "support": {
+      "criterion": "CI lower bound > 0.01",
+      "decision": "CONTINUE",
+      "preregistration_id": "O1"
+    },
+    "refute": {
+      "criterion": "CI upper bound < 0.01",
+      "decision": "REDESIGN",
+      "preregistration_id": "O2"
+    },
+    "uncertain": {
+      "criterion": "CI includes minimum meaningful effect",
+      "decision": "HOLD",
+      "preregistration_id": "O3"
+    },
+    "invalid": {
+      "criterion": "Protocol or measurement check fails",
+      "decision": "RETRY",
+      "preregistration_id": "O4"
+    }
+  },
+  "conditions": {
+    "failure": "Absent realized dose",
+    "stop": "Budget exhausted or stop rule triggered",
+    "redesign": "Comparator cannot isolate the intervention"
+  },
+  "budget_hours": 2,
+  "pilot": {
+    "goal": "Calibrate observable dose",
+    "measurement": "effective SSL gradient norm",
+    "max_runs": 1,
+    "max_hours": 0.1,
+    "stop": "One calibration run or 0.1 hours",
+    "decisions": [
+      {
+        "hypothesis_id": "H1",
+        "observation": "Matched Psi improves Dice by >= 0.01",
+        "decision": "CONTINUE"
+      },
+      {
+        "hypothesis_id": "H2",
+        "observation": "Matched Psi does not improve Dice",
+        "decision": "REDESIGN"
+      }
+    ]
+  },
+  "scientific_review": {
+    "status": "UNKNOWN",
+    "reviewer": "Scientific reviewer required",
+    "reason": "Check that capacity and observable dose isolate the hypotheses",
+    "design_digest": "unreviewed",
+    "execution_digest": "unreviewed-command"
+  },
+  "human_exception": null
+}

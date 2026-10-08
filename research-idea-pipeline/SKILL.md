@@ -938,7 +938,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   第 3 步的判据是「**有没有有意义的 state delta**」，不是「有没有关掉一条 `U`」：
   `uncertainty` 可 `high → medium → low` 而 `status` 保持 `open`（两个维度独立，**不得**判不闭环）。
 - **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
-  EIG 对照写同目录的 `scheduler.json`（telemetry，**无校验器**）。
+  EIG 对照写同目录的 `scheduler.json`（telemetry，由 execution gate 检查来源和状态）。
 
 ### R13 / R14 — artifact 审计与决策
 
@@ -1291,3 +1291,24 @@ git log --oneline -S"<被删章节的关键词>" -- SKILL.md
 
 **改完后问一句：这次漏掉的位置，属于 A/B/C 里的哪一类？**
 如果是**新的一类**，把它加进上表 —— 否则下一轮还会漏在同一处。
+
+### Execution gate within R8/R9 and bounded R10 diagnosis
+
+Read [execution-identifiability.md](references/execution-identifiability.md) before
+managed experiments or diagnostic repairs. Use `scripts/experiment_execute.py`
+issue/run with a current scheduler and content-bound manifest. Formal X3/X4
+requires PEIG PASS; prospectively bounded exploration/X1/X2/pilots use PILOT_ONLY.
+HOLD affects the named claim validation. Record R7 attacks and real arm/control
+values; a control ID or reviewer score is not mechanical evidence of validity.
+
+Use diagnose for R10 decision-bearing repairs. The finite shared route ledger
+prevents rewording, repeated R10, new IDs/seeds, scope edits, extra U or documents
+from manufacturing progress. After the configured limit, stop diagnosis and use
+existing REDESIGN/T8/R14 authority. Do not iterate experiment cards to make PEIG
+pass indefinitely. Post-hoc explanations are exploratory; confirm them with an
+independent identifying protocol. Scientific uncertainty remains uncertainty.
+
+The runner covers only its managed entrypoint, not arbitrary external GPU paths.
+It never grants global GPU control. Legacy states remain compatible, with no
+retrospective execution PASS. R9.O retains and verifies managed execution_record;
+R11 uses scheduler-check to source-check actual EIG. Full tests use mock/dry-run.

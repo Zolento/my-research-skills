@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "required": [
+    "schema",
+    "argv",
+    "cwd",
+    "env",
+    "requested_hours",
+    "files",
+    "gpu_devices"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "execution-manifest@1"
+    },
+    "argv": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "cwd": {
+      "type": "string",
+      "minLength": 1
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "requested_hours": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "code",
+              "config",
+              "data_split",
+              "preregistration"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 4
+    },
+    "gpu_devices": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

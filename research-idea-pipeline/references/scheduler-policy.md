@@ -235,9 +235,14 @@ Meta-Controller later → 用对照校准未来的 EIG 估计
 6. **`observed_delta` 与 state 的关系：** 它必须与同一轮 `research-state.json` 的实际改动
    **一致**。不一致时**以 state 为准**，并重算 `rating`。
 
-> ⚠️ **已知限制（不得假装已闭环）：** `scheduler.json` **没有机械校验器** ——
-> 上面这些是**契约**，不是闸门。`state_check.py` 只校验 `research-state.json`。
-> 因此 EIG 对照目前靠 R11 的自检与评审保证；把它变成机械闸门需要一份 scheduler schema（未实现）。
+`scripts/experiment_execute.py scheduler-check` now validates the bundled
+scheduler schema, current state version and actual EIG against source-bound outcome
+receipts. The managed issue/run boundary requires this gate. Legacy telemetry
+without outcome receipts requires review; it is not automatically certified.
+See [execution-identifiability.md](execution-identifiability.md). The checker does
+not choose a scientific decision, authenticate reviewers, or infer semantic
+causality. AALG applies decision value and finite attempts before EIG priority;
+new uncertainties or a lower uncertainty rating alone cannot reopen diagnosis.
 
 ---
 
@@ -261,3 +266,15 @@ Meta-Controller later → 用对照校准未来的 EIG 估计
 - [ ] 每个 `done` 实验都有 **三件套**：`predicted_information_gain` + `observed_delta` +
       `actual_information_gain`，且 `rating` 由 `observed_delta` 支撑（§6.1）。
 - [ ] `observed_delta` 与同一轮 `research-state.json` 的实际改动一致。
+
+## 9. Bounded eligibility (PEIG/AALG)
+
+Before ranking a managed execution, validate actual arm/protocol/risk bindings,
+Failure Memory, receipt and diagnostic budget using
+[execution-identifiability.md](execution-identifiability.md). Counters are telemetry
+in the shared route .execution ledger. Unsuccessful PEIG edits are capped at 3 by
+default; equivalent diagnostic attempts at 2. Project policy freezes before the
+first operation. No automatic expansion of controls or repeated documents.
+STOP_DIAGNOSIS recommends REDESIGN/T8 (R5.1 once then R3/R6); PIVOT_RECOMMENDED
+recommends R14. These are scheduler eligibility statuses, not new R10/R14 enums.
+State changes without new evidence/decision value do not reset these limits.

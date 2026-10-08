@@ -1,0 +1,679 @@
+{
+  "schema": "preflight-e2e@1",
+  "scenario": "CVPR27 CT→MRI source-free measurement-only SSL",
+  "state": {
+    "state_version": 0,
+    "contract": {
+      "goal": "判断某机制性假设是否在目标分布上成立",
+      "primary_anchor": "theory",
+      "constraints": "单卡，≤ 40 GPU·小时",
+      "resources": "已有代码与一份公开数据集",
+      "provisional_anchor_rationale": "先用理论锚点把问题形式化，证据到位后复核",
+      "out_of_scope": "不做新数据集采集，不做临床验证",
+      "outcome_policy": {
+        "schema": "evidence-outcome-policy@1",
+        "frozen_at_state_version": 0,
+        "min_valid_runs": 2,
+        "min_seeds": 2,
+        "min_datasets": 1,
+        "require_independent_replication": false,
+        "min_verification_tier": "T2"
+      }
+    },
+    "claims": [
+      {
+        "id": "C1",
+        "statement": "Measurement-only Psi SSL improves target MRI segmentation at matched capacity and compute",
+        "parent": null,
+        "subclaims": [],
+        "status": "ungrounded",
+        "supporting_evidence": [],
+        "refuting_evidence": [],
+        "nearest_alternative": "Gain comes from additional trainable capacity",
+        "falsifier": "等训练步数下增益消失",
+        "scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+        "known_flaws": [],
+        "depends_on": [
+          "H1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "id": "E1",
+        "kind": "literature",
+        "supports": [],
+        "contradicts": [],
+        "strength": "partial",
+        "scope": "target domain",
+        "epistemic_status": "Supported",
+        "source_ref": "LIT1",
+        "verification_tier": "T1",
+        "depends_on": [
+          "LIT1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "AS1",
+        "statement": "目标分布与源分布共享该结构",
+        "status": "tacit",
+        "challenged_by": [],
+        "if_false": "机制主张不成立",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "Measurement-only SSL dose changes useful target features",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 3,
+          "representation_distance": 1,
+          "theory_lens_distance": 3,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "Matched capacity/dose control removes the improvement",
+        "expected_information_gain": 0.6,
+        "status": "elite",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        },
+        "scientific_scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+        "central": true
+      },
+      {
+        "id": "H2",
+        "statement": "Additional trainable capacity explains the gain",
+        "structural_signature": {
+          "assumption_distance": 3,
+          "formulation_distance": 4,
+          "representation_distance": 2,
+          "theory_lens_distance": 4,
+          "mechanism_distance": 1
+        },
+        "novelty_source": "问题重构",
+        "theory_lens": "partial-identification",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分识别界为空则 H2 无意义",
+        "expected_information_gain": 0.5,
+        "status": "elite",
+        "niche": "formulation-shift",
+        "island": "P1",
+        "operator": "reframe",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      },
+      {
+        "id": "H3",
+        "statement": "仅解除部分假设即可恢复能力",
+        "structural_signature": {
+          "assumption_distance": 2,
+          "formulation_distance": 2,
+          "representation_distance": 2,
+          "theory_lens_distance": 2,
+          "mechanism_distance": 2
+        },
+        "novelty_source": "假设移除（部分）",
+        "theory_lens": "transfer-learning",
+        "nearest_prior": "LIT1",
+        "falsifier": "若部分解除无增益则 H3 不成立",
+        "expected_information_gain": 0.4,
+        "status": "active",
+        "niche": "assumption-shift",
+        "island": "P2",
+        "operator": "assumption_breaker",
+        "parents": [],
+        "generation": 0,
+        "depends_on": [
+          "AS1"
+        ],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "experiments": [
+      {
+        "id": "X1",
+        "parent": null,
+        "stage": "X3",
+        "claim_targeted": [
+          "C1"
+        ],
+        "hypothesis_targeted": [
+          "H1"
+        ],
+        "alternative_targeted": [
+          "H2"
+        ],
+        "code_commit": "abc123",
+        "data_split": "MRI target held-out patients",
+        "seed": 0,
+        "metric": "Dice",
+        "result": "",
+        "interpretation": "Result not yet interpreted.",
+        "unexpected": [],
+        "known_flaws": [],
+        "next_branches": [],
+        "status": "planned",
+        "preregistration": {
+          "frozen_at_state_version": 0,
+          "outcomes": [
+            {
+              "id": "O1",
+              "observation": "CI lower bound > 0.01",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "strengthen"
+                }
+              ]
+            },
+            {
+              "id": "O2",
+              "observation": "CI upper bound < 0.01",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "weaken"
+                }
+              ]
+            },
+            {
+              "id": "O3",
+              "observation": "CI includes minimum meaningful effect",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "retain-with-alternative"
+                }
+              ]
+            },
+            {
+              "id": "O4",
+              "observation": "Protocol or measurement check fails",
+              "update": [
+                {
+                  "target": "C1",
+                  "op": "retain-with-alternative"
+                }
+              ]
+            }
+          ]
+        },
+        "result_at_state_version": null,
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "Frozen planned comparison.",
+          "since_state_version": 0
+        },
+        "outcome_protocol": {
+          "dataset": "Dataset A",
+          "design": "X versus P under matched compute",
+          "scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+          "independent_replication": false
+        },
+        "execution_protocol": {
+          "schema": "preflight-protocol@1",
+          "mode": "formal",
+          "claims": [
+            "C1"
+          ],
+          "competitors": [
+            "H1",
+            "H2"
+          ],
+          "risk_controls": [
+            {
+              "risk_id": "A-capacity",
+              "disposition": "DISCRIMINATING_CONTROL",
+              "comparison_ids": [
+                "CMP-capacity"
+              ],
+              "owner": "R8",
+              "reason": "Matched capacity excludes extra trainable parameters",
+              "limited_scope": "none",
+              "excluded_scope": "none",
+              "repair_index": -1
+            }
+          ],
+          "arms": [
+            {
+              "id": "Psi",
+              "role": "method",
+              "trainable_parameters": 1024,
+              "training_dof": [
+                "adapter"
+              ],
+              "compute_hours": 1,
+              "data_split": "MRI target held-out patients",
+              "optimization": {
+                "optimizer": "AdamW",
+                "lr": 0.001,
+                "schedule": "cosine",
+                "batch": 8,
+                "steps": 100,
+                "tuning_trials": 2,
+                "diagnostics": [
+                  "loss",
+                  "gradient norm"
+                ]
+              },
+              "intervention": {
+                "variable": "measurement SSL weight",
+                "dose": 1
+              }
+            },
+            {
+              "id": "matched",
+              "role": "control",
+              "trainable_parameters": 1024,
+              "training_dof": [
+                "adapter"
+              ],
+              "compute_hours": 1,
+              "data_split": "MRI target held-out patients",
+              "optimization": {
+                "optimizer": "AdamW",
+                "lr": 0.001,
+                "schedule": "cosine",
+                "batch": 8,
+                "steps": 100,
+                "tuning_trials": 2,
+                "diagnostics": [
+                  "loss",
+                  "gradient norm"
+                ]
+              },
+              "intervention": {
+                "variable": "measurement SSL weight",
+                "dose": 0
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "id": "CMP-capacity",
+              "left": "Psi",
+              "right": "matched",
+              "controlled_variables": [
+                "trainable_parameters",
+                "training_dof",
+                "compute_hours",
+                "data_split",
+                "optimization"
+              ],
+              "contrast_variables": [
+                "intervention.dose"
+              ],
+              "measurement": "paired patient Dice",
+              "predictions": [
+                {
+                  "hypothesis_id": "H1",
+                  "observation": "Matched Psi improves Dice by >= 0.01",
+                  "decision": "CONTINUE"
+                },
+                {
+                  "hypothesis_id": "H2",
+                  "observation": "Matched Psi does not improve Dice",
+                  "decision": "REDESIGN"
+                }
+              ]
+            }
+          ],
+          "intervention": {
+            "definition": "Measurement-only SSL loss coefficient",
+            "frozen": true,
+            "dose_levels": [
+              0,
+              1
+            ],
+            "observable": "effective SSL gradient norm",
+            "manipulation_check": "Log realized coefficient and nonzero gradient norm before confirmation"
+          },
+          "evaluation": {
+            "data_split": "MRI target held-out patients",
+            "seeds": [
+              0,
+              1
+            ],
+            "metric": "Dice",
+            "min_effect": 0.01,
+            "statistics": "Paired patient bootstrap 95% CI"
+          },
+          "outcomes": {
+            "support": {
+              "criterion": "CI lower bound > 0.01",
+              "decision": "CONTINUE",
+              "preregistration_id": "O1"
+            },
+            "refute": {
+              "criterion": "CI upper bound < 0.01",
+              "decision": "REDESIGN",
+              "preregistration_id": "O2"
+            },
+            "uncertain": {
+              "criterion": "CI includes minimum meaningful effect",
+              "decision": "HOLD",
+              "preregistration_id": "O3"
+            },
+            "invalid": {
+              "criterion": "Protocol or measurement check fails",
+              "decision": "RETRY",
+              "preregistration_id": "O4"
+            }
+          },
+          "conditions": {
+            "failure": "Absent realized dose",
+            "stop": "Budget exhausted or stop rule triggered",
+            "redesign": "Comparator cannot isolate the intervention"
+          },
+          "budget_hours": 2,
+          "pilot": {
+            "goal": "Calibrate observable dose",
+            "measurement": "effective SSL gradient norm",
+            "max_runs": 1,
+            "max_hours": 0.1,
+            "stop": "One calibration run or 0.1 hours",
+            "decisions": [
+              {
+                "hypothesis_id": "H1",
+                "observation": "Matched Psi improves Dice by >= 0.01",
+                "decision": "CONTINUE"
+              },
+              {
+                "hypothesis_id": "H2",
+                "observation": "Matched Psi does not improve Dice",
+                "decision": "REDESIGN"
+              }
+            ]
+          },
+          "scientific_review": {
+            "status": "PASS",
+            "reviewer": "Fixture reviewer",
+            "reason": "Matched capacity and frozen effective dose support this comparison",
+            "design_digest": "cbb4dcf0a8716bc618f4ba5de4bc3499fcb05a094a700873d1e6584cdd152033",
+            "execution_digest": "unreviewed-command"
+          },
+          "human_exception": null
+        }
+      }
+    ],
+    "literature": [
+      {
+        "id": "LIT1",
+        "ref": "[Author, 2024]",
+        "relation": "shares-assumption",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "failures": [],
+    "uncertainties": [
+      {
+        "id": "U1",
+        "question": "该结构是否可识别？",
+        "importance": "critical",
+        "uncertainty": "high",
+        "cheapest_discriminating_test": "TBD",
+        "status": "open",
+        "depends_on": [],
+        "validity": {
+          "status": "valid",
+          "reason": "初始",
+          "since_state_version": 0
+        }
+      }
+    ],
+    "assurance": [
+      {
+        "id": "A-capacity",
+        "target": "C1",
+        "severity": "critical",
+        "risk_type": "capacity",
+        "kill_condition": "Matched capacity removes improvement",
+        "discriminating_test": "X1",
+        "verification_tier": "T0"
+      }
+    ],
+    "repairs": [],
+    "narrative_view": {
+      "rendered_claims": [
+        "C1"
+      ],
+      "note": "Frozen communication view."
+    }
+  },
+  "packet": {
+    "schema": "evidence-result@1",
+    "experiment_id": "X1",
+    "experiment_digest": "237623d905119d99f5fa8b590b206ecbea2c6ef762af0912723a8969ea59bd93",
+    "execution_status": "completed",
+    "result_summary": "M improves by 0.8 against matched P.",
+    "sources": [
+      {
+        "id": "S1",
+        "kind": "log",
+        "location": "X1/run.log",
+        "content": "M improves by 0.8 against matched P. Protocol and metric checked against frozen configuration.",
+        "digest": "224789f60a9673c3005fa76d60ece46040b54bcc310ca2c2f1c6f294e2ce37b3"
+      }
+    ],
+    "observations": [
+      {
+        "id": "O1",
+        "statement": "M improves by 0.8 against matched P.",
+        "scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    ]
+  },
+  "analysis": {
+    "schema": "evidence-outcome-analysis@1",
+    "id": "OA-X1",
+    "experiment_id": "X1",
+    "base_state_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "context_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "packet_digest": "2d492aab0d2cfe5c9264d6c18e90413ee6121ca580040707dba370e5740cf5d8",
+    "outcome": "POSITIVE_EVIDENCE",
+    "verification_tier": "T2",
+    "validity_checks": {
+      "execution": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "protocol": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "measurement": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      },
+      "evaluation": {
+        "status": "PASS",
+        "reason": "Inspected the supplied protocol/log fixture.",
+        "source_ids": [
+          "S1"
+        ]
+      }
+    },
+    "claim_updates": [
+      {
+        "id": "C1",
+        "scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "SUPPORTED",
+        "evidence": [
+          "O1"
+        ],
+        "direction": "positive",
+        "identification": "PASS",
+        "reason": "M improves by 0.8 against matched P.",
+        "replication_ids": [
+          "X1"
+        ],
+        "previous_support": "ungrounded",
+        "new_support": "supported",
+        "scope_change": null
+      }
+    ],
+    "hypothesis_updates": [
+      {
+        "id": "H1",
+        "scope": "CT→MRI source-free / measurement-only SSL / target patients / fixed compute",
+        "scope_relation": "FULL",
+        "previous_status": "UNRESOLVED",
+        "new_status": "SUPPORTED",
+        "evidence": [
+          "O1"
+        ],
+        "direction": "positive",
+        "identification": "PASS",
+        "reason": "M improves by 0.8 against matched P.",
+        "replication_ids": [
+          "X1"
+        ]
+      }
+    ],
+    "failure_attributions": [],
+    "alternatives": [],
+    "decisions": [
+      {
+        "target_ids": [
+          "C1",
+          "H1"
+        ],
+        "action": "CONTINUE",
+        "reason": "M improves by 0.8 against matched P.",
+        "required_fixes": [],
+        "stop_rule_id": null,
+        "next_action_id": "N1"
+      }
+    ],
+    "stop_rules": [],
+    "followups": [
+      {
+        "id": "N1",
+        "target_ids": [
+          "C1",
+          "H1"
+        ],
+        "description": "Discriminate H1 against its nearest alternative after the stated prerequisite.",
+        "expected_information_gain": "high",
+        "cost": "low",
+        "scientific_value": "high",
+        "risk": "medium",
+        "decision_it_resolves": "Whether the proposed intervention changes the measured effect."
+      }
+    ],
+    "negative_knowledge": [],
+    "repairs": [],
+    "open_questions": [],
+    "uncertainty_updates": [],
+    "unchanged": [
+      "Dataset, metric, comparator, scope and narrative remain unchanged."
+    ],
+    "reasoning_summary": "M improves by 0.8 against matched P."
+  },
+  "audit": {
+    "schema": "evidence-outcome-audit@1",
+    "state_digest": "d20dc86543d930fe230242c410619c02ca5f2fca9b0278ef32ac6350e1059d23",
+    "packet_digest": "2d492aab0d2cfe5c9264d6c18e90413ee6121ca580040707dba370e5740cf5d8",
+    "analysis_digest": "a940df2bf4fcb480ec3428c052f2bb526555156d1c14dc50261de0c0d09f4a3b",
+    "checks": {
+      "result_faithful": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "validity_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "inference_calibrated": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "scope_preserved": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "attributions_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "confirmation_bias_checked": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "replication_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "alternatives_grounded": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      },
+      "decisions_justified": {
+        "status": "PASS",
+        "reason": "Source-bound transition fixture, not an LLM benchmark."
+      }
+    }
+  }
+}

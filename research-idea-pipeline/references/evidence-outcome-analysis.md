@@ -177,3 +177,14 @@ Structured LLM judgments can still be wrong. A protocol fingerprint is a conserv
 syntactic check, not a semantic-equivalence proof. Inspect changed designs and matching
 scopes in planning/Assurance. The bundled helper neither executes experiments nor
 rewrites papers. Test fixtures verify contracts and transitions, not detection accuracy.
+
+## Prospective design and bounded followups
+
+R9.O reuses [PEIG/AALG](execution-identifiability.md). When a risk was known in R7,
+inspect its actual pre-execution control and execution receipt before attributing
+a result. A post-hoc possible cause stays uncertainty/unknown; it does not rescue
+a negative finding or become an original preregistered explanation. New mechanism
+hypotheses require independent identifying protocols and observations. Mark them
+exploratory until that check succeeds. A followup report, scope edit or new U does
+not reset the bounded diagnostic ledger. STOP_DIAGNOSIS recommends existing
+REDESIGN/T8; scientific negative knowledge and stop rules remain intact.

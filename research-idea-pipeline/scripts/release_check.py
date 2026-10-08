@@ -29,6 +29,8 @@
        —— 文本攻击注入测试必须能把发布闸门判红
     9. Evidence Outcome 的五份来源绑定示例、状态回写和 Assurance 决策
        —— 原始结果变异必须让发布闸门判红
+    10. PEIG/AALG schema、模板和 CT→MRI 对照变异
+        —— 漏掉容量对照必须拒绝正式执行；启动路径仅用 mock/dry-run 测试
 
 退出码
 ------
@@ -242,6 +244,24 @@ def step_evidence_outcome() -> Tuple[bool, str]:
     return True, f'{len(paths)} 份来源/状态/决策全通过 EO 门禁（科学判断为示例，不是模型准确率）'
 
 
+def step_execution_identifiability() -> Tuple[bool, str]:
+    import execution_gate as eg
+    case = json.loads((ROOT/'examples/preflight-identifiability/ct-mri.json').read_text(encoding='utf-8'))
+    if case.get('schema') != 'preflight-e2e@1': return False, 'invalid CT→MRI fixture envelope'
+    state = case['state']; x = state['experiments'][-1]
+    gate = eg.peig(state,x['id'])
+    if gate['status'] != 'PASS': return False, str(gate)
+    for name in ('preflight-protocol','diagnostic-protocol','execution-manifest'):
+        template = json.loads((ROOT/'templates'/f'{name}.template.json').read_text(encoding='utf-8'))
+        errors = eg.schema_errors(template,f'{name}.schema.json')
+        if errors: return False, str(errors)
+    scheduler = json.loads((ROOT/'templates/scheduler.template.json').read_text(encoding='utf-8'))
+    if eg.schema_errors(scheduler,'scheduler.schema.json'): return False, 'scheduler template/schema mismatch'
+    x['execution_protocol']['arms'][0]['trainable_parameters'] *= 2
+    if eg.peig(state,x['id'])['status'] != 'HOLD': return False, 'capacity mutation escaped gate'
+    return True, 'CT→MRI design + schemas/templates + capacity mutation (mock execution is covered by tests)'
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),
     ("state_check --selftest", step_selftest),
@@ -252,6 +272,7 @@ STEPS = (
     ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
     ("Rhetorical Realization（RE1–RE5）来源与正文", step_rhetorical_realization),
     ("Evidence Outcome 来源/回写/Assurance/决策", step_evidence_outcome),
+    ("PEIG/AALG schemas/templates/CT→MRI mutation", step_execution_identifiability),
 )
 
 
