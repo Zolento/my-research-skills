@@ -283,3 +283,111 @@ green.
 
 `git status` on the branch is clean after this commit. The branch is local and awaits review.
 No push, no merge to `main`, no PR, no tag, no release.
+
+## 6c. Third fix round — Prediction Integrity / Evidence Qualification / Insight Certification
+
+### Root causes
+
+| # | Symptom | Root cause |
+|---|---|---|
+| P0-1 | A packet that declared `observed_outcome` **after** seeing the numbers had only the favourable branch adjudicated, and read as `PREDICTION_HELD` with qualified evidence | Branch mode was opened by the *packet*, not by the freeze; non-selected branches were never evaluated unless the packet volunteered them; exclusivity was inferred from a reported second branch instead of from the frozen criteria |
+| P0-2 | A packet with a missing source, a wrong digest or an empty `location` was reported (`PC2`) and still came back `evidence_eligible: true` | Two independent opinions: `observation_errors()` reported, while `assess_experiment` decided eligibility from a disjoint chain of `if`s that never looked at the source result |
+| P1 | A card reached `evidence_supported_insight` on the strength of "T2 evidence somewhere in the same experiment" plus "an assurance entry exists" | Certification was experiment-level, not prediction-level; the assurance's actual audit result was never read; direction, scope and cross-prediction binding were unchecked |
+| same root cause (found by the chain audit) | A project holding insight cards or a `scheduler.json` was **refused** by Legacy Handoff with a false `LH12` index-drift finding | `build`/`check` rebuilt the projection with cards+scheduler+audits, while `legacy_handoff` rebuilt it with state+revisions only |
+
+### Fixes (one mechanism each)
+
+* `branch_rule_errors()` (`PC10`) + `criteria_mutually_exclusive()`: branch mode requires a frozen
+  `outcome_mode: "branch"` with `branch_rule.{selector, quantity, branches}`; `branches` must be an
+  exact partition of the frozen outcomes; all branches must share the observable and measurement
+  basis; exclusivity is **computed** from the frozen criteria. Anything else falls back to
+  completeness mode, which is also the default for a freeze that declares nothing.
+* `_adjudicate_branch()`: exactly one raw observation, its `source.kind`/`location` must equal the
+  frozen `selector`, and that one observation is evaluated against **every** frozen branch. The
+  selected branch is derived; `observed_outcome` is only a claim that must agree. Non-selected
+  branches land in `excluded_branches[]` with the verdict that excluded them.
+* `freeze_digest()` now covers `outcome_mode` and `branch_rule`; the pre-round-3 payload is accepted
+  only when the freeze declares neither, so old projects keep reading clean and a retro-fitted branch
+  rule changes the digest.
+* `qualify_evidence()` (schema `evidence-qualification@1`, sub-checks `PQ1`—`PQ8`) is the single
+  authority. `assess_experiment` fills `evidence_class`/`evidence_eligible`/`scientific_status`/
+  `provenance_gaps` from its block only; `evidence_transition_allowed` reads the block, refuses a
+  block produced for another packet (`packet_digest`) and re-derives the state-only preconditions.
+  Blocking failure → `INSUFFICIENT_PROVENANCE`/`NO_INFERENCE`; diagnostic failure →
+  `DIAGNOSTIC_ONLY`; both are `evidence_eligible: false`.
+* `_insight_certification()` (`IC1`—`IC6`, reported as `PC11`): explicit prediction/experiment
+  binding, referenced claims valid and not contradicted, the card's **own** prediction–observation
+  packet re-qualified and adjudicated `PREDICTION_HELD`, a consistent R9.O receipt in the supporting
+  direction at `T2`+, canonical evidence bound to that experiment and mechanism with a matching
+  direction, and an `assurance[]` entry whose `audit_ref` loads a SENA artifact that passes
+  `structural_equivalence_check` with a non-equivalent verdict for the referenced candidate.
+* `cognition.projection_inputs()`: one reader for the out-of-state projection inputs, used by
+  `_load_inputs`, `legacy_handoff.compatibility_audit` (`LH12`) and `_take`.
+
+### Authoritative call path for evidence qualification
+
+```
+observation packet ──► observation_errors()  (PC2, shape/provenance reporting)
+                          │
+packet + state + adjudication ──► qualify_evidence()  (PQ1—PQ8, the only eligibility decision)
+                          │
+                          ├─► assess_experiment(): evidence_class / evidence_eligible /
+                          │     scientific_status / provenance_gaps / outcome_class slot
+                          ├─► evidence_transition_allowed(): transition allowed? (re-derives state
+                          │     preconditions, refuses a foreign or forged block)
+                          ├─► op_compare --for-transition: exit code
+                          ├─► research_replay decision + metrics
+                          └─► classify_insight() → IC3 (the certified prediction's adjudication)
+```
+`check_freezes()` (`PC4`/`PC5`) and `branch_rule_errors()` (`PC10`) feed `PQ2`/`PQ8`; `cognition`
+and `state_check` keep their own authority over claim status, verification tier and the R8 contract.
+
+### Adversarial cases before/after
+
+Measured with `.dev/adversarial-probe.py`, which loads the previous module (`5279b1f`) from git and
+runs both versions on the same inputs:
+
+| Case | Before (`5279b1f`) | After |
+|---|---|---|
+| 2 independent predictions, only `O1` submitted, `observed_outcome` declared | `PREDICTION_HELD`, eligible, transition allowed | `PARTIALLY_ASSESSED`, not eligible |
+| legitimately frozen branch, one raw observation | `PREDICTION_HELD`, eligible | `PREDICTION_HELD`, eligible, `O2` excluded by a recorded condition |
+| branch declared, rule never frozen | `PREDICTION_HELD`, eligible | completeness mode, not eligible (`PC10`) |
+| declaration contradicts the raw observation | `PREDICTION_DEVIATED`, eligible | `UNTESTABLE`, not eligible |
+| branches not mutually exclusive | `PREDICTION_HELD`, eligible | refused, completeness mode |
+| observation source missing | `PREDICTION_HELD`, eligible | `UNTESTABLE`, not eligible (`PQ4`) |
+| source digest mismatch | `PREDICTION_HELD`, eligible | `UNTESTABLE`, not eligible (`PQ4`) |
+| branch basis outside the frozen selector | `PREDICTION_HELD`, eligible | `UNTESTABLE`, not eligible (`PQ5`) |
+| hand-written `evidence_eligible: true` | transition allowed | transition refused |
+| `T2` evidence bound to another prediction of the same experiment | certified | lower class (`IC5`) |
+| assurance present, audit result unknown | certified | lower class (`IC6`) |
+| audit entry with `discriminating_test: "TBD"` | certified | lower class (`IC6`) |
+| audit verdict `equivalent` | certified | lower class (`IC6`) |
+| prediction not held | certified | lower class (`IC3`) |
+| fully bound card (positive path) | certified | certified |
+
+### Files changed in this round
+
+Code: `scripts/prediction_compare.py`, `scripts/cognition.py`, `scripts/legacy_handoff.py`,
+`scripts/release_check.py`, `scripts/research_replay.py`.
+Tests: `scripts/test_prediction_compare.py` (+45), `scripts/test_cognition.py` (+9),
+`scripts/test_legacy_handoff.py` (+2), `scripts/test_research_replay.py`.
+Fixtures: `examples/cognition/state.json` (frozen branch declaration),
+`examples/cognition/model-revisions.jsonl` (freeze digest + mode), `examples/replay/adversarial/`
+(14 cases, `adv13`/`adv14` new).
+Docs: `references/prediction-anomaly-competition.md`, `references/research-state-policy.md` §3.5,
+`references/cognitive-memory-policy.md`, `references/discovery-replay.md`,
+`docs/cognitive-insight-engine.md`, `SKILL.md`, root `README.md`, both fixture READMEs.
+Unchanged: `state_check.py`, `evidence_outcome.py`, `execution_gate.py`, `experiment_execute.py`,
+`structural_equivalence_check.py`, `render_status.py`, both templates, the four schemas.
+
+### Remaining risk
+
+* No real Agent A/B and no real prediction–observation packet; the positive certification path is
+  exercised against in-memory SENA artifacts.
+* The freeze digest protects a branch declaration only when the revision log recorded one; a project
+  that never ran `cognition build` has no digest, so a post-hoc `branch_rule` is caught by the shape
+  and exclusivity checks (`PC10`) but not by `PC4`.
+* Branch selection remains a human judgement about *which* branches are the right ones; the
+  comparator proves partition, freeze and traceability only.
+* `load_audits` resolves `audit_ref` as `route_dir / assurance/structural-equivalence/<basename>`,
+  mirroring `structural_equivalence_check`; an artifact stored elsewhere is not found (fail closed).

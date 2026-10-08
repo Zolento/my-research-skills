@@ -108,6 +108,16 @@ SCIENTIFIC_STATUSES: Tuple[str, ...] = (
     "NO_INFERENCE",
 )
 
+#: How one experiment's frozen outcomes relate to each other. `completeness` (the default,
+#: and the only reading available to a project that never froze a mode) treats every frozen
+#: outcome as an independent adjudication that must all be decided. `branch` says the frozen
+#: outcomes are mutually exclusive branches of a *single* decision, and is legal only when
+#: the preregistration froze a verifiable branch rule.
+OUTCOME_MODES: Tuple[str, ...] = ("completeness", "branch")
+
+#: Source kinds an observation may bind to. Same vocabulary as `execution_gate`'s R8 rule.
+SOURCE_KINDS: Tuple[str, ...] = ("log", "metric", "result")
+
 #: Mechanism distinguishability. Four semantics, because "the digests differ" is not a
 #: scientific claim:
 #:
@@ -308,6 +318,179 @@ def discrimination_rule_errors(rule: Any, path: str) -> List[Diagnostic]:
     if "requires" in rule and not isinstance(rule["requires"], str):
         failures.append(Diagnostic("PC1", path, "requires 是给人读的前置说明，必须是字符串"))
     return failures
+
+
+def branch_rule_errors(preregistration: Any, path: str) -> List[Diagnostic]:
+    """Shape-check the frozen declaration that turns a freeze into *branch mode*.
+
+    Branch mode exists because a preregistration often enumerates mutually exclusive
+    branches of one decision. Used carelessly it is a hole: a submitter could declare
+    "I observed O1" after seeing the numbers and have only the favourable branch
+    adjudicated. The declaration below closes the hole by freezing, *before the run*:
+
+    * `outcome_mode` — the reading itself;
+    * `branch_rule.selector` — which raw observation decides the branch (`kind` +
+      `location`, both known before the run);
+    * `branch_rule.quantity` — the observed variable, which must be the one every branch
+      criterion is written against;
+    * `branch_rule.branches` — an exact partition of the frozen outcome set.
+
+    Everything else is *computed*: exclusivity comes from the frozen criteria, and the
+    selected branch is derived from the raw observation. A missing declaration is not an
+    error — it simply means `completeness` mode, which is the safe default for every
+    project that predates this rule.
+    """
+    if not isinstance(preregistration, dict):
+        return []
+    mode = preregistration.get("outcome_mode")
+    rule = preregistration.get("branch_rule")
+    if mode is None and rule is None:
+        return []
+    failures: List[Diagnostic] = []
+    if mode is None:
+        return [Diagnostic(
+            "PC10", path,
+            "声明了 branch_rule 却没有 outcome_mode：分支模式必须显式冻结 mode，"
+            "未声明 mode 的预注册按 completeness 判定")]
+    if mode not in OUTCOME_MODES:
+        return [Diagnostic(
+            "PC10", path, f"outcome_mode 必须是 {list(OUTCOME_MODES)} 之一，实际 {mode!r}")]
+    frozen = [item for item in preregistration.get("outcomes") or [] if isinstance(item, dict)]
+    frozen_ids = [item.get("id") for item in frozen]
+    if mode == "completeness":
+        if rule is not None:
+            failures.append(Diagnostic(
+                "PC10", path,
+                "outcome_mode=completeness 的预注册不得携带 branch_rule；"
+                "分支模式必须整体冻结，不能事后附加选择规则"))
+        return failures
+
+    if not isinstance(rule, dict):
+        return [Diagnostic(
+            "PC10", path,
+            "outcome_mode=branch 需要 branch_rule 对象 {selector, quantity, branches}；"
+            "没有冻结的选择规则时分支模式不成立，按 completeness 判定")]
+    unknown = sorted(set(rule) - {"selector", "quantity", "branches"})
+    if unknown:
+        failures.append(Diagnostic(
+            "PC10", path, f"branch_rule 出现未定义键：{unknown}；判定只读 {['selector','quantity','branches']}"))
+    selector = rule.get("selector")
+    if not isinstance(selector, dict):
+        failures.append(Diagnostic(
+            "PC10", path, "branch_rule.selector 必须是对象 {kind, location}（选择分支的原始观测）"))
+    else:
+        if sorted(selector) != ["kind", "location"]:
+            failures.append(Diagnostic(
+                "PC10", path, "branch_rule.selector 必须恰好是 {kind, location}，"
+                              f"实际 {sorted(selector)}"))
+        if selector.get("kind") not in SOURCE_KINDS:
+            failures.append(Diagnostic(
+                "PC10", path, f"branch_rule.selector.kind 必须是 {list(SOURCE_KINDS)} 之一"))
+        if not isinstance(selector.get("location"), str) or not selector["location"].strip():
+            failures.append(Diagnostic(
+                "PC10", path, "branch_rule.selector.location 必须是非空字符串（原始结果文件/字段）"))
+    quantity = rule.get("quantity")
+    if not isinstance(quantity, str) or not quantity.strip():
+        failures.append(Diagnostic(
+            "PC10", path, "branch_rule.quantity 必须是非空字符串（分支共同的可观测口径）"))
+    branches = rule.get("branches")
+    if not _non_empty_string_list(branches):
+        failures.append(Diagnostic("PC10", path, "branch_rule.branches 必须是非空字符串数组"))
+    elif len(set(branches)) != len(branches):
+        failures.append(Diagnostic(
+            "PC10", path, f"branch_rule.branches 不得重复：{branches}"))
+    elif sorted(branches) != sorted(frozen_ids):
+        failures.append(Diagnostic(
+            "PC10", path,
+            f"branch_rule.branches {sorted(branches)} 必须是冻结结果集合 {sorted(frozen_ids)} "
+            "的完整划分（不得遗漏、不得多余）：选择性分支不是分支模式，而是漏提交"))
+    if failures:
+        return failures
+
+    by_id = {item.get("id"): item for item in frozen}
+    criteria: Dict[str, Dict[str, Any]] = {}
+    for outcome_id in branches:
+        criterion = (by_id.get(outcome_id) or {}).get("criterion")
+        if not isinstance(criterion, dict):
+            failures.append(Diagnostic(
+                "PC10", path, f"分支 {outcome_id} 没有 criterion，无法判定分支归属"))
+            continue
+        shape = criterion_errors(criterion, f"{path}.outcomes[{outcome_id}].criterion")
+        failures.extend(shape)
+        if not shape:
+            criteria[outcome_id] = criterion
+    if failures:
+        return failures
+
+    wanted = normalize_text(quantity)
+    for outcome_id, criterion in sorted(criteria.items()):
+        if observable_of(criterion) != wanted:
+            failures.append(Diagnostic(
+                "PC10", path,
+                f"分支 {outcome_id} 的观测口径 {criterion.get('quantity')!r} 与 rule.quantity "
+                f"{quantity!r} 不一致：分支必须落在同一个可观测上，否则一次观测无法决定分支"))
+    measurements = {measurement_of(criterion) for criterion in criteria.values()
+                    if measurement_of(criterion)}
+    if len(measurements) > 1:
+        failures.append(Diagnostic(
+            "PC10", path, f"分支的测量口径不一致：{sorted(measurements)}"))
+
+    ordered = sorted(criteria)
+    for left_index, left_id in enumerate(ordered):
+        for right_id in ordered[left_index + 1:]:
+            exclusive, reason = criteria_mutually_exclusive(criteria[left_id], criteria[right_id])
+            if not exclusive:
+                failures.append(Diagnostic(
+                    "PC10", path,
+                    f"分支 {left_id} 与 {right_id} 不能证明互斥（{reason}）："
+                    "互斥性必须由冻结判据推出，否则「只评价有利分支」就是选择性报告"))
+    return cg._dedupe(failures)
+
+
+def criteria_mutually_exclusive(
+    first: Dict[str, Any],
+    second: Dict[str, Any],
+) -> Tuple[bool, str]:
+    """Decide from frozen criteria alone whether one observation can satisfy both.
+
+    Returns `(exclusive, reason)`. This is the operational difference between "mutually
+    exclusive branches of one decision" and "several independent predictions, one of which
+    was reported". Only the three frozen criterion kinds participate; no prose is read.
+    """
+    first_kind, second_kind = first.get("kind"), second.get("kind")
+    if first_kind != second_kind:
+        return False, "mixed_criterion_kinds"
+    if first_kind == "quantitative":
+        left, right = effective_range(first), effective_range(second)
+        if left is None or right is None:
+            return False, "invalid_criterion"
+        if intervals_intersect(left, right):
+            return False, "overlapping_effective_ranges（含 tolerance 与 noise/√n 展宽）"
+        return True, "disjoint_effective_ranges"
+    if first_kind == "discrete":
+        if set(first.get("held_labels") or []) & set(second.get("held_labels") or []):
+            return False, "held_labels_overlap"
+        return True, "disjoint_held_labels"
+    if first_kind == "directional":
+        if first.get("direction") == second.get("direction"):
+            return False, "same_direction"
+        return True, "different_directions"
+    return False, "invalid_criterion"
+
+
+def branch_mode_enabled(preregistration: Any) -> bool:
+    """True only when the freeze legitimately declares branch mode (rules `PC10` clean)."""
+    if not isinstance(preregistration, dict):
+        return False
+    if preregistration.get("outcome_mode") != "branch":
+        return False
+    return not branch_rule_errors(preregistration, "preregistration")
+
+
+def branch_selector(preregistration: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    rule = preregistration.get("branch_rule")
+    selector = rule.get("selector") if isinstance(rule, dict) else None
+    return selector if isinstance(selector, dict) else None
 
 
 def _is_non_negative_number(value: Any) -> bool:
@@ -550,8 +733,14 @@ def resolve_prediction(state: Dict[str, Any], ref: Any) -> Tuple[Optional[Dict[s
 # Freeze integrity
 # ---------------------------------------------------------------------------
 
-def freeze_digest(experiment: Dict[str, Any]) -> str:
-    """Digest of exactly what was frozen: the outcomes and the freeze version."""
+def freeze_digest(experiment: Dict[str, Any], legacy: bool = False) -> str:
+    """Digest of exactly what was frozen: the outcomes, the freeze version, the mode.
+
+    `legacy=True` reproduces the pre-round-3 payload (outcomes + version only). It is
+    accepted **only** for a preregistration that declares no mode and no branch rule, so an
+    old project keeps reading clean while a project that adds a branch declaration must
+    record a digest that covers it — a post-hoc branch rule therefore changes the digest.
+    """
     preregistration = experiment.get("preregistration")
     if not isinstance(preregistration, dict):
         return ""
@@ -559,7 +748,17 @@ def freeze_digest(experiment: Dict[str, Any]) -> str:
         "frozen_at_state_version": preregistration.get("frozen_at_state_version"),
         "outcomes": preregistration.get("outcomes"),
     }
+    if not legacy:
+        payload["outcome_mode"] = preregistration.get("outcome_mode", "completeness")
+        payload["branch_rule"] = preregistration.get("branch_rule")
     return cg.digest_of(payload)
+
+
+def _declares_branch(preregistration: Any) -> bool:
+    if not isinstance(preregistration, dict):
+        return False
+    return preregistration.get("outcome_mode") is not None \
+        or preregistration.get("branch_rule") is not None
 
 
 def check_freezes(
@@ -588,19 +787,25 @@ def check_freezes(
             after = record.get("after") if isinstance(record.get("after"), dict) else {}
             recorded = after.get("freeze_digest")
             current = freeze_digest(experiment)
+            accepted = {current}
+            preregistration = experiment.get("preregistration") or {}
+            if not _declares_branch(preregistration):
+                # A project frozen before branch mode existed recorded the shorter payload.
+                accepted.add(freeze_digest(experiment, legacy=True))
             if not recorded:
                 diagnostics.append(Diagnostic(
                     "PC5", path,
                     f"{experiment_id} 的 prediction_freeze 未登记 freeze_digest；"
                     "无法检测冻结后的改写"))
-            elif recorded != current:
+            elif recorded not in accepted:
                 diagnostics.extend(_tamper_diagnostics(state, experiment, experiment_id, path))
+            diagnostics.extend(branch_rule_errors(
+                preregistration, f"experiments[{experiment_id}].preregistration"))
             if not _criterion_present(experiment):
                 diagnostics.append(Diagnostic(
                     "PC1", f"experiments[{experiment_id}].preregistration.outcomes",
                     "冻结结果没有 criterion，比较器只能返回 UNTESTABLE；"
                     "请在结果产生前通过 preregistration.amended[] 补上可判定判据"))
-            preregistration = experiment.get("preregistration") or {}
             frozen_at = preregistration.get("frozen_at_state_version")
             if isinstance(record.get("at_state_version"), int) and isinstance(frozen_at, int) \
                     and record["at_state_version"] != frozen_at:
@@ -729,6 +934,39 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+
+
+
+
+def observation_source_errors(packet: Any) -> List[Diagnostic]:
+    """The R8 source-binding rule, applied to every submitted observation.
+
+    One implementation, two consumers: `observation_errors` reports it as `PC2`, and the
+    Evidence Qualification Gate refuses to qualify anything that fails it. Before round 3
+    these were two independent opinions, and the gate's opinion was the weaker one — a
+    packet with a missing source was reported as a diagnostic and still qualified.
+    """
+    if not isinstance(packet, dict):
+        return [Diagnostic("PC2", "observation", "观测包必须是对象")]
+    outcomes = packet.get("outcomes")
+    if not isinstance(outcomes, list):
+        return [Diagnostic("PC2", "observation.outcomes", "outcomes 必须是数组")]
+    failures: List[Diagnostic] = []
+    for index, outcome in enumerate(outcomes):
+        path = f"observation.outcomes[{index}]"
+        if not isinstance(outcome, dict):
+            failures.append(Diagnostic("PC2", path, "每个观测必须是对象"))
+            continue
+        if not isinstance(outcome.get("id"), str) or not outcome["id"].strip():
+            failures.append(Diagnostic("PC2", path, "缺少 id"))
+        if eg.source_observation({"diagnostic_observation": outcome.get("source")}) is None:
+            failures.append(Diagnostic(
+                "PC2", path + ".source",
+                "source 必须绑定来源：恰好 {kind, location, content, digest}，"
+                "kind ∈ {log, metric, result}，digest == digest(content)"))
+    return failures
+
+
 def observation_errors(packet: Any) -> List[Diagnostic]:
     if not isinstance(packet, dict):
         return [Diagnostic("PC2", "observation", "观测包必须是对象")]
@@ -749,85 +987,320 @@ def observation_errors(packet: Any) -> List[Diagnostic]:
             failures.append(Diagnostic(
                 "PC2", "observation.observed_outcome",
                 "observed_outcome 是分支选择，必须是非空字符串（指向冻结的 outcome id）"))
-    outcomes = packet.get("outcomes")
-    if not isinstance(outcomes, list):
-        failures.append(Diagnostic("PC2", "observation.outcomes", "outcomes 必须是数组"))
-        return failures
-    for index, outcome in enumerate(outcomes):
-        path = f"observation.outcomes[{index}]"
-        if not isinstance(outcome, dict):
-            failures.append(Diagnostic("PC2", path, "每个观测必须是对象"))
-            continue
-        if not isinstance(outcome.get("id"), str) or not outcome["id"].strip():
-            failures.append(Diagnostic("PC2", path, "缺少 id"))
-        if eg.source_observation({"diagnostic_observation": outcome.get("source")}) is None:
-            failures.append(Diagnostic(
-                "PC2", path + ".source",
-                "source 必须绑定来源：恰好 {kind, location, content, digest}，"
-                "kind ∈ {log, metric, result}，digest == digest(content)"))
+    failures.extend(observation_source_errors(packet))
     return failures
 
 
-def _provenance_gaps(
-    packet: Dict[str, Any],
-    experiment: Dict[str, Any],
-    preregistration: Dict[str, Any],
-) -> List[str]:
-    """The R8 / R9.O provenance a qualified comparison depends on.
+# ---------------------------------------------------------------------------
+# Evidence Qualification Gate
+#
+# One entry point decides what a comparison is worth. Everything that grants scientific
+# standing — the scientific verdict slot, `evidence_eligible`, `scientific_status`, the
+# `--for-transition` exit code, the replay metrics and the insight certification — reads
+# this block and nothing else. The failure mode it removes is a *split* decision: the
+# schema checker reported a broken source while an independent branch of `if`s still
+# declared `QUALIFIED_EVIDENCE`.
+# ---------------------------------------------------------------------------
 
-    A comparison may still be *computed* without these, and it is useful to compute it.
-    What it may not do is feed a scientific state transition, which is what this list
-    separates. The authoritative transition gate stays `evidence_outcome.py` and
-    `state_check.py`; this only reports whether the comparator's own inputs are complete.
+SCHEMA_QUALIFICATION = "research-idea-pipeline/evidence-qualification@1"
+
+#: Sub-check ids of the gate. These are not rule ids: every failure is reported under `PC7`
+#: (evidence eligibility) or `PC10` (branch/decision-set integrity). They exist so a reader
+#: can name the single step that would change the verdict.
+QUALIFICATION_CHECK_IDS: Tuple[str, ...] = (
+    "PQ1", "PQ2", "PQ3", "PQ4", "PQ5", "PQ6", "PQ7", "PQ8",
+)
+
+#: A `BLOCKING` failure means the comparison is not evidence at all. A `DIAGNOSTIC` failure
+#: means the comparison is legitimate but its provenance is incomplete; either way it may
+#: not inform a state transition. Neither kind may ever produce `QUALIFIED_EVIDENCE`.
+BLOCKING = "BLOCKING"
+DIAGNOSTIC = "DIAGNOSTIC"
+
+
+def _qualification_check(
+    check_id: str,
+    name: str,
+    failures: Sequence[str],
+    *,
+    severity: str = BLOCKING,
+    path: str = "",
+) -> Dict[str, Any]:
+    return {
+        "id": check_id,
+        "name": name,
+        "passed": not failures,
+        "severity": severity,
+        "detail": "；".join(failures),
+        "failures": list(failures),
+        "path": path,
+    }
+
+
+def qualify_evidence(
+    state: Dict[str, Any],
+    packet: Any,
+    assessment: Optional[Dict[str, Any]] = None,
+    revisions: Optional[Sequence[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """The single authority for "may this comparison be used as science?".
+
+    Checks, in order:
+
+    | id | question |
+    |---|---|
+    | `PQ1` | did the execution carry a usable validity verdict? |
+    | `PQ2` | is there a frozen, well-formed preregistration (criteria + branch rule)? |
+    | `PQ3` | is the frozen set completely adjudicated (or legitimately branch-mode)? |
+    | `PQ4` | is every submitted observation source-bound with a matching digest? |
+    | `PQ5` | does the branch selection trace to the frozen raw observation? |
+    | `PQ6` | is the packet bound to an existing experiment id? |
+    | `PQ7` | is the execution and experiment receipt terminal? |
+    | `PQ8` | does the freeze precede the result, with no post-hoc amendment? |
+
+    Fail closed: any failure produces `evidence_eligible: false`. `BLOCKING` failures yield
+    `INSUFFICIENT_PROVENANCE` / `NO_INFERENCE`; `DIAGNOSTIC` failures keep the comparison
+    available as `DIAGNOSTIC_ONLY`. No caller may re-derive eligibility from a subset of
+    these fields — see `evidence_transition_allowed`.
     """
-    gaps: List[str] = []
-    execution = packet.get("execution") or {}
+    packet = packet if isinstance(packet, dict) else {}
+    if assessment is None:
+        # Standalone use must be exactly as strict as the integrated path: without an
+        # adjudication the decision-set checks would silently pass. The nested call passes
+        # an assessment, so this does not recurse.
+        assessment, _ = assess_experiment(state, packet, revisions)
+    view = cg.CanonicalView(state)
+    experiment_id = packet.get("experiment_id") if isinstance(packet.get("experiment_id"), str) \
+        else assessment.get("experiment_id")
+    experiment = view.get("experiments", experiment_id) if isinstance(experiment_id, str) else None
+    preregistration = experiment.get("preregistration") if isinstance(experiment, dict) else None
+    execution = packet.get("execution") if isinstance(packet.get("execution"), dict) else {}
+    validity = execution.get("validity")
+    checks: List[Dict[str, Any]] = []
+
+    # --- PQ1 execution validity ------------------------------------------------
+    if validity == "VALID":
+        checks.append(_qualification_check("PQ1", "execution_validity", [], path="observation.execution"))
+    elif validity == "UNKNOWN":
+        checks.append(_qualification_check(
+            "PQ1", "execution_validity",
+            ["execution.validity=UNKNOWN：允许保留诊断性比较结果，但它不是合格科学证据，"
+             "不得据此支持或否证机制、升级 Insight 或触发 R10/R11 状态迁移"],
+            severity=DIAGNOSTIC, path="observation.execution"))
+    elif validity == "INVALID":
+        checks.append(_qualification_check(
+            "PQ1", "execution_validity",
+            ["执行/测量无效（INVALID）：不产生合格科学证据，走 R9.O 的 INVALID_EXPERIMENT"],
+            path="observation.execution"))
+    else:
+        checks.append(_qualification_check(
+            "PQ1", "execution_validity",
+            [f"execution.validity={validity!r}：只有 VALID 的执行可以进入科学判定"],
+            path="observation.execution"))
+
+    # --- PQ2 frozen, well-formed preregistration --------------------------------
+    frozen_failures: List[str] = []
+    if not isinstance(preregistration, dict):
+        frozen_failures.append("没有冻结的 preregistration：观察只能登记为探索性异常")
+    else:
+        frozen_at = preregistration.get("frozen_at_state_version")
+        if not isinstance(frozen_at, int) or isinstance(frozen_at, bool):
+            frozen_failures.append("preregistration.frozen_at_state_version 缺失")
+        elif isinstance(state.get("state_version"), int) and frozen_at > state["state_version"]:
+            frozen_failures.append(
+                f"preregistration.frozen_at_state_version={frozen_at} 超过当前 state_version")
+        if not _criterion_present(experiment):
+            frozen_failures.append("冻结结果缺少可判定 criterion，比较器只能返回 UNTESTABLE")
+        else:
+            for item in preregistration.get("outcomes") or []:
+                if not isinstance(item, dict):
+                    continue
+                shape = criterion_errors(
+                    item.get("criterion"),
+                    f"experiments[{experiment_id}].preregistration.outcomes"
+                    f"[{item.get('id')}].criterion")
+                frozen_failures.extend(detail.detail for detail in shape)
+        frozen_failures.extend(
+            detail.detail for detail in branch_rule_errors(
+                preregistration, f"experiments[{experiment_id}].preregistration"))
+        if preregistration.get("amended"):
+            frozen_failures.extend(
+                detail.detail for detail in _tamper_diagnostics(
+                    state, experiment, str(experiment_id),
+                    f"experiments[{experiment_id}].preregistration.amended"))
+    checks.append(_qualification_check(
+        "PQ2", "preregistration_frozen", frozen_failures,
+        path=f"experiments[{experiment_id}].preregistration"))
+
+    # --- PQ3 decision-set integrity ---------------------------------------------
+    decision_failures: List[str] = []
+    unexpected = assessment.get("unexpected_observations") or []
+    if unexpected:
+        decision_failures.append("观测包含未冻结结果：" + ", ".join(str(item) for item in unexpected))
+    if any(entry.get("reason") == "duplicate_observation"
+           for entry in assessment.get("predictions") or []):
+        decision_failures.append("同一结果被重复提交：该分支不可判定")
+    missing = [entry.get("ref") for entry in assessment.get("predictions") or []
+               if entry.get("reason") == "missing_observation"]
+    if missing:
+        decision_failures.append(f"存在未被观测的冻结预测：{missing}；评价未完成")
+    if assessment.get("ambiguous_preregistration"):
+        decision_failures.append("一次观测同时满足多个冻结分支：预注册不是互斥分支")
+    if assessment.get("mode") == "branch":
+        resolution = assessment.get("branch_resolution") or {}
+        if resolution.get("status") != "resolved":
+            decision_failures.append(
+                "分支模式未被冻结规则解析：" + str(resolution.get("reason") or "unknown"))
+    checks.append(_qualification_check(
+        "PQ3", "decision_set_integrity", decision_failures,
+        path=f"experiments[{experiment_id}].preregistration.outcomes"))
+
+    # --- PQ4 observation source binding -----------------------------------------
+    checks.append(_qualification_check(
+        "PQ4", "observation_source_binding",
+        [item.detail for item in observation_source_errors(packet)],
+        path="observation.outcomes[].source"))
+
+    # --- PQ5 branch selector traceability ---------------------------------------
+    if assessment.get("mode") == "branch":
+        resolution = assessment.get("branch_resolution") or {}
+        traceability: List[str] = []
+        if not resolution.get("traceable"):
+            selector = resolution.get("selector") or {}
+            traceability.append(
+                "分支选择依据未绑定到预注册冻结的原始观测 "
+                f"({selector.get('kind')}:{selector.get('location')})；"
+                "分支选择必须可追溯到事前声明的来源")
+        checks.append(_qualification_check(
+            "PQ5", "branch_selector_traceability", traceability,
+            path=f"experiments[{experiment_id}].preregistration.branch_rule.selector"))
+    else:
+        checks.append(_qualification_check(
+            "PQ5", "branch_selector_traceability", [],
+            path=f"experiments[{experiment_id}].preregistration.outcome_mode"))
+
+    # --- PQ6 experiment binding --------------------------------------------------
+    binding: List[str] = []
+    if not isinstance(experiment, dict):
+        binding.append(f"实验不存在：{experiment_id!r}")
+    elif not isinstance(experiment_id, str) or experiment.get("id") != experiment_id:
+        binding.append("观测包的 experiment_id 与 canonical 实验不一致")
+    checks.append(_qualification_check(
+        "PQ6", "experiment_binding", binding, path="observation.experiment_id"))
+
+    # --- PQ7 terminal receipt ----------------------------------------------------
+    receipt: List[str] = []
     if execution.get("status") not in ("completed", "failed"):
-        gaps.append("execution.status 缺失或非法")
-    experiment_id = experiment.get("id")
-    if experiment.get("status") not in ("done", "failed"):
-        gaps.append(f"experiments[{experiment_id}].status={experiment.get('status')!r} "
-                    "未进入终态")
-    result_version = experiment.get("result_at_state_version")
-    if not isinstance(result_version, int) or isinstance(result_version, bool):
-        gaps.append(f"experiments[{experiment_id}].result_at_state_version 缺失")
-    frozen_version = preregistration.get("frozen_at_state_version")
-    if not isinstance(frozen_version, int) or isinstance(frozen_version, bool):
-        gaps.append("preregistration.frozen_at_state_version 缺失")
-    elif isinstance(result_version, int) and not isinstance(result_version, bool) \
-            and frozen_version > result_version:
-        gaps.append(f"预测时间泄漏：frozen_at_state_version={frozen_version} > "
-                    f"result_at_state_version={result_version}")
-    return gaps
+        receipt.append("execution.status 缺失或非法（必须是 completed / failed）")
+    if isinstance(experiment, dict):
+        if experiment.get("status") not in ("done", "failed"):
+            receipt.append(
+                f"experiments[{experiment_id}].status={experiment.get('status')!r} 未进入终态")
+        result_version = experiment.get("result_at_state_version")
+        if not isinstance(result_version, int) or isinstance(result_version, bool):
+            receipt.append(f"experiments[{experiment_id}].result_at_state_version 缺失")
+    checks.append(_qualification_check(
+        "PQ7", "terminal_receipt", receipt, severity=DIAGNOSTIC,
+        path=f"experiments[{experiment_id}].status"))
+
+    # --- PQ8 temporal order ------------------------------------------------------
+    temporal: List[str] = []
+    tamper: List[str] = []
+    if isinstance(experiment, dict) and isinstance(preregistration, dict):
+        frozen_at = preregistration.get("frozen_at_state_version")
+        result_version = experiment.get("result_at_state_version")
+        if not isinstance(frozen_at, int) or isinstance(frozen_at, bool):
+            temporal.append("preregistration.frozen_at_state_version 缺失")
+        elif isinstance(result_version, int) and not isinstance(result_version, bool) \
+                and frozen_at > result_version:
+            temporal.append(f"预测时间泄漏：frozen_at_state_version={frozen_at} > "
+                            f"result_at_state_version={result_version}")
+        if preregistration.get("amended"):
+            tamper.extend(
+                detail.detail for detail in _tamper_diagnostics(
+                    state, experiment, str(experiment_id),
+                    f"experiments[{experiment_id}].preregistration.amended"))
+    if revisions:
+        for diagnostic in check_freezes(state, revisions):
+            if diagnostic.rule in ("PC4",):
+                tamper.append(diagnostic.detail)
+    if tamper:
+        checks.append(_qualification_check(
+            "PQ8", "temporal_order", tamper,
+            path=f"experiments[{experiment_id}].preregistration.amended"))
+    else:
+        checks.append(_qualification_check(
+            "PQ8", "temporal_order", temporal, severity=DIAGNOSTIC,
+            path=f"experiments[{experiment_id}].result_at_state_version"))
+
+    failures = [check for check in checks if not check["passed"]]
+    blocking = [check for check in failures if check["severity"] == BLOCKING]
+    if blocking:
+        evidence_class, scientific_status, eligible = (
+            "INSUFFICIENT_PROVENANCE", "NO_INFERENCE", False)
+    elif failures:
+        evidence_class, scientific_status, eligible = (
+            "DIAGNOSTIC_ONLY", "DIAGNOSTIC_ONLY", False)
+    else:
+        evidence_class, scientific_status, eligible = (
+            "QUALIFIED_EVIDENCE", "MAY_INFORM_TRANSITION", True)
+    return {
+        "schema": SCHEMA_QUALIFICATION,
+        "eligible": eligible,
+        "evidence_class": evidence_class,
+        "scientific_status": scientific_status,
+        "outcome_mode": assessment.get("mode", "completeness"),
+        "packet_digest": cg.digest_of(packet),
+        "checks": checks,
+        "failures": [{"id": check["id"], "severity": check["severity"],
+                      "detail": check["detail"], "path": check["path"]}
+                     for check in failures],
+        "gaps": [failure["detail"] for failure in failures if failure["detail"]],
+    }
+
+
+def _qualification_block(assessment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Read the gate's block back, refusing anything that is not a real gate result."""
+    block = assessment.get("qualification")
+    if not isinstance(block, dict) or block.get("schema") != SCHEMA_QUALIFICATION:
+        return None
+    if block.get("packet_digest") != assessment.get("packet_digest"):
+        return None
+    if not isinstance(block.get("checks"), list) or not block["checks"]:
+        return None
+    return block
 
 
 def assess_experiment(
     state: Dict[str, Any],
     packet: Dict[str, Any],
+    revisions: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """Adjudicate every frozen prediction of one experiment against its observation packet.
 
     The **frozen preregistration is the complete decision set.** The packet is evidence
     *about* it, not the set of things to decide. Walking the packet instead of the freeze
-    makes selective submission a way to manufacture a `PREDICTION_HELD`, which is the
-    defect this function used to have.
+    makes selective submission a way to manufacture a `PREDICTION_HELD`.
 
-    Two adjudication modes, selected by the optional `observed_outcome` field:
+    Two adjudication modes:
 
-    * **completeness mode** (no `observed_outcome`) — every frozen outcome must be
-      addressed by an observation. `PREDICTION_HELD` requires all of them decided and held;
-      a missing one caps the experiment at `PARTIALLY_ASSESSED`.
-    * **branch mode** (`observed_outcome` names a frozen branch) — the frozen outcomes are
-      mutually exclusive branches of one decision, so only the selected branch is
-      adjudicated. A non-selected branch is not a failed prediction, and a second branch
-      that *also* holds means the freeze cannot decide: `UNTESTABLE`, reason
-      `ambiguous_preregistration`.
+    * **completeness mode** — the default, and the only reading available when the freeze
+      declares nothing. Every frozen outcome must be addressed by an observation.
+      `PREDICTION_HELD` requires all of them decided and held; a missing one caps the
+      experiment at `PARTIALLY_ASSESSED`.
+    * **branch mode** — the freeze declared `outcome_mode: "branch"` with a verifiable
+      `branch_rule`, so the frozen outcomes are mutually exclusive branches of one decision.
+      The selected branch is **derived** by applying the frozen rule to the raw observation;
+      the packet's `observed_outcome` is only a claim that must agree. Every frozen branch
+      is evaluated against that same raw observation, so a non-selected branch is excluded
+      by an explicit, checkable condition rather than by being ignored.
 
     Whatever the mode, an outcome that was never frozen may not enter the verdict set, a
-    duplicated outcome makes that branch undecidable, and an execution whose validity is
-    `UNKNOWN` produces a diagnostic comparison that is explicitly not evidence.
+    duplicated outcome makes that branch undecidable, and the scientific worth of the result
+    is decided by exactly one function: `qualify_evidence`.
     """
     diagnostics = observation_errors(packet)
+    packet = packet if isinstance(packet, dict) else {}
     view = cg.CanonicalView(state)
     experiment_id = packet.get("experiment_id")
     experiment = view.get("experiments", experiment_id) if isinstance(experiment_id, str) else None
@@ -838,9 +1311,12 @@ def assess_experiment(
         "outcome_class": "UNTESTABLE",
         "diagnostic_outcome_class": None,
         "mode": "completeness",
-        "selected_outcome": packet.get("observed_outcome"),
+        "selected_outcome": None,
+        "declared_outcome": None,
+        "branch_resolution": None,
         "predictions": [],
         "not_selected": [],
+        "excluded_branches": [],
         "branch_conflicts": [],
         "unexpected_observations": [],
         "frozen_outcome_ids": [],
@@ -850,12 +1326,39 @@ def assess_experiment(
         "evidence_eligible": False,
         "scientific_status": "NO_INFERENCE",
         "provenance_gaps": [],
+        "packet_digest": cg.digest_of(packet),
+        "qualification": None,
     }
+
+    def finish() -> Tuple[Dict[str, Any], List[Diagnostic]]:
+        """Attach the single qualification verdict and the derived diagnostics."""
+        block = qualify_evidence(state, packet, assessment, revisions)
+        assessment["qualification"] = block
+        assessment["evidence_class"] = block["evidence_class"]
+        assessment["evidence_eligible"] = block["eligible"]
+        assessment["scientific_status"] = block["scientific_status"]
+        assessment["provenance_gaps"] = list(block["gaps"])
+        for failure in block["failures"]:
+            diagnostics.append(Diagnostic(
+                "PC7", failure["path"] or f"experiments[{experiment_id}]",
+                f"{failure['id']} 证据资格未通过（{failure['severity']}）：{failure['detail']}"))
+        diagnostic_class = assessment["diagnostic_outcome_class"]
+        if assessment["evidence_eligible"] or diagnostic_class not in WORLD_CLAIMING_CLASSES:
+            if assessment["outcome_class"] not in ("INVALID_EXECUTION", "EXPLORATORY_ANOMALY"):
+                assessment["outcome_class"] = diagnostic_class
+        else:
+            assessment["outcome_class"] = "UNTESTABLE"
+            assessment["outcome_class_downgraded_from"] = diagnostic_class
+        diagnostics.extend(_aggregate_diagnostics(str(experiment_id), assessment))
+        unique = cg._dedupe(diagnostics)
+        assessment["diagnostics"] = [d.as_dict() for d in unique]
+        return assessment, unique
+
     if experiment is None:
         diagnostics.append(Diagnostic("PC3", "observation.experiment_id",
                                       f"实验不存在：{experiment_id!r}"))
-        assessment["diagnostics"] = [d.as_dict() for d in cg._dedupe(diagnostics)]
-        return assessment, cg._dedupe(diagnostics)
+        assessment["outcome_class"] = "UNTESTABLE"
+        return finish()
 
     validity = (packet.get("execution") or {}).get("validity")
     if validity == "INVALID":
@@ -863,29 +1366,24 @@ def assess_experiment(
         # observation cannot become evidence by looking plausible.
         assessment["outcome_class"] = "INVALID_EXECUTION"
         assessment["diagnostic_outcome_class"] = None
-        assessment["evidence_class"] = "INSUFFICIENT_PROVENANCE"
-        assessment["evidence_eligible"] = False
-        assessment["scientific_status"] = "NO_INFERENCE"
         diagnostics.append(Diagnostic(
             "PC6", f"experiments[{experiment_id}]",
             "执行/测量无效：不产生预测判定，也不是异常；走 R9.O 的 INVALID_EXPERIMENT 与 failures[]"))
-        assessment["diagnostics"] = [d.as_dict() for d in cg._dedupe(diagnostics)]
-        return assessment, cg._dedupe(diagnostics)
+        return finish()
 
     preregistration = experiment.get("preregistration")
     if not isinstance(preregistration, dict):
         assessment["outcome_class"] = "EXPLORATORY_ANOMALY"
         assessment["diagnostic_outcome_class"] = None
-        assessment["evidence_class"] = "INSUFFICIENT_PROVENANCE"
-        assessment["scientific_status"] = "NO_INFERENCE"
         diagnostics.append(Diagnostic(
             "PC1", f"experiments[{experiment_id}]",
             "没有冻结预注册：该观察只能登记为探索性异常，不得写成预测成立或失败"))
-        assessment["diagnostics"] = [d.as_dict() for d in cg._dedupe(diagnostics)]
-        return assessment, cg._dedupe(diagnostics)
+        return finish()
 
     assessment["frozen_at_state_version"] = preregistration.get("frozen_at_state_version")
     assessment["freeze_digest"] = freeze_digest(experiment)
+    diagnostics.extend(branch_rule_errors(
+        preregistration, f"experiments[{experiment_id}].preregistration"))
 
     frozen_items = [item for item in preregistration.get("outcomes") or []
                     if isinstance(item, dict)]
@@ -906,7 +1404,7 @@ def assess_experiment(
                 f"结果 id 重复：{outcome_id!r}；重复提交使该分支不可判定，且不得取其中之一"))
             continue
         submitted[outcome_id] = observed
-    for outcome_id in sorted(submitted):
+    for outcome_id in sorted(submitted, key=str):
         if outcome_id not in frozen_ids:
             assessment["unexpected_observations"].append(outcome_id)
             diagnostics.append(Diagnostic(
@@ -914,162 +1412,248 @@ def assess_experiment(
                 f"{experiment_id} 的冻结预注册里没有结果 {outcome_id!r}；"
                 "未冻结的结果不得进入判定集合"))
 
-    selected = packet.get("observed_outcome")
-    if isinstance(selected, str) and selected.strip():
-        selected = selected.strip()
+    declared = packet.get("observed_outcome")
+    if isinstance(declared, str) and declared.strip():
+        declared = declared.strip()
+    else:
+        declared = None
+    assessment["declared_outcome"] = declared
+
+    if branch_mode_enabled(preregistration):
         assessment["mode"] = "branch"
-        assessment["selected_outcome"] = selected
-        if selected not in frozen_ids:
+        _adjudicate_branch(assessment, experiment_id, preregistration, frozen_items,
+                           submitted, duplicated, declared, diagnostics)
+    else:
+        assessment["mode"] = "completeness"
+        if declared is not None:
             diagnostics.append(Diagnostic(
-                "PC3", "observation.observed_outcome",
-                f"observed_outcome={selected!r} 不是 {experiment_id} 的冻结结果之一；"
-                "分支选择必须指向预注册"))
-
-    adjudicate = _branches_to_adjudicate(assessment, frozen_items, selected)
-    adjudicated_ids = {item.get("id") for item in adjudicate}
-    # In branch mode the non-selected branches are still *probed* when the packet reports
-    # them: if one of them holds as well, the freeze is not a set of exclusive branches and
-    # the observation cannot say which one happened. Probes never enter the verdict set.
-    probe = [item for item in frozen_items if item.get("id") not in adjudicated_ids] \
-        if assessment["mode"] == "branch" else []
-    held_branches: List[str] = []
-    ambiguous_branches: List[str] = []
-    for frozen in adjudicate + probe:
-        outcome_id = frozen.get("id")
-        role = "adjudicated" if outcome_id in adjudicated_ids else "probe"
-        ref = f"{experiment_id}:{outcome_id}"
-        entry: Dict[str, Any] = {"ref": ref, "outcome_id": outcome_id, "role": role,
-                                 "selected": outcome_id == assessment.get("selected_outcome")}
-        observed = submitted.get(outcome_id)
-        def record(payload: Dict[str, Any]) -> None:
-            entry.update(payload)
-            if role == "probe":
-                assessment["branch_conflicts"].append(entry)
-            else:
-                assessment["predictions"].append(entry)
-                if entry.get("verdict") == "PREDICTION_HELD":
-                    held_branches.append(outcome_id)
-
-        if outcome_id in duplicated:
-            record({"verdict": "UNTESTABLE", "reason": "duplicate_observation"})
-            continue
-        if observed is None:
-            record({"verdict": "UNTESTABLE", "reason": "missing_observation"})
-            if role == "adjudicated":
-                diagnostics.append(Diagnostic(
-                    "PC8", f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}]",
-                    "冻结结果是判定集合的成员，但观测包里没有任何对应观测："
-                    "未完成评价不得宣称预测成立"))
-            continue
-        criterion = frozen.get("criterion")
-        if not isinstance(criterion, dict):
-            record({"verdict": "UNTESTABLE", "reason": "no_criterion"})
-            if role == "adjudicated":
-                diagnostics.append(Diagnostic(
-                    "PC1", f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}]",
-                    "冻结结果没有 criterion：不得宣告预测成立或失败"))
-            continue
-        shape = criterion_errors(
-            criterion,
-            f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}].criterion")
-        diagnostics.extend(shape)
-        if shape:
-            record({"verdict": "UNTESTABLE", "reason": "invalid_criterion"})
-            continue
-        verdict, detail = compare_outcome(criterion, observed)
-        record({"verdict": verdict, "detail": detail,
-                "criterion_signature": criterion_signature(criterion),
-                "observation_statement": frozen.get("observation")})
-        if role == "probe" and verdict == "PREDICTION_HELD":
-            ambiguous_branches.append(outcome_id)
-
-    for frozen in _not_selected_branches(assessment, frozen_items):
-        assessment["not_selected"].append(frozen.get("id"))
-
-    # Ambiguity is a *branch* defect: one observation satisfies the selected branch and
-    # another branch of the same freeze. In completeness mode each outcome is an
-    # independent adjudication, so two held outcomes are simply two held predictions.
-    ambiguous = bool(ambiguous_branches)
-    if ambiguous:
-        diagnostics.append(Diagnostic(
-            "PC8", f"experiments[{experiment_id}]",
-            f"冻结预注册不是互斥分支：选中的 {assessment.get('selected_outcome')} 与"
-            f"{ambiguous_branches} 同时成立，一次观测无法判定哪一支发生；"
-            "该预注册必须先修正"))
+                "PC10", "observation.observed_outcome",
+                f"观测包声明 observed_outcome={declared!r}，但 {experiment_id} 的预注册没有冻结"
+                "可验证的分支模式（outcome_mode=branch + branch_rule）：分支选择不能由提交者"
+                "指定，该声明被忽略，按完整判定集合评价"))
+        _adjudicate_completeness(assessment, experiment_id, frozen_items, submitted,
+                                 duplicated, diagnostics)
 
     diagnostic_class = _aggregate(
-        assessment["predictions"], assessment["mode"], ambiguous)
+        assessment["predictions"], assessment["mode"],
+        bool(assessment.get("ambiguous_preregistration")))
     assessment["diagnostic_outcome_class"] = diagnostic_class
-
-    gaps = _provenance_gaps(packet, experiment, preregistration)
-    assessment["provenance_gaps"] = gaps
-    if validity == "UNKNOWN":
-        assessment["evidence_class"] = "DIAGNOSTIC_ONLY"
-        assessment["scientific_status"] = "DIAGNOSTIC_ONLY"
-        diagnostics.append(Diagnostic(
-            "PC7", f"experiments[{experiment_id}]",
-            "execution.validity=UNKNOWN：允许保留诊断性比较结果，但它不是合格科学证据，"
-            "不得据此支持或否证机制、升级 Insight 或触发 R10/R11 状态迁移；"
-            "先补齐执行收据与来源绑定"))
-    elif gaps:
-        assessment["evidence_class"] = "DIAGNOSTIC_ONLY"
-        assessment["scientific_status"] = "DIAGNOSTIC_ONLY"
-        diagnostics.append(Diagnostic(
-            "PC7", f"experiments[{experiment_id}]",
-            "关键 provenance 不完整（" + "；".join(gaps) + "）：只能作为诊断信息，"
-            "不得支持或否证机制，也不得升级 Insight"))
-    elif assessment["unexpected_observations"] or duplicated \
-            or any(entry.get("reason") == "missing_observation"
-                   for entry in assessment["predictions"]) or ambiguous:
-        assessment["evidence_class"] = "DIAGNOSTIC_ONLY"
-        assessment["scientific_status"] = "DIAGNOSTIC_ONLY"
-        diagnostics.append(Diagnostic(
-            "PC7", f"experiments[{experiment_id}]",
-            "观测包与冻结预注册不一致（缺失/额外/重复/歧义）：该比较只能作为诊断信息，"
-            "先修正冻结与观测的对应关系"))
-    else:
-        assessment["evidence_class"] = "QUALIFIED_EVIDENCE"
-        assessment["evidence_eligible"] = True
-        assessment["scientific_status"] = "MAY_INFORM_TRANSITION"
-
-    # The scientific verdict slot never carries an unqualified support or refutation claim.
-    # The comparison stays available as `diagnostic_outcome_class` for the researcher.
-    if assessment["evidence_eligible"] or diagnostic_class not in WORLD_CLAIMING_CLASSES:
-        assessment["outcome_class"] = diagnostic_class
-    else:
-        assessment["outcome_class"] = "UNTESTABLE"
-        assessment["outcome_class_downgraded_from"] = diagnostic_class
-        diagnostics.append(Diagnostic(
-            "PC7", f"experiments[{experiment_id}]",
-            f"比较结果是 {diagnostic_class}，但证据不合格：科学判定栏只能记 UNTESTABLE，"
-            f"诊断结果保留在 diagnostic_outcome_class={diagnostic_class}"))
-
-    diagnostics.extend(_aggregate_diagnostics(experiment_id, assessment))
-    assessment["diagnostics"] = [d.as_dict() for d in cg._dedupe(diagnostics)]
-    return assessment, cg._dedupe(diagnostics)
+    return finish()
 
 
-def _branches_to_adjudicate(
+def _adjudicate_completeness(
     assessment: Dict[str, Any],
+    experiment_id: Any,
     frozen_items: List[Dict[str, Any]],
-    selected: Any,
-) -> List[Dict[str, Any]]:
-    """Branch mode adjudicates the selected branch; completeness mode adjudicates all."""
-    if assessment["mode"] == "branch" and isinstance(selected, str):
-        chosen = [item for item in frozen_items if item.get("id") == selected]
-        if chosen:
-            return chosen
-    return frozen_items
+    submitted: Dict[str, Dict[str, Any]],
+    duplicated: set,
+    diagnostics: List[Diagnostic],
+) -> None:
+    """Every frozen outcome is an independent adjudication and none may be skipped."""
+    for frozen in frozen_items:
+        outcome_id = frozen.get("id")
+        entry: Dict[str, Any] = {"ref": f"{experiment_id}:{outcome_id}",
+                                 "outcome_id": outcome_id, "role": "adjudicated",
+                                 "selected": False}
+        assessment["predictions"].append(entry)
+        if outcome_id in duplicated:
+            entry.update({"verdict": "UNTESTABLE", "reason": "duplicate_observation"})
+            continue
+        observed = submitted.get(outcome_id)
+        if observed is None:
+            entry.update({"verdict": "UNTESTABLE", "reason": "missing_observation"})
+            diagnostics.append(Diagnostic(
+                "PC8", f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}]",
+                "冻结结果是判定集合的成员，但观测包里没有任何对应观测："
+                "未完成评价不得宣称预测成立"))
+            continue
+        _record_comparison(assessment, entry, frozen, observed, experiment_id, diagnostics)
 
 
-def _not_selected_branches(
+def _record_comparison(
     assessment: Dict[str, Any],
+    entry: Dict[str, Any],
+    frozen: Dict[str, Any],
+    observed: Dict[str, Any],
+    experiment_id: Any,
+    diagnostics: List[Diagnostic],
+) -> None:
+    outcome_id = frozen.get("id")
+    criterion = frozen.get("criterion")
+    if not isinstance(criterion, dict):
+        entry.update({"verdict": "UNTESTABLE", "reason": "no_criterion"})
+        diagnostics.append(Diagnostic(
+            "PC1", f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}]",
+            "冻结结果没有 criterion：不得宣告预测成立或失败"))
+        return
+    shape = criterion_errors(
+        criterion,
+        f"experiments[{experiment_id}].preregistration.outcomes[{outcome_id}].criterion")
+    diagnostics.extend(shape)
+    if shape:
+        entry.update({"verdict": "UNTESTABLE", "reason": "invalid_criterion"})
+        return
+    verdict, detail = compare_outcome(criterion, observed)
+    entry.update({"verdict": verdict, "detail": detail,
+                  "criterion_signature": criterion_signature(criterion),
+                  "observation_statement": frozen.get("observation")})
+
+
+def _selector_traceable(observed: Any, selector: Dict[str, Any]) -> bool:
+    """Whether an observation's source is the one the freeze declared as the branch basis."""
+    if not isinstance(observed, dict):
+        return False
+    source = observed.get("source") if isinstance(observed.get("source"), dict) else {}
+    return (bool(selector) and source.get("kind") == selector.get("kind")
+            and source.get("location") == selector.get("location"))
+
+
+def _adjudicate_branch(
+    assessment: Dict[str, Any],
+    experiment_id: Any,
+    preregistration: Dict[str, Any],
     frozen_items: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    if assessment["mode"] != "branch":
-        return []
-    selected = assessment.get("selected_outcome")
-    return [item for item in frozen_items if item.get("id") != selected]
+    submitted: Dict[str, Dict[str, Any]],
+    duplicated: set,
+    declared: Optional[str],
+    diagnostics: List[Diagnostic],
+) -> None:
+    """Derive the observed branch from the frozen rule, then exclude the others explicitly.
+
+    The submitter does not choose the branch. Exactly one raw observation is required, its
+    source must be the one the freeze declared, and it is evaluated against **every** frozen
+    branch. The branch that holds is the observed branch; the others are recorded with the
+    condition that excluded them.
+    """
+    frozen_ids = [item.get("id") for item in frozen_items]
+    resolution: Dict[str, Any] = {
+        "status": "unresolved", "observed": None, "matched": [], "reason": None,
+        "selector": branch_selector(preregistration), "traceable": False,
+        "evaluated": {},
+    }
+    assessment["branch_resolution"] = resolution
+    candidates = [outcome_id for outcome_id in frozen_ids if outcome_id in submitted]
+    selector = resolution["selector"] or {}
+    if len(candidates) != 1:
+        resolution["reason"] = "branch_observation_count"
+        if candidates:
+            resolution["traceable"] = _selector_traceable(submitted.get(candidates[0]), selector)
+        diagnostics.append(Diagnostic(
+            "PC10", "observation.outcomes",
+            f"分支模式要求观测包恰好提交一条原始观测（全部分支共享同一个可观测），"
+            f"实际 {len(candidates)} 条：互斥分支不可能同时发生，提交多条时无法决定分支"))
+        _record_unresolved(assessment, experiment_id, frozen_items, resolution)
+        return
+
+    raw_id = candidates[0]
+    raw = submitted[raw_id]
+    resolution["raw_outcome_id"] = raw_id
+    source = raw.get("source") if isinstance(raw.get("source"), dict) else {}
+    resolution["traceable"] = _selector_traceable(raw, selector)
+    if not resolution["traceable"]:
+        diagnostics.append(Diagnostic(
+            "PC10", f"observation.outcomes[{raw_id}].source",
+            f"分支选择依据必须来自预注册冻结的原始观测 "
+            f"({selector.get('kind')}:{selector.get('location')})，"
+            f"实际 ({source.get('kind')}:{source.get('location')})；"
+            "分支不能由提交者自由指定来源"))
+
+    matched: List[str] = []
+    for frozen in frozen_items:
+        outcome_id = frozen.get("id")
+        if outcome_id in duplicated:
+            resolution["evaluated"][outcome_id] = "duplicate_observation"
+            continue
+        criterion = frozen.get("criterion")
+        if not isinstance(criterion, dict) or criterion_errors(criterion, "criterion"):
+            resolution["evaluated"][outcome_id] = "invalid_criterion"
+            continue
+        verdict, _ = compare_outcome(criterion, raw)
+        resolution["evaluated"][outcome_id] = verdict
+        if verdict == "PREDICTION_HELD":
+            matched.append(outcome_id)
+    resolution["matched"] = matched
+
+    if not resolution["traceable"]:
+        resolution["reason"] = "selector_source_mismatch"
+    elif not matched:
+        resolution["reason"] = "no_branch_matched"
+        diagnostics.append(Diagnostic(
+            "PC10", f"experiments[{experiment_id}]",
+            f"原始观测不满足任何冻结分支（{sorted(resolution['evaluated'].items())}）："
+            "预注册的分支集合没有覆盖该观测，不得挑选最接近的一支"))
+    elif len(matched) > 1:
+        resolution["reason"] = "ambiguous_preregistration"
+        assessment["ambiguous_preregistration"] = True
+        for outcome_id in matched:
+            assessment["branch_conflicts"].append({
+                "ref": f"{experiment_id}:{outcome_id}", "outcome_id": outcome_id,
+                "role": "branch_conflict", "verdict": "PREDICTION_HELD"})
+        diagnostics.append(Diagnostic(
+            "PC8", f"experiments[{experiment_id}]",
+            f"冻结预注册不是互斥分支：{sorted(matched)} 同时成立，一次观测无法判定哪一支发生；"
+            "该预注册必须先修正"))
+    elif matched[0] != raw_id:
+        resolution["reason"] = "branch_id_conflict"
+        diagnostics.append(Diagnostic(
+            "PC10", "observation.outcomes",
+            f"提交把观测登记为 {raw_id}，但按冻结规则它属于 {matched[0]}："
+            "分支身份由冻结规则决定，不由提交者指定"))
+    elif declared is not None and declared != matched[0]:
+        resolution["reason"] = "branch_declaration_conflict"
+        diagnostics.append(Diagnostic(
+            "PC10", "observation.observed_outcome",
+            f"观测包声明 observed_outcome={declared!r}，但冻结规则把该观测判为 {matched[0]}："
+            "分支选择与原始观测冲突，不得据此判定预测成立"))
+    else:
+        resolution["status"] = "resolved"
+        resolution["observed"] = matched[0]
+        resolution["reason"] = None
+
+    if resolution["status"] != "resolved":
+        _record_unresolved(assessment, experiment_id, frozen_items, resolution)
+        return
+
+    observed_id = resolution["observed"]
+    assessment["selected_outcome"] = observed_id
+    for frozen in frozen_items:
+        outcome_id = frozen.get("id")
+        if outcome_id == observed_id:
+            entry: Dict[str, Any] = {"ref": f"{experiment_id}:{outcome_id}",
+                                     "outcome_id": outcome_id, "role": "selected",
+                                     "selected": True}
+            assessment["predictions"].append(entry)
+            _record_comparison(assessment, entry, frozen, raw, experiment_id, diagnostics)
+            continue
+        # The exclusion is a *checked* condition, not a silent omission: the same raw
+        # observation was evaluated against this branch and did not satisfy it. An excluded
+        # branch is not a failed prediction, so it never enters the verdict set.
+        verdict = resolution["evaluated"].get(outcome_id, "UNTESTABLE")
+        assessment["excluded_branches"].append({
+            "ref": f"{experiment_id}:{outcome_id}", "outcome_id": outcome_id,
+            "excluded_verdict": verdict,
+            "observation_statement": frozen.get("observation"),
+            "basis": "原始观测先对全部分支求值；该分支未成立，因此被排除"})
+        assessment["not_selected"].append(outcome_id)
+
+
+def _record_unresolved(
+    assessment: Dict[str, Any],
+    experiment_id: Any,
+    frozen_items: List[Dict[str, Any]],
+    resolution: Dict[str, Any],
+) -> None:
+    """An unresolved branch rule decides nothing; every frozen branch is left open."""
+    assessment["selected_outcome"] = None
+    reason = resolution.get("reason") or "branch_unresolved"
+    for frozen in frozen_items:
+        outcome_id = frozen.get("id")
+        entry: Dict[str, Any] = {
+            "ref": f"{experiment_id}:{outcome_id}", "outcome_id": outcome_id,
+            "role": "unresolved", "selected": False, "verdict": "UNTESTABLE",
+            "reason": reason, "evaluated_verdict": resolution.get("evaluated", {}).get(outcome_id),
+            "branch_matched": resolution.get("matched") or []}
+        assessment["predictions"].append(entry)
 
 
 def _aggregate(
@@ -1123,52 +1707,87 @@ def _aggregate_diagnostics(experiment_id: str, assessment: Dict[str, Any]) -> Li
     return outcomes
 
 
+def _state_side_blockers(state: Dict[str, Any], assessment: Dict[str, Any]) -> List[str]:
+    """Re-derive the state-only preconditions, so a stale or forged block cannot pass.
+
+    A caller that hands `evidence_transition_allowed` a hand-written assessment is not
+    trusted: the qualification block must be the one the gate produced for the same packet
+    (`packet_digest`), and the canonical facts behind it are checked again here.
+    """
+    blockers: List[str] = []
+    experiment_id = assessment.get("experiment_id")
+    view = cg.CanonicalView(state)
+    experiment = view.get("experiments", experiment_id) if isinstance(experiment_id, str) else None
+    if not isinstance(experiment, dict):
+        return [f"实验不存在：{experiment_id!r}"]
+    preregistration = experiment.get("preregistration")
+    if not isinstance(preregistration, dict):
+        blockers.append("没有冻结预注册：该观察不是可判定的预测")
+    else:
+        branch_errors = branch_rule_errors(
+            preregistration, f"experiments[{experiment_id}].preregistration")
+        if branch_errors:
+            blockers.append("分支模式声明无效：" + branch_errors[0].detail)
+        frozen_at = preregistration.get("frozen_at_state_version")
+        result_version = experiment.get("result_at_state_version")
+        if not isinstance(frozen_at, int) or isinstance(frozen_at, bool):
+            blockers.append("preregistration.frozen_at_state_version 缺失")
+        elif isinstance(result_version, int) and not isinstance(result_version, bool) \
+                and frozen_at > result_version:
+            blockers.append(f"预测时间泄漏：frozen_at_state_version={frozen_at} > "
+                            f"result_at_state_version={result_version}")
+    if experiment.get("status") not in ("done", "failed"):
+        blockers.append(f"experiments[{experiment_id}].status={experiment.get('status')!r} 未进入终态")
+    if not isinstance(experiment.get("result_at_state_version"), int) \
+            or isinstance(experiment.get("result_at_state_version"), bool):
+        blockers.append(f"experiments[{experiment_id}].result_at_state_version 缺失")
+    if assessment.get("unexpected_observations"):
+        blockers.append("观测包含未冻结结果："
+                        + ", ".join(str(item) for item in assessment["unexpected_observations"]))
+    if any(entry.get("reason") == "missing_observation"
+           for entry in assessment.get("predictions") or []):
+        blockers.append("存在未被观测的冻结预测：评价未完成")
+    if assessment.get("outcome_class") == "INVALID_EXECUTION":
+        blockers.append("执行无效：走 R9.O 的 INVALID_EXPERIMENT 与 failures[]")
+    if assessment.get("mode") == "branch":
+        resolution = assessment.get("branch_resolution") or {}
+        if resolution.get("status") != "resolved":
+            blockers.append("分支模式未被冻结规则解析：" + str(resolution.get("reason")))
+    return blockers
+
+
 def evidence_transition_allowed(
     state: Dict[str, Any],
     assessment: Dict[str, Any],
 ) -> Tuple[bool, List[str]]:
     """Whether a comparison may feed a scientific state transition.
 
-    This is the comparator-side precondition only. The authority for a claim-status change
-    remains R8's single-direction upgrade or R10, and the authoritative gates remain
-    `scripts/evidence_outcome.py` plus `scripts/state_check.py`; a `True` here grants
-    nothing on its own.
+    It reads **one** thing: the Evidence Qualification Gate's block. A missing or mismatched
+    block is a blocker, not a default-pass — an isolated `evidence_eligible: true` field is
+    exactly the split decision this gate exists to remove. The state-only preconditions are
+    then re-derived, so a block that was produced for a different packet, or a state that
+    changed after it was produced, cannot grant a transition either.
+
+    This remains the comparator-side precondition only. The authority for a claim-status
+    change is R8's single-direction upgrade or R10, enforced by `scripts/evidence_outcome.py`
+    plus `scripts/state_check.py`; a `True` here grants nothing on its own.
     """
     reasons: List[str] = []
-    validity = (assessment.get("execution") or {}).get("validity")
-    if validity not in ("VALID",):
-        reasons.append(f"execution.validity={validity!r}：只有 VALID 的执行可以进入科学判定")
-    if assessment.get("evidence_class") != "QUALIFIED_EVIDENCE":
+    block = _qualification_block(assessment)
+    if block is None:
         reasons.append(
-            f"evidence_class={assessment.get('evidence_class')!r}："
-            f"{'; '.join(assessment.get('provenance_gaps') or []) or '诊断性比较不是合格证据'}")
-    if assessment.get("provenance_gaps"):
-        reasons.extend(assessment["provenance_gaps"])
-    if assessment.get("unexpected_observations"):
-        reasons.append("观测包含未冻结结果："
-                       + ", ".join(str(item) for item in assessment["unexpected_observations"]))
-    if any(entry.get("reason") == "missing_observation"
-           for entry in assessment.get("predictions") or []):
-        reasons.append("存在未被观测的冻结预测：评价未完成")
-    if assessment.get("outcome_class") == "INVALID_EXECUTION":
-        reasons.append("执行无效：走 R9.O 的 INVALID_EXPERIMENT 与 failures[]")
-    if assessment.get("outcome_class_downgraded_from"):
-        reasons.append("科学判定栏已被降级为 UNTESTABLE（原比较结果："
-                       f"{assessment['outcome_class_downgraded_from']}）")
-    experiment_id = assessment.get("experiment_id")
-    view = cg.CanonicalView(state)
-    experiment = view.get("experiments", experiment_id) if isinstance(experiment_id, str) else None
-    if not isinstance(experiment, dict):
-        reasons.append(f"实验不存在：{experiment_id!r}")
-    else:
-        frozen = (experiment.get("preregistration") or {}).get("frozen_at_state_version")
-        result = experiment.get("result_at_state_version")
-        if isinstance(frozen, int) and isinstance(result, int) and frozen > result:
-            reasons.append("预测冻结晚于结果：时间顺序约束被破坏")
+            "缺少统一的证据资格判定（Evidence Qualification Gate 的 qualification 块）："
+            "不接受孤立的 evidence_eligible 字段，请重新运行 compare")
+    elif not block.get("eligible"):
+        for failure in block.get("failures") or []:
+            reasons.append(f"{failure.get('id')}（{failure.get('severity')}）"
+                           f"{failure.get('detail')}")
+    for blocker in _state_side_blockers(state, assessment):
+        if blocker not in reasons:
+            reasons.append(blocker)
     return (not reasons), reasons
 
 
-# ---------------------------------------------------------------------------
 # Mechanism competition
 # ---------------------------------------------------------------------------
 
@@ -1522,16 +2141,44 @@ def diagnosis_switch(
 
 
 # ---------------------------------------------------------------------------
-# Insight cards
+# Insight certification
+#
+# A card is an intermediate product, not a state object, and its class is a display label.
+# What this section removes is the shortcut from "an experiment produced T2 evidence" to
+# "this insight is evidence-supported": the card must name the exact frozen prediction, the
+# exact observation that decided it, the exact evidence, and an audit whose *result* is
+# known. Anything unverifiable keeps the lower class — provenance is never guessed.
 # ---------------------------------------------------------------------------
 
+#: `assurance[].audit_ref` points at a Structural Equivalence audit artifact. Verdicts that
+#: mean "this is prior work reworded, or not decided" cannot certify a new mechanism.
+NON_SUPPORTING_AUDIT_VERDICTS: Tuple[str, ...] = (
+    "equivalent", "subsumed-by-prior", "reframing-only", "uncertain",
+)
+
+#: Certification sub-checks. Reported under `PC11`; the ids name the missing step.
+CERTIFICATION_CHECKS: Tuple[str, ...] = (
+    "IC1", "IC2", "IC3", "IC4", "IC5", "IC6",
+)
+
+#: Every card must state these in prose. They are not evidence; they are the question.
 CARD_REQUIRED_TEXT: Tuple[str, ...] = (
     "observation", "existing_mechanism", "challenged_assumption", "proposed_mechanism",
     "explanatory_gain", "competing_mechanism", "scope_boundary", "scientific_implication",
 )
 
 
-def insight_card_errors(card: Any, state: Dict[str, Any]) -> List[Diagnostic]:
+def insight_card_errors(
+    card: Any,
+    state: Dict[str, Any],
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> List[Diagnostic]:
+    """Shape-check one card, and refuse any class stronger than the canonical facts support.
+
+    The derived class is the card's class. `evidence_supported_insight` declared without the
+    certification checks is a hard violation (`PC7`); a card that *attempts* certification
+    but fails a binding check (`IC1`—`IC6`) is reported as `PC11` with the failing step named.
+    """
     if not isinstance(card, dict):
         return [Diagnostic("PC8", "insight_card", "Insight Card 必须是对象")]
     failures: List[Diagnostic] = []
@@ -1578,7 +2225,11 @@ def insight_card_errors(card: Any, state: Dict[str, Any]) -> List[Diagnostic]:
     if declared not in INSIGHT_CLASSES:
         failures.append(Diagnostic("PC8", "insight_card.declared_class",
                                    f"declared_class 必须是 {list(INSIGHT_CLASSES)} 之一"))
-    derived, reasons = classify_insight(card, state)
+    derived, reasons = classify_insight(card, state, audits)
+    certification = reasons.get("certification") or {}
+    if certification.get("attempted"):
+        for problem in certification.get("failures") or []:
+            failures.append(Diagnostic("PC11", "insight_card.novel_prediction", problem))
     if declared == "evidence_supported_insight" and derived != "evidence_supported_insight":
         failures.append(Diagnostic(
             "PC7", "insight_card.declared_class",
@@ -1591,8 +2242,342 @@ def insight_card_errors(card: Any, state: Dict[str, Any]) -> List[Diagnostic]:
     return cg._dedupe(failures)
 
 
-def classify_insight(card: Dict[str, Any], state: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-    """Derive the insight class from canonical facts, never from the card's own label."""
+def load_audits(
+    state: Dict[str, Any],
+    root: Optional[Path],
+) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+    """Load and validate the SENA artifacts the state's assurance entries point at.
+
+    `assurance[]` keeps only `audit_ref`; the audit itself lives in the control plane
+    (`assurance/structural-equivalence/H<n>.json` next to the route's state). Loading and
+    validating it here reuses the module that owns the artifact contract —
+    `structural_equivalence_check` — instead of re-deriving an audit verdict locally.
+
+    Returns `(audits, problems)`: `audits[assurance_id] = {artifact, verdict, source,
+    violations}`. `problems` are plain strings recorded in the certification reasons; this
+    function does not invent rule ids for another module's artifacts.
+    """
+    audits: Dict[str, Dict[str, Any]] = {}
+    problems: List[str] = []
+    if root is None:
+        return audits, problems
+    import structural_equivalence_check as sec
+    for index, entry in enumerate(state.get("assurance") or []):
+        if not isinstance(entry, dict) or entry.get("attack_type") != "structural-equivalence":
+            continue
+        assurance_id = entry.get("id") or f"assurance[{index}]"
+        audit_ref = entry.get("audit_ref")
+        if not isinstance(audit_ref, str) or not audit_ref.strip():
+            problems.append(f"{assurance_id} 没有 audit_ref：审计只被声明，没有被审核过的结果")
+            continue
+        path = root / sec.AUDIT_DIR / audit_ref.strip().rsplit("/", 1)[-1]
+        if not path.is_file():
+            problems.append(f"{assurance_id} 的 audit_ref 指向的 artifact 不存在：{audit_ref}")
+            continue
+        try:
+            artifact = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"{assurance_id} 的审计 artifact 不可读：{exc}")
+            continue
+        report = sec.check_artifact(artifact, str(path))
+        violations = [f"{item.rule} {item.path}" for item in report.violations]
+        if report.env_error:
+            problems.append(f"{assurance_id} 的审计 artifact 环境不满足：{report.env_error}")
+            continue
+        audits[assurance_id] = {
+            "artifact": artifact,
+            "verdict": artifact.get("verdict") if isinstance(artifact, dict) else None,
+            "candidate": artifact.get("candidate") if isinstance(artifact, dict) else None,
+            "source": str(path),
+            "violations": violations,
+        }
+    return audits, problems
+
+
+def _insight_certification(
+    card: Dict[str, Any],
+    state: Dict[str, Any],
+    resolved: Dict[str, Any],
+    refs: Dict[str, List[str]],
+    audits: Optional[Dict[str, Dict[str, Any]]],
+) -> Tuple[bool, List[str], List[str], Dict[str, Any]]:
+    """Canonical preconditions for `evidence_supported_insight`.
+
+    Returns `(certified, missing, failures, info)`. Every condition reads canonical state or the
+    gate's own verdict; the card's prose and the card's own class are never inputs.
+    """
+    view = cg.CanonicalView(state)
+    experiment_id = resolved["experiment_id"]
+    outcome_id = resolved["outcome_id"]
+    prediction = card.get("novel_prediction") or {}
+    boundary = card.get("scope_boundary") or ""
+    targets = list(refs.get("claims") or []) + list(refs.get("hypotheses") or [])
+    missing: List[str] = []
+    failures: List[str] = []
+
+    # --- IC1 explicit binding: prediction_ref + experiment_ref + mechanism -----------
+    declared_experiment = prediction.get("experiment_ref")
+    if not isinstance(declared_experiment, str) or not declared_experiment.strip():
+        missing.append("novel_prediction.experiment_ref（显式的实验绑定）")
+    elif declared_experiment.strip() != experiment_id:
+        failures.append(
+            f"IC1 novel_prediction.experiment_ref={declared_experiment!r} 与预测引用 "
+            f"{prediction.get('ref')!r} 的实验 {experiment_id} 不一致：禁止跨实验借用证据")
+    if experiment_id not in (refs.get("experiments") or []):
+        missing.append(f"refs.experiments 中的 {experiment_id}（实验必须被显式引用）")
+    if not targets:
+        missing.append("refs.claims / refs.hypotheses 中的机制引用")
+
+    # --- IC2 the referenced mechanism is not already dead ---------------------------
+    for claim_id in refs.get("claims") or []:
+        claim = view.get("claims", claim_id)
+        if not isinstance(claim, dict):
+            continue
+        if claim.get("status") in ("contradicted", "killed"):
+            failures.append(f"IC2 claims[{claim_id}].status={claim['status']}：已被反驳的主张不能认证支持")
+        status, reason = view.validity_of("claims", claim_id)
+        if status != "valid":
+            failures.append(f"IC2 claims[{claim_id}].validity={status}（{reason}）")
+    for hypothesis_id in refs.get("hypotheses") or []:
+        status, reason = view.validity_of("hypotheses", hypothesis_id)
+        if status != "valid":
+            failures.append(f"IC2 hypotheses[{hypothesis_id}].validity={status}（{reason}）")
+
+    # --- IC3 a qualified adjudication of *this* prediction --------------------------
+    packet = prediction.get("observation")
+    if not isinstance(packet, dict):
+        missing.append("novel_prediction.observation（该预测对应的预测—观测包）")
+    else:
+        if packet.get("experiment_id") != experiment_id:
+            failures.append(
+                f"IC3 观测包的 experiment_id={packet.get('experiment_id')!r} 与预测引用不一致")
+        expected_digest = prediction.get("observation_digest")
+        actual_digest = cg.digest_of(packet)
+        if not isinstance(expected_digest, str) or not expected_digest.strip():
+            missing.append("novel_prediction.observation_digest（观测包的摘要绑定）")
+        elif expected_digest != actual_digest:
+            failures.append("IC3 观测包与登记的 observation_digest 不一致：包已被修改")
+        assessment, _ = assess_experiment(state, packet)
+        allowed, blockers = evidence_transition_allowed(state, assessment)
+        if not assessment["evidence_eligible"] or not allowed:
+            failures.append(
+                "IC3 该预测的预测—观测判定不是合格证据（"
+                + (assessment["evidence_class"] or "")
+                + (f"；{'；'.join(blockers[:2])}" if blockers else "") + "）")
+        entry = next((item for item in assessment["predictions"]
+                      if item.get("outcome_id") == outcome_id), None)
+        if entry is None:
+            failures.append(f"IC3 该判定没有评价预测 {experiment_id}:{outcome_id}")
+        elif entry.get("verdict") != "PREDICTION_HELD":
+            failures.append(
+                f"IC3 预测 {experiment_id}:{outcome_id} 的判定是 "
+                f"{entry.get('verdict')}（{entry.get('reason') or '未成立'}）："
+                "不成立的预测不能支撑 Insight")
+        elif assessment.get("mode") == "branch" and entry.get("role") != "selected":
+            failures.append("IC3 该预测不是分支规则选中的分支")
+
+    # --- IC4 an R9.O receipt for the same experiment, with a supporting direction ---
+    analysis = experiment_id and _r9o_receipt(view.get("experiments", experiment_id))
+    if analysis is None:
+        missing.append("experiments[].outcome_analysis（R9.O 结果分析收据）")
+    else:
+        outcome, tier, reason = analysis
+        if outcome != "POSITIVE_EVIDENCE":
+            failures.append(f"IC4 R9.O 结论是 {outcome}（{reason}）：不支持方向不能认证支持")
+        if not cg.tier_at_least(tier, 2):
+            failures.append(f"IC4 R9.O 收据的 verification_tier={tier}：低于 T2 不得升级认知等级")
+        positive = _r9o_positive_targets(view.get("experiments", experiment_id), targets)
+        if targets and not positive:
+            failures.append("IC4 R9.O 收据没有把任何被引用主张判为 positive：结论方向与机制主张不一致")
+
+    # --- IC5 canonical evidence bound to the prediction and its mechanism -----------
+    supported: List[str] = []
+    for evidence_id in refs.get("evidence") or []:
+        evidence = view.get("evidence", evidence_id)
+        if not isinstance(evidence, dict):
+            continue
+        status, _ = view.validity_of("evidence", evidence_id)
+        if status != "valid":
+            failures.append(f"IC5 evidence[{evidence_id}] 已失效（{status}）")
+            continue
+        if not cg.tier_at_least(evidence.get("verification_tier"), 2):
+            failures.append(f"IC5 evidence[{evidence_id}] 的 verification_tier "
+                            f"{evidence.get('verification_tier')} 低于 T2")
+            continue
+        if evidence.get("epistemic_status") not in ("Observed", "Supported"):
+            failures.append(f"IC5 evidence[{evidence_id}] 的 epistemic_status="
+                            f"{evidence.get('epistemic_status')!r} 不能作为支持性证据")
+            continue
+        scope = evidence.get("scope")
+        if not isinstance(scope, str) or not scope.strip() or not _scope_within(scope, boundary):
+            failures.append(f"IC5 evidence[{evidence_id}] 的范围 {scope!r} 不在卡片边界 {boundary!r} 内")
+            continue
+        if experiment_id not in [str(dep) for dep in evidence.get("depends_on") or []]:
+            missing.append(f"evidence[{evidence_id}] 未绑定到预测的实验 {experiment_id}")
+            continue
+        point = _evidence_prediction_point(evidence, prediction, experiment_id, outcome_id)
+        if point:
+            failures.append(f"IC5 evidence[{evidence_id}] {point}")
+            continue
+        supports = [str(item) for item in evidence.get("supports") or []]
+        contradicts = [str(item) for item in evidence.get("contradicts") or []]
+        if targets and not (set(supports) & set(targets)):
+            failures.append(f"IC5 evidence[{evidence_id}] 没有 supports 任何被引用的机制"
+                            f"（{targets}）：同实验不等于支持同一主张")
+            continue
+        if set(contradicts) & set(targets):
+            failures.append(f"IC5 evidence[{evidence_id}] 反驳了被引用的机制（{contradicts}）："
+                            "结论方向与卡片主张相反")
+            continue
+        supported.append(evidence_id)
+    if not refs.get("evidence"):
+        missing.append("refs.evidence 中的独立证据对象")
+    elif not supported:
+        missing.append("可用的支持性证据（valid、≥T2、绑定该预测与机制、范围包含、方向一致）")
+
+    # --- IC6 an audit whose actual result is known and applicable -------------------
+    audit_targets = set(refs.get("hypotheses") or []) | set(refs.get("claims") or [])
+    audited: List[str] = []
+    audit_seen = False
+    for entry in state.get("assurance") or []:
+        if not isinstance(entry, dict) or entry.get("attack_type") != "structural-equivalence":
+            continue
+        if entry.get("target") not in audit_targets:
+            continue
+        audit_seen = True
+        assurance_id = entry.get("id") or "<unnamed>"
+        if not cg.tier_at_least(entry.get("verification_tier"), 1):
+            failures.append(f"IC6 assurance[{assurance_id}].verification_tier="
+                            f"{entry.get('verification_tier')} 低于 T1")
+            continue
+        validity = entry.get("validity")
+        if isinstance(validity, dict) and validity.get("status") != "valid":
+            failures.append(f"IC6 assurance[{assurance_id}].validity.status="
+                            f"{validity.get('status')!r}：审计已失效")
+            continue
+        test = entry.get("discriminating_test")
+        if not isinstance(test, str) or test.strip() in ("", "TBD"):
+            failures.append(f"IC6 assurance[{assurance_id}] 没有可执行的判别实验")
+            continue
+        record = (audits or {}).get(assurance_id)
+        if not isinstance(record, dict):
+            missing.append(f"assurance[{assurance_id}] 的审计结果（audit_ref 指向的 SENA artifact）")
+            continue
+        if record.get("violations"):
+            failures.append(f"IC6 assurance[{assurance_id}] 的审计 artifact 不合法："
+                            f"{record['violations'][:2]}")
+            continue
+        artifact = record.get("artifact") or {}
+        verdict = artifact.get("verdict")
+        if verdict in NON_SUPPORTING_AUDIT_VERDICTS:
+            failures.append(f"IC6 审计结论 verdict={verdict!r}：该主张与既有结构等价或尚未判定，"
+                            "不能认证为受证据支持的新机制")
+            continue
+        candidate = artifact.get("candidate")
+        if refs.get("hypotheses") and candidate not in refs.get("hypotheses"):
+            failures.append(f"IC6 审计的 candidate={candidate!r} 不是卡片引用的候选"
+                            f"（{refs.get('hypotheses')}）：审计结果不适用于该主张")
+            continue
+        audited.append(assurance_id)
+    if not audit_seen:
+        missing.append("针对被引用主张的结构等价审计（防自我认证创新性）")
+
+    info = {"supporting_evidence": supported, "audited": audited}
+    return (not missing and not failures), missing, failures, info
+
+
+def _evidence_prediction_point(
+    evidence: Dict[str, Any],
+    prediction: Dict[str, Any],
+    experiment_id: str,
+    outcome_id: str,
+) -> str:
+    """Cross-prediction borrowing guard: an explicit prediction ref must match exactly."""
+    declared = evidence.get("prediction_ref")
+    if not isinstance(declared, str) or not declared.strip():
+        return ""
+    parsed = parse_ref(declared.strip())
+    if parsed is None:
+        return f"的 prediction_ref={declared!r} 不是 `<XID>:<OID>`"
+    if parsed != (experiment_id, outcome_id):
+        return (f"绑定到预测 {declared}，而卡片认证的是 {experiment_id}:{outcome_id}："
+                "同一实验的不同预测不能互相借用证据")
+    return ""
+
+
+def _r9o_receipt(experiment: Any) -> Optional[Tuple[str, str, str]]:
+    """`(outcome, verification_tier, reason)` from a consistent R9.O receipt.
+
+    The source digest is recomputed with the R8 rule (`evidence_outcome.digest` of the
+    source content), which is the authority `execution_gate.source_observation` applies to
+    `evidence[].diagnostic_observation`; a receipt whose hashes do not match its own content
+    is not a receipt.
+    """
+    import evidence_outcome as eo
+    if not isinstance(experiment, dict):
+        return None
+    record = experiment.get("outcome_analysis")
+    if not isinstance(record, dict):
+        return None
+    packet = record.get("packet")
+    analysis = record.get("analysis")
+    if not isinstance(packet, dict) or not isinstance(analysis, dict):
+        return None
+    if packet.get("schema") != "evidence-result@1" \
+            or packet.get("experiment_id") != experiment.get("id"):
+        return None
+    if analysis.get("experiment_id") != experiment.get("id"):
+        return None
+    if packet.get("execution_status") not in ("completed", "failed"):
+        return None
+    sources = {item.get("id") for item in packet.get("sources") or [] if isinstance(item, dict)}
+    for source in packet.get("sources") or []:
+        if not isinstance(source, dict):
+            return None
+        if source.get("digest") != eo.digest(source.get("content")):
+            return None
+    for observation in packet.get("observations") or []:
+        if not isinstance(observation, dict):
+            return None
+        if not set(observation.get("source_ids") or []) <= sources:
+            return None
+    tier = analysis.get("verification_tier")
+    if not isinstance(tier, str):
+        return None
+    return (str(analysis.get("outcome")), tier, "R9.O 收据")
+
+
+def _r9o_positive_targets(experiment: Any, targets: Sequence[str]) -> List[str]:
+    """Targets the R9.O receipt judged positive with a passing identification."""
+    if not isinstance(experiment, dict) or not targets:
+        return []
+    record = experiment.get("outcome_analysis")
+    analysis = record.get("analysis") if isinstance(record, dict) else None
+    if not isinstance(analysis, dict):
+        return []
+    wanted = set(targets)
+    positive: List[str] = []
+    for key in ("claim_updates", "hypothesis_updates"):
+        for update in analysis.get(key) or []:
+            if not isinstance(update, dict) or update.get("id") not in wanted:
+                continue
+            if update.get("direction") == "positive" and update.get("identification") == "PASS":
+                positive.append(str(update["id"]))
+    return sorted(set(positive))
+
+
+def classify_insight(
+    card: Dict[str, Any],
+    state: Dict[str, Any],
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Tuple[str, Dict[str, Any]]:
+    """Derive the insight class from canonical facts, never from the card's own label.
+
+    `explanatory_hypothesis` → `predictive_insight_candidate` → `evidence_supported_insight`
+    is a ladder of *verified* structure. The top rung requires the certification checks
+    above; a project that recorded no fine-grained references keeps the lower rung, because
+    provenance is never reconstructed by guessing.
+    """
     view = cg.CanonicalView(state)
     reasons: Dict[str, Any] = {"missing": []}
     prediction = card.get("novel_prediction")
@@ -1608,48 +2593,36 @@ def classify_insight(card: Dict[str, Any], state: Dict[str, Any]) -> Tuple[str, 
     intervention = card.get("discriminating_intervention")
     has_intervention = (isinstance(intervention, str) and intervention.strip()
                         and view.contains("experiments", intervention))
-    # Evidence support needs a valid, strong enough, in-scope observation of the new
-    # prediction, plus an independent structural-equivalence audit of the claim.
     refs = cg.normalize_refs(card.get("refs"))
-    boundary = card.get("scope_boundary") or ""
-    supported: List[str] = []
-    for evidence_id in refs.get("evidence", []):
-        evidence = view.get("evidence", evidence_id)
-        if not isinstance(evidence, dict):
-            continue
-        status, _ = view.validity_of("evidence", evidence_id)
-        if status != "valid" or not cg.tier_at_least(evidence.get("verification_tier"), 2):
-            continue
-        if evidence.get("epistemic_status") not in ("Observed", "Supported"):
-            continue
-        scope = evidence.get("scope")
-        if not isinstance(scope, str) or not scope.strip():
-            continue
-        if not _scope_within(scope, boundary):
-            continue
-        if resolved["experiment_id"] not in [str(dep) for dep in evidence.get("depends_on") or []]:
-            reasons["missing"].append(f"证据 {evidence_id} 未绑定到该实验")
-            continue
-        supported.append(evidence_id)
-    audited = any(
-        isinstance(entry, dict)
-        and entry.get("attack_type") == "structural-equivalence"
-        and cg.tier_at_least(entry.get("verification_tier"), 1)
-        and entry.get("target") in (refs.get("claims") or []) + (refs.get("hypotheses") or [])
-        for entry in view.assurance
-    )
-    reasons["supporting_evidence"] = supported
-    reasons["structural_equivalence_audit"] = audited
-    if supported and audited:
+    attempted = _certification_attempted(card)
+    if attempted:
+        certified, missing, failures, info = _insight_certification(
+            card, state, resolved, refs, audits)
+    else:
+        certified, missing, failures, info = False, [], [], {}
+    reasons["certification"] = {"attempted": attempted, "missing": missing,
+                                "failures": failures}
+    reasons["supporting_evidence"] = info.get("supporting_evidence", [])
+    reasons["structural_equivalence_audit"] = bool(info.get("audited"))
+    reasons["missing"].extend(missing)
+    reasons["missing"].extend(failures)
+    if certified:
         return "evidence_supported_insight", reasons
-    if not supported:
-        reasons["missing"].append("valid 且 ≥ T2 的独立证据")
-    if not audited:
-        reasons["missing"].append("针对该主张的结构等价审计（防自我认证创新性）")
     if has_intervention:
         return "predictive_insight_candidate", reasons
     reasons["missing"].append("可执行的判别干预")
     return "explanatory_hypothesis", reasons
+
+
+def _certification_attempted(card: Dict[str, Any]) -> bool:
+    """Whether the card actually asks to be certified, or merely to be a candidate."""
+    if card.get("declared_class") == "evidence_supported_insight":
+        return True
+    prediction = card.get("novel_prediction")
+    if isinstance(prediction, dict) and isinstance(prediction.get("observation"), dict):
+        return True
+    refs = cg.normalize_refs(card.get("refs"))
+    return bool(refs.get("evidence"))
 
 
 def _scope_within(evidence_scope: str, boundary: str) -> bool:
@@ -1707,15 +2680,22 @@ def op_freeze(state_path: Path, experiment_id: str) -> int:
         return EXIT_ENV
     diagnostics = criterion_errors(preregistration.get("outcomes"), f"{experiment_id}.outcomes") \
         if not isinstance(preregistration.get("outcomes"), list) else []
+    diagnostics.extend(branch_rule_errors(
+        preregistration, f"experiments[{experiment_id}].preregistration"))
+    rule = preregistration.get("branch_rule")
     print(json.dumps({
         "kind": "prediction_freeze",
         "subject": experiment_id,
         "at_state_version": preregistration.get("frozen_at_state_version"),
         "freeze_digest": freeze_digest(experiment),
+        "freeze_digest_schema": "outcomes+frozen_at_state_version+outcome_mode+branch_rule",
+        "outcome_mode": preregistration.get("outcome_mode", "completeness"),
+        "branch_mode": branch_mode_enabled(preregistration),
+        "branch_rule": rule if isinstance(rule, dict) else None,
         "outcomes": [item.get("id") for item in preregistration.get("outcomes", [])
                      if isinstance(item, dict)],
         "criteria_present": _criterion_present(experiment),
-        "diagnostics": [d.as_dict() for d in diagnostics],
+        "diagnostics": [d.as_dict() for d in cg._dedupe(diagnostics)],
     }, ensure_ascii=False, indent=2))
     return EXIT_OK if not diagnostics else EXIT_HARD
 
@@ -1734,7 +2714,11 @@ def op_compare(state_path: Path, packet_path: Optional[Path],
     except json.JSONDecodeError as exc:
         print(f"environment error: packet is not valid JSON: {exc.msg}", file=sys.stderr)
         return EXIT_ENV
-    assessment, diagnostics = assess_experiment(state, packet)
+    revisions: List[Dict[str, Any]] = []
+    revisions_path = cg.cognition_dir_for(state_path) / cg.REVISIONS_NAME
+    if revisions_path.is_file():
+        revisions, _ = cg.load_revisions(revisions_path)
+    assessment, diagnostics = assess_experiment(state, packet, revisions)
     if for_transition:
         allowed, reasons = evidence_transition_allowed(state, assessment)
         assessment["transition_allowed"] = allowed
@@ -1790,18 +2774,23 @@ def op_insight(state_path: Path, cognition_dir: Path, card_path: Optional[Path])
     if card_path is None:
         card_path = cognition_dir / INSIGHT_CARDS_NAME
     cards, parse_diagnostics = load_cards(card_path)
+    audits, audit_problems = load_audits(state, state_path.parent)
     diagnostics: List[Diagnostic] = list(parse_diagnostics)
     payload = []
     for card in cards:
-        diagnostics.extend(insight_card_errors(card, state))
-        derived, reasons = classify_insight(card, state)
+        diagnostics.extend(insight_card_errors(card, state, audits))
+        derived, reasons = classify_insight(card, state, audits)
         payload.append({"id": card.get("id"), "derived_class": derived,
                         "declared_class": card.get("declared_class"), "reasons": reasons})
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    # Audit artifacts are owned by `structural_equivalence_check` (its `EQ1`/`EQ12` route
+    # rules). Here they are only an input to certification, so their problems are reported
+    # as readiness, not as a second verdict on the artifact.
+    print(json.dumps({"cards": payload, "audits_loaded": sorted(audits),
+                      "audit_problems": audit_problems}, ensure_ascii=False, indent=2))
     diagnostics = cg._dedupe(diagnostics)
     for diagnostic in diagnostics:
         print(diagnostic.render(), file=sys.stderr)
-    hard = [d for d in diagnostics if d.rule in ("PC7", "PC8")]
+    hard = [d for d in diagnostics if d.rule in ("PC7", "PC8", "PC11")]
     return EXIT_OK if not hard else EXIT_HARD
 
 
@@ -1918,6 +2907,31 @@ def _source(content: str) -> Dict[str, str]:
             "content": content, "digest": eo.digest(content)}
 
 
+def _branch_fixture() -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """The fixture with a legitimately frozen branch declaration.
+
+    `O1`/`O2` are the same observable with disjoint effective ranges, the rule names the raw
+    observation that decides the branch, and the packet submits only that one observation —
+    so branch mode is derived, not asserted.
+    """
+    state, observation = _fixture()
+    preregistration = state["experiments"][0]["preregistration"]
+    preregistration["outcome_mode"] = "branch"
+    preregistration["branch_rule"] = {
+        "selector": {"kind": "result", "location": "results/A/X1/summary.json"},
+        "quantity": "落差（dB）",
+        "branches": ["O1", "O2"],
+    }
+    packet = {
+        "schema": observation["schema"],
+        "experiment_id": observation["experiment_id"],
+        "execution": observation["execution"],
+        "outcomes": [observation["outcomes"][0]],
+        "observed_outcome": "O1",
+    }
+    return state, packet
+
+
 def selftest() -> int:
     failures = 0
 
@@ -2023,25 +3037,85 @@ def selftest() -> int:
           with_extra["evidence_eligible"] is False
           and any(d.rule == "PC2" for d in extra_diagnostics))
 
-    # branch mode: mutually exclusive branches of one decision
-    branch = json.loads(json.dumps(observation))
-    branch["observed_outcome"] = "O1"
-    branch["outcomes"] = [branch["outcomes"][0]]
-    branch_assessment, _ = assess_experiment(state, branch)
-    check("branch mode adjudicates only the selected branch",
+    # --- P0-1: branch mode must be frozen, derived, and verifiable ------------------
+    branch_state, branch_packet = _branch_fixture()
+    branch_assessment, branch_diagnostics = assess_experiment(branch_state, branch_packet)
+    check("a frozen branch rule adjudicates the derived branch",
           branch_assessment["outcome_class"] == "PREDICTION_HELD"
           and branch_assessment["mode"] == "branch"
-          and branch_assessment["not_selected"] == ["O2"])
-    ambiguous = json.loads(json.dumps(observation))
-    ambiguous["observed_outcome"] = "O1"
-    ambiguous["outcomes"] = [
+          and branch_assessment["selected_outcome"] == "O1")
+    check("the selected branch is the one the frozen rule derives, not the declared one",
+          branch_assessment["declared_outcome"] == "O1"
+          and branch_assessment["branch_resolution"]["matched"] == ["O1"])
+    check("every non-selected branch is excluded by a checked condition",
+          branch_assessment["not_selected"] == ["O2"]
+          and [item["outcome_id"] for item in branch_assessment["excluded_branches"]] == ["O2"]
+          and branch_assessment["excluded_branches"][0]["excluded_verdict"] != "PREDICTION_HELD")
+    check("a legitimate frozen branch selection is qualified evidence",
+          branch_assessment["evidence_eligible"] is True
+          and branch_diagnostics == [])
+
+    unfrozen, unfrozen_packet = _branch_fixture()
+    del unfrozen["experiments"][0]["preregistration"]["outcome_mode"]
+    del unfrozen["experiments"][0]["preregistration"]["branch_rule"]
+    rejected, rejected_diagnostics = assess_experiment(unfrozen, unfrozen_packet)
+    check("an unfrozen branch selection falls back to completeness mode",
+          rejected["mode"] == "completeness"
+          and rejected["outcome_class"] == "PARTIALLY_ASSESSED"
+          and rejected["evidence_eligible"] is False)
+    check("an unfrozen branch selection is reported",
+          any(d.rule == "PC10" for d in rejected_diagnostics))
+
+    partial_rule, partial_rule_packet = _branch_fixture()
+    partial_rule["experiments"][0]["preregistration"]["branch_rule"]["branches"] = ["O1"]
+    broken_rule, broken_rule_diagnostics = assess_experiment(partial_rule, partial_rule_packet)
+    check("a branch set that is not a partition is not branch mode",
+          broken_rule["evidence_eligible"] is False
+          and any(d.rule == "PC10" for d in broken_rule_diagnostics))
+
+    overlapping, overlapping_packet = _branch_fixture()
+    overlapping["experiments"][0]["preregistration"]["outcomes"][1]["criterion"][
+        "expected_range"] = [0.0, 0.6]
+    not_exclusive, not_exclusive_diagnostics = assess_experiment(overlapping, overlapping_packet)
+    check("branches that are not mutually exclusive cannot use branch mode",
+          not_exclusive["mode"] == "completeness"
+          and not_exclusive["evidence_eligible"] is False
+          and any("互斥" in d.detail for d in not_exclusive_diagnostics))
+
+    elsewhere, elsewhere_packet = _branch_fixture()
+    elsewhere_packet["outcomes"][0]["source"]["location"] = "results/other.json"
+    untraceable, untraceable_diagnostics = assess_experiment(elsewhere, elsewhere_packet)
+    check("a branch basis outside the frozen source is not evidence",
+          untraceable["outcome_class"] == "UNTESTABLE"
+          and untraceable["evidence_eligible"] is False)
+    check("an untraceable branch basis is reported",
+          any(d.rule == "PC10" for d in untraceable_diagnostics)
+          and any(check_result["id"] == "PQ5" and not check_result["passed"]
+                  for check_result in untraceable["qualification"]["checks"]))
+
+    conflicted, conflicted_packet = _branch_fixture()
+    conflicted_packet["observed_outcome"] = "O2"
+    conflicted_assessment, _ = assess_experiment(conflicted, conflicted_packet)
+    check("a branch declaration that contradicts the raw observation is rejected",
+          conflicted_assessment["outcome_class"] == "UNTESTABLE"
+          and conflicted_assessment["evidence_eligible"] is False)
+
+    two, two_packet = _branch_fixture()
+    two_packet["outcomes"] = [
         {"id": "O1", "value": 0.8, "source": _source("a")},
         {"id": "O2", "value": 0.05, "source": _source("b")},
     ]
-    ambiguous_assessment, ambiguous_diagnostics = assess_experiment(state, ambiguous)
-    check("two satisfied branches make the freeze undecidable",
-          ambiguous_assessment["outcome_class"] == "UNTESTABLE"
-          and any(d.rule == "PC8" for d in ambiguous_diagnostics))
+    two_assessment, _ = assess_experiment(two, two_packet)
+    check("mutually exclusive branches cannot both be submitted",
+          two_assessment["outcome_class"] == "UNTESTABLE"
+          and two_assessment["evidence_eligible"] is False)
+
+    unmatched, unmatched_packet = _branch_fixture()
+    unmatched_packet["outcomes"][0]["value"] = 0.35
+    unmatched_assessment, _ = assess_experiment(unmatched, unmatched_packet)
+    check("an observation outside every frozen branch decides nothing",
+          unmatched_assessment["outcome_class"] == "UNTESTABLE"
+          and unmatched_assessment["branch_resolution"]["reason"] == "no_branch_matched")
 
     bad_packet = json.loads(json.dumps(observation))
     bad_packet["execution"]["validity"] = "INVALID"
@@ -2101,11 +3175,42 @@ def selftest() -> int:
     check("legacy outcome raises PC1",
           any(d.rule == "PC1" for d in legacy_diagnostics))
 
-    # -- source binding ----------------------------------------------------
+    # -- P0-2: source binding must gate qualification, not just be reported ---
     unbound = json.loads(json.dumps(observation))
     unbound["outcomes"][0]["source"]["digest"] = "sha256:deadbeef"
-    _, unbound_diagnostics = assess_experiment(state, unbound)
+    unbound_assessment, unbound_diagnostics = assess_experiment(state, unbound)
     check("unbound source is rejected", any(d.rule == "PC2" for d in unbound_diagnostics))
+    check("a digest mismatch cannot qualify evidence",
+          unbound_assessment["evidence_eligible"] is False
+          and unbound_assessment["evidence_class"] != "QUALIFIED_EVIDENCE"
+          and not evidence_transition_allowed(state, unbound_assessment)[0])
+
+    missing_source = json.loads(json.dumps(observation))
+    del missing_source["outcomes"][0]["source"]
+    missing_assessment, missing_diagnostics = assess_experiment(state, missing_source)
+    check("a missing source is reported", any(d.rule == "PC2" for d in missing_diagnostics))
+    check("a missing source cannot qualify evidence",
+          missing_assessment["evidence_eligible"] is False
+          and any(check_result["id"] == "PQ4" and not check_result["passed"]
+                  for check_result in missing_assessment["qualification"]["checks"]))
+
+    incomplete_source = json.loads(json.dumps(observation))
+    incomplete_source["outcomes"][0]["source"]["location"] = ""
+    incomplete_assessment, _ = assess_experiment(state, incomplete_source)
+    check("an incomplete source cannot qualify evidence",
+          incomplete_assessment["evidence_eligible"] is False)
+
+    # The gate is the only authority: an assessment without its block grants nothing.
+    forged = {k: v for k, v in held.items() if k != "qualification"}
+    forged["evidence_eligible"] = True
+    forged["evidence_class"] = "QUALIFIED_EVIDENCE"
+    forged["scientific_status"] = "MAY_INFORM_TRANSITION"
+    forged_allowed, forged_reasons = evidence_transition_allowed(state, forged)
+    check("a hand-written eligibility flag is not a qualification",
+          forged_allowed is False and forged_reasons)
+    check("the qualification block is produced by exactly one function",
+          [check_result["id"] for check_result in held["qualification"]["checks"]]
+          == list(QUALIFICATION_CHECK_IDS))
 
     # -- freeze integrity --------------------------------------------------
     freeze_event = {
@@ -2345,37 +3450,121 @@ def selftest() -> int:
           any(d.rule == "PC8" for d in errors))
 
     supported = dict(card, id="IC2",
-                     novel_prediction={"ref": "X1:O1", "statement": "落差 ≥ 0.5 dB"},
+                     novel_prediction={"ref": "X1:O1", "statement": "落差 ≥ 0.5 dB",
+                                       "experiment_ref": "X1"},
                      discriminating_intervention="X1",
-                     refs={"claims": ["C1"], "evidence": ["E1"], "hypotheses": ["H1"]},
+                     refs={"claims": ["C1"], "evidence": ["E1"], "hypotheses": ["H1"],
+                           "experiments": ["X1"]},
                      declared_class="evidence_supported_insight")
     errors = insight_card_errors(supported, state)
     check("self-certified evidence support is a hard violation",
           any(d.rule == "PC7" for d in errors))
 
-    audited_state = json.loads(json.dumps(state))
-    audited_state["assurance"] = [{"id": "A1", "target": "C1",
-                                   "attack_type": "structural-equivalence",
-                                   "verification_tier": "T1",
-                                   "kill_condition": "若与 LIT1 结构等价则杀死",
-                                   "discriminating_test": "X1"}]
-    derived, reasons = classify_insight(supported, audited_state)
-    check("evidence plus an independent audit derives evidence support",
-          derived == "evidence_supported_insight", )
-    errors = insight_card_errors(supported, audited_state)
-    check("a supported card after the audit validates",
-          [d for d in errors if d.rule in ("PC7",)] == [])
+    # P1: certification needs a qualified adjudication of *this* prediction, an R9.O
+    # receipt in the supporting direction, bound evidence, and an audit whose result is
+    # known. Every ingredient below is canonical or comes from the audit's owner.
+    import evidence_outcome as eo
+    certified_state = json.loads(json.dumps(state))
+    certified_state["assurance"] = [{"id": "A1", "target": "H1",
+                                     "attack_type": "structural-equivalence",
+                                     "verification_tier": "T1",
+                                     "kill_condition": "若与 LIT1 结构等价则杀死",
+                                     "discriminating_test": "X2",
+                                     "audit_ref": ".research-idea-pipeline/routes/A/assurance/"
+                                                  "structural-equivalence/H1.json"}]
+    certified_state["evidence"][0]["supports"] = ["C1"]
+    result_packet = {
+        "schema": "evidence-result@1", "experiment_id": "X1",
+        "experiment_digest": "sha256:synthetic", "execution_status": "completed",
+        "result_summary": "落差 0.8 dB（SYNTHETIC FIXTURE）",
+        "sources": [{"id": "S1", "kind": "result",
+                     "location": "results/A/X1/summary.json",
+                     "content": "落差 0.8 dB（SYNTHETIC FIXTURE）",
+                     "digest": eo.digest("落差 0.8 dB（SYNTHETIC FIXTURE）")}],
+        "observations": [{"id": "OBS1", "statement": "落差 0.8 dB",
+                          "scope": "数据集 A", "source_ids": ["S1"]}],
+    }
+    certified_state["experiments"][0]["outcome_analysis"] = {
+        "packet": result_packet,
+        "analysis": {"schema": "evidence-outcome-analysis@1", "id": "AN1",
+                     "experiment_id": "X1", "verification_tier": "T2",
+                     "outcome": "POSITIVE_EVIDENCE",
+                     "claim_updates": [{"id": "C1", "direction": "positive",
+                                        "identification": "PASS",
+                                        "new_status": "SUPPORTED",
+                                        "evidence": ["OBS1"], "scope": "数据集 A"}]},
+        "audit": None,
+    }
+    full_packet = json.loads(json.dumps(observation))
+    full_packet["outcomes"] = [
+        {"id": "O1", "value": 0.8, "source": _source("落差 0.8 dB")},
+        {"id": "O2", "value": 0.05, "source": _source("落差 0.05 dB")},
+    ]
+    supported["novel_prediction"] = {"ref": "X1:O1", "statement": "落差 ≥ 0.5 dB",
+                                     "experiment_ref": "X1",
+                                     "observation": full_packet,
+                                     "observation_digest": cg.digest_of(full_packet)}
+    import structural_equivalence_check as sec
+    artifact = sec._selftest_artifact()
+    audits = {"A1": {"artifact": artifact, "verdict": artifact.get("verdict"),
+                     "candidate": artifact.get("candidate"), "source": "synthetic",
+                     "violations": []}}
+    derived, reasons = classify_insight(supported, certified_state, audits)
+    check("a fully bound card is certified on qualified evidence",
+          derived == "evidence_supported_insight")
+    check("the certified card raises no rule violation",
+          insight_card_errors(supported, certified_state, audits) == [])
+    derived, _ = classify_insight(supported, certified_state)
+    check("without the audit result the card cannot be certified",
+          derived != "evidence_supported_insight")
 
-    unscoped = json.loads(json.dumps(audited_state))
+    no_receipt = json.loads(json.dumps(certified_state))
+    no_receipt["experiments"][0]["outcome_analysis"] = None
+    derived, _ = classify_insight(supported, no_receipt, audits)
+    check("without an R9.O receipt the card cannot be certified",
+          derived != "evidence_supported_insight")
+
+    negative_receipt = json.loads(json.dumps(certified_state))
+    negative_receipt["experiments"][0]["outcome_analysis"]["analysis"]["outcome"] = \
+        "NEGATIVE_EVIDENCE"
+    derived, _ = classify_insight(supported, negative_receipt, audits)
+    check("an R9.O receipt in the opposite direction cannot certify support",
+          derived != "evidence_supported_insight")
+
+    borrowed = json.loads(json.dumps(certified_state))
+    borrowed["evidence"][0]["supports"] = []
+    derived, _ = classify_insight(supported, borrowed, audits)
+    check("evidence that supports nothing cannot certify the card",
+          derived != "evidence_supported_insight")
+
+    mismatched_audit = {"A1": {**audits["A1"], "artifact": {**artifact, "verdict": "equivalent"},
+                               "verdict": "equivalent"}}
+    derived, _ = classify_insight(supported, certified_state, mismatched_audit)
+    check("an audit that finds an equivalent prior cannot certify a new mechanism",
+          derived != "evidence_supported_insight")
+
+    unscoped = json.loads(json.dumps(certified_state))
     unscoped["evidence"][0]["scope"] = "数据集 Z"
-    derived, _ = classify_insight(supported, unscoped)
+    derived, _ = classify_insight(supported, unscoped, audits)
     check("evidence outside the claimed boundary cannot support the card",
           derived == "predictive_insight_candidate")
 
-    unbound = json.loads(json.dumps(audited_state))
+    unbound = json.loads(json.dumps(certified_state))
     unbound["evidence"][0]["depends_on"] = []
-    derived, _ = classify_insight(supported, unbound)
+    derived, _ = classify_insight(supported, unbound, audits)
     check("evidence not bound to the prediction's experiment cannot support the card",
+          derived != "evidence_supported_insight")
+
+    contradicted = json.loads(json.dumps(certified_state))
+    contradicted["claims"][0]["status"] = "contradicted"
+    derived, _ = classify_insight(supported, contradicted, audits)
+    check("a contradicted claim cannot back an evidence-supported insight",
+          derived != "evidence_supported_insight")
+
+    tampered_card = json.loads(json.dumps(supported))
+    tampered_card["novel_prediction"]["observation"]["outcomes"][0]["value"] = 0.4
+    derived, _ = classify_insight(tampered_card, certified_state, audits)
+    check("a tampered observation packet breaks the certification",
           derived != "evidence_supported_insight")
 
     print(f"selftest: {'PASS' if failures == 0 else 'FAIL'} ({failures} failures)")

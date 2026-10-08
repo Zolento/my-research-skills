@@ -90,21 +90,55 @@ evidence eligibility.
 ### Branch mode
 
 A preregistration often enumerates *mutually exclusive branches* of one decision, not several
-independent measurements. The packet says which branch it matched:
+independent measurements. Branch mode exists for that case and **only** for that case, because
+the same shape is also the easiest way to report one favourable result out of several
+independent predictions. The difference must be frozen, not asserted, so branch mode is turned
+on by the **preregistration**, never by the packet (`PC10`):
 
 ```json
-{"experiment_id": "X1", "observed_outcome": "O1", "outcomes": [ "... only O1 ..." ]}
+{"frozen_at_state_version": 3,
+ "outcome_mode": "branch",
+ "branch_rule": {
+   "selector": {"kind": "result",
+                "location": "results/A/X1/summary.json#cross_centre_gap"},
+   "quantity": "跨中心 PSNR 差（dB）",
+   "branches": ["O1", "O2"]},
+ "outcomes": [{"id": "O1", "criterion": {"...": "..."}},
+              {"id": "O2", "criterion": {"...": "..."}}]}
 ```
 
-* `observed_outcome` must name a **frozen** outcome; an unknown id is `PC3`.
-* Only the selected branch is adjudicated. A non-selected branch is `not_selected`, **not** a
-  failed prediction.
-* If a non-selected branch that the packet also reports evaluates to `HELD` as well, the
-  freeze is not exclusive: the result is `UNTESTABLE`, reason `ambiguous_preregistration`
-  (`PC8`). One observation cannot say which branch happened.
+| Field | Meaning |
+|---|---|
+| `outcome_mode` | `completeness` (default) or `branch`; a freeze without it is read as completeness |
+| `branch_rule.selector` | the raw observation that decides the branch: `kind` + `location`, both known before the run |
+| `branch_rule.quantity` | the observed variable; every branch criterion must be written against it |
+| `branch_rule.branches` | an exact partition of the frozen outcome set — no omission, no extra |
 
-Without `observed_outcome` the comparator uses **completeness mode**: every frozen outcome is
-an independent adjudication and all of them must be decided before `PREDICTION_HELD`.
+What is **computed** rather than declared:
+
+* each branch criterion must have a decidable shape, the same observable and the same declared
+  measurement basis;
+* the branches must be **provably mutually exclusive** from the frozen criteria alone
+  (`criteria_mutually_exclusive`: disjoint effective ranges, disjoint held labels, or different
+  directions). If they are not, branch mode is refused and the freeze is read as completeness;
+* the packet must submit **exactly one** raw observation, its `source.kind`/`source.location`
+  must equal the frozen `selector`, and that one observation is evaluated against **every**
+  frozen branch. The branch that holds is the observed branch;
+* the packet's `observed_outcome`, if present, is only a claim: it must equal the derived
+  branch, and the observation's id must equal it too. A declaration that contradicts the raw
+  observation is `PC10` and decides nothing (`branch_declaration_conflict`,
+  `branch_id_conflict`, `selector_source_mismatch`, `branch_observation_count`,
+  `no_branch_matched`).
+
+A non-selected branch is **not** a failed prediction, and it is not silently ignored either: it
+is recorded in `excluded_branches[]` with the verdict the same raw observation produced
+(`excluded_verdict`) and the exclusion basis, and its id is listed in `not_selected[]`.
+"Chose `O1`, therefore `O2` does not matter" is not available.
+
+Without a frozen branch mode the comparator uses **completeness mode**: every frozen outcome is
+an independent adjudication and all of them must be decided before `PREDICTION_HELD`. A packet
+that declares `observed_outcome` on a completeness freeze is read as completeness and the
+declaration is reported (`PC10`) — this is exactly the post-hoc selection the freeze prevents.
 
 ### Evidence eligibility
 
@@ -120,18 +154,45 @@ separate field.
 | `scientific_status` | `MAY_INFORM_TRANSITION` / `DIAGNOSTIC_ONLY` / `NO_INFERENCE` | what a consumer may do with it |
 | `outcome_class_downgraded_from` | class or absent | set when a world-claiming result was demoted to `UNTESTABLE` |
 
-Rules:
+### One gate, fail closed
+
+Eligibility is decided by exactly one function, `qualify_evidence` (schema
+`research-idea-pipeline/evidence-qualification@1`). `assess_experiment`,
+`evidence_transition_allowed`, the `--for-transition` exit code, the replay metrics and the
+insight certification all read its block; none of them re-derives eligibility from a subset of
+fields. The block lists every sub-check with its verdict:
+
+| Check | Question | On failure |
+|---|---|---|
+| `PQ1` | did the execution carry a usable validity verdict? | `INVALID` → blocking, `UNKNOWN` → diagnostic |
+| `PQ2` | is there a frozen, well-formed preregistration (criteria + branch rule + no post-hoc amendment)? | blocking |
+| `PQ3` | is the frozen set completely adjudicated, or legitimately branch-mode? | blocking |
+| `PQ4` | is every submitted observation bound to exactly `{kind, location, content, digest}` with `digest == digest(content)`? | blocking |
+| `PQ5` | does the branch selection trace to the frozen raw observation? | blocking |
+| `PQ6` | is the packet bound to an existing experiment? | blocking |
+| `PQ7` | are the execution and the experiment receipt terminal (`completed`/`failed`, `done`/`failed`, `result_at_state_version` present)? | diagnostic |
+| `PQ8` | does the freeze precede the result, with no post-hoc amendment? | diagnostic (blocking for a post-hoc amendment) |
+
+A **blocking** failure yields `INSUFFICIENT_PROVENANCE` / `NO_INFERENCE`; a **diagnostic**
+failure yields `DIAGNOSTIC_ONLY` / `DIAGNOSTIC_ONLY`. Either way `evidence_eligible` is
+`false`, no world claim may occupy `outcome_class`, and no mechanism may be supported or
+refuted. A missing source is not a warning: it is a blocking failure of `PQ4`. That is the
+defect this gate removes — the schema checker reported the broken source while an independent
+chain of `if`s still declared `QUALIFIED_EVIDENCE`.
+
+Every failure is emitted as a `PC7` diagnostic that names the check, its severity and the JSON
+path, and the failed checks are also listed in `provenance_gaps`.
 
 * `execution.validity == "INVALID"` → `INVALID_EXECUTION`, no comparison, `NO_INFERENCE`.
 * `execution.validity == "UNKNOWN"` → the comparison is kept, but a world claim may not occupy
   `outcome_class`: it is downgraded to `UNTESTABLE` and recorded in
-  `diagnostic_outcome_class`. A `PC7` diagnostic is emitted.
-* Incomplete provenance (experiment not terminal, missing `result_at_state_version`, missing
-  `frozen_at_state_version`, or a freeze later than the result) → `DIAGNOSTIC_ONLY`.
-* Missing, duplicated, extra or ambiguous outcomes → `DIAGNOSTIC_ONLY`.
+  `diagnostic_outcome_class`.
 * `PARTIALLY_ASSESSED` and `UNTESTABLE` are statements about the *adjudication*, not about the
   world, so they remain in the scientific slot even when the evidence is not qualified: "we
   could not finish evaluating" is itself the correct conclusion.
+* `evidence_transition_allowed` returns `false` when the block is missing or was produced for a
+  different packet (`packet_digest`), and re-checks the state-only preconditions. A
+  hand-written `evidence_eligible: true` grants nothing.
 
 ```sh
 python3 scripts/prediction_compare.py compare --state S --packet P --for-transition
@@ -267,14 +328,36 @@ The class shown in the index is **derived**:
 |---|---|
 | `explanatory_hypothesis` | it explains something already observed, and has no decidable independent prediction |
 | `predictive_insight_candidate` | it has a frozen prediction *and* a real discriminating intervention |
-| `evidence_supported_insight` | additionally, valid evidence at `T2` or above is bound to that experiment and lies inside the claimed boundary, **and** an independent `structural-equivalence` audit targets the claim |
+| `evidence_supported_insight` | all six certification checks below pass |
+
+The top rung is a **binding** claim, not "this experiment produced T2 evidence somewhere". Each
+check names the single missing step (`PC11`):
+
+| Check | Requirement |
+|---|---|
+| `IC1` | an explicit `novel_prediction.experiment_ref` equal to the experiment of `ref`, `refs.experiments` containing it, and at least one claim/hypothesis reference |
+| `IC2` | the referenced claim is not `contradicted`/`killed` and every referenced object is `valid` — the display class cannot outrun `claims[].status` or `validity` |
+| `IC3` | the card carries the prediction–observation packet for **that** prediction with a matching `observation_digest`, and the unified gate qualifies it with verdict `PREDICTION_HELD` (in branch mode, on the selected branch) |
+| `IC4` | a consistent R9.O receipt for the same experiment: `POSITIVE_EVIDENCE`, `verification_tier ≥ T2`, and a `positive` + `identification: PASS` update for one of the referenced targets |
+| `IC5` | canonical evidence at `T2` or above, `Observed`/`Supported`, `valid`, inside the claimed boundary, bound to that experiment, `supports` one of the referenced mechanisms, contradicts none, and (when an explicit `prediction_ref` is present) bound to **that** prediction |
+| `IC6` | an `assurance[]` entry with `attack_type: structural-equivalence`, tier ≥ `T1`, a real `discriminating_test`, a valid `validity`, whose `audit_ref` resolves to a SENA artifact that passes `structural_equivalence_check` and whose `verdict` is neither `equivalent`/`subsumed-by-prior`/`reframing-only`/`uncertain` nor about a different candidate |
+
+Consequences worth stating explicitly:
+
+* "same experiment" is not "same prediction": two cards sharing one experiment are certified
+  separately, and an evidence object bound to another prediction of the same experiment is
+  refused;
+* an audit that merely **exists** is not an audit that **passed**: its actual verdict is loaded
+  from the artifact its owner validates, so `assurance[]` without `audit_ref` keeps the card at
+  the lower class;
+* a card without fine-grained references keeps the lower class and says what is missing —
+  provenance is reported, never guessed.
 
 Declaring `evidence_supported_insight` without those canonical facts is a hard violation
 (`PC7`) — self-certified novelty is exactly what the pipeline is built to prevent. A mismatch
-between the declared and derived class is reported (`PC9`) and the derived class wins.
-
-These classes are display and cognitive-index labels. They never replace `claims[].status` or
-`verification_tier`.
+between the declared and derived class is reported (`PC9`) and the derived class wins. These
+classes are display and cognitive-index labels; they never replace `claims[].status`,
+`verification_tier` or the R8 evidence contract.
 
 ## 7. Commands
 
@@ -298,6 +381,13 @@ Exit codes: `0` pass, `1` argument error, `3` hard violation, `4` environment.
 - [ ] An invalid run produced `INVALID_EXECUTION`, not a mechanism refutation.
 - [ ] An observation without a preregistration is recorded as `EXPLORATORY_ANOMALY`.
 - [ ] Every competition prediction is attributed to a mechanism, and the criteria differ.
+- [ ] Branch mode is frozen (`outcome_mode` + `branch_rule`) before the run, the branches are
+      provably exclusive, and the selected branch is derived from the raw observation.
+- [ ] A missing source, a digest mismatch or an unfrozen branch selection leaves
+      `evidence_eligible: false` (`PQ1`—`PQ8`), not merely a diagnostic.
+- [ ] An insight is certified only with a qualified adjudication of *its own* prediction, an
+      R9.O receipt in the supporting direction, bound evidence and an audit whose result is
+      known.
 - [ ] Repeated empty diagnosis changed the behaviour instead of producing another explanation.
 - [ ] No insight card certifies its own novelty or evidence support.
 - [ ] `V1`—`V24` and the R10/R14 enums are unchanged.

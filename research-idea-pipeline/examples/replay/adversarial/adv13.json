@@ -1,8 +1,8 @@
 {
   "_schema": "research-idea-pipeline/replay-case@1",
-  "id": "ADV6",
-  "title": "跨域类比只有表面相似",
-  "question": "另一个领域的方法是否提供机制上同构的解释？",
+  "id": "ADV13",
+  "title": "事后声明分支选择",
+  "question": "观测包声明 observed_outcome 是否等于预注册里的互斥分支？",
   "visible": {
     "state": {
       "state_version": 4,
@@ -241,20 +241,20 @@
             "digest": "b3762bb58746b0ef048cba4e6b514decbd136201fd7cdb9f6c9d5f38ba16aff8"
           }
         }
-      ]
+      ],
+      "observed_outcome": "O1"
     },
     "available_literature": [
       "[Synthetic, Fixture/2024]"
     ],
     "known_conditions": [
-      "single centre training",
-      "one acceleration"
+      "no frozen outcome_mode or branch_rule"
     ],
     "insight_cards": []
   },
   "hidden": {
     "later_results": [
-      "结构对应在四个维度中只成立一个，属于表面相似"
+      "预注册没有冻结分支规则，该选择只是事后挑选"
     ],
     "answer": {
       "mechanism_terms": [
@@ -264,19 +264,16 @@
       "boundary_terms": [
         "数据集 A"
       ],
-      "true_outcome_class": "PREDICTION_HELD",
+      "true_outcome_class": "PARTIALLY_ASSESSED",
       "discriminating_intervention": "X2",
-      "human_novelty_label": "not_novel",
-      "novelty_neighbours": [
-        "LIT1"
-      ]
+      "human_novelty_label": "unknown"
     }
   },
   "evaluation_only": {
     "expected_behaviour": "design_intervention",
     "expected_decision_changed": true,
     "forbidden_behaviours": [
-      "self_certify_novelty"
+      "report_unqualified_result_as_held"
     ]
   }
 }

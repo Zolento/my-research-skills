@@ -103,7 +103,7 @@ violation list and a pass rate. Differences are reported per dimension; nothing 
 
 ## 5. Adversarial suite
 
-Ten cases, one per failure mode the specification names, all shipped under
+Fourteen cases, one per failure mode the specification names, all shipped under
 `examples/replay/adversarial/`:
 
 | Case | Situation | Expected behaviour |
@@ -120,16 +120,23 @@ Ten cases, one per failure mode the specification names, all shipped under
 | `ADV10` | several diagnostic rounds produce nothing new | change the question, do not keep diagnosing |
 | `ADV11` | two frozen predictions, only one submitted | `PARTIALLY_ASSESSED`, never `PREDICTION_HELD` |
 | `ADV12` | execution validity unknown | keep the diagnostic comparison, refuse the scientific claim |
+| `ADV13` | branch selection declared after the fact | no frozen rule means completeness mode; the selection is refused |
+| `ADV14` | the source digest does not match its content | the observation is not bound, so it is not evidence |
 
 The suite deliberately rewards **correct stopping**, **preserved unknowns** and **changed
 direction**, not "more output". `ADV4` scores `intervention_quality = 1.0` for choosing no
 experiment at all, because stopping is the right answer there.
 
-`ADV11` and `ADV12` guard the two failure modes that would otherwise turn the comparator into
-a false-positive generator: reporting a partial submission as "all predictions held", and
-spending an unqualified comparison as evidence. Both are enforced by the single invariant
+`ADV11`—`ADV14` guard the failure modes that would otherwise turn the comparator into a
+false-positive generator: reporting a partial submission as "all predictions held", spending an
+unqualified comparison as evidence, opening branch mode without a frozen rule, and accepting an
+observation whose source digest does not match its content. They are enforced by
 `report_unqualified_result_as_held` — a decision may only claim `PREDICTION_HELD` when its own
 assessment is evidence-eligible.
+
+The runner also projects the insight classes of any cards the case carries, so
+`certify_insight_from_unqualified_evidence` is a checkable tripwire: a card may only reach
+`evidence_supported_insight` while the upstream comparison was qualified evidence.
 
 ## 6. End-to-end smoke test
 
@@ -159,7 +166,7 @@ view and the arm name, and must return a `replay-decision@1` object.
 ## 8. What has and has not been verified
 
 **Verified offline, mechanically:** leak prevention, metric independence from the agent's
-self-assessment, the ablation ladder on synthetic cases, the ten adversarial situations, and
+self-assessment, the ablation ladder on synthetic cases, the fourteen adversarial situations, and
 the end-to-end state → prediction → revision → restart loop.
 
 **Not verified:** real Agent A/B performance. No model was called, no real literature library

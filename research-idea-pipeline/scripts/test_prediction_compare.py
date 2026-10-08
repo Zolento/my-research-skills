@@ -245,33 +245,114 @@ class TestAssessment(unittest.TestCase):
         self.assertEqual([entry["outcome_id"] for entry in assessment["predictions"]],
                          ["O1", "O2"])
 
-    def test_branch_mode_adjudicates_only_the_selected_branch(self):
+    def test_branch_mode_adjudicates_the_derived_branch(self):
+        """P0-1: branch mode needs a frozen rule, and the rule — not the packet — selects."""
+        state, packet = pc._branch_fixture()
+        assessment, diagnostics = pc.assess_experiment(state, packet)
+        self.assertEqual(assessment["mode"], "branch")
+        self.assertEqual(assessment["outcome_class"], "PREDICTION_HELD")
+        self.assertEqual(assessment["selected_outcome"], "O1")
+        self.assertEqual(assessment["not_selected"], ["O2"])
+        self.assertTrue(assessment["evidence_eligible"])
+        self.assertEqual(diagnostics, [])
+
+    def test_a_branch_declaration_without_a_frozen_rule_is_ignored(self):
+        """The exploit: declare `observed_outcome` after seeing the numbers."""
         packet = clone(self.observation)
         packet["observed_outcome"] = "O1"
         packet["outcomes"] = [packet["outcomes"][0]]
-        assessment, _ = pc.assess_experiment(self.state, packet)
-        self.assertEqual(assessment["mode"], "branch")
-        self.assertEqual(assessment["outcome_class"], "PREDICTION_HELD")
-        self.assertEqual(assessment["not_selected"], ["O2"])
-        self.assertTrue(assessment["evidence_eligible"])
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        self.assertEqual(assessment["mode"], "completeness")
+        self.assertEqual(assessment["outcome_class"], "PARTIALLY_ASSESSED")
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertIn("PC10", {d.rule for d in diagnostics})
 
-    def test_two_satisfied_branches_make_the_freeze_undecidable(self):
-        packet = clone(self.observation)
-        packet["observed_outcome"] = "O1"
+    def test_a_post_hoc_branch_rule_changes_the_freeze_digest(self):
+        state, _ = pc._branch_fixture()
+        experiment = state["experiments"][0]
+        recorded = pc.freeze_digest(experiment)
+        stripped = clone(state)
+        del stripped["experiments"][0]["preregistration"]["branch_rule"]
+        self.assertNotEqual(pc.freeze_digest(stripped["experiments"][0]), recorded)
+
+    def test_an_old_freeze_without_a_branch_declaration_still_matches(self):
+        """A project frozen before branch mode existed keeps reading clean."""
+        state, _ = pc._fixture()
+        experiment = state["experiments"][0]
+        legacy = pc.freeze_digest(experiment, legacy=True)
+        self.assertNotEqual(legacy, pc.freeze_digest(experiment))
+        event = {
+            "_schema": cg.SCHEMA_REVISION, "id": "REV1", "seq": 1, "kind": "prediction_freeze",
+            "subject": "X1", "actor": "R8", "at_state_version": 5, "summary": "freeze X1",
+            "trigger": {"kind": "preregistration_frozen", "ref": "X1"},
+            "refs": {"experiments": ["X1"]}, "after": {"freeze_digest": legacy},
+        }
+        self.assertEqual(pc.check_freezes(state, [event]), [])
+        branch_state, _ = pc._branch_fixture()
+        self.assertTrue(pc.check_freezes(branch_state, [event]))
+
+    def test_branch_criteria_must_be_mutually_exclusive(self):
+        state, packet = pc._branch_fixture()
+        state["experiments"][0]["preregistration"]["outcomes"][1]["criterion"][
+            "expected_range"] = [0.0, 0.6]
+        assessment, diagnostics = pc.assess_experiment(state, packet)
+        self.assertEqual(assessment["mode"], "completeness")
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertTrue(any("互斥" in d.detail for d in diagnostics))
+        exclusive, reason = pc.criteria_mutually_exclusive(
+            {"kind": "quantitative", "quantity": "x", "expected_range": [0.0, 0.5], "tolerance": 0.0},
+            {"kind": "quantitative", "quantity": "x", "expected_range": [0.5, 1.0], "tolerance": 0.0})
+        self.assertFalse(exclusive, reason)
+
+    def test_the_branch_set_must_partition_the_frozen_outcomes(self):
+        state, packet = pc._branch_fixture()
+        state["experiments"][0]["preregistration"]["branch_rule"]["branches"] = ["O1"]
+        _, diagnostics = pc.assess_experiment(state, packet)
+        self.assertTrue(any(d.rule == "PC10" and "完整划分" in d.detail for d in diagnostics))
+
+    def test_a_branch_basis_outside_the_frozen_source_is_rejected(self):
+        state, packet = pc._branch_fixture()
+        packet["outcomes"][0]["source"]["location"] = "results/other.json"
+        assessment, diagnostics = pc.assess_experiment(state, packet)
+        self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertTrue(any(d.rule == "PC10" for d in diagnostics))
+        failed = {item["id"] for item in assessment["qualification"]["checks"]
+                  if not item["passed"]}
+        self.assertIn("PQ5", failed)
+
+    def test_a_branch_declaration_that_conflicts_with_the_observation_is_rejected(self):
+        state, packet = pc._branch_fixture()
+        packet["observed_outcome"] = "O2"
+        assessment, _ = pc.assess_experiment(state, packet)
+        self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
+        self.assertEqual(assessment["branch_resolution"]["reason"], "branch_declaration_conflict")
+        self.assertFalse(assessment["evidence_eligible"])
+
+    def test_two_submitted_branches_cannot_both_be_observed(self):
+        state, packet = pc._branch_fixture()
         packet["outcomes"] = [
             {"id": "O1", "value": 0.8, "source": bound_source("a")},
             {"id": "O2", "value": 0.05, "source": bound_source("b")},
         ]
-        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        assessment, _ = pc.assess_experiment(state, packet)
         self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
-        self.assertTrue(assessment["branch_conflicts"])
-        self.assertIn("PC8", {d.rule for d in diagnostics})
+        self.assertEqual(assessment["branch_resolution"]["reason"], "branch_observation_count")
+        self.assertFalse(assessment["evidence_eligible"])
 
-    def test_a_selected_branch_must_be_frozen(self):
+    def test_an_observation_outside_every_branch_decides_nothing(self):
+        state, packet = pc._branch_fixture()
+        packet["outcomes"][0]["value"] = 0.35
+        assessment, _ = pc.assess_experiment(state, packet)
+        self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
+        self.assertEqual(assessment["branch_resolution"]["reason"], "no_branch_matched")
+
+    def test_a_selected_branch_must_still_be_frozen(self):
         packet = clone(self.observation)
         packet["observed_outcome"] = "O9"
-        _, diagnostics = pc.assess_experiment(self.state, packet)
-        self.assertIn("PC3", {d.rule for d in diagnostics})
+        assessment, diagnostics = pc.assess_experiment(self.state, packet)
+        self.assertNotEqual(assessment["outcome_class"], "PREDICTION_HELD")
+        self.assertIn("PC10", {d.rule for d in diagnostics})
 
     def test_an_invalid_execution_is_never_a_prediction_verdict(self):
         packet = clone(self.observation)
@@ -363,6 +444,263 @@ class TestAssessment(unittest.TestCase):
         packet["experiment_id"] = "X404"
         assessment, diagnostics = pc.assess_experiment(self.state, packet)
         self.assertIn("PC3", {d.rule for d in diagnostics})
+
+
+# ---------------------------------------------------------------------------
+# The Evidence Qualification Gate
+# ---------------------------------------------------------------------------
+
+class TestEvidenceQualificationGate(unittest.TestCase):
+    """P0-2: one entry point decides what a comparison is worth, and it fails closed.
+
+    Each test mutates the packet or the state and then reads the *public* result:
+    `assess_experiment` and `evidence_transition_allowed`. None of them asserts on a private
+    helper, and none of them accepts "a diagnostic was reported" as a substitute for
+    "the evidence is not qualified".
+    """
+
+    def setUp(self):
+        self.state, self.observation = pc._fixture()
+        self.complete = clone(self.observation)
+        self.complete["outcomes"] = [
+            {"id": "O1", "value": 0.8, "source": bound_source("落差 0.8 dB")},
+            {"id": "O2", "value": 0.05, "source": bound_source("落差 0.05 dB")},
+        ]
+
+    def _evaluate(self, packet=None, state=None):
+        state = state or self.state
+        assessment, _ = pc.assess_experiment(state, packet or self.complete)
+        allowed, reasons = pc.evidence_transition_allowed(state, assessment)
+        return assessment, allowed, reasons
+
+    def test_a_clean_comparison_is_qualified(self):
+        assessment, allowed, reasons = self._evaluate()
+        self.assertTrue(assessment["evidence_eligible"])
+        self.assertTrue(allowed, reasons)
+        self.assertEqual(assessment["evidence_class"], "QUALIFIED_EVIDENCE")
+        self.assertEqual(assessment["scientific_status"], "MAY_INFORM_TRANSITION")
+        self.assertEqual(assessment["provenance_gaps"], [])
+        self.assertEqual([item["id"] for item in assessment["qualification"]["checks"]],
+                         list(pc.QUALIFICATION_CHECK_IDS))
+
+    def test_every_check_is_recorded_with_its_verdict(self):
+        assessment, _, _ = self._evaluate()
+        checks = assessment["qualification"]["checks"]
+        self.assertTrue(all(item["passed"] for item in checks))
+        self.assertEqual(assessment["qualification"]["schema"], pc.SCHEMA_QUALIFICATION)
+        self.assertEqual(assessment["qualification"]["packet_digest"],
+                         assessment["packet_digest"])
+
+    def test_a_missing_source_cannot_qualify_evidence(self):
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["source"]
+        assessment, allowed, reasons = self._evaluate(packet)
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertFalse(allowed)
+        self.assertTrue(reasons)
+        failed = {item["id"] for item in assessment["qualification"]["checks"]
+                  if not item["passed"]}
+        self.assertIn("PQ4", failed)
+        self.assertEqual(assessment["outcome_class"], "UNTESTABLE")
+        self.assertEqual(assessment["diagnostic_outcome_class"], "PREDICTION_HELD")
+
+    def test_a_digest_mismatch_cannot_qualify_evidence(self):
+        packet = clone(self.complete)
+        packet["outcomes"][0]["source"]["digest"] = "0" * 64
+        assessment, allowed, _ = self._evaluate(packet)
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertFalse(allowed)
+        self.assertIn("PQ4", {item["id"] for item in assessment["qualification"]["checks"]
+                              if not item["passed"]})
+
+    def test_source_content_edited_after_the_fact_is_detected(self):
+        packet = clone(self.complete)
+        packet["outcomes"][0]["source"]["content"] = "落差 0.8 dB（改过）"
+        assessment, allowed, _ = self._evaluate(packet)
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertFalse(allowed)
+
+    def test_an_incomplete_source_cannot_qualify_evidence(self):
+        for field in ("kind", "location", "content", "digest"):
+            packet = clone(self.complete)
+            packet["outcomes"][0]["source"][field] = ""
+            assessment, allowed, _ = self._evaluate(packet)
+            self.assertFalse(assessment["evidence_eligible"], field)
+            self.assertFalse(allowed, field)
+
+    def test_unknown_validity_keeps_the_comparison_but_not_the_evidence(self):
+        packet = clone(self.complete)
+        packet["execution"]["validity"] = "UNKNOWN"
+        assessment, allowed, reasons = self._evaluate(packet)
+        self.assertFalse(allowed)
+        self.assertEqual(assessment["evidence_class"], "DIAGNOSTIC_ONLY")
+        self.assertEqual(assessment["scientific_status"], "DIAGNOSTIC_ONLY")
+        self.assertEqual(assessment["diagnostic_outcome_class"], "PREDICTION_HELD")
+        self.assertNotIn(assessment["outcome_class"], pc.WORLD_CLAIMING_CLASSES)
+        self.assertTrue(any("UNKNOWN" in reason for reason in reasons), reasons)
+        self.assertIn("PQ1", {item["id"] for item in assessment["qualification"]["checks"]
+                              if not item["passed"]})
+
+    def test_invalid_execution_is_never_qualified(self):
+        packet = clone(self.complete)
+        packet["execution"]["validity"] = "INVALID"
+        assessment, allowed, _ = self._evaluate(packet)
+        self.assertFalse(allowed)
+        self.assertEqual(assessment["outcome_class"], "INVALID_EXECUTION")
+        self.assertEqual(assessment["evidence_class"], "INSUFFICIENT_PROVENANCE")
+        self.assertEqual(assessment["scientific_status"], "NO_INFERENCE")
+        self.assertEqual(assessment["predictions"], [])
+
+    def test_an_unfinished_experiment_is_diagnostic_only(self):
+        state = clone(self.state)
+        state["experiments"][0]["status"] = "running"
+        state["experiments"][0]["result_at_state_version"] = None
+        assessment, allowed, _ = self._evaluate(state=state)
+        self.assertFalse(allowed)
+        self.assertEqual(assessment["evidence_class"], "DIAGNOSTIC_ONLY")
+        self.assertIn("PQ7", {item["id"] for item in assessment["qualification"]["checks"]
+                              if not item["passed"]})
+
+    def test_a_time_leak_is_blocked_and_named(self):
+        state = clone(self.state)
+        state["experiments"][0]["preregistration"]["frozen_at_state_version"] = 99
+        assessment, allowed, reasons = self._evaluate(state=state)
+        self.assertFalse(allowed)
+        self.assertTrue(any("时间" in reason or "泄漏" in reason for reason in reasons), reasons)
+        self.assertFalse(assessment["evidence_eligible"])
+
+    def test_a_post_hoc_amendment_blocks_the_gate(self):
+        state = clone(self.state)
+        state["experiments"][0]["preregistration"]["amended"] = [
+            {"at_state_version": 6, "reason": "看到结果之后调整判据"}]
+        assessment, allowed, _ = self._evaluate(state=state)
+        self.assertFalse(allowed)
+        self.assertFalse(assessment["evidence_eligible"])
+
+    def test_the_revision_log_participates_in_the_gate(self):
+        """A frozen criterion rewritten after the result is not evidence, log or no log."""
+        state, _ = pc._fixture()
+        freeze = {
+            "_schema": cg.SCHEMA_REVISION, "id": "REV1", "seq": 1, "kind": "prediction_freeze",
+            "subject": "X1", "actor": "R8", "at_state_version": 5, "summary": "freeze X1",
+            "trigger": {"kind": "preregistration_frozen", "ref": "X1"},
+            "refs": {"experiments": ["X1"]},
+            "after": {"freeze_digest": pc.freeze_digest(state["experiments"][0])},
+        }
+        clean, _ = pc.assess_experiment(state, self.complete, [freeze])
+        self.assertTrue(clean["evidence_eligible"])
+        rewritten = clone(state)
+        rewritten["experiments"][0]["preregistration"]["outcomes"][0]["criterion"][
+            "expected_range"] = [0.79, 3.0]
+        tampered, _ = pc.assess_experiment(rewritten, self.complete, [freeze])
+        self.assertFalse(tampered["evidence_eligible"])
+        self.assertIn("PQ8", {item["id"] for item in tampered["qualification"]["checks"]
+                              if not item["passed"]})
+
+    def test_re_freezing_after_the_result_cannot_escape_the_gate(self):
+        """A version bump plus a retro-fitted branch rule is still a post-hoc rewrite."""
+        state, _ = pc._fixture()
+        freeze = {
+            "_schema": cg.SCHEMA_REVISION, "id": "REV1", "seq": 1, "kind": "prediction_freeze",
+            "subject": "X1", "actor": "R8", "at_state_version": 5, "summary": "freeze X1",
+            "trigger": {"kind": "preregistration_frozen", "ref": "X1"},
+            "refs": {"experiments": ["X1"]},
+            "after": {"freeze_digest": pc.freeze_digest(state["experiments"][0])},
+        }
+        refrozen = clone(state)
+        preregistration = refrozen["experiments"][0]["preregistration"]
+        preregistration["frozen_at_state_version"] = 6
+        preregistration["outcome_mode"] = "branch"
+        preregistration["branch_rule"] = {
+            "selector": {"kind": "result", "location": "results/A/X1/summary.json"},
+            "quantity": "落差（dB）", "branches": ["O1", "O2"]}
+        packet = clone(self.complete)
+        packet["observed_outcome"] = "O1"
+        packet["outcomes"] = [packet["outcomes"][0]]
+        assessment, diagnostics = pc.assess_experiment(refrozen, packet, [freeze])
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertFalse(pc.evidence_transition_allowed(refrozen, assessment)[0])
+        self.assertNotEqual(assessment["outcome_class"], "PREDICTION_HELD")
+        failed = {item["id"] for item in assessment["qualification"]["checks"]
+                  if not item["passed"]}
+        self.assertTrue({"PQ8"} & failed, sorted(failed))
+        self.assertTrue(any(d.rule in ("PC4", "PC5") for d in pc.check_freezes(refrozen, [freeze])))
+
+    def test_a_hand_written_assessment_grants_nothing(self):
+        """No caller may re-derive eligibility from a subset of the fields."""
+        assessment, _, _ = self._evaluate()
+        forged = {k: v for k, v in assessment.items() if k != "qualification"}
+        forged["evidence_eligible"] = True
+        forged["evidence_class"] = "QUALIFIED_EVIDENCE"
+        forged["scientific_status"] = "MAY_INFORM_TRANSITION"
+        allowed, reasons = pc.evidence_transition_allowed(self.state, forged)
+        self.assertFalse(allowed)
+        self.assertTrue(reasons)
+
+    def test_a_block_from_another_packet_is_refused(self):
+        assessment, _, _ = self._evaluate()
+        other = clone(self.complete)
+        other["outcomes"][0]["value"] = 0.1
+        mismatched = dict(assessment, packet_digest=cg.digest_of(other))
+        allowed, _ = pc.evidence_transition_allowed(self.state, mismatched)
+        self.assertFalse(allowed)
+
+    def test_a_state_that_changed_after_the_block_blocks_the_transition(self):
+        assessment, allowed, _ = self._evaluate()
+        self.assertTrue(allowed)
+        state = clone(self.state)
+        state["experiments"][0]["status"] = "running"
+        allowed_after, reasons = pc.evidence_transition_allowed(state, assessment)
+        self.assertFalse(allowed_after)
+        self.assertTrue(reasons)
+
+    def test_the_gate_is_the_only_authority_for_the_assessment_fields(self):
+        """Every mutation must move `qualification`, `evidence_class` and the gate together."""
+        mutations = []
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["source"]
+        mutations.append(("missing source", packet, None))
+        packet = clone(self.complete)
+        packet["execution"]["validity"] = "UNKNOWN"
+        mutations.append(("unknown validity", packet, None))
+        packet = clone(self.complete)
+        packet["outcomes"] = [packet["outcomes"][0]]
+        mutations.append(("partial submission", packet, None))
+        packet = clone(self.complete)
+        packet["outcomes"] = list(packet["outcomes"]) + [
+            {"id": "O9", "value": 0.8, "source": bound_source("未冻结")}]
+        mutations.append(("unfrozen outcome", packet, None))
+        for label, mutated, _ in mutations:
+            state = self.state
+            assessment, _ = pc.assess_experiment(state, mutated)
+            direct = pc.qualify_evidence(state, mutated, assessment)
+            self.assertEqual(assessment["qualification"], direct, label)
+            self.assertEqual(assessment["evidence_class"], direct["evidence_class"], label)
+            self.assertEqual(assessment["evidence_eligible"], direct["eligible"], label)
+            self.assertEqual(assessment["scientific_status"], direct["scientific_status"], label)
+            self.assertFalse(direct["eligible"], label)
+            self.assertFalse(pc.evidence_transition_allowed(state, assessment)[0], label)
+
+    def test_the_standalone_gate_is_as_strict_as_the_integrated_one(self):
+        packet = clone(self.complete)
+        packet["outcomes"] = [packet["outcomes"][0]]
+        standalone = pc.qualify_evidence(self.state, packet)
+        integrated, _ = pc.assess_experiment(self.state, packet)
+        self.assertFalse(standalone["eligible"])
+        self.assertEqual([item["id"] for item in standalone["failures"]],
+                         [item["id"] for item in integrated["qualification"]["failures"]])
+        self.assertEqual(standalone, integrated["qualification"])
+        clean = pc.qualify_evidence(self.state, self.complete)
+        self.assertTrue(clean["eligible"])
+
+    def test_a_partial_submission_is_reported_as_an_incomplete_decision_set(self):
+        packet = clone(self.complete)
+        packet["outcomes"] = [packet["outcomes"][0]]
+        assessment, allowed, _ = self._evaluate(packet)
+        self.assertFalse(allowed)
+        self.assertIn("PQ3", {item["id"] for item in assessment["qualification"]["checks"]
+                              if not item["passed"]})
+        self.assertEqual(assessment["outcome_class"], "PARTIALLY_ASSESSED")
 
 
 # ---------------------------------------------------------------------------
@@ -768,46 +1106,249 @@ class TestInsightCards(unittest.TestCase):
         supported["refs"] = {"claims": ["C1"], "evidence": ["E1"], "hypotheses": ["H1"]}
         self.assertIn("PC7", {d.rule for d in pc.insight_card_errors(supported, self.state)})
 
-    def test_evidence_support_requires_an_independent_structural_audit(self):
-        supported = clone(self.card)
-        supported["declared_class"] = "evidence_supported_insight"
-        supported["novel_prediction"] = {"ref": "X1:O1", "statement": "落差 ≥ 0.5 dB"}
-        supported["discriminating_intervention"] = "X1"
-        supported["refs"] = {"claims": ["C1"], "evidence": ["E1"], "hypotheses": ["H1"]}
+    def _certified(self, **overrides):
+        """A card whose every certification ingredient is canonical and verifiable.
+
+        The synthesis is deliberate: the point of the P1 gate is that this is what it takes.
+        The observation packet is a real `prediction-observation@1` packet for `X1`, the
+        R9.O receipt is a real `evidence-result@1` + analysis pair in the supporting
+        direction, and the audit is validated by its owning module.
+        """
+        packet = clone(self.state["experiments"][0]["preregistration"]["outcomes"])
+        observation_packet = {
+            "schema": pc.SCHEMA_OBSERVATION, "experiment_id": "X1",
+            "execution": {"status": "completed", "validity": "VALID"},
+            "outcomes": [
+                {"id": "O1", "value": 0.8, "source": bound_source("落差 0.8 dB")},
+                {"id": "O2", "value": 0.05, "source": bound_source("落差 0.05 dB")},
+            ],
+        }
+        self.assertEqual(len(packet), 2)
         state = clone(self.state)
-        state["assurance"] = [{"id": "A1", "target": "C1",
-                               "attack_type": "structural-equivalence",
-                               "verification_tier": "T1",
-                               "kill_condition": "若与 LIT1 结构等价则杀死",
-                               "discriminating_test": "X1"}]
-        derived, reasons = pc.classify_insight(supported, state)
+        state["evidence"][0]["supports"] = ["C1"]
+        state["assurance"] = [{
+            "id": "A1", "target": "H1", "attack_type": "structural-equivalence",
+            "verification_tier": "T1", "kill_condition": "若与 LIT1 结构等价则杀死",
+            "discriminating_test": "X2",
+            "audit_ref": ".research-idea-pipeline/routes/A/assurance/structural-equivalence/"
+                         "H1.json"}]
+        content = "落差 0.8 dB"
+        state["experiments"][0]["outcome_analysis"] = {
+            "packet": {
+                "schema": "evidence-result@1", "experiment_id": "X1",
+                "experiment_digest": "sha256:x", "execution_status": "completed",
+                "result_summary": content,
+                "sources": [{"id": "S1", "kind": "result",
+                             "location": "results/A/X1/summary.json",
+                             "content": content, "digest": eo.digest(content)}],
+                "observations": [{"id": "OBS1", "statement": content, "scope": "数据集 A",
+                                  "source_ids": ["S1"]}],
+            },
+            "analysis": {
+                "schema": "evidence-outcome-analysis@1", "id": "AN1", "experiment_id": "X1",
+                "verification_tier": "T2", "outcome": "POSITIVE_EVIDENCE",
+                "claim_updates": [{"id": "C1", "direction": "positive", "identification": "PASS",
+                                   "new_status": "SUPPORTED", "evidence": ["OBS1"],
+                                   "scope": "数据集 A"}],
+            },
+            "audit": None,
+        }
+        card = clone(self.card)
+        card["declared_class"] = "evidence_supported_insight"
+        card["discriminating_intervention"] = "X1"
+        card["refs"] = {"claims": ["C1"], "hypotheses": ["H1"], "evidence": ["E1"],
+                        "experiments": ["X1"]}
+        card["novel_prediction"] = {
+            "ref": "X1:O1", "statement": "落差 ≥ 0.5 dB", "experiment_ref": "X1",
+            "observation": observation_packet,
+            "observation_digest": cg.digest_of(observation_packet)}
+        import structural_equivalence_check as sec
+        artifact = sec._selftest_artifact()
+        audits = {"A1": {"artifact": artifact, "verdict": artifact.get("verdict"),
+                         "candidate": artifact.get("candidate"), "source": "<synthetic>",
+                         "violations": []}}
+        for key, value in overrides.items():
+            target = {"state": state, "card": card, "audits": audits}[key]
+            target.update(value)
+        return card, state, audits
+
+    def test_a_fully_bound_card_is_certified(self):
+        card, state, audits = self._certified()
+        derived, reasons = pc.classify_insight(card, state, audits)
         self.assertEqual(derived, "evidence_supported_insight")
+        self.assertEqual(pc.insight_card_errors(card, state, audits), [])
         self.assertTrue(reasons["structural_equivalence_audit"])
-        self.assertFalse([d for d in pc.insight_card_errors(supported, state)
-                          if d.rule == "PC7"])
+
+    def test_the_audit_result_must_be_known(self):
+        """P1: 'an audit exists' is not 'the audit found a structural delta'."""
+        card, state, _ = self._certified()
+        derived, _ = pc.classify_insight(card, state)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_the_audit_result_must_support_the_claim(self):
+        card, state, audits = self._certified()
+        audits["A1"]["artifact"] = {**audits["A1"]["artifact"], "verdict": "reframing-only"}
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_the_audit_must_apply_to_the_referenced_candidate(self):
+        card, state, audits = self._certified()
+        audits["A1"]["artifact"] = {**audits["A1"]["artifact"], "candidate": "H9"}
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_the_prediction_must_have_a_qualified_adjudication(self):
+        card, state, audits = self._certified()
+        del card["novel_prediction"]["observation_digest"]
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_an_unobserved_prediction_cannot_be_certified(self):
+        card, state, audits = self._certified()
+        card["novel_prediction"]["observation"]["outcomes"] = [
+            card["novel_prediction"]["observation"]["outcomes"][0]]
+        card["novel_prediction"]["observation_digest"] = cg.digest_of(
+            card["novel_prediction"]["observation"])
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_a_failing_prediction_cannot_support_the_insight(self):
+        card, state, audits = self._certified()
+        card["novel_prediction"]["observation"]["outcomes"][0]["value"] = 9.0
+        card["novel_prediction"]["observation"]["outcomes"][0]["source"] = bound_source("落差 9 dB")
+        card["novel_prediction"]["observation_digest"] = cg.digest_of(
+            card["novel_prediction"]["observation"])
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_an_observation_packet_for_another_experiment_is_rejected(self):
+        card, state, audits = self._certified()
+        card["novel_prediction"]["observation"]["experiment_id"] = "X2"
+        card["novel_prediction"]["observation_digest"] = cg.digest_of(
+            card["novel_prediction"]["observation"])
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("experiment_id" in item
+                            for item in reasons["certification"]["failures"]))
+
+    def test_certification_requires_an_r9o_receipt(self):
+        card, state, audits = self._certified()
+        state["experiments"][0]["outcome_analysis"] = None
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_an_r9o_receipt_in_the_opposite_direction_is_rejected(self):
+        card, state, audits = self._certified()
+        state["experiments"][0]["outcome_analysis"]["analysis"]["outcome"] = "NEGATIVE_EVIDENCE"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_an_r9o_receipt_below_t2_cannot_upgrade_the_insight(self):
+        card, state, audits = self._certified()
+        state["experiments"][0]["outcome_analysis"]["analysis"]["verification_tier"] = "T1"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_t2_evidence_from_the_same_experiment_but_another_prediction(self):
+        """Cross-prediction borrowing: same experiment is not the same prediction."""
+        card, state, audits = self._certified()
+        state["evidence"][0]["prediction_ref"] = "X1:O2"
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("不能互相借用" in item
+                            for item in reasons["certification"]["failures"]))
+
+    def test_two_cards_on_one_experiment_are_checked_separately(self):
+        """Two cards sharing an experiment: each must bind its *own* held prediction."""
+        first, state, audits = self._certified()
+        second = clone(first)
+        second["id"] = "IC2"
+        second["novel_prediction"] = {**clone(first["novel_prediction"]), "ref": "X1:O2",
+                                      "statement": "落差 < 0.1 dB"}
+        outcomes = second["novel_prediction"]["observation"]["outcomes"]
+        outcomes[1] = {"id": "O2", "value": 0.5, "source": bound_source("落差 0.5 dB")}
+        second["novel_prediction"]["observation_digest"] = cg.digest_of(
+            second["novel_prediction"]["observation"])
+        derived_first, _ = pc.classify_insight(first, state, audits)
+        derived_second, second_reasons = pc.classify_insight(second, state, audits)
+        self.assertEqual(derived_first, "evidence_supported_insight")
+        self.assertNotEqual(derived_second, "evidence_supported_insight")
+        self.assertTrue(any("IC3" in item
+                            for item in second_reasons["certification"]["failures"]))
+
+    def test_a_contradicted_claim_cannot_back_a_certified_insight(self):
+        card, state, audits = self._certified()
+        state["claims"][0]["status"] = "contradicted"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_invalidated_evidence_downgrades_a_certified_card(self):
+        """Evidence retracted after certification must push the card back down."""
+        card, state, audits = self._certified()
+        self.assertEqual(pc.classify_insight(card, state, audits)[0],
+                         "evidence_supported_insight")
+        state["evidence"][0]["validity"]["status"] = "invalid"
+        state["evidence"][0]["validity"]["reason"] = "上游实验被撤销"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_legacy_cards_without_fine_grained_refs_keep_the_lower_class(self):
+        """No guessing: missing provenance is reported, never reconstructed."""
+        card, state, audits = self._certified()
+        card["declared_class"] = "predictive_insight_candidate"
+        card["refs"] = {"claims": ["C1"], "hypotheses": ["H1"]}
+        card["novel_prediction"] = {"ref": "X2:O1", "statement": "解耦后落差下降 ≥ 0.5 dB"}
+        card["discriminating_intervention"] = "X2"
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertEqual(derived, "predictive_insight_candidate")
+        self.assertFalse(reasons["certification"]["attempted"])
+        self.assertEqual([d.rule for d in pc.insight_card_errors(card, state, audits)], [])
 
     def test_evidence_outside_the_boundary_cannot_support_the_card(self):
-        state = clone(self.state)
+        card, state, audits = self._certified()
         state["evidence"][0]["scope"] = "数据集 Z"
-        state["assurance"] = [{"id": "A1", "target": "C1",
-                               "attack_type": "structural-equivalence",
-                               "verification_tier": "T1",
-                               "kill_condition": "x", "discriminating_test": "X1"}]
-        derived, _ = pc.classify_insight(self.card, state)
+        derived, _ = pc.classify_insight(card, state, audits)
         self.assertNotEqual(derived, "evidence_supported_insight")
 
     def test_evidence_must_be_bound_to_the_prediction_experiment(self):
-        state = clone(self.state)
+        card, state, audits = self._certified()
         state["evidence"][0]["depends_on"] = []
-        state["assurance"] = [{"id": "A1", "target": "C1",
-                               "attack_type": "structural-equivalence",
-                               "verification_tier": "T1",
-                               "kill_condition": "x", "discriminating_test": "X1"}]
-        supported = clone(self.card)
-        supported["refs"] = {"claims": ["C1"], "evidence": ["E1"]}
-        supported["novel_prediction"] = {"ref": "X1:O1", "statement": "x"}
-        derived, _ = pc.classify_insight(supported, state)
+        derived, _ = pc.classify_insight(card, state, audits)
         self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_evidence_that_contradicts_the_claim_is_not_support(self):
+        card, state, audits = self._certified()
+        state["evidence"][0]["supports"] = []
+        state["evidence"][0]["contradicts"] = ["C1"]
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("方向" in item or "supports" in item
+                            for item in reasons["certification"]["failures"]))
+
+    def test_the_audit_artifact_is_loaded_from_the_assurance_reference(self):
+        import structural_equivalence_check as sec
+        card, state, _ = self._certified()
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            directory = root / sec.AUDIT_DIR
+            directory.mkdir(parents=True)
+            (directory / "H1.json").write_text(
+                json.dumps(sec._selftest_artifact(), ensure_ascii=False), encoding="utf-8")
+            audits, problems = pc.load_audits(state, root)
+            self.assertEqual(problems, [])
+            self.assertEqual(sorted(audits), ["A1"])
+            self.assertTrue(audits["A1"]["artifact"])
+            unsupported = clone(state)
+            unsupported["assurance"] = []
+            self.assertEqual(pc.load_audits(unsupported, root)[0], {})
+
+    def test_a_certification_attempt_without_provenance_is_reported(self):
+        card, state, _ = self._certified()
+        card["novel_prediction"]["observation"] = {}
+        card["novel_prediction"]["observation_digest"] = "sha256:x"
+        errors = pc.insight_card_errors(card, state)
+        self.assertIn("PC11", {d.rule for d in errors})
+        self.assertIn("PC7", {d.rule for d in errors})
 
     def test_card_log_round_trip(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -929,7 +1470,10 @@ class TestCLI(unittest.TestCase):
                                 "--cognition", str(cognition_dir))
             self.assertEqual(proc.returncode, pc.EXIT_OK, proc.stdout + proc.stderr)
             payload = json.loads(proc.stdout)
-            self.assertEqual(payload[0]["derived_class"], "predictive_insight_candidate")
+            self.assertEqual(payload["cards"][0]["derived_class"],
+                             "predictive_insight_candidate")
+            self.assertEqual(payload["audit_problems"],
+                             ["A1 没有 audit_ref：审计只被声明，没有被审核过的结果"])
 
     def test_a_missing_competition_is_an_environment_error(self):
         with tempfile.TemporaryDirectory() as temp:

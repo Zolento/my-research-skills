@@ -308,7 +308,12 @@ def _document_findings(project_root: Path, route: str) -> List[Finding]:
 
 def _cognition_findings(state: Dict[str, Any], revisions: Sequence[Dict[str, Any]],
                         cognition_dir: Path) -> List[Finding]:
-    """A pre-existing derived layer must be rebuildable, or takeover is refused."""
+    """A pre-existing derived layer must be rebuildable, or takeover is refused.
+
+    The rebuild uses the same inputs the builder used (`cg.projection_inputs`), otherwise a
+    project holding insight cards or a `scheduler.json` would look inconsistent when it is
+    not, and the takeover would refuse a perfectly healthy project.
+    """
     index_path = cognition_dir / cg.INDEX_NAME
     if not index_path.is_file():
         return []
@@ -320,7 +325,8 @@ def _cognition_findings(state: Dict[str, Any], revisions: Sequence[Dict[str, Any
                         f"已有认知索引不可解析：{exc}；先人工修复，接管不覆盖未知内容")]
     if not isinstance(stored, dict):
         return [Finding("LH12", BLOCKING, str(index_path), "已有认知索引必须是对象")]
-    diagnostics = cg.validate_index(state, revisions, stored)
+    cards, scheduler, audits = cg.projection_inputs(state, cognition_dir.parent)
+    diagnostics = cg.validate_index(state, revisions, stored, cards, scheduler, audits)
     for diagnostic in diagnostics:
         findings.append(Finding("LH12", BLOCKING, diagnostic.path,
                                 "已有认知索引与 canonical 重建不一致：" + diagnostic.detail))
@@ -656,7 +662,8 @@ def _take(state_path: Path, project_root: Optional[Path]) -> int:
     state = cg.load_state(state_path)
     route = audit["route"]
     revisions = audit["revisions"]
-    index, index_diagnostics = cg.full_index(state, revisions, route)
+    cards, scheduler, audits = cg.projection_inputs(state, route_dir)
+    index, index_diagnostics = cg.full_index(state, revisions, route, cards, scheduler, audits)
     brief = cg.render_brief(index, state)
     handoff_path = cognition_dir / HANDOFF_NAME
     already = handoff_path.is_file()

@@ -158,7 +158,7 @@ COMPETITION_FIELDS: Tuple[str, ...] = (
 )
 PREDICTION_FIELDS: Tuple[str, ...] = (
     "freeze_digest", "outcomes", "criteria_present", "prediction_id", "experiment_id",
-    "outcome_class", "assessment", "observed", "reason", "note",
+    "outcome_mode", "branch_rule", "outcome_class", "assessment", "observed", "reason", "note",
 )
 STRATEGY_FIELDS: Tuple[str, ...] = (
     "note", "priors", "operator", "action", "evidence", "observations",
@@ -284,16 +284,23 @@ def load_insight_cards(path: Path) -> Tuple[List[Dict[str, Any]], List[Diagnosti
 def project_insights(
     state: Dict[str, Any],
     cards: Sequence[Dict[str, Any]],
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Classify insight cards from canonical facts, never from their own label."""
+    """Classify insight cards from canonical facts, never from their own label.
+
+    `audits` carries Control Plane SENA artifacts loaded by the caller (see
+    `prediction_compare.load_audits`). Without them a card cannot be certified as
+    evidence-supported: the audit's actual result is not in the state, and guessing it is
+    exactly what the certification gate refuses to do.
+    """
     if not cards:
         return {"insights": [], "diagnostics": []}
     import prediction_compare as pc
     insights: List[Dict[str, Any]] = []
     diagnostics: List[Diagnostic] = []
     for card in cards:
-        derived, reasons = pc.classify_insight(card, state)
-        diagnostics.extend(pc.insight_card_errors(card, state))
+        derived, reasons = pc.classify_insight(card, state, audits)
+        diagnostics.extend(pc.insight_card_errors(card, state, audits))
         insights.append({
             "id": card.get("id"),
             "declared_class": card.get("declared_class"),
@@ -1372,6 +1379,7 @@ def build_index(
     route: str = "",
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
     scheduler: Optional[Dict[str, Any]] = None,
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """Build the cognitive index. Pure: no I/O, no mutation of `state`.
 
@@ -1421,6 +1429,9 @@ def build_index(
     else:
         mode = "revision_log"
 
+    # One projection, computed once: `build`, `check` and `validate` must agree on it, and
+    # a card's class must not depend on which command asked for the index.
+    projected = project_insights(state, insight_cards or [], audits)
     index = {
         "_schema": SCHEMA_INDEX,
         "route": route,
@@ -1436,7 +1447,7 @@ def build_index(
         "mechanisms": mechanisms,
         "anomalies": anomalies,
         "competitions": competitions,
-        "insights": project_insights(state, insight_cards or [])["insights"],
+        "insights": projected["insights"],
         "boundaries": legacy["boundaries"],
         "counts": {
             "mechanisms": len(mechanisms),
@@ -1444,10 +1455,10 @@ def build_index(
             "anomalies": len(anomalies),
             "competitions": len(competitions),
             "boundaries": len(legacy["boundaries"]),
-            "insights": sum(1 for item in project_insights(state, insight_cards or [])["insights"]
+            "insights": sum(1 for item in projected["insights"]
                             if item.get("derived_class") == "predictive_insight_candidate"),
             "evidence_supported_insights": sum(
-                1 for item in project_insights(state, insight_cards or [])["insights"]
+                1 for item in projected["insights"]
                 if item.get("derived_class") == "evidence_supported_insight"),
             "stale_mechanisms": sum(1 for m in mechanisms if m["stale"]),
             "refuted_mechanisms": sum(1 for m in mechanisms if m["status"] == "refuted"),
@@ -1472,15 +1483,17 @@ def full_index(
     route: str = "",
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
     scheduler: Optional[Dict[str, Any]] = None,
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], List[Diagnostic]]:
     """The index as written to disk: projection plus the complete diagnostic set.
 
     A single entry point, so `build`, `validate`, `check`, `brief` and `recall`
     can never disagree about what the index should contain.
     """
-    index, build_diagnostics = build_index(state, revisions, route, insight_cards, scheduler)
+    index, build_diagnostics = build_index(state, revisions, route, insight_cards, scheduler,
+                                           audits)
     diagnostics = _dedupe(list(build_diagnostics) + validate_revisions(state, revisions))
-    diagnostics.extend(project_insights(state, insight_cards or [])["diagnostics"])
+    diagnostics.extend(project_insights(state, insight_cards or [], audits)["diagnostics"])
     index["diagnostics"] = [d.as_dict() for d in sorted(
         diagnostics, key=lambda d: (d.rule, d.path, d.detail))]
     return index, diagnostics
@@ -1586,6 +1599,7 @@ def validate_index(
     index: Dict[str, Any],
     insight_cards: Optional[Sequence[Dict[str, Any]]] = None,
     scheduler: Optional[Dict[str, Any]] = None,
+    audits: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Diagnostic]:
     """Recompute the index and compare. Any drift is a hard violation."""
     diagnostics: List[Diagnostic] = []
@@ -1613,7 +1627,7 @@ def validate_index(
         diagnostics.append(Diagnostic(
             "CM3", INDEX_NAME, "索引的 scheduler 摘要与当前 scheduler.json 不一致；必须重建"))
     expected, build_diagnostics = full_index(
-        state, revisions, str(index.get("route", "")), insight_cards, scheduler)
+        state, revisions, str(index.get("route", "")), insight_cards, scheduler, audits)
     # Diagnostics are advisory output, not projected science: compare the
     # projection itself, so a torn log line cannot masquerade as index drift.
     left = {k: v for k, v in expected.items() if k != "diagnostics"}
@@ -2079,18 +2093,45 @@ def load_scheduler(path: Path) -> Optional[Dict[str, Any]]:
     return payload
 
 
+def projection_inputs(
+    state: Dict[str, Any],
+    route_dir: Path,
+) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """The index inputs that live outside `research-state.json`, read one way only.
+
+    `build`, `check`, `validate` and the Legacy Handoff all rebuild the same index, so they
+    must all supply the same inputs. Reading cards in one place and not another made the
+    handoff report a false "index drift" for any project holding insight cards or a
+    `scheduler.json` — the projection, not the project, was inconsistent.
+
+    The SENA audit artifacts are loaded through their owning module
+    (`prediction_compare.load_audits`) so that certification reads the same artifact the
+    Structural Equivalence checker validates.
+    """
+    import prediction_compare as pc
+    cognition_dir = route_dir / COGNITION_DIRNAME
+    cards, _ = load_insight_cards(cognition_dir / INSIGHT_CARDS_NAME)
+    scheduler = load_scheduler(route_dir / SCHEDULER_NAME)
+    audits, _ = pc.load_audits(state, route_dir)
+    return cards, scheduler, audits
+
+
 def _load_inputs(state_path: Path, cognition_dir: Path):
+    """Everything the index builder needs, read once so `build` and `check` agree."""
     state = load_state(state_path)
     revisions, parse_diagnostics = load_revisions(cognition_dir / REVISIONS_NAME)
     cards, card_diagnostics = load_insight_cards(cognition_dir / INSIGHT_CARDS_NAME)
     scheduler = load_scheduler(state_path.parent / SCHEDULER_NAME)
-    return state, revisions, parse_diagnostics + card_diagnostics, cards, scheduler
+    _, _, audits = projection_inputs(state, state_path.parent)
+    return state, revisions, parse_diagnostics + card_diagnostics, cards, scheduler, audits
 
 
 def op_build(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler)
+    state, revisions, parse_diagnostics, cards, scheduler, audits = _load_inputs(
+        state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler,
+                                          audits)
     diagnostics = _dedupe(list(parse_diagnostics) + list(index_diagnostics))
     index["diagnostics"] = [d.as_dict() for d in sorted(
         diagnostics, key=lambda d: (d.rule, d.path, d.detail))]
@@ -2113,7 +2154,8 @@ def op_build(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_validate(state_path: Path, cognition_dir: Path) -> int:
-    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
+    state, revisions, parse_diagnostics, cards, scheduler, audits = _load_inputs(
+        state_path, cognition_dir)
     diagnostics = list(parse_diagnostics) + validate_revisions(state, revisions)
     index_path = cognition_dir / INDEX_NAME
     if not index_path.is_file():
@@ -2125,7 +2167,8 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
             index = None
         if isinstance(index, dict):
-            diagnostics.extend(validate_index(state, revisions, index, cards, scheduler))
+            diagnostics.extend(validate_index(state, revisions, index, cards, scheduler,
+                                              audits))
     diagnostics = _dedupe(diagnostics)
     for diagnostic in diagnostics:
         print(diagnostic.render())
@@ -2134,8 +2177,8 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
 
 
 def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget: int) -> int:
-    state, revisions, _, cards, scheduler = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler)
+    state, revisions, _, cards, scheduler, audits = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler, audits)
     text = render_brief(index, state, budget)
     target = out or (cognition_dir / BRIEF_NAME)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -2145,23 +2188,26 @@ def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget:
 
 
 def op_recall(state_path: Path, cognition_dir: Path, budget: int) -> int:
-    state, revisions, _, cards, scheduler = _load_inputs(state_path, cognition_dir)
-    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler)
+    state, revisions, _, cards, scheduler, audits = _load_inputs(state_path, cognition_dir)
+    index, _ = full_index(state, revisions, route_of(state_path), cards, scheduler, audits)
     print(json.dumps(recall(index, state, budget), ensure_ascii=False, indent=2))
     return EXIT_OK
 
 
 def op_check(state_path: Path, cognition_dir: Path) -> int:
     before = state_fingerprint(state_path)
-    state, revisions, parse_diagnostics, cards, scheduler = _load_inputs(state_path, cognition_dir)
-    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler)
+    state, revisions, parse_diagnostics, cards, scheduler, audits = _load_inputs(
+        state_path, cognition_dir)
+    index, index_diagnostics = full_index(state, revisions, route_of(state_path), cards, scheduler,
+                                          audits)
     diagnostics = list(parse_diagnostics) + list(index_diagnostics)
     index_path = cognition_dir / INDEX_NAME
     if index_path.is_file():
         try:
             stored = json.loads(index_path.read_text(encoding="utf-8"))
             if isinstance(stored, dict):
-                diagnostics.extend(validate_index(state, revisions, stored, cards, scheduler))
+                diagnostics.extend(validate_index(state, revisions, stored, cards, scheduler,
+                                              audits))
         except json.JSONDecodeError as exc:
             diagnostics.append(Diagnostic("CM3", INDEX_NAME, f"索引不是合法 JSON：{exc.msg}"))
     else:

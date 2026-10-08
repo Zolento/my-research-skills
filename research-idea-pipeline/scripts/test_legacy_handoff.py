@@ -17,6 +17,7 @@ import contextlib
 import io
 import json
 import pathlib
+import shutil
 import tempfile
 import unittest
 
@@ -31,6 +32,14 @@ def quiet(callable_, *args, **kwargs):
     with contextlib.redirect_stdout(io.StringIO()) as sink:
         result = callable_(*args, **kwargs)
     return result, sink.getvalue()
+
+
+def quiet_all(callable_, *args, **kwargs):
+    """Both streams: blocking findings are printed to stderr by design."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        result = callable_(*args, **kwargs)
+    return result, out.getvalue() + err.getvalue()
 
 
 class Project:
@@ -637,6 +646,50 @@ class TestShippedFixtureIsTakeable(unittest.TestCase):
             self.assertGreater(index["counts"]["competitions"], 0)
             self.assertGreater(index["counts"]["anomalies"], 0)
             self.assertGreater(index["counts"]["boundaries"], 0)
+
+    def test_a_project_with_an_existing_cognitive_layer_is_still_takeable(self):
+        """The takeover rebuilds the projection with the same inputs the builder used.
+
+        Before this was fixed, a project holding insight cards or a `scheduler.json` looked
+        like index drift (`LH12`) and the takeover refused a healthy project — the projection
+        was inconsistent, not the project.
+        """
+        with tempfile.TemporaryDirectory() as temp:
+            project = Project(pathlib.Path(temp), state=json.loads(
+                (FIXTURES / "state.json").read_text(encoding="utf-8")))
+            project.add_scheduler(version=5)
+            project.cognition_dir.mkdir(parents=True, exist_ok=True)
+            for name in (cg.REVISIONS_NAME, pc.INSIGHT_CARDS_NAME):
+                shutil.copy(FIXTURES / name, project.cognition_dir / name)
+            self.assertEqual(quiet(cg.op_build, project.state_path,
+                                   project.cognition_dir)[0], cg.EXIT_OK)
+            stored = json.loads((project.cognition_dir / cg.INDEX_NAME).read_text("utf-8"))
+            self.assertEqual(len(stored["insights"]), 1)
+            code, output = quiet_all(lh._take, project.state_path, project.root)
+            self.assertEqual(code, lh.EXIT_OK, output[-400:])
+            rebuilt = json.loads((project.cognition_dir / cg.INDEX_NAME).read_text("utf-8"))
+            self.assertEqual(len(rebuilt["insights"]), 1)
+            self.assertEqual(rebuilt["digest"], stored["digest"])
+            # And the written context brief still matches the index it was built from.
+            self.assertEqual(quiet(cg.op_check, project.state_path,
+                                   project.cognition_dir)[0], cg.EXIT_OK)
+
+    def test_genuine_index_drift_still_blocks_the_takeover(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = Project(pathlib.Path(temp), state=json.loads(
+                (FIXTURES / "state.json").read_text(encoding="utf-8")))
+            project.add_scheduler(version=5)
+            project.cognition_dir.mkdir(parents=True, exist_ok=True)
+            for name in (cg.REVISIONS_NAME, pc.INSIGHT_CARDS_NAME):
+                shutil.copy(FIXTURES / name, project.cognition_dir / name)
+            quiet(cg.op_build, project.state_path, project.cognition_dir)
+            index_path = project.cognition_dir / cg.INDEX_NAME
+            tampered = json.loads(index_path.read_text("utf-8"))
+            tampered["mechanisms"] = []
+            index_path.write_text(json.dumps(tampered, ensure_ascii=False), encoding="utf-8")
+            code, output = quiet_all(lh._take, project.state_path, project.root)
+            self.assertEqual(code, lh.EXIT_HARD)
+            self.assertIn("LH12", output)
 
     def test_the_fixture_state_still_passes_the_canonical_gate_after_takeover(self):
         import state_check as sc

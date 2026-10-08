@@ -335,7 +335,19 @@
               "rule": "落差 < 0.1 dB 视为「无差异」（SYNTHETIC FIXTURE）"
             }
           }
-        ]
+        ],
+        "outcome_mode": "branch",
+        "branch_rule": {
+          "selector": {
+            "kind": "result",
+            "location": "results/A/X1/summary.json#cross_centre_gap"
+          },
+          "quantity": "跨中心 PSNR 差（dB）",
+          "branches": [
+            "O1",
+            "O2"
+          ]
+        }
       },
       "result_at_state_version": 4,
       "depends_on": [],

@@ -249,7 +249,8 @@
     "known_conditions": [
       "single centre training",
       "one acceleration"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

@@ -364,6 +364,22 @@ state 集合。
 `prediction_compare` 的判别力分析。它们回答「这个设计能不能分开两个机制」，
 `expected_range` 与 `tolerance` 回答「什么算预测成立」——两者不得混用。
 
+**`preregistration.outcome_mode` / `preregistration.branch_rule`（可选加性槽位，2026-10 CIE 第三轮登记）**
+
+一个预注册常常列出**同一次决策的互斥分支**，而不是多个独立测量。允许在冻结时显式声明这件事；
+这也是唯一允许 `prediction_compare` 进入 branch mode 的途径。**未声明 mode 的预注册一律按
+completeness 判定**，旧项目因此不需要迁移。
+
+| 字段 | 取值 / 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `outcome_mode` | `completeness` \| `branch` | ❌ | 缺省 = `completeness`；`branch` 才允许分支模式 |
+| `branch_rule.selector` | `{kind, location}`，`kind ∈ {log, metric, result}` | `branch` 时 ✅ | 决定分支的原始观测；`location` 与观测包 `source.location` 必须逐字一致 |
+| `branch_rule.quantity` | 非空字符串 | `branch` 时 ✅ | 分支共同的可观测口径；必须与每个分支 `criterion.quantity` 一致 |
+| `branch_rule.branches` | 非空字符串数组 | `branch` 时 ✅ | 冻结 `outcomes[].id` 的**完整划分**（不得遗漏、不得多余） |
+
+互斥性不是声明出来的，而是从冻结判据**算出**来的：区间必须（含 `tolerance` 与 `noise/√n` 展宽后）
+不相交，或 `held_labels` 不相交，或方向不同。不满足时 branch mode 直接不成立，退回 completeness。
+
 **硬规则：**
 
 1. **无 `criterion` 不得宣告预测成立或失败。** 比较器对该结果只能返回 `UNTESTABLE`，
@@ -373,10 +389,19 @@ state 集合。
 3. **冻结的 `outcomes[]` 是完整判定集合。** 观测包是**关于它**的证据，不是「要判定哪些
    结果」的清单。逐条判定冻结结果；缺失即未完成评价，**不得**因为只提交了一部分就宣称
    全部预测成立。
-4. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion` 的形状与判定由
-   `scripts/prediction_compare.py`（规则 `PC1`—`PC9`）强制，`state_check.py` 继续忽略
-   未知键，**S1—S7 / V1—V24 不改号、不改义**。规则见
+4. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion`、`outcome_mode` / `branch_rule`
+   与证据资格的形状和判定由 `scripts/prediction_compare.py`（规则 `PC1`—`PC11`）强制，
+   `state_check.py` 继续忽略未知键，**S1—S7 / V1—V24 不改号、不改义**。规则见
    [prediction-anomaly-competition.md](prediction-anomaly-competition.md)。
+5. **分支模式不能由观测包打开。** `observed_outcome` 只是声明；分支由冻结规则作用于原始观测
+   导出（规则 `PC10`）。分支选择与原始观测冲突、分支集合不是完整划分、分支不互斥、来源不在
+   冻结 `selector` 上时，一律不得产生 `PREDICTION_HELD` 或合格科学证据。
+6. **证据资格只有一个入口。** `qualify_evidence`（检查 `PQ1`—`PQ8`）是唯一判定；source 缺失、
+   digest 不符、判定集合不完整、分支未解析、时间顺序破坏都 **fail closed**
+   （`evidence_eligible: false`），不得只记一条诊断。
+7. **冻结摘要覆盖分支声明。** `prediction_freeze` 登记的 `freeze_digest` 覆盖
+   `outcome_mode` 与 `branch_rule`；事后追加分支规则的摘要必然不匹配（`PC4`）。
+   旧格式摘要仅在预注册未声明 mode/rule 时继续被接受。
 
 **实验树六段（固定，`stage` 取值，逐字）：**
 

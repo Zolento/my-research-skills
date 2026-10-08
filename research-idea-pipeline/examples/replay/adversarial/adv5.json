@@ -263,7 +263,8 @@
     ],
     "known_conditions": [
       "no cheap experiment available"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

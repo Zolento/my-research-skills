@@ -179,6 +179,23 @@ Test results
 - `unittest discover -s scripts -p 'test_*.py'` → 1164 tests, OK, 3 skipped.
 - `research_replay.py --selftest` → PASS (0 failures).
 
+## Round 3 record (Prediction Integrity / Evidence Qualification / Insight Certification)
+
+- Branch mode is opened by a **frozen** `outcome_mode` + `branch_rule`; the selected branch is
+  derived from the raw observation the freeze named and every other branch is excluded by a
+  recorded condition (`PC10`). A freeze that declares nothing stays in completeness mode.
+- Evidence eligibility has **one** entry point: `qualify_evidence` (`PQ1`—`PQ8`). A missing source,
+  a digest mismatch, an incomplete decision set, an untraceable branch basis or a broken time order
+  is fail-closed; `evidence_transition_allowed` refuses a block that is missing or foreign.
+- `evidence_supported_insight` requires `IC1`—`IC6`: an explicit prediction/experiment binding, a
+  qualified adjudication of that prediction, an R9.O receipt in the supporting direction, evidence
+  bound to that prediction and mechanism, and an audit whose actual verdict is loaded from the SENA
+  artifact its owner validates.
+- Chain audit also fixed a Legacy Handoff defect: the takeover rebuilt the cognitive index without
+  insight cards / scheduler / audits and therefore refused healthy projects with a false `LH12`.
+  `cg.projection_inputs()` is now the single reader for those inputs.
+- `git status` is clean after the round-3 commit; nothing pushed, no merge, no release.
+
 ## Open items carried into Phase 2
 
 - (resolved in Phase 2) `<XID>:<OID>` references resolve and validate against

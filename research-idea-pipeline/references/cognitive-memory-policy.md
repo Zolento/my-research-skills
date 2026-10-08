@@ -189,7 +189,7 @@ policy only fixes where the anomaly record lives and what may be claimed from it
 | R2 / R5 | retrieval cues from the brief | — |
 | R3—R6 | strategy priors, existing mechanisms, `CM9` duplicates | `mechanism_*`, `competition_*` |
 | R7 | mechanisms and competitions under attack | — |
-| R8 | pending predictions, competitions | `prediction_freeze` |
+| R8 | pending predictions, competitions | `prediction_freeze`（`after` 记录 `freeze_digest`、`outcomes`、`outcome_mode`、`branch_rule`）|
 | R9 | failure constraints, pending predictions | — |
 | R9.O | frozen predictions | `anomaly_record`, `prediction_assessment` |
 | R10 | refuted mechanisms | `mechanism_refute`, `mechanism_weaken`, `mechanism_reactivate` |

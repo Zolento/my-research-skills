@@ -57,11 +57,14 @@ The same fixture without its revision log is also a legacy project: deleting
 | `AN1` records a direction reversal against a frozen prediction, `reproduced: false` | a high-importance, non-reproduced anomaly |
 | `F2` is a repeat-blocking failure kind | failure memory shown with `retry=blocked` and a `failed_repeat` boundary |
 | No revision declares its own support level | the brief labels every mechanism from canonical facts |
-| `X1:O1` is frozen with a quantitative criterion, `X2` carries M1's and M2's predictions, and `CP1` declares a `discrimination_rule` | `CP1` is `DISTINGUISHABLE` (`discrimination_rule_satisfied`); the packet selects branch `O1` and gives `PREDICTION_HELD` |
-| `X1` freezes two mutually exclusive branches `O1`/`O2` | the packet declares `observed_outcome: "O1"`, so only that branch is adjudicated; a second branch that also holds makes the freeze `UNTESTABLE` |
+| `X1:O1` is frozen with a quantitative criterion, `X2` carries M1's and M2's predictions, and `CP1` declares a `discrimination_rule` | `CP1` is `DISTINGUISHABLE` (`discrimination_rule_satisfied`); the packet gives `PREDICTION_HELD` on qualified evidence |
+| `X1` freezes two mutually exclusive branches `O1`/`O2` **with** `outcome_mode: "branch"` and a `branch_rule` | the selected branch is derived from the frozen `selector` plus the raw observation; `O2` is excluded by a recorded condition; `observed_outcome` only has to agree |
+| The same packet without the frozen branch declaration | completeness mode: the one submitted observation leaves `O2` unobserved, so the result is `PARTIALLY_ASSESSED` with `evidence_eligible: false` (`PC10`) |
+| `A1` declares a structural-equivalence attack but has no `audit_ref` | the audit's result is unknown, so no card can be certified as `evidence_supported_insight`; `insight` reports it under `audit_problems` |
 | `X2:O2` restates `X2:O1` with the same criterion | swapping it in makes the competition `NOT_DISTINGUISHABLE` (`identical_criteria`) |
 | Only `O1` is submitted without a branch selection | the result is `PARTIALLY_ASSESSED` with `evidence_eligible: false` — never `PREDICTION_HELD` |
 | `IC1` declares `predictive_insight_candidate` and has a real intervention | the index derives the same class; declaring `evidence_supported_insight` would raise `PC7` |
+| A card that claims evidence support without the prediction-level packet, the R9.O receipt, bound evidence and a *passed* audit | stays at the lower class and names each missing ingredient (`PC11`); `scripts/test_prediction_compare.py` builds both the full and the failing bindings in memory |
 
 ## Negative examples, not shipped here
 

@@ -249,7 +249,8 @@
     "known_conditions": [
       "execution receipt missing",
       "validity unknown"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

@@ -6,7 +6,7 @@ through the same gates as the ordinary pipeline.
 
 | Path | Role |
 |---|---|
-| [adversarial/](adversarial/) | Ten adversarial situations, one per failure mode the specification names |
+| [adversarial/](adversarial/) | Fourteen adversarial situations, one per failure mode the specification names |
 
 Each case carries a `visible` section — the state, revisions, scheduler and observation packet
 as they were at the time — and a `hidden` section with later results and the reference answer.

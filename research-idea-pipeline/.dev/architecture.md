@@ -79,6 +79,17 @@ and must cite canonical ids. Every support level shown in the index is **recompu
 | Self-certified novelty | insight class depends on canonical evidence tier, structural-equivalence audit required for `evidence_supported` |
 | Future-information leak in replay | replay loader strips hidden fields; leak guard is a test |
 
+## 5b. Round-3 additions (branch mode, qualification gate, certification)
+
+| Concern | Home | Note |
+|---|---|---|
+| Is a comparison usable as science? | `prediction_compare.qualify_evidence` (`PQ1`—`PQ8`) | single decision; `PC7` reports each failed check |
+| Is branch mode legitimate? | `preregistration.outcome_mode` + `branch_rule`, checked by `branch_rule_errors` (`PC10`) | partition + shared observable + computed exclusivity + frozen selector |
+| Which branch was observed? | derived in `_adjudicate_branch` from the raw observation | never from `observed_outcome`; other branches recorded as excluded |
+| May an insight be certified? | `_insight_certification` (`IC1`—`IC6` → `PC11`) | prediction-level binding, R9.O receipt, evidence direction, audit verdict |
+| Where do audit verdicts come from? | `load_audits` → `structural_equivalence_check.check_artifact` | the state keeps only `assurance[].audit_ref` |
+| Who reads the out-of-state projection inputs? | `cognition.projection_inputs` | used by `build`/`check`/`validate` and Legacy Handoff |
+
 ## 6. Minimal-change budget
 
 New files only, plus four doc insertions (SKILL.md, README.md, phase-r3-r6, phase-r8, phase-r9-r11)

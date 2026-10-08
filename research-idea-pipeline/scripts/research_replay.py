@@ -95,6 +95,7 @@ FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
     "inherit_unverified_inference",
     "repeat_stopped_protocol",
     "report_unqualified_result_as_held",
+    "certify_insight_from_unqualified_evidence",
 )
 
 #: A novelty label must come from outside the agent.
@@ -121,7 +122,7 @@ def case_errors(case: Any) -> List[Diagnostic]:
         return diagnostics
     if not isinstance(visible.get("state"), dict):
         diagnostics.append(Diagnostic("RP1", "case.visible.state", "visible 必须包含 state"))
-    for key in ("revisions", "available_literature", "known_conditions"):
+    for key in ("revisions", "available_literature", "known_conditions", "insight_cards"):
         if key in visible and not isinstance(visible[key], list):
             diagnostics.append(Diagnostic("RP1", f"case.visible.{key}", "必须是数组"))
     hidden = case.get("hidden")
@@ -184,6 +185,8 @@ def visible_view(case: Dict[str, Any]) -> Dict[str, Any]:
         "observation_packet": visible.get("observation_packet"),
         "available_literature": list(visible.get("available_literature") or []),
         "known_conditions": list(visible.get("known_conditions") or []),
+        "insight_cards": [card for card in visible.get("insight_cards") or []
+                          if isinstance(card, dict)],
     }
 
 
@@ -258,6 +261,7 @@ def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
         "repeated_prior_error": False,
         "novelty_self_rating": None,
         "decision_changed": False,
+        "insight_classes": {},
     }
 
     if "cognitive_memory" not in capabilities:
@@ -314,6 +318,12 @@ def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
         decision["scientific_status"] = assessment.get("scientific_status")
         decision["provenance_gaps"] = list(assessment.get("provenance_gaps") or [])
         decision["transition_allowed"] = pc.evidence_transition_allowed(state, assessment)[0]
+    # The insight layer is the last link of the chain, so its class is observable here: a
+    # regression that certifies an insight while the comparison was not qualified evidence
+    # becomes a forbidden behaviour rather than a silent upgrade.
+    projected = cg.project_insights(state, visible.get("insight_cards") or [])
+    decision["insight_classes"] = {
+        item.get("id"): item.get("derived_class") for item in projected["insights"]}
     switch = pc.diagnosis_switch(state, index.get("competitions", []),
                                  scheduler, index.get("mechanisms"))
     decision["switch_action"] = switch["action"]
@@ -566,6 +576,12 @@ def _behaviour_present(behaviour: str, decision: Dict[str, Any], case: Dict[str,
         # "every frozen prediction held".
         return (decision.get("predicted_outcome_class") == "PREDICTION_HELD"
                 and not decision.get("evidence_eligible"))
+    if behaviour == "certify_insight_from_unqualified_evidence":
+        # A downstream failure mode: the insight layer certifying itself while the upstream
+        # comparison was not qualified evidence.
+        return (not decision.get("evidence_eligible")
+                and "evidence_supported_insight"
+                in set((decision.get("insight_classes") or {}).values()))
     return False
 
 
@@ -832,6 +848,21 @@ def _two_outcome_preregistration() -> Dict[str, Any]:
     }]}
 
 
+def _unfrozen_branch_packet() -> Dict[str, Any]:
+    """A packet that names a branch after the fact, on a freeze that never declared one."""
+    packet = _packet(-0.8)
+    packet["observed_outcome"] = "O1"
+    content = "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）"
+    return packet
+
+
+def _tampered_source_packet() -> Dict[str, Any]:
+    """A source whose digest does not match its content: the observation is not bound."""
+    packet = _packet(-0.8)
+    packet["outcomes"][0]["source"]["digest"] = "0" * 64
+    return packet
+
+
 def _partial_packet() -> Dict[str, Any]:
     """Only the favourable frozen outcome is submitted."""
     content = "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）"
@@ -853,7 +884,8 @@ def _case(ident: str, title: str, question: str, *, state: Dict[str, Any],
           conditions: Optional[List[str]] = None,
           later_results: Optional[List[str]] = None,
           revisions: Optional[List[Dict[str, Any]]] = None,
-          scheduler: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+          scheduler: Optional[Dict[str, Any]] = None,
+          insight_cards: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     return {
         "_schema": SCHEMA_CASE,
         "id": ident,
@@ -866,6 +898,7 @@ def _case(ident: str, title: str, question: str, *, state: Dict[str, Any],
             "observation_packet": packet,
             "available_literature": literature or ["[Synthetic, Fixture/2024]"],
             "known_conditions": conditions or ["single centre training", "one acceleration"],
+            "insight_cards": insight_cards or [],
         },
         "hidden": {"later_results": later_results or [], "answer": answer},
         "evaluation_only": evaluation,
@@ -873,7 +906,7 @@ def _case(ident: str, title: str, question: str, *, state: Dict[str, Any],
 
 
 def adversarial_cases() -> List[Dict[str, Any]]:
-    """The ten adversarial situations from the specification, as replayable cases."""
+    """The adversarial situations from the specification, as replayable cases."""
     cases: List[Dict[str, Any]] = []
 
     # 1. The existing mechanism explains history but fails on the future.
@@ -1091,6 +1124,34 @@ def adversarial_cases() -> List[Dict[str, Any]]:
                                              "treat_invalid_run_as_refutation"]},
         later_results=["补齐执行收据后才确认该结果"],
         conditions=["execution receipt missing", "validity unknown"]))
+
+    # 13. Branch selection declared after the fact, on a freeze that never froze one.
+    cases.append(_case(
+        "ADV13", "事后声明分支选择",
+        "观测包声明 observed_outcome 是否等于预注册里的互斥分支？",
+        state=_base_state(), packet=_unfrozen_branch_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PARTIALLY_ASSESSED",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["预注册没有冻结分支规则，该选择只是事后挑选"],
+        conditions=["no frozen outcome_mode or branch_rule"]))
+
+    # 14. The observation's source digest does not match its content.
+    cases.append(_case(
+        "ADV14", "观测来源摘要与内容不符",
+        "来源摘要不一致的观测能否作为科学证据？",
+        state=_base_state(), packet=_tampered_source_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["原始结果文件与摘要不符，必须重新绑定来源"],
+        conditions=["source digest mismatch"]))
     return cases
 
 
@@ -1207,7 +1268,7 @@ def selftest() -> int:
             print(f"[FAIL] {name}")
 
     cases = adversarial_cases()
-    check("twelve adversarial cases are defined", len(cases) == 12)
+    check("fourteen adversarial cases are defined", len(cases) == 14)
     check("every case validates", all(case_errors(case) == [] for case in cases))
 
     for case in cases:
@@ -1247,7 +1308,7 @@ def selftest() -> int:
           any(d.rule == "RP5" for d in decision_errors(self_rated)))
 
     passes = [result for result in results if result["evaluation"]["passed"]]
-    check("the offline runner satisfies most adversarial cases", len(passes) >= 10)
+    check("the offline runner satisfies most adversarial cases", len(passes) >= 12)
     check("a partial submission never reads as fully held",
           by_id_case(results, "ADV11")["decision"]["predicted_outcome_class"]
           == "PARTIALLY_ASSESSED")

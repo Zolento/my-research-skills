@@ -248,7 +248,8 @@
     ],
     "known_conditions": [
       "measurement pipeline recently changed"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

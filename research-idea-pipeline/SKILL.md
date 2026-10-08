@@ -781,8 +781,23 @@ python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/re
 清单。只提交一部分只能得到 `PARTIALLY_ASSESSED`，**永远不能读成「全部预测成立」**；
 `execution.validity=UNKNOWN` 时比较结果保留在 `diagnostic_outcome_class`，
 但**不占据科学判定栏**、不是合格证据，也不得触发 R10/R11 状态迁移
-（`evidence_transition_allowed`）。互斥分支用 `observed_outcome` 声明；若另一支也成立，
-则该预注册不可判定。
+（`evidence_transition_allowed`）。
+
+**互斥分支必须由预注册打开，不能由观测包声明。** 只有在冻结时写入
+`outcome_mode: "branch"` + `branch_rule`（`selector` / `quantity` / `branches` 完整划分），
+且分支判据**可证互斥**时，比较器才进入 branch mode；所选分支由冻结规则作用于**原始观测**
+导出，packet 里的 `observed_outcome` 只是必须与之一致的声明。未声明 mode 的预注册一律按
+completeness 判定（旧项目无需迁移）；分支规则缺失、冲突、不可验证或事后追加时，
+**不得产生 `PREDICTION_HELD`**，未选分支也要以可核验的排除条件记录（`PC10`）。
+
+**证据资格只有一个入口。** `qualify_evidence` 的 `PQ1`—`PQ8` 同时检查执行有效性、
+预注册冻结与判据形状、判定集合完整性或合法 branch mode、观测来源绑定（
+`{kind, location, content, digest}` 且 `digest == digest(content)`）、分支选择的可追溯性、
+实验与预测绑定、终态收据、时间顺序与事后篡改。**任何一项不过就 fail closed**
+（`evidence_eligible: false`）：不得标记 `QUALIFIED_EVIDENCE`、不得授权 Claim 状态升级、
+不得用于机制否证或 Insight 认证；诊断性比较照常保留。Insight 只有绑定到**具体预测**、
+具有合格判定、方向一致的证据与**已通过**的结构等价审计时才能成为
+`evidence_supported_insight`（`PC11`）。
 
 机制竞争必须逐对检验**可比性 → 冲突 → 分辨率 → 预先声明的判别规则**：
 不同观测变量、不同测量口径、区间重叠、`noise/√n` 吃掉间隔、间隔小于 `min_separation`、
@@ -893,13 +908,13 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 | **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM9` 规则、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
 | **认知记忆脚本** | [scripts/cognition.py](scripts/cognition.py) | Memory Builder + Validator + Recall / Context Brief；`build` / `check` / `brief` / `recall` / `--selftest` / `--list-kinds`；**只读 canonical，从不写 `research-state.json`** |
 | 认知记忆测试与示例 | [scripts/test_cognition.py](scripts/test_cognition.py)、[examples/cognition/](examples/cognition/README.md) | 离线测试（兼容性 / 可重建性 / 支持度推导 / 写入禁止 / 失效过滤 / CLI / fixture）+ 合成 fixture（**不是真实科研证据**） |
-| **预测 / 异常 / 机制竞争（CIE Phase 2）** | [references/prediction-anomaly-competition.md](references/prediction-anomaly-competition.md) | 可判定判据 `criterion`、观测包来源绑定、六类结果、竞争区分力（`PC1`—`PC9`）、诊断→干预行为切换、Insight Card 与推导类别；**不得自我认证创新性** |
-| **预测比较器脚本** | [scripts/prediction_compare.py](scripts/prediction_compare.py) | `freeze` / `compare` / `compete` / `switch` / `insight` / `--selftest`；判据形状、来源绑定、冻结完整性（`PC4`/`PC5`）、区分力与行为切换 |
+| **预测 / 异常 / 机制竞争（CIE Phase 2）** | [references/prediction-anomaly-competition.md](references/prediction-anomaly-competition.md) | 可判定判据 `criterion`、**冻结的 branch mode**（`outcome_mode`/`branch_rule`）、观测包来源绑定、七类结果、**统一证据资格门（`PQ1`—`PQ8`，fail closed）**、竞争区分力、诊断→干预行为切换、Insight Card 与**按预测逐个绑定**的认证；规则 `PC1`—`PC11`；**不得自我认证创新性** |
+| **预测比较器脚本** | [scripts/prediction_compare.py](scripts/prediction_compare.py) | `freeze` / `compare` / `compete` / `switch` / `insight` / `--selftest`；判据形状、来源绑定、冻结完整性（`PC4`/`PC5`）、分支规则（`PC10`）、**唯一证据资格入口 `qualify_evidence`**、Insight 证据绑定（`PC11`）、区分力与行为切换 |
 | **旧项目接管（Legacy Handoff）** | [references/legacy-handoff.md](references/legacy-handoff.md)、[scripts/legacy_handoff.py](scripts/legacy_handoff.py) | 已初始化项目**禁止重新 Bootstrap**；只读兼容性审计 `LH1`—`LH16`、`canonical` 无损、重建认知记忆、`unknown`/`retrospective` 标注、接管报告、幂等与回滚；**严重错误阻止写回** |
 | 接管回归测试 | [scripts/test_legacy_handoff.py](scripts/test_legacy_handoff.py) | 无损接管 / 跨会话重启 / 重复接管 / 缺失历史 / 失效传播 / 预测时间泄漏 / 多路线隔离 / 下一轮复用旧知识 / 严重错误阻止写回 |
 | **科学价值与自适应发现（CIE Phase 3）** | [references/scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md) | Decision Value / Discovery Potential 分维判断（**无总分**，`SV1`—`SV8`）、Taste Memory 双层权限、八种探索菜单到既有算子的映射、防锁死规则、`P4` 上下文隔离 |
 | **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
-| **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
+| **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十四个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
 | **回放脚本与 fixture** | [scripts/research_replay.py](scripts/research_replay.py)、[examples/replay/](examples/replay/README.md) | `validate` / `show` / `run` / `suite` / `ablate` / `adversarial` / `smoke`；可插拔 `--runner module:function`；fixture 为**合成**，不是真实科研证据 |
 
 ---

@@ -298,7 +298,8 @@
     ],
     "known_conditions": [
       "two consecutive diagnostics produced no decision change"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

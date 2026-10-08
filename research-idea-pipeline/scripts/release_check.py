@@ -40,7 +40,7 @@
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
     14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
         —— 注入聚合分数或删除探索下限必须让闸门判红
-    15. 历史回放：十个对抗 case、泄漏防护、消融与端到端 smoke
+    15. 历史回放：十四个对抗 case、泄漏防护、消融与端到端 smoke
         —— 注入未来信息必须让回放拒绝执行
 
 退出码
@@ -339,10 +339,15 @@ def step_prediction_comparator() -> Tuple[bool, str]:
         return False, "an invalid execution became a scientific verdict"
 
     # P0-1: the frozen set is the decision set; a partial submission must not read as HELD.
+    # The fixture freezes a legitimate branch rule, so the same packet must first be moved
+    # back to completeness mode: that is the situation the exploit needs.
+    complete = json.loads(json.dumps(state))
+    del complete["experiments"][0]["preregistration"]["outcome_mode"]
+    del complete["experiments"][0]["preregistration"]["branch_rule"]
     measured = json.loads(json.dumps(packet))
     measured.pop("observed_outcome", None)
     measured["outcomes"] = [measured["outcomes"][0]]
-    measured_assessment, measured_diagnostics = pc.assess_experiment(state, measured)
+    measured_assessment, measured_diagnostics = pc.assess_experiment(complete, measured)
     if measured_assessment["outcome_class"] != "PARTIALLY_ASSESSED":
         return False, ("a one-of-two submission did not become PARTIALLY_ASSESSED: "
                        + str(measured_assessment["outcome_class"]))
@@ -354,31 +359,95 @@ def step_prediction_comparator() -> Tuple[bool, str]:
                for entry in measured_assessment["predictions"]):
         return False, "the missing frozen outcome was not identified"
 
-    # Branch mode is the legitimate reading of a mutually exclusive preregistration, but it
-    # must verify the selection, and it must detect a freeze that is not exclusive.
-    branch = json.loads(json.dumps(packet))
-    branch["observed_outcome"] = "O1"
-    branch["outcomes"] = [branch["outcomes"][0]]
-    branch_assessment, _ = pc.assess_experiment(state, branch)
-    if branch_assessment["outcome_class"] != "PREDICTION_HELD" \
-            or not branch_assessment["evidence_eligible"]:
-        return False, "a valid branch selection was not adjudicated"
-    ambiguous = json.loads(json.dumps(packet))
-    ambiguous["observed_outcome"] = "O1"
-    source = json.loads(json.dumps(ambiguous["outcomes"][0]["source"]))
-    ambiguous["outcomes"] = [{"id": "O1", "value": 0.8, "source": source},
-                             {"id": "O2", "value": 0.05,
-                              "source": json.loads(json.dumps(source))}]
-    ambiguous_assessment, ambiguous_diagnostics = pc.assess_experiment(state, ambiguous)
-    if ambiguous_assessment["outcome_class"] != "UNTESTABLE" \
-            or not any(d.rule == "PC8" for d in ambiguous_diagnostics):
-        return False, "a non-exclusive freeze was not detected"
+    # The same packet *with* a branch declaration, but without a frozen rule, must not
+    # become branch mode: post-hoc selection is the defect, not a reading of the freeze.
+    forged_branch = json.loads(json.dumps(measured))
+    forged_branch["observed_outcome"] = "O1"
+    forged_assessment, forged_diagnostics = pc.assess_experiment(complete, forged_branch)
+    if forged_assessment["mode"] != "completeness"             or forged_assessment["outcome_class"] == "PREDICTION_HELD":
+        return False, "an unfrozen branch selection was accepted as branch mode"
+    if not any(d.rule == "PC10" for d in forged_diagnostics):
+        return False, "an unfrozen branch selection was not reported"
+
+    # Branch mode is the legitimate reading of a mutually exclusive preregistration. It must
+    # derive the branch from the frozen rule, and it must exclude the others verifiably.
+    branch_assessment, branch_diagnostics = pc.assess_experiment(state, packet)
+    if branch_assessment["outcome_class"] != "PREDICTION_HELD"             or not branch_assessment["evidence_eligible"] or branch_diagnostics:
+        return False, "a valid frozen branch selection was not adjudicated"
+    if branch_assessment["selected_outcome"] != "O1"             or branch_assessment["not_selected"] != ["O2"]:
+        return False, "the branch selection did not report the excluded branch"
+    excluded = branch_assessment["excluded_branches"]
+    if [item["outcome_id"] for item in excluded] != ["O2"]             or excluded[0]["excluded_verdict"] == "PREDICTION_HELD":
+        return False, "the excluded branch was not excluded by a checked condition"
+    for label, mutate, expect_check in (
+            ("branch rule missing",
+             lambda s: s["experiments"][0]["preregistration"].pop("branch_rule"), "PQ2"),
+            ("branch set is not a partition",
+             lambda s: s["experiments"][0]["preregistration"]["branch_rule"].update(
+                 {"branches": ["O1"]}), "PQ2"),
+            ("branches are not mutually exclusive",
+             lambda s: s["experiments"][0]["preregistration"]["outcomes"][1]["criterion"].update(
+                 {"expected_range": [0.0, 0.6]}), "PQ2")):
+        mutated_state = json.loads(json.dumps(state))
+        mutate(mutated_state)
+        invalid, _ = pc.assess_experiment(mutated_state, packet)
+        if invalid["evidence_eligible"] or invalid["outcome_class"] == "PREDICTION_HELD":
+            return False, f"{label}: branch mode was granted anyway"
+        failed = {item["id"] for item in invalid["qualification"]["checks"]
+                  if not item["passed"]}
+        if expect_check not in failed:
+            return False, f"{label}: {expect_check} did not fail ({sorted(failed)})"
+    conflicted = json.loads(json.dumps(packet))
+    conflicted["observed_outcome"] = "O2"
+    conflict_assessment, _ = pc.assess_experiment(state, conflicted)
+    if conflict_assessment["evidence_eligible"]             or conflict_assessment["outcome_class"] == "PREDICTION_HELD":
+        return False, "a branch declaration that contradicts the observation was accepted"
+
     extra = json.loads(json.dumps(packet))
     extra["outcomes"] = list(extra["outcomes"]) + [
         {"id": "O9", "value": 0.8, "source": extra["outcomes"][0]["source"]}]
     extra_assessment, _ = pc.assess_experiment(state, extra)
     if extra_assessment["evidence_eligible"] or extra_assessment["unexpected_observations"] != ["O9"]:
         return False, "an unfrozen outcome entered the decision set"
+
+    # P0-2: source binding must gate qualification, not merely be reported. Before the gate
+    # existed, all three of these mutations still produced `evidence_eligible: true`.
+    for label, mutate, expect_check in (
+            ("missing source", lambda p: p["outcomes"][0].pop("source"), "PQ4"),
+            ("digest mismatch",
+             lambda p: p["outcomes"][0]["source"].update({"digest": "0" * 64}), "PQ4"),
+            ("empty location",
+             lambda p: p["outcomes"][0]["source"].update({"location": ""}), "PQ4"),
+            ("source content rewritten",
+             lambda p: p["outcomes"][0]["source"].update({"content": "改过的内容"}), "PQ4"),
+            ("selector outside the frozen source",
+             lambda p: p["outcomes"][0]["source"].update(
+                 {"location": "results/other.json"}), "PQ5")):
+        mutated_packet = json.loads(json.dumps(packet))
+        mutate(mutated_packet)
+        if mutated_packet["outcomes"][0].get("source") is not None \
+                and mutated_packet["outcomes"][0]["source"].get("location") == "results/other.json":
+            import evidence_outcome as _eo
+            content = mutated_packet["outcomes"][0]["source"]["content"]
+            mutated_packet["outcomes"][0]["source"]["digest"] = _eo.digest(content)
+        assessed, _ = pc.assess_experiment(state, mutated_packet)
+        if assessed["evidence_eligible"] or assessed["evidence_class"] == "QUALIFIED_EVIDENCE":
+            return False, f"{label}: the evidence still qualified"
+        if pc.evidence_transition_allowed(state, assessed)[0]:
+            return False, f"{label}: the transition was still allowed"
+        failed = {item["id"] for item in assessed["qualification"]["checks"]
+                  if not item["passed"]}
+        if expect_check not in failed:
+            return False, f"{label}: {expect_check} did not fail ({sorted(failed)})"
+
+    # The gate is the single authority: an assessment without its block grants nothing.
+    clean_assessment, _ = pc.assess_experiment(state, packet)
+    hand_written = {k: v for k, v in clean_assessment.items() if k != "qualification"}
+    hand_written["evidence_eligible"] = True
+    hand_written["evidence_class"] = "QUALIFIED_EVIDENCE"
+    hand_written["scientific_status"] = "MAY_INFORM_TRANSITION"
+    if pc.evidence_transition_allowed(state, hand_written)[0]:
+        return False, "a hand-written eligibility flag was accepted without the gate"
 
     # P0-2: UNKNOWN keeps the diagnostic result and loses the scientific verdict.
     unknown = json.loads(json.dumps(packet))
@@ -436,9 +505,24 @@ def step_prediction_comparator() -> Tuple[bool, str]:
     self_certified["declared_class"] = "evidence_supported_insight"
     if not any(d.rule == "PC7" for d in pc.insight_card_errors(self_certified, state)):
         return False, "a self-certified insight card escaped PC7"
+    # P1: the audit's result is not in the state, so the fixture (whose assurance entry has
+    # no `audit_ref`) may never reach the top class — with or without the evidence refs.
+    attested = json.loads(json.dumps(card))
+    attested["declared_class"] = "evidence_supported_insight"
+    attested["refs"] = dict(attested["refs"], evidence=["E1"], experiments=["X1"])
+    attested["novel_prediction"] = dict(attested["novel_prediction"],
+                                        experiment_ref="X1")
+    derived, reasons = pc.classify_insight(attested, state)
+    if derived == "evidence_supported_insight":
+        return False, "an insight was certified without a verifiable audit result"
+    if not reasons.get("certification", {}).get("missing"):
+        return False, "the missing certification ingredient was not named"
+    if not any(d.rule in ("PC7", "PC11") for d in pc.insight_card_errors(attested, state)):
+        return False, "an unbound certification attempt escaped PC7/PC11"
     return True, ("criterion mutation + missing criterion + invalid run + partial submission "
-                  "+ UNKNOWN eligibility + comparability/conflict/resolution/rule + "
-                  "self-certification 全部判红")
+                  "+ unfrozen/conflicting/non-exclusive branch selection + source and selector "
+                  "mutations + hand-written eligibility + UNKNOWN eligibility + "
+                  "comparability/conflict/resolution/rule + uncertifiable insight 全部判红")
 
 
 def step_legacy_handoff() -> Tuple[bool, str]:
@@ -529,8 +613,9 @@ def step_discovery_replay() -> Tuple[bool, str]:
     """Replay fixtures, the leak guard, the ablation ladder and the end-to-end smoke."""
     import research_replay as rr
     cases = rr.load_cases(ROOT / "examples" / "replay" / "adversarial")
-    if len(cases) != 12:
-        return False, f"expected 12 adversarial cases, found {len(cases)}"
+    expected_cases = len(rr.adversarial_cases())
+    if len(cases) != expected_cases:
+        return False, (f"expected {expected_cases} adversarial cases, found {len(cases)}")
     generated = rr.adversarial_cases()
     if [case["id"] for case in cases] != [case["id"] for case in generated]:
         return False, "shipped cases drifted from the generator"

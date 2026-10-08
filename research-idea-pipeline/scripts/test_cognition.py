@@ -752,6 +752,250 @@ class TestCrossSessionAvoidsRefutedMechanism(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Insight certification and the evidence chain
+# ---------------------------------------------------------------------------
+
+def certified_state() -> dict:
+    """A state whose insight card can legitimately reach `evidence_supported_insight`.
+
+    Everything the certification gate reads is present: a frozen decidable criterion, a
+    source-bound observation packet, an R9.O receipt in the supporting direction, T2 evidence
+    bound to that experiment and claim, and an assurance entry that points at a real SENA
+    artifact. The text is marked synthetic; nothing here is a research result.
+    """
+    import evidence_outcome as eo
+    doc = state()
+    doc["experiments"][0]["preregistration"]["outcomes"][0]["criterion"] = {
+        "kind": "quantitative", "quantity": "效应量",
+        "expected_range": [0.5, 3.0], "tolerance": 0.1,
+        "rule": "效应量 ≥ 0.5 视为预测成立（SYNTHETIC FIXTURE）",
+    }
+    doc["assurance"] = [{
+        "id": "A1", "target": "H1", "attack_type": "structural-equivalence",
+        "verification_tier": "T1",
+        "kill_condition": "若与 LIT1 结构等价则杀死（SYNTHETIC FIXTURE）",
+        "discriminating_test": "X2",
+        "audit_ref": ".research-idea-pipeline/routes/A/assurance/structural-equivalence/"
+                     "H1.json",
+        "validity": validity("审计已通过（SYNTHETIC FIXTURE）"),
+    }]
+    content = "效应量 0.8（SYNTHETIC FIXTURE）"
+    doc["experiments"][0]["outcome_analysis"] = {
+        "packet": {
+            "schema": "evidence-result@1", "experiment_id": "X1",
+            "experiment_digest": "sha256:synthetic", "execution_status": "completed",
+            "result_summary": content,
+            "sources": [{"id": "S1", "kind": "result",
+                         "location": "results/A/X1/summary.json",
+                         "content": content, "digest": eo.digest(content)}],
+            "observations": [{"id": "OBS1", "statement": content, "scope": "数据集 A",
+                              "source_ids": ["S1"]}],
+        },
+        "analysis": {
+            "schema": "evidence-outcome-analysis@1", "id": "AN1", "experiment_id": "X1",
+            "verification_tier": "T2", "outcome": "POSITIVE_EVIDENCE",
+            "claim_updates": [{"id": "C1", "direction": "positive", "identification": "PASS",
+                               "new_status": "SUPPORTED", "evidence": ["OBS1"],
+                               "scope": "数据集 A"}],
+        },
+        "audit": None,
+    }
+    return doc
+
+
+def certified_card(doc: dict) -> dict:
+    import prediction_compare as pc
+    content = "效应量 0.8（SYNTHETIC FIXTURE）"
+    packet = {
+        "schema": pc.SCHEMA_OBSERVATION, "experiment_id": "X1",
+        "execution": {"status": "completed", "validity": "VALID"},
+        "outcomes": [{"id": "O1", "value": 0.8,
+                      "source": {"kind": "result",
+                                 "location": "results/A/X1/summary.json",
+                                 "content": content,
+                                 "digest": __import__("evidence_outcome").digest(content)}}],
+    }
+    return {
+        "_schema": pc.SCHEMA_INSIGHT, "id": "IC1", "at_state_version": 4, "actor": "R6",
+        "observation": "效应量 0.8（SYNTHETIC FIXTURE）", "existing_mechanism": "M1",
+        "challenged_assumption": "AS1", "proposed_mechanism": "M2",
+        "explanatory_gain": "用另一机制解释同一观察（SYNTHETIC FIXTURE）",
+        "competing_mechanism": "M1", "discriminating_intervention": "X2",
+        "scope_boundary": "数据集 A", "scientific_implication": "需要判别干预（SYNTHETIC FIXTURE）",
+        "novel_prediction": {"ref": "X1:O1", "statement": "效应量 ≥ 0.5（SYNTHETIC FIXTURE）",
+                             "experiment_ref": "X1", "observation": packet,
+                             "observation_digest": cg.digest_of(packet)},
+        "refs": {"claims": ["C1"], "hypotheses": ["H1"], "evidence": ["E1"],
+                 "experiments": ["X1"]},
+        "declared_class": "evidence_supported_insight",
+    }
+
+
+def write_audit(root: pathlib.Path, name: str = "H1") -> pathlib.Path:
+    import structural_equivalence_check as sec
+    directory = root / sec.AUDIT_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.json"
+    path.write_text(json.dumps(sec._selftest_artifact(), ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+class TestInsightCertificationChain(unittest.TestCase):
+    """The chain Frozen Prediction → Observation → Gate → Insight → Memory → Scheduler.
+
+    A failure anywhere upstream must not produce downstream scientific support, and a later
+    invalidation must propagate back down. The tests drive the public index builder and CLI,
+    not the certification helpers.
+    """
+
+    def setUp(self):
+        self.state = certified_state()
+        self.card = certified_card(self.state)
+
+    def test_a_certified_card_reaches_the_top_class(self):
+        import prediction_compare as pc
+        import structural_equivalence_check as sec
+        audits = {"A1": {"artifact": sec._selftest_artifact(),
+                         "verdict": sec._selftest_artifact().get("verdict"),
+                         "candidate": "H1", "source": "<memory>", "violations": []}}
+        derived, _ = pc.classify_insight(self.card, self.state, audits)
+        self.assertEqual(derived, "evidence_supported_insight")
+        index, diagnostics = cg.full_index(self.state, [], "A", [self.card], None, audits)
+        self.assertEqual(index["insights"][0]["derived_class"], "evidence_supported_insight")
+        self.assertEqual([d for d in diagnostics if d.rule in ("PC7", "PC11")], [])
+
+    def test_without_the_audit_result_the_class_stays_lower(self):
+        index, _ = cg.full_index(self.state, [], "A", [self.card])
+        self.assertEqual(index["insights"][0]["derived_class"], "predictive_insight_candidate")
+        self.assertTrue(any("审计" in item
+                            for item in index["insights"][0]["reasons"]["missing"]))
+
+    def test_invalidating_the_evidence_downgrades_insight_and_memory(self):
+        import prediction_compare as pc
+        import structural_equivalence_check as sec
+        audits = {"A1": {"artifact": sec._selftest_artifact(),
+                         "verdict": sec._selftest_artifact().get("verdict"),
+                         "candidate": "H1", "source": "<memory>", "violations": []}}
+        before, _ = cg.full_index(self.state, [], "A", [self.card], None, audits)
+        self.assertEqual(before["insights"][0]["derived_class"],
+                         "evidence_supported_insight")
+        invalidated = json.loads(json.dumps(self.state))
+        invalidated["evidence"][0]["validity"] = validity(
+            "上游实验被撤销（SYNTHETIC FIXTURE）", status="invalid")
+        invalidated["claims"][0]["validity"] = validity(
+            "支持证据已失效（SYNTHETIC FIXTURE）", status="stale")
+        after, _ = cg.full_index(invalidated, [], "A", [self.card], None, audits)
+        self.assertNotEqual(after["insights"][0]["derived_class"],
+                            "evidence_supported_insight")
+
+    def test_a_cross_session_restart_does_not_inherit_false_support(self):
+        """A restart that cannot see the audit must not reproduce the certified class."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, self.state, [])
+            (cognition_dir / "insight-cards.jsonl").write_text(
+                json.dumps(self.card, ensure_ascii=False) + "\n", encoding="utf-8")
+            write_audit(root)
+            self.assertEqual(quiet(cg.op_build, state_path, cognition_dir), cg.EXIT_OK)
+            index = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
+            self.assertEqual(index["insights"][0]["derived_class"],
+                             "evidence_supported_insight")
+            # New session: the same files, read from disk again.
+            reloaded = cg.load_state(state_path)
+            cards, _ = cg.load_insight_cards(cognition_dir / "insight-cards.jsonl")
+            audits, problems = __import__("prediction_compare").load_audits(
+                reloaded, state_path.parent)
+            self.assertEqual(problems, [])
+            index, _ = cg.full_index(reloaded, [], "A", cards, None, audits)
+            self.assertEqual(index["insights"][0]["derived_class"],
+                             "evidence_supported_insight")
+            # And a session that cannot read the audit keeps the lower class.
+            without, _ = cg.full_index(reloaded, [], "A", cards, None, {})
+            self.assertEqual(without["insights"][0]["derived_class"],
+                             "predictive_insight_candidate")
+            self.assertEqual(quiet(cg.op_check, state_path, cognition_dir), cg.EXIT_OK)
+
+    def test_deleting_the_audit_artifact_downgrades_the_rebuilt_index(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, self.state, [])
+            (cognition_dir / "insight-cards.jsonl").write_text(
+                json.dumps(self.card, ensure_ascii=False) + "\n", encoding="utf-8")
+            audit = write_audit(root)
+            quiet(cg.op_build, state_path, cognition_dir)
+            audit.unlink()
+            index = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
+            self.assertEqual(index["insights"][0]["derived_class"],
+                             "evidence_supported_insight")
+            # Rebuilding after the artifact is gone must not keep the certification.
+            self.assertEqual(quiet(cg.op_build, state_path, cognition_dir), cg.EXIT_OK)
+            rebuilt = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
+            self.assertEqual(rebuilt["insights"][0]["derived_class"],
+                             "predictive_insight_candidate")
+            # The card still *declares* the top class, and that declaration is now a hard
+            # violation: the certification it relied on is gone.
+            self.assertEqual(quiet(cg.op_check, state_path, cognition_dir), cg.EXIT_HARD)
+            index, diagnostics = cg.full_index(
+                cg.load_state(state_path), [], "A",
+                cg.load_insight_cards(cognition_dir / "insight-cards.jsonl")[0], None, {})
+            self.assertIn("PC7", {d.rule for d in diagnostics})
+
+    def test_a_diagnostic_comparison_cannot_raise_mechanism_support(self):
+        """Support comes from canonical evidence; the comparator is not an entrance."""
+        import prediction_compare as pc
+        revision = {
+            "_schema": cg.SCHEMA_REVISION, "id": "REV1", "seq": 1, "kind": "mechanism_create",
+            "subject": "M1", "actor": "R3", "at_state_version": 4,
+            "summary": "从 H1 与 C1 抽出机制（SYNTHETIC FIXTURE）",
+            "trigger": {"kind": "candidate_generation", "ref": "H1"},
+            "refs": {"claims": ["C1"], "hypotheses": ["H1"]},
+            "after": {"statement": "机制 M 是主因（SYNTHETIC FIXTURE）"},
+        }
+        baseline, _ = cg.full_index(self.state, [revision], "A")
+        level = next(m for m in baseline["mechanisms"] if m["id"] == "M1")["support_level"]
+        packet = {
+            "schema": pc.SCHEMA_OBSERVATION, "experiment_id": "X1",
+            "execution": {"status": "completed", "validity": "UNKNOWN"},
+            "outcomes": [{"id": "O1", "value": 0.8,
+                          "source": {"kind": "result",
+                                     "location": "results/A/X1/summary.json",
+                                     "content": "效应量 0.8（SYNTHETIC FIXTURE）",
+                                     "digest": __import__("evidence_outcome").digest(
+                                         "效应量 0.8（SYNTHETIC FIXTURE）")}}],
+        }
+        assessment, _ = pc.assess_experiment(self.state, packet)
+        self.assertFalse(assessment["evidence_eligible"])
+        after, _ = cg.full_index(self.state, [revision], "A")
+        self.assertEqual(
+            next(m for m in after["mechanisms"] if m["id"] == "M1")["support_level"], level)
+
+    def test_the_comparator_never_writes_the_canonical_state(self):
+        import prediction_compare as pc
+        before = cg.digest_of(self.state)
+        packet = certified_card(self.state)["novel_prediction"]["observation"]
+        for mutated in (
+                packet,
+                {**packet, "execution": {"status": "completed", "validity": "UNKNOWN"}},
+                {**packet, "execution": {"status": "completed", "validity": "INVALID"}},
+        ):
+            assessment, _ = pc.assess_experiment(self.state, mutated)
+            pc.evidence_transition_allowed(self.state, assessment)
+        self.assertEqual(cg.digest_of(self.state), before)
+
+    def test_an_invalid_result_does_not_move_the_scheduler_or_the_switch(self):
+        """The behaviour switch reads frozen predictions and the scheduler, never results."""
+        import prediction_compare as pc
+        before = pc.diagnosis_switch(self.state, [], None, None)
+        packet = certified_card(self.state)["novel_prediction"]["observation"]
+        invalid = {**packet, "execution": {"status": "completed", "validity": "INVALID"}}
+        pc.assess_experiment(self.state, invalid)
+        after = pc.diagnosis_switch(self.state, [], None, None)
+        self.assertEqual(before, after)
+        frozen = json.dumps(self.state.get("scheduler"), ensure_ascii=False)
+        self.assertEqual(json.dumps(self.state.get("scheduler"), ensure_ascii=False), frozen)
+
+
+# ---------------------------------------------------------------------------
 # No canonical mutation
 # ---------------------------------------------------------------------------
 

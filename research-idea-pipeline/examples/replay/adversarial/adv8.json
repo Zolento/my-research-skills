@@ -249,7 +249,8 @@
     "known_conditions": [
       "second session",
       "no new evidence"
-    ]
+    ],
+    "insight_cards": []
   },
   "hidden": {
     "later_results": [

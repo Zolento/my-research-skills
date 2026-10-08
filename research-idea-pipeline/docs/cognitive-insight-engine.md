@@ -92,7 +92,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | `S1`—`S7`, `V1`—`V24` | `scripts/state_check.py` | shape gate and reference integrity of the canonical state |
 | `EO1`, `EX1` | `evidence_outcome.py`, `execution_gate.py` | additive outcome and execution gates |
 | `CM0`—`CM10` | `scripts/cognition.py` | cognitive projection, provenance, revision authority |
-| `PC1`—`PC9` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, evidence eligibility (`PC7`), adjudication completeness (`PC8`), competition, insight cards |
+| `PC1`—`PC11` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, the frozen branch mode (`PC10`), evidence eligibility (`PC7`, sub-checks `PQ1`—`PQ8`), adjudication completeness (`PC8`), competition, insight cards and their per-prediction evidence binding (`PC11`) |
 | `LH1`—`LH16` | `scripts/legacy_handoff.py` | takeover compatibility audit |
 | `SV1`—`SV8` | `scripts/strategy_memory.py` | value judgment, taste authority, anti-lock-in, isolation |
 | `RP1`—`RP5` | `scripts/research_replay.py` | case schema, leak guard, decision schema, independent novelty |
@@ -144,7 +144,7 @@ python3 scripts/release_check.py
 
 ## 8. Verification status
 
-Verified offline and mechanically, by the fifteen-step release gate and 1164 unit tests:
+Verified offline and mechanically, by the fifteen-step release gate and 1248 unit tests:
 
 * the canonical state, scheduler template and the four schemas are unchanged, and
   `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
@@ -155,6 +155,16 @@ Verified offline and mechanically, by the fifteen-step release gate and 1164 uni
 * an invalid execution is never a prediction verdict and never a mechanism refutation;
 * the frozen preregistration is the complete decision set, so a partial submission yields
   `PARTIALLY_ASSESSED` with `evidence_eligible: false` and never `PREDICTION_HELD`;
+* branch mode is opened by a frozen rule, not by the packet: the selected branch is derived
+  from the raw observation the freeze named, the other branches are excluded by a recorded,
+  checkable condition, and a post-hoc `observed_outcome` is read as completeness;
+* exactly one function decides evidence eligibility (`qualify_evidence`, `PQ1`—`PQ8`), a
+  missing source or a digest mismatch is a blocking failure rather than a warning, and a
+  hand-written `evidence_eligible: true` grants no transition;
+* an insight reaches `evidence_supported_insight` only with a qualified adjudication of *its
+  own* prediction, an R9.O receipt in the supporting direction, evidence bound to that
+  prediction and mechanism, and an audit whose actual verdict is loaded from the artifact its
+  owner validates;
 * an `UNKNOWN` execution keeps its diagnostic comparison but cannot occupy the scientific
   verdict slot, and `evidence_transition_allowed` blocks the transition;
 * distinguishability requires a comparable observable, a conflicting prediction, enough
@@ -162,8 +172,13 @@ Verified offline and mechanically, by the fifteen-step release gate and 1164 uni
   text and self-ratings cannot move the verdict;
 * a takeover leaves the state, scheduler and execution ledger byte-identical;
 * no value judgment or strategy update contains an aggregate score, and no operator is banned;
-* the offline ablation reproduces the capability ladder, and the ten adversarial cases are
+* the offline ablation reproduces the capability ladder, and the fourteen adversarial cases are
   satisfied by the full arm and not by the baseline.
+
+**Not verified:** real Agent A/B discovery performance, and a real (non-synthetic) prediction–
+observation packet. Every certification fixture is synthetic and marked as such; the positive
+certification path is exercised offline against in-memory SENA artifacts, not against a real
+audit produced by a human reviewer.
 
 **Not verified:** real Agent A/B discovery performance. No model was called and no real
 literature library was used. Every fixture is synthetic and marked as such. The ablation
@@ -176,6 +191,15 @@ Structural checks establish provenance, determinism and authority boundaries. Th
 establish that a mechanism is true, that a competition is scientifically the most important
 one, or that a recall selection is the most useful. Index entries are summaries of canonical
 records; when they disagree with the state, the state wins and the index must be rebuilt.
+
+Branch selection remains a human judgement in one respect: the comparator can prove that a
+freeze is a partition, that the rule is frozen and that the observation is traceable, but it
+cannot prove that the frozen branches are the scientifically right ones.
+
+The freeze digest protects a branch declaration only when the cognitive revision log recorded
+one; a project that never ran `cognition build` has no recorded digest, so a post-hoc
+`branch_rule` added to the state is caught by `PC10` shape and exclusivity checks but not by
+`PC4`. Canonical writes remain governed by R13's Integrity Gate.
 
 A reconstructed legacy mechanism is a projection of canonical state, not a recovered memory
 of what the previous session thought. The takeover cannot recover a judgement the state never

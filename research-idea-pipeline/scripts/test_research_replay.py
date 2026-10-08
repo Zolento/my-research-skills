@@ -45,9 +45,9 @@ class TestCaseSchema(unittest.TestCase):
 
     def test_the_generated_suite_is_complete(self):
         cases = rr.adversarial_cases()
-        self.assertEqual(len(cases), 12)
+        self.assertEqual(len(cases), 14)
         self.assertEqual([case["id"] for case in cases],
-                         [f"ADV{n}" for n in range(1, 13)])
+                         [f"ADV{n}" for n in range(1, 15)])
 
     def test_every_case_validates(self):
         for case in rr.adversarial_cases():
@@ -77,7 +77,7 @@ class TestCaseSchema(unittest.TestCase):
 
     def test_the_shipped_cases_load_and_match_the_generator(self):
         shipped = rr.load_cases(CASES)
-        self.assertEqual(len(shipped), 12)
+        self.assertEqual(len(shipped), 14)
         generated = rr.adversarial_cases()
         self.assertEqual([case["id"] for case in shipped],
                          [case["id"] for case in generated])
@@ -471,13 +471,14 @@ class TestCLI(unittest.TestCase):
             proc = self.run_cli(command, "--dir", str(CASES), "--runs", "1")
             self.assertEqual(proc.returncode, rr.EXIT_OK, proc.stdout + proc.stderr)
             report = json.loads(proc.stdout)
-            self.assertEqual(report["cases"], 12)
+            self.assertEqual(report["cases"], len(rr.adversarial_cases()))
 
     def test_adversarial_writes_the_cases(self):
         with tempfile.TemporaryDirectory() as temp:
             proc = self.run_cli("adversarial", "--write", temp)
             self.assertEqual(proc.returncode, rr.EXIT_OK, proc.stdout + proc.stderr)
-            self.assertEqual(len(list(pathlib.Path(temp).glob("*.json"))), 12)
+            self.assertEqual(len(list(pathlib.Path(temp).glob("*.json"))),
+                             len(rr.adversarial_cases()))
 
     def test_smoke_runs(self):
         with tempfile.TemporaryDirectory() as temp:
