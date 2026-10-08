@@ -996,6 +996,90 @@ class TestInsightCertificationChain(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# The documented severity table actually governs the exit code
+# ---------------------------------------------------------------------------
+
+def legacy_project_state() -> dict:
+    """A pre-`criterion` project: the legacy derivation yields a competition it cannot decide.
+
+    `nearest_alternative` + `contract.minimal_discriminating_experiment` make the derivation
+    treat the alternative as a competing mechanism (`LCP-C1`), and the frozen outcomes carry no
+    `criterion`, so the rebuild reports `CM10`. The policy says that is legal and receives no
+    retrospective verdict, so it must be a warning — not a reason to keep `check` red forever.
+    """
+    doc = state()
+    claim = doc["claims"][0]
+    claim["nearest_alternative"] = "机制 N 也能解释同一现象"
+    claim["contract"] = {
+        "statement": claim["statement"], "scope": claim["scope"],
+        "critical_assumptions": [], "supporting_required": [],
+        "refuting": claim["falsifier"], "nearest_alternative": claim["nearest_alternative"],
+        "minimal_discriminating_experiment": "X1",
+        "expected_outcomes": {"O1": "效应量 ≥ 0.5", "O2": "效应量 < 0.1"},
+        "kill_rule": "若 O2 出现则降级", "expansion_rule": "O1 在高场复现",
+    }
+    # `negative_knowledge` / `stop_rules` require a frozen `contract.outcome_policy` (EO1).
+    # This fixture models a project that predates both, so it carries neither.
+    for failure in doc["failures"]:
+        failure.pop("negative_knowledge", None)
+        failure.pop("stop_rules", None)
+    return doc
+
+
+class TestLegacyWarningsDoNotBlock(unittest.TestCase):
+    """Found in review: `check` was red and the takeover refused itself on a legal legacy state.
+
+    The severity column of `references/cognitive-memory-policy.md` §2 already said
+    `CM7`—`CM9` are warnings; the implementation treated every diagnostic as hard. A takeover
+    of a pre-`criterion` project writes an index that carries `CM10`, so the next takeover
+    refused the project because of its own previous output.
+    """
+
+    def test_the_warning_table_matches_the_documented_severity(self):
+        self.assertEqual(cg.WARNING_RULES, ("CM7", "CM8", "CM9", "CM10"))
+        self.assertTrue(cg.is_warning("CM10") and not cg.is_warning("CM3"))
+        hard = [cg.Diagnostic("CM3", "p", "d"), cg.Diagnostic("CM10", "p", "d")]
+        self.assertEqual([d.rule for d in cg.hard_only(hard)], ["CM3"])
+        self.assertEqual([d.rule for d in cg.warnings_only(hard)], ["CM10"])
+
+    def test_a_legacy_competition_note_does_not_make_check_red(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, legacy_project_state(), [])
+            self.assertEqual(quiet(cg.op_build, state_path, cognition_dir), cg.EXIT_OK)
+            index = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
+            self.assertTrue(any(item["rule"] == "CM10" for item in index["diagnostics"]),
+                            "the fixture no longer produces CM10")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                code = cg.op_check(state_path, cognition_dir)
+            self.assertEqual(code, cg.EXIT_OK, output.getvalue())
+            self.assertIn("[advisory] CM10", output.getvalue())
+            self.assertIn("legacy 提示（不阻断）", output.getvalue())
+            self.assertEqual(quiet(cg.op_validate, state_path, cognition_dir), cg.EXIT_OK)
+
+    def test_a_projection_warning_is_not_index_drift(self):
+        doc = legacy_project_state()
+        index, _ = cg.full_index(doc, [], "A")
+        self.assertEqual(cg.validate_index(doc, [], index), [])
+        drifted = json.loads(json.dumps(index))
+        drifted["mechanisms"] = []
+        rules = {d.rule for d in cg.validate_index(doc, [], drifted)}
+        self.assertIn("CM3", rules)
+
+    def test_a_hard_violation_still_makes_check_red(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            state_path, cognition_dir = write_fixture(root, legacy_project_state(), [])
+            quiet(cg.op_build, state_path, cognition_dir)
+            index_path = cognition_dir / cg.INDEX_NAME
+            broken = json.loads(index_path.read_text(encoding="utf-8"))
+            broken["mechanisms"] = []
+            index_path.write_text(json.dumps(broken, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(quiet(cg.op_check, state_path, cognition_dir), cg.EXIT_HARD)
+
+
+# ---------------------------------------------------------------------------
 # No canonical mutation
 # ---------------------------------------------------------------------------
 

@@ -674,6 +674,50 @@ class TestShippedFixtureIsTakeable(unittest.TestCase):
             self.assertEqual(quiet(cg.op_check, project.state_path,
                                    project.cognition_dir)[0], cg.EXIT_OK)
 
+    def test_a_legacy_warning_does_not_block_or_break_idempotence(self):
+        """The self-lock: a takeover wrote an index that made the next takeover refuse.
+
+        A pre-`criterion` project derives a competition it cannot decide (`CM10`). The first
+        takeover has no index to validate, so it succeeds and writes one carrying that
+        diagnostic; escalating the diagnostic to a blocking `LH12` made every later takeover —
+        including the idempotence check — fail on the project's own healthy output.
+        """
+        import test_cognition as tc
+        with tempfile.TemporaryDirectory() as temp:
+            project = Project(pathlib.Path(temp), state=tc.legacy_project_state())
+            code, output = quiet_all(lh._take, project.state_path, project.root)
+            self.assertEqual(code, lh.EXIT_OK, output[-400:])
+            first = {name: (project.cognition_dir / name).read_bytes()
+                     for name in lh.OWNED_FILES}
+            index = json.loads((project.cognition_dir / cg.INDEX_NAME).read_text("utf-8"))
+            self.assertTrue(any(item["rule"] == "CM10" for item in index["diagnostics"]),
+                            "the fixture no longer produces CM10")
+            code, output = quiet_all(lh._take, project.state_path, project.root)
+            self.assertEqual(code, lh.EXIT_OK, output[-400:])
+            second = {name: (project.cognition_dir / name).read_bytes()
+                      for name in lh.OWNED_FILES}
+            self.assertEqual(first, second)
+            audit = lh.compatibility_audit(project.state_path, project.root)
+            self.assertFalse(audit["blocking"])
+            self.assertFalse([f for f in audit["findings"]
+                              if f.rule == "LH12" and f.severity == lh.BLOCKING])
+
+    def test_a_warning_diagnostic_is_never_escalated_to_blocking_lh12(self):
+        """`LH12` blocks on drift. A documented warning must stay a warning."""
+        import test_cognition as tc
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as temp:
+            project = Project(pathlib.Path(temp), state=tc.legacy_project_state())
+            project.cognition_dir.mkdir(parents=True, exist_ok=True)
+            (project.cognition_dir / cg.INDEX_NAME).write_text("{}", encoding="utf-8")
+            warning = cg.Diagnostic("CM10", "competitions[LCP-C1]",
+                                    "历史竞争无法判定区分力：X1:O1 没有可判定判据")
+            with mock.patch.object(cg, "validate_index", return_value=[warning]):
+                audit = lh.compatibility_audit(project.state_path, project.root)
+            lh12 = [finding for finding in audit["findings"] if finding.rule == "LH12"]
+            self.assertEqual([finding.severity for finding in lh12], [lh.WARNING])
+            self.assertIn("legacy 提示", lh12[0].detail)
+
     def test_genuine_index_drift_still_blocks_the_takeover(self):
         with tempfile.TemporaryDirectory() as temp:
             project = Project(pathlib.Path(temp), state=json.loads(

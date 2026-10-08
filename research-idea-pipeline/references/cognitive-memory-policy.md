@@ -27,7 +27,7 @@ placed under `routes/<R>/docs/`.
 
 **No new state slot is introduced.** S1—S7 and V1—V24 are unchanged, the state template is
 unchanged, and `scripts/state_check.py` is unchanged. The layer is enforced by
-`scripts/cognition.py` under its own rule namespace `CM1`—`CM9`, which never collides with
+`scripts/cognition.py` under its own rule namespace `CM1`—`CM10`, which never collides with
 `S`/`V` rule numbers or with the `C`/`E`/`AS`/`H`/`X`/`LIT`/`F`/`U` id prefixes.
 
 ## 1. Four cognitive memory classes
@@ -51,7 +51,7 @@ unchanged, and `scripts/state_check.py` is unchanged. The layer is enforced by
 4. A cognitive entry that restates a canonical object without adding structure, boundary or
    prediction is a duplicate, not progress (rule `CM9`).
 
-## 2. Rule table `CM1`—`CM9`
+## 2. Rule table `CM1`—`CM10`
 
 | Rule | Check | Severity |
 |---|---|---|
@@ -65,9 +65,18 @@ unchanged, and `scripts/state_check.py` is unchanged. The layer is enforced by
 | **CM7** | A self-declared support level is recorded as a conflict and is never adopted | warning |
 | **CM8** | An open competition without conflicting predictions plus a discriminating intervention is reported as lacking distinguishing power | warning |
 | **CM9** | Two mechanisms with an identical canonical anchor set are reported as substantively equivalent explanations | warning |
+| **CM10** | A competition cannot be decided because a frozen outcome has no machine-decidable `criterion`; a legacy state stays readable, compares as `UNTESTABLE` and receives no retrospective verdict | warning |
 
-`CM7`, `CM8` and `CM9` are warnings: they do not block a build, but they must appear in the
-context brief's provenance section. `CM0`—`CM6` block: `scripts/cognition.py check` exits 3.
+`CM7`—`CM10` are warnings: they do not block a build, and **they do not flip an exit code**.
+They must appear in the context brief's provenance section, and `check`/`validate` print them
+with an `[advisory]` marker and count them separately. `CM0`—`CM6` block:
+`scripts/cognition.py check` exits 3.
+
+The severity column is the contract. A consumer that treats *every* diagnostic as a violation
+will refuse legitimate legacy projects: an index written by a takeover of a pre-`criterion`
+project always carries `CM10`, so escalating it to a blocking finding makes the takeover refuse
+its own output. `scripts/cognition.py` exposes the table as `WARNING_RULES`, and every consumer
+(index validation, `LH12`, exit codes) reads it from there instead of re-deciding.
 
 ## 3. Derived support ladder (the anti self-certification core)
 

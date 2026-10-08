@@ -36,7 +36,7 @@ for projects with **no** state; this is not one of them.
 | **LH9** | Failures carry `negative_knowledge` or `stop_rules` | warning |
 | **LH10** | `ACCEPTED_LIMITATION` repairs are recovered as boundaries | info |
 | **LH11** | An existing `.execution` ledger means budget is already spent | info |
-| **LH12** | A pre-existing `cognition/index.json` still matches a fresh rebuild | blocking |
+| **LH12** | A pre-existing `cognition/index.json` still matches a fresh rebuild. *Drift* only: a `warning`-severity CM diagnostic describes the canonical state, is reported as a warning, and never refuses the takeover | blocking |
 | **LH13** | No prediction was frozen after its result existed | blocking |
 | **LH14** | The route keeps `README.md`, `STATUS.md` and `INDEX.md` | warning |
 | **LH15** | Existing code or route configuration is discovered | info |
@@ -58,6 +58,12 @@ Three of these deserve a note.
 * **LH12 — a corrupt derived layer is not overwritten.** If a stored index does not match a
   rebuild, silently replacing it could change a scientific conclusion. The handoff stops and
   reports the drift.
+  **Drift is not the same thing as a warning.** A `warning`-severity CM diagnostic (say `CM10`:
+  a legacy competition whose frozen outcomes have no criterion) describes the *canonical state*
+  and is reported as a warning; the index still matches. Escalating it would be self-defeating:
+  a takeover of a pre-`criterion` project **writes an index that carries that diagnostic**, so
+  the next takeover would refuse the healthy project because of the previous takeover's own
+  output — and `take` would stop being idempotent.
 * **LH13 — prediction time leakage.** A preregistration frozen at or after the result is not
   a prediction. `frozen_at_state_version <= result_at_state_version` is legal for both
   `done` and `failed`; anything later is a leak, and the result may not be presented as a

@@ -760,7 +760,7 @@ R10 写 `mechanism_refute` / `mechanism_weaken` / `mechanism_reactivate`；
 R11 写 `mechanism_merge` / `mechanism_revise` 后重建；R12 / R13 **只读**（叙事与审阅是
 state 的视图）；R14 只读 Context Brief。详见该政策 §8。
 
-**机械闸门 `CM1`—`CM9`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
+**机械闸门 `CM1`—`CM10`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
 
 ```sh
 python3 scripts/cognition.py build --state .research-idea-pipeline/routes/<R>/research-state.json
@@ -905,7 +905,7 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
 | 串联示例 | [examples/](examples/) | 主链路串联（`R3—R6 → R8 → R12 → R7`）、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
-| **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM9` 规则、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
+| **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM10` 规则（`CM7`—`CM10` 为 warning，不翻转退出码）、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
 | **认知记忆脚本** | [scripts/cognition.py](scripts/cognition.py) | Memory Builder + Validator + Recall / Context Brief；`build` / `check` / `brief` / `recall` / `--selftest` / `--list-kinds`；**只读 canonical，从不写 `research-state.json`** |
 | 认知记忆测试与示例 | [scripts/test_cognition.py](scripts/test_cognition.py)、[examples/cognition/](examples/cognition/README.md) | 离线测试（兼容性 / 可重建性 / 支持度推导 / 写入禁止 / 失效过滤 / CLI / fixture）+ 合成 fixture（**不是真实科研证据**） |
 | **预测 / 异常 / 机制竞争（CIE Phase 2）** | [references/prediction-anomaly-competition.md](references/prediction-anomaly-competition.md) | 可判定判据 `criterion`、**冻结的 branch mode**（`outcome_mode`/`branch_rule`）、观测包来源绑定、七类结果、**统一证据资格门（`PQ1`—`PQ8`，fail closed）**、竞争区分力、诊断→干预行为切换、Insight Card 与**按预测逐个绑定**的认证；规则 `PC1`—`PC11`；**不得自我认证创新性** |

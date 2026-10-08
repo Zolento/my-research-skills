@@ -565,7 +565,40 @@ def step_legacy_handoff() -> Tuple[bool, str]:
         code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
         if code != 3 or cognition_dir.exists():
             return False, "a terminal experiment without a preregistration did not block"
-    return True, "无损接管 + 幂等 + Bootstrap 拒绝 + 缺失预注册阻止写回"
+
+    # A pre-`criterion` project derives a competition it cannot decide (`CM10`). The policy
+    # says that is legal and receives no retrospective verdict, so the note must not flip an
+    # exit code — otherwise the takeover writes an index that makes the next takeover refuse
+    # the project's own healthy output, and `take` stops being idempotent.
+    import test_cognition as tc
+    with tempfile.TemporaryDirectory() as temp:
+        route = pathlib.Path(temp) / ".research-idea-pipeline" / "routes" / "A"
+        route.mkdir(parents=True)
+        state_path = route / cg.STATE_NAME
+        state_path.write_text(json.dumps(tc.legacy_project_state(), ensure_ascii=False),
+                              encoding="utf-8")
+        cognition_dir = route / cg.COGNITION_DIRNAME
+        code, out = _run(["scripts/cognition.py", "build", "--state", str(state_path)])
+        if code != 0:
+            return False, f"legacy build exit={code} {out.strip()[-160:]}"
+        stored = json.loads((cognition_dir / "index.json").read_text(encoding="utf-8"))
+        if not any(item["rule"] == "CM10" for item in stored["diagnostics"]):
+            return False, "the legacy fixture no longer produces CM10"
+        code, out = _run(["scripts/cognition.py", "check", "--state", str(state_path)])
+        if code != 0:
+            return False, f"a legacy warning made check red: exit={code}"
+        if "[advisory] CM10" not in out:
+            return False, "the legacy warning was not printed as an advisory"
+        code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
+        if code != 0:
+            return False, f"a legacy warning blocked the takeover: {out.strip()[-160:]}"
+        first = {name: (cognition_dir / name).read_bytes() for name in lh.OWNED_FILES}
+        code, out = _run(["scripts/legacy_handoff.py", "take", "--state", str(state_path)])
+        if code != 0 or {name: (cognition_dir / name).read_bytes()
+                         for name in lh.OWNED_FILES} != first:
+            return False, "the takeover of a legacy project is not idempotent"
+    return True, ("无损接管 + 幂等 + Bootstrap 拒绝 + 缺失预注册阻止写回 + "
+                  "legacy warning 不翻转退出码/不阻断接管")
 
 
 def step_scientific_value() -> Tuple[bool, str]:

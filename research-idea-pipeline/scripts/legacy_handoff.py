@@ -328,6 +328,14 @@ def _cognition_findings(state: Dict[str, Any], revisions: Sequence[Dict[str, Any
     cards, scheduler, audits = cg.projection_inputs(state, cognition_dir.parent)
     diagnostics = cg.validate_index(state, revisions, stored, cards, scheduler, audits)
     for diagnostic in diagnostics:
+        # `LH12` blocks on *drift*: the stored index does not match a fresh rebuild. A rule
+        # with the documented `warning` severity describes the canonical state, not the
+        # projection, so it is reported without refusing the takeover.
+        if cg.is_warning(diagnostic.rule):
+            findings.append(Finding(
+                "LH12", WARNING, diagnostic.path,
+                "索引可重建，但重建报告了 legacy 提示：" + diagnostic.detail))
+            continue
         findings.append(Finding("LH12", BLOCKING, diagnostic.path,
                                 "已有认知索引与 canonical 重建不一致：" + diagnostic.detail))
     return findings

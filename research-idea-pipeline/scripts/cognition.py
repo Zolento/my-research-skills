@@ -202,6 +202,38 @@ ID_PREFIX: Dict[str, str] = {
 
 CONTEXT_TIERS = ("hot", "warm", "cold")
 
+#: The documented `warning` severity of the CM namespace
+#: (`references/cognitive-memory-policy.md` §2): `CM0`—`CM6` block, `CM7`—`CM9` warn.
+#:
+#: `CM10` belongs to the same family as `CM8`: it reports a competition that cannot be decided
+#: because a frozen outcome has no machine-decidable criterion. The policy fixes that handling
+#: in three places — an absent criterion is "legal but not decidable"
+#: (`prediction_compare.criterion_errors`), legacy states "compare as `UNTESTABLE` and receive
+#: no retrospective verdict" (`prediction_compare` module docstring), and such an outcome is
+#: "reported as `retrospective`" (`legacy-handoff.md` §3). A note about a legal legacy state
+#: must not turn `check` permanently red, and it is not index drift.
+#:
+#: Before this table was enforced, every CM diagnostic behaved as if it were hard: `check`
+#: exited 3 for `CM7`—`CM10`, and `legacy_handoff` escalated a projection note into a blocking
+#: `LH12` — so a legacy project refused to be taken over because of the index that the previous
+#: takeover had written.
+WARNING_RULES: Tuple[str, ...] = ("CM7", "CM8", "CM9", "CM10")
+
+
+def is_warning(rule: str) -> bool:
+    """Whether a rule id carries the documented `warning` severity."""
+    return rule in WARNING_RULES
+
+
+def hard_only(diagnostics: Iterable[Diagnostic]) -> List[Diagnostic]:
+    """The diagnostics that actually block: everything outside the warning table."""
+    return [diagnostic for diagnostic in diagnostics if not is_warning(diagnostic.rule)]
+
+
+def warnings_only(diagnostics: Iterable[Diagnostic]) -> List[Diagnostic]:
+    return [diagnostic for diagnostic in diagnostics if is_warning(diagnostic.rule)]
+
+
 #: Default context budget: characters of the generated brief. The brief is a
 #: recovery aid, not a state dump; the policy requires a bounded context.
 DEFAULT_BUDGET = 6000
@@ -1653,7 +1685,11 @@ def validate_index(
             diagnostics.append(Diagnostic(
                 "CM3", f"{INDEX_NAME}:competitions[{entry.get('id')}]",
                 f"status 非法：{entry.get('status')!r}"))
-    diagnostics.extend(build_diagnostics)
+    # A warning produced by the rebuild describes the *canonical state* (for example a legacy
+    # competition whose frozen outcomes have no criterion). It is not a mismatch between the
+    # stored index and the rebuild, so it must not be reported as drift — `LH12` treats every
+    # diagnostic here as "the index is inconsistent", and that claim would be false.
+    diagnostics.extend(hard_only(build_diagnostics))
     return _dedupe(diagnostics)
 
 
@@ -2170,10 +2206,14 @@ def op_validate(state_path: Path, cognition_dir: Path) -> int:
             diagnostics.extend(validate_index(state, revisions, index, cards, scheduler,
                                               audits))
     diagnostics = _dedupe(diagnostics)
+    hard = hard_only(diagnostics)
+    warnings = warnings_only(diagnostics)
     for diagnostic in diagnostics:
-        print(diagnostic.render())
-    print(f"validate: {len(diagnostics)} 处问题（规则 CM1—CM9）")
-    return EXIT_OK if not diagnostics else EXIT_HARD
+        prefix = "[advisory] " if is_warning(diagnostic.rule) else ""
+        print(prefix + diagnostic.render())
+    print(f"validate: {len(hard)} 处问题（规则 CM1—CM10）"
+          + (f"；另有 {len(warnings)} 条 legacy 提示（不阻断）" if warnings else ""))
+    return EXIT_OK if not hard else EXIT_HARD
 
 
 def op_brief(state_path: Path, cognition_dir: Path, out: Optional[Path], budget: int) -> int:
@@ -2224,10 +2264,14 @@ def op_check(state_path: Path, cognition_dir: Path) -> int:
     diagnostics = _dedupe(diagnostics)
     if state_fingerprint(state_path) != before:
         diagnostics.append(Diagnostic("CM0", STATE_NAME, "认知检查过程修改了 canonical state"))
+    hard = hard_only(diagnostics)
+    warnings = warnings_only(diagnostics)
     for diagnostic in diagnostics:
-        print(diagnostic.render())
-    print(f"check: {len(diagnostics)} 处问题（规则 CM1—CM9）")
-    return EXIT_OK if not diagnostics else EXIT_HARD
+        prefix = "[advisory] " if is_warning(diagnostic.rule) else ""
+        print(prefix + diagnostic.render())
+    print(f"check: {len(hard)} 处问题（规则 CM1—CM10）"
+          + (f"；另有 {len(warnings)} 条 legacy 提示（不阻断）" if warnings else ""))
+    return EXIT_OK if not hard else EXIT_HARD
 
 
 # ---------------------------------------------------------------------------

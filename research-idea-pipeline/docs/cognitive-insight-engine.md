@@ -117,7 +117,7 @@ No namespace collides with the canonical id prefixes `C` / `E` / `AS` / `H` / `X
 
 | Artifact | Purpose |
 |---|---|
-| [cognitive-memory-policy.md](../references/cognitive-memory-policy.md) | memory classes, layers, rules `CM1`—`CM9`, lifecycle, write prohibitions |
+| [cognitive-memory-policy.md](../references/cognitive-memory-policy.md) | memory classes, layers, rules `CM1`—`CM10` (with the documented `hard` / `warning` severity table), lifecycle, write prohibitions |
 | [prediction-anomaly-competition.md](../references/prediction-anomaly-competition.md) | frozen criteria, comparison classes, competition verdicts, behaviour switch, insight cards |
 | [legacy-handoff.md](../references/legacy-handoff.md) | detection, audit `LH1`—`LH16`, reconstruction, retrospection rules, rollback |
 | [scientific-value-adaptive-discovery.md](../references/scientific-value-adaptive-discovery.md) | value dimensions, taste memory, menu ordering, anti-lock-in rules, `P4` isolation |
@@ -144,7 +144,7 @@ python3 scripts/release_check.py
 
 ## 8. Verification status
 
-Verified offline and mechanically, by the fifteen-step release gate and 1252 unit tests:
+Verified offline and mechanically, by the fifteen-step release gate and 1258 unit tests:
 
 * the canonical state, scheduler template and the four schemas are unchanged, and
   `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
@@ -170,7 +170,9 @@ Verified offline and mechanically, by the fifteen-step release gate and 1252 uni
 * distinguishability requires a comparable observable, a conflicting prediction, enough
   resolution against `tolerance + noise/√n`, and a pre-declared `discrimination_rule`; free
   text and self-ratings cannot move the verdict;
-* a takeover leaves the state, scheduler and execution ledger byte-identical;
+* a takeover leaves the state, scheduler and execution ledger byte-identical, and repeating it
+  is idempotent even when the rebuild reports `warning`-severity CM diagnostics — the severity
+  table is enforced, so a legacy note never flips an exit code or blocks a takeover;
 * no value judgment or strategy update contains an aggregate score, and no operator is banned;
 * the offline ablation reproduces the capability ladder, and the fourteen adversarial cases are
   satisfied by the full arm and not by the baseline.
