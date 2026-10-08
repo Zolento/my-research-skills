@@ -706,6 +706,73 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 
 ---
 
+### 1.8 认知记忆：跨会话恢复科学理解（Cognitive Insight Engine）
+
+> **记录事实 ≠ 积累理解。** Research State 回答「我们目前认为世界是什么样」；
+> 认知记忆回答「我们持有哪些机制、它们如何被证据改写、下一位执行者必须先恢复什么」。
+
+**定位：** 它是**已有系统的认知增强层**，不是第 16 个阶段，不是第九类一等对象，
+也不是第二份事实来源。权威定义见
+[cognitive-memory-policy.md](references/cognitive-memory-policy.md)。
+
+**三层，一个方向：**
+
+```text
+Canonical  .research-idea-pipeline/routes/<R>/research-state.json   ← 唯一权威
+Event      .research-idea-pipeline/routes/<R>/cognition/model-revisions.jsonl
+           结构断言 + canonical 指针，append-only                  ← 不承载支持度
+Derived    .research-idea-pipeline/routes/<R>/cognition/index.json
+           .research-idea-pipeline/routes/<R>/cognition/context-brief.md
+           可由前两层重建                                         ← 永不是权威
+```
+
+**四条硬边界（违反即与 §1.6 / §1.7 冲突）：**
+
+1. **支持度是算出来的，不是声明的。** 机制的支持等级由 canonical 事实推出
+   （`speculative` / `hypothesis` / `literature_supported` / `experiment_supported` /
+   `refuted`）。修订事件**不得**声明 `epistemic_status`、支持等级或 Claim 状态（`CM2`）；
+   自评只被记成冲突（`CM7`），不被采用。
+2. **认知记忆不写 canonical。** 它不写 `claims[].status`、不写 `contract`、不写锚点、
+   不写 `evidence[]` / `failures[]`。构建前后对 `research-state.json` 做字节比对（`CM0`）。
+3. **失效即过期。** 引用的证据或对象 `validity` 变成 `stale` / `invalid` / `pending` 时，
+   派生条目自动标记过期、退出 hot memory，并保留原因；不补写推测。
+4. **记忆不等于事实。** 每条机制必须带支持等级、适用范围与来源引用。Context Brief
+   不得把推测写成结论。
+
+**记忆生命周期：** `Recall → Reason → Test → Revise → Consolidate → Recall`。
+每次启动先恢复：研究契约与目标 / 仍有效的机制 / 未解释异常 / 被否证机制及其边界 /
+未完成的机制竞争 / 上一轮决策与未完成操作。**三级加载，不得无差别注入全部历史：**
+
+| 层 | 内容 | 选择依据 |
+|---|---|---|
+| **Hot** | 与当前焦点挂钩的机制、高重要度未复现异常、开放竞争、失败约束、上一轮决策 | 引用与焦点集相交 |
+| **Warm** | 被否证 / 被削弱的机制与相关历史 | 非 hot，但有支持理由 |
+| **Cold** | 其余一切，含全部过期条目 | 只给 id 与过期原因 |
+
+焦点集取自 canonical：`open` 且 `importance ∈ {critical, high}` 的 `U` 及其判别测试、
+存活的 `C`、`planned` / `running` 的 `X`、存活候选、`ACCEPTED_LIMITATION` 的 `repairs[].targets`。
+另有去重（同一 canonical 锚点集合 = 实质等价解释，`CM9`）、来源引用、版本检查和
+上下文预算（`--budget`，默认 6000 字符，截断必须显式标注）。
+
+**读写协议（逐阶段）：** R3—R6 写 `mechanism_*` / `competition_*` 并读策略先验；
+R8 写 `prediction_freeze`；R9.O 写 `anomaly_record` / `prediction_assessment`；
+R10 写 `mechanism_refute` / `mechanism_weaken` / `mechanism_reactivate`；
+R11 写 `mechanism_merge` / `mechanism_revise` 后重建；R12 / R13 **只读**（叙事与审阅是
+state 的视图）；R14 只读 Context Brief。详见该政策 §8。
+
+**机械闸门 `CM1`—`CM9`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
+
+```sh
+python3 scripts/cognition.py build --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/cognition.py check --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/research-state.json --budget 4000
+```
+
+退出码同仓库约定：`0` 通过 / `1` 参数错误 / `3` 硬违规 / `4` 环境不满足。
+**不新增 state 槽位**：S1—S7 / V1—V24、state 模板与 `state_check.py` 一律不变。
+
+---
+
 ## 2. 共享资源索引
 
 | 资源 | 位置 | 内容 |
@@ -743,6 +810,9 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
 | 串联示例 | [examples/](examples/) | 主链路串联（`R3—R6 → R8 → R12 → R7`）、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
+| **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM9` 规则、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
+| **认知记忆脚本** | [scripts/cognition.py](scripts/cognition.py) | Memory Builder + Validator + Recall / Context Brief；`build` / `check` / `brief` / `recall` / `--selftest` / `--list-kinds`；**只读 canonical，从不写 `research-state.json`** |
+| 认知记忆测试与示例 | [scripts/test_cognition.py](scripts/test_cognition.py)、[examples/cognition/](examples/cognition/README.md) | 离线测试（兼容性 / 可重建性 / 支持度推导 / 写入禁止 / 失效过滤 / CLI / fixture）+ 合成 fixture（**不是真实科研证据**） |
 
 ---
 

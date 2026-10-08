@@ -7,7 +7,7 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。本地文献源默认走 Zotero（Local API 只读），不可用时自动回落到 `docs/refs/` 旧格式；`zotero_refs.py` 可把 Zotero 元数据 / PDF 导出到该格式。内部 Evidence Outcome Analysis 区分有效负证据与无效执行，固化 scoped updates、negative knowledge 和下一步决策。PEIG/AALG 将风险对照、有限诊断与内容绑定 receipt 接入受控执行入口。 |
+| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。本地文献源默认走 Zotero（Local API 只读），不可用时自动回落到 `docs/refs/` 旧格式；`zotero_refs.py` 可把 Zotero 元数据 / PDF 导出到该格式。内部 Evidence Outcome Analysis 区分有效负证据与无效执行，固化 scoped updates、negative knowledge 和下一步决策。PEIG/AALG 将风险对照、有限诊断与内容绑定 receipt 接入受控执行入口。**Cognitive Insight Engine** 在路线控制平面下维护四类认知记忆（机制 / 异常 / 竞争 / 科学价值）：`cognition/index.json` 与 `cognition/context-brief.md` 完全可由 `research-state.json` 加 append-only 修订日志重建，支持等级一律由 canonical 证据推出，跨会话恢复机制模型、失败约束与未完成竞争。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改。提供 Scientific Coherence Audit、Compact / Full Blueprint、多选 suggestion bank、作者风格保护和语义 / style 门禁；可独立安装，不依赖其他 skill。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图**字符草稿**架构师：读代码 / 论文 / 配置 / 用户说明，产出若干份结构不同的 Markdown 字符示意图 draft，作为 SVG / TikZ / Figma 代理的结构蓝图。强制四级证据（A/B/C/D）、强制区分 train / inference / frozen，禁止补造不存在的模块；含契约校验脚本与离线测试。 |
 

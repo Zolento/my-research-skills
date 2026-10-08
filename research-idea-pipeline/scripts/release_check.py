@@ -31,6 +31,8 @@
        —— 原始结果变异必须让发布闸门判红
     10. PEIG/AALG schema、模板和 CT→MRI 对照变异
         —— 漏掉容量对照必须拒绝正式执行；启动路径仅用 mock/dry-run 测试
+    11. Cognitive Insight Engine 的合成 fixture
+        —— 构建 → 校验 → 重建必须一致，且 canonical state 逐字节不变
 
 退出码
 ------
@@ -43,8 +45,10 @@ from __future__ import annotations
 import pathlib
 import json
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from typing import List, Tuple
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -244,6 +248,45 @@ def step_evidence_outcome() -> Tuple[bool, str]:
     return True, f'{len(paths)} 份来源/状态/决策全通过 EO 门禁（科学判断为示例，不是模型准确率）'
 
 
+def step_cognitive_memory() -> Tuple[bool, str]:
+    """Cognitive Insight Engine: build → check → rebuild must agree, state untouched.
+
+    The fixture is copied into a temporary route directory so the shipped example
+    stays a pure input. Two things are asserted mechanically: `check` passes after
+    `build`, and the canonical state file is byte-identical afterwards. Without the
+    second assertion a projection could quietly become a second authority.
+    """
+    source = ROOT / "examples" / "cognition"
+    state_source = source / "state.json"
+    revisions_source = source / "model-revisions.jsonl"
+    if not state_source.is_file() or not revisions_source.is_file():
+        return False, "examples/cognition fixture is incomplete"
+    with tempfile.TemporaryDirectory() as temp:
+        route = pathlib.Path(temp) / "routeA"
+        (route / "cognition").mkdir(parents=True)
+        state_path = route / "research-state.json"
+        shutil.copy(state_source, state_path)
+        shutil.copy(revisions_source, route / "cognition" / "model-revisions.jsonl")
+        before = state_path.read_bytes()
+        code, out = _run(["scripts/cognition.py", "build", "--state", str(state_path)])
+        if code != 0:
+            return False, f"build exit={code} {out.strip()[-160:]}"
+        if state_path.read_bytes() != before:
+            return False, "cognitive build modified the canonical state"
+        code, out = _run(["scripts/cognition.py", "check", "--state", str(state_path)])
+        if code != 0:
+            return False, f"check exit={code} {out.strip()[-160:]}"
+        first = (route / "cognition" / "index.json").read_bytes()
+        code, out = _run(["scripts/cognition.py", "build", "--state", str(state_path)])
+        if code != 0 or (route / "cognition" / "index.json").read_bytes() != first:
+            return False, "cognitive index is not reproducible from the same inputs"
+        index = json.loads(first.decode("utf-8"))
+        if index.get("diagnostics"):
+            return False, f"fixture carries diagnostics: {index['diagnostics'][:1]}"
+    return True, (f"fixture build/check/rebuild green, "
+                  f"mechanisms={len(index['mechanisms'])}, state byte-identical")
+
+
 def step_execution_identifiability() -> Tuple[bool, str]:
     import execution_gate as eg
     case = json.loads((ROOT/'examples/preflight-identifiability/ct-mri.json').read_text(encoding='utf-8'))
@@ -263,8 +306,7 @@ def step_execution_identifiability() -> Tuple[bool, str]:
 
 
 STEPS = (
-    ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),
-    ("state_check --selftest", step_selftest),
+    ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),    ("state_check --selftest", step_selftest),
     ("模板自身通过校验", step_template),
     ("规则表逐字比对（S1—S7 + V1—V24）", step_rule_table_parity),
     ("三方读写表逐格比对", step_readwrite_parity),
@@ -273,6 +315,7 @@ STEPS = (
     ("Rhetorical Realization（RE1–RE5）来源与正文", step_rhetorical_realization),
     ("Evidence Outcome 来源/回写/Assurance/决策", step_evidence_outcome),
     ("PEIG/AALG schemas/templates/CT→MRI mutation", step_execution_identifiability),
+    ("Cognitive Insight Engine 合成 fixture（构建/校验/重建/状态不变）", step_cognitive_memory),
 )
 
 

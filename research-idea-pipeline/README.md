@@ -177,6 +177,34 @@ Detailed contracts are in the [experiment loop](references/phase-r9-r11-experime
 [equivalence policy](references/rhetoric-equivalence-policy.md) and
 [structural equivalence policy](references/structural-equivalence-policy.md).
 
+## Cognitive memory across sessions
+
+Research State records what we believe about the world. It does not record how our
+understanding of a mechanism changed, or what the next session must recover before it can
+reason. The Cognitive Insight Engine adds that layer without adding a state slot.
+
+```
+canonical   research-state.json + frozen preregistration      sole authority
+event       cognition/model-revisions.jsonl                   append-only, no epistemics
+derived     cognition/index.json, cognition/context-brief.md  rebuildable
+```
+
+A mechanism's support level is computed from canonical facts, never declared by the agent
+that proposes it. Lifecycle decisions such as dormant or merged are recorded explicitly;
+they are decisions, not measurements. Recall is tiered into hot, warm and cold memory and
+bounded by a context budget, so a session does not receive the whole history.
+
+```sh
+python3 scripts/cognition.py build --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/cognition.py check --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/A/research-state.json --budget 4000
+```
+
+The builder never writes `research-state.json`; `check` compares the stored projection
+against a fresh rebuild and fails on drift. See the
+[cognitive memory policy](references/cognitive-memory-policy.md) and the
+[architecture note](docs/cognitive-insight-engine.md).
+
 ## Examples
 
 | Example | What it demonstrates |
@@ -190,6 +218,7 @@ Detailed contracts are in the [experiment loop](references/phase-r9-r11-experime
 | [Rhetorical realization](examples/narrative-realization/README.md) | Frozen sources, four expression profiles, recovery probes and fragility checks |
 | [Evidence outcomes](examples/evidence-outcome/README.md) | Positive, negative, invalid, pivot and mixed state transitions |
 | [Structural equivalence fixtures](examples/structural-equivalence/) | Near-neighbor audits and structural deltas |
+| [Cognitive memory fixture](examples/cognition/README.md) | Mechanisms, a competition and an anomaly derived from a synthetic state |
 | [Literature library](docs/refs/README.md) | Portable PDF metadata, sidecars and indexing |
 
 Structural equivalence fixtures cover

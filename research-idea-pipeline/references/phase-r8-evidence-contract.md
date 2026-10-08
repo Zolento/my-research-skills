@@ -377,3 +377,26 @@ risk. SCOPE_LIMIT requires the existing R10 repair and scoped claim; UNIDENTIFIA
 gets finite HOLD or an explicit bounded pilot. Do not expand a control matrix to
 satisfy the gate indefinitely. The frozen route revision budget gives finite
 REDESIGN when exhausted. Legacy experiments are not retroactively certified.
+
+## CIE 接入：冻结预测的认知登记
+
+R8 冻结 `preregistration` 之后，追加一条 `prediction_freeze` 修订事件，登记该实验
+**冻结了哪些机制预测**、以及冻结发生在哪个 `state_version`。认知层不重新冻结任何东西，
+它只记录 canonical 冻结的指针与摘要，供 R9.O 事后比对。
+
+```json
+{"_schema": "research-idea-pipeline/cognition-revision@1", "id": "REV<n>", "seq": <n>,
+ "kind": "prediction_freeze", "subject": "<X 编号>", "actor": "R8",
+ "at_state_version": <冻结时的 state_version>, "summary": "冻结 X<n> 的预注册结果判据",
+ "trigger": {"kind": "preregistration_frozen", "ref": "X<n>"},
+ "refs": {"experiments": ["X<n>"], "claims": ["C<n>"], "hypotheses": ["H<n>"]},
+ "after": {"prediction_id": "X<n>:O1", "note": "机制 M<n> 预测 O1"}}
+```
+
+**边界：**
+
+1. 支持等级与 Claim 状态仍按 R8 的单向升级规则处理；认知层不参与判定（`CM2`）。
+2. 冻结之后修改 `outcomes` 必须追加 `preregistration.amended[]`；认知层据此区分
+   **合法修订**与**事后改写**，静默改写会在 `prediction_assessment` 阶段报出。
+3. `mechanism` 的待检验预测引用格式为 `<XID>:<OID>`，与
+   `claims[].contract.expected_outcomes` 的键一一对应。
