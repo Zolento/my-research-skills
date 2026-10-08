@@ -49,6 +49,17 @@ _DOI_RE = re.compile(r"10\.\d{4,9}/\S+", re.IGNORECASE)
 _ARXIV_NEW_RE = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?")
 _ARXIV_OLD_RE = re.compile(r"([a-z-]+(?:\.[A-Z]{2})?/\d{7})(v\d+)?")
 
+#: 裸新式 ID 必须独立成词，否则 `10.1109/TMI.2018.2820120` 会被截成 `2018.28201`。
+_BARE_ARXIV_NEW_RE = re.compile(r"(?<![\d.])(\d{4}\.\d{4,5})(?!\d)")
+
+#: 旧式标识的 archive 部分（`cs.CV/0701001` 里的 `cs.CV`）。
+#: 用于拒绝无锚点误匹配 —— 例如 URL 路径 `.../document/10656634/`。
+_ARXIV_ARCHIVES = frozenset({
+    "cs", "stat", "math", "physics", "eess", "q-bio", "q-fin",
+    "astro-ph", "cond-mat", "gr-qc", "hep-ex", "hep-lat", "hep-ph",
+    "hep-th", "math-ph", "nlin", "nucl-ex", "nucl-th", "quant-ph",
+})
+
 
 class ZoteroUnavailable(RuntimeError):
     """Zotero 本地 API 不可达（未运行 / 地址错误 / 超时）。
@@ -84,6 +95,54 @@ def _year(value: Optional[str]) -> Optional[int]:
     return int(match.group(0)) if match else None
 
 
+def _old_arxiv_archive(value: str) -> bool:
+    """旧式标识的 archive 是否为真实 arXiv archive。
+
+    防止 `https://ieeexplore.ieee.org/document/10656634/` 这类路径被当成
+    `document/1065663`（历史 bug）。
+    """
+    archive = value.split("/", 1)[0].lower()
+    return archive.split(".", 1)[0] in _ARXIV_ARCHIVES
+
+
+def _arxiv_in_context(text: str) -> Optional[str]:
+    """只从**明确的 arXiv 语境**取 ID：arXiv 链接，或 `arXiv:` 前缀。
+
+    不对任意 URL 做无锚点匹配。
+    """
+    match = re.search(
+        r"arxiv\.org/(?:abs|pdf)/((?:\d{4}\.\d{4,5})|(?:[a-z-]+(?:\.[A-Z]{2})?/\d{7}))",
+        text, re.IGNORECASE)
+    if match:
+        value = match.group(1)
+        if "/" not in value or _old_arxiv_archive(value):
+            return value
+
+    match = re.search(
+        r"arxiv[.:\s/]\s*((?:\d{4}\.\d{4,5})|(?:[a-z-]+(?:\.[A-Z]{2})?/\d{7}))(?:v\d+)?",
+        text, re.IGNORECASE)
+    if match:
+        value = match.group(1)
+        if "/" not in value or _old_arxiv_archive(value):
+            return value
+    return None
+
+
+def _bare_arxiv_in_metadata(text: str) -> Optional[str]:
+    """无前缀裸 ID：只用于 `archiveID` / `extra` 这类纯元数据字段。
+
+    旧式必须落在真实 archive 上；新式必须**独立成词**，避免把别处的
+    DOI（如 `10.1109/TMI.2018.2820120` → `2018.28201`）当成 arXiv ID。
+    """
+    match = _BARE_ARXIV_NEW_RE.search(text)
+    if match:
+        return match.group(1)
+    match = _ARXIV_OLD_RE.search(text)
+    if match and _old_arxiv_archive(match.group(1)):
+        return match.group(1)
+    return None
+
+
 def arxiv_id(item: Dict[str, Any]) -> Optional[str]:
     """从 DOI / url / extra / archiveID 提取 arXiv 标识。"""
     doi = _clean(item.get("DOI")) or ""
@@ -92,28 +151,21 @@ def arxiv_id(item: Dict[str, Any]) -> Optional[str]:
         return match.group(1)
 
     for field in ("url", "extra"):
-        text = _clean(item.get(field)) or ""
-        match = re.search(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})", text, re.IGNORECASE)
-        if match:
-            return match.group(1)
-        match = _ARXIV_NEW_RE.search(text)
-        if match:
-            return match.group(1)
-        match = _ARXIV_OLD_RE.search(text)
-        if match:
-            return match.group(1)
+        found = _arxiv_in_context(_clean(item.get(field)) or "")
+        if found:
+            return found
 
-    archive = _clean(item.get("archiveID"))
-    if archive:
-        match = _ARXIV_NEW_RE.search(archive) or _ARXIV_OLD_RE.search(archive)
-        if match:
-            return match.group(1)
+    for field in ("archiveID", "extra"):
+        found = _bare_arxiv_in_metadata(_clean(item.get(field)) or "")
+        if found:
+            return found
 
     if (_clean(item.get("libraryCatalog")) or "").lower().startswith("arxiv"):
         for field in ("archiveID", "extra", "url"):
-            match = _ARXIV_NEW_RE.search(_clean(item.get(field)) or "")
-            if match:
-                return match.group(1)
+            text = _clean(item.get(field)) or ""
+            found = _arxiv_in_context(text) or _bare_arxiv_in_metadata(text)
+            if found:
+                return found
     return None
 
 
