@@ -327,11 +327,14 @@ Step 0: 先尝试 web search，打开论文、作者实现与官方资料
         工具不可用或失败 → 记录状态并继续；明确离线请求 → 跳过
 Step 1: 搜索本地文献库（默认由 Zotero 本地 API 提供）
         地址：--zotero-url → 环境变量 ZOTERO_LOCAL_API → 默认 http://127.0.0.1:23119/api
+        前置：Zotero `Settings → Advanced` 勾选
+          「Allow other applications on this computer to communicate with Zotero」
         探测可达 → 用 Zotero（默认）；探测失败 → 自动回落 ./docs/refs/papers/*.json
         并打印警告，不失败；--local-format auto（默认）/ zotero（强制，不可用报错）/ refs（强制跳过 Zotero）
         命中 → 纳入结果，标注 sources=["local"] —— 但流程继续，不得在此返回
         ★ Zotero 是本地库的后端，provenance 仍是 local；源枚举 local|arxiv|openalex|crossref
           不变，不得把 Zotero 计入在线源
+        ★ 端点、授权、错误码、附件协议见 references/zotero-local-api.md（按需读，不必每次加载）
 Step 2: 调用全部启用源（arxiv / openalex / crossref）
         ★ 即使 Step 1 已命中，只要触发下述任一条件，本步必须执行
         ★ 单源失败【不终止】检索：该源标记 unavailable，其余源照常

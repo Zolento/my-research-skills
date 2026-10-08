@@ -36,6 +36,9 @@ Step 0: 先尝试 web search（执行方式见 §1.1）
   将标题、DOI / arXiv ID、机制术语作为后续检索与引文追溯的种子
 
 Step 1: 本地检索（默认由 Zotero 本地 API 提供）
+  前置条件：Zotero `Settings → Advanced` 勾选
+    「Allow other applications on this computer to communicate with Zotero」
+    （偏好键 `extensions.zotero.httpServer.localAPI.enabled`）；未勾选时返回 403
   地址解析顺序：`--zotero-url` → 环境变量 `ZOTERO_LOCAL_API` → 默认
     `http://127.0.0.1:23119/api`；探测可达即用 Zotero（**默认行为**）
   `--local-format auto`（默认）/ `zotero`（强制 Zotero，不可用即报错）/
@@ -46,6 +49,7 @@ Step 1: 本地检索（默认由 Zotero 本地 API 提供）
   命中：纳入结果集，标注 sources=["local"] —— 但流程继续，不得在此返回
   ★ Zotero 是本地库的**实现后端，不是新源**：命中 provenance 仍是 `local`，
     源枚举 `local|arxiv|openalex|crossref` 不变，不得把 Zotero 计入在线源
+  ★ 端点、写入授权、错误码与附件协议见 [zotero-local-api.md](zotero-local-api.md)
 
 Step 2: 在线源检索（**默认执行**；§2 的触发条件决定的是“要扩检到什么等级”，不是“要不要查”）
   默认启用全部已实现源（见 §9.1）：
