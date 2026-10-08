@@ -256,6 +256,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `contradicts` | `C` id 数组，可为 `[]` | ✅ | |
 | `strength` | `partial` \| `strong` \| `weak` | ✅ | |
 | `scope` | 字符串（例 `brain MRI / acceleration=4`） | ✅ | 证据自身的适用范围，不得越界 |
+| `scope_region` | 对象 `{轴: 值}`，值为字符串 / 数值 | ❌ | 可选加性槽位（2026-10 CIE 终轮登记）：把适用范围写成**可机械求包含关系**的约束集。`{轴: 值}` 越多 = 范围越窄；`evidence[].scope_region` 只有在**每一个约束都能在主张的 region 里找到相同值**时才覆盖该主张。缺省时按 `scope` 字符串**规范化精确相等**判定，**不做子串包含** |
 | `epistemic_status` | `Observed` \| `Supported` \| `Hypothesized` \| `Planned` \| `Unknown` | ✅ | V5；↔ 措辞等级见 [evidence-policy.md](evidence-policy.md) §3 |
 | `source_ref` | 字符串 | ✅ | 具体位置（实验 id / 文献 / 定理 / 数据路径） |
 | `verification_tier` | `T0` \| `T1` \| `T2` \| `T3` \| `T4` \| `T5` | ✅ | 证据的**来源强度**（§2.5）；与 `epistemic_status` **正交**；**V20** |

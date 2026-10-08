@@ -166,12 +166,12 @@ fields. The block lists every sub-check with its verdict:
 |---|---|---|
 | `PQ1` | did the execution carry a usable validity verdict? | `INVALID` → blocking, `UNKNOWN` → diagnostic |
 | `PQ2` | is there a frozen, well-formed preregistration (criteria + branch rule + no post-hoc amendment)? | blocking |
-| `PQ3` | is the frozen set completely adjudicated, or legitimately branch-mode? | blocking |
-| `PQ4` | is every submitted observation bound to exactly `{kind, location, content, digest}` with `digest == digest(content)`? | blocking |
+| `PQ3` | is the frozen set completely adjudicated, or legitimately branch-mode? Does every declared `observed_outcome` name a **frozen** outcome? | blocking |
+| `PQ4` | does the packet pass the **whole** authoritative observation validator — `schema` id, required fields, field types, outcome list, ids, and every source bound to exactly `{kind, location, content, digest}` with `digest == digest(content)`? | blocking |
 | `PQ5` | does the branch selection trace to the frozen raw observation? | blocking |
 | `PQ6` | is the packet bound to an existing experiment? | blocking |
 | `PQ7` | are the execution and the experiment receipt terminal (`completed`/`failed`, `done`/`failed`, `result_at_state_version` present)? | diagnostic |
-| `PQ8` | does the freeze precede the result, with no post-hoc amendment? | diagnostic (blocking for a post-hoc amendment) |
+| `PQ8` | does the freeze precede the result, with no post-hoc amendment, and is its recorded `freeze_digest` complete (`PC4` rewrite / `PC5` unverifiable freeze)? | diagnostic (blocking for a post-hoc amendment or an unverifiable freeze) |
 
 A **blocking** failure yields `INSUFFICIENT_PROVENANCE` / `NO_INFERENCE`; a **diagnostic**
 failure yields `DIAGNOSTIC_ONLY` / `DIAGNOSTIC_ONLY`. Either way `evidence_eligible` is
@@ -182,6 +182,15 @@ chain of `if`s still declared `QUALIFIED_EVIDENCE`.
 
 Every failure is emitted as a `PC7` diagnostic that names the check, its severity and the JSON
 path, and the failed checks are also listed in `provenance_gaps`.
+
+**The validator is the gate.** `PQ4` consumes the complete result of the observation
+validator, not a hand-picked subset, so the invariant is structural rather than maintained by
+hand: *whatever the validator refuses, the gate refuses.* A wrong `schema` id, a missing
+required field, an illegal field type and an illegal `observed_outcome` type were previously
+diagnosed as `PC2` while eligibility was decided by a disjoint chain of checks — the packet
+was reported broken and still qualified. Warnings keep their diagnostic role: informational
+extra keys (`_note`, `notes`, …) are not schema errors and do not close the gate, and the
+comparison itself is still computed and kept in `diagnostic_outcome_class`.
 
 * `execution.validity == "INVALID"` → `INVALID_EXECUTION`, no comparison, `NO_INFERENCE`.
 * `execution.validity == "UNKNOWN"` → the comparison is kept, but a world claim may not occupy
@@ -339,19 +348,47 @@ check names the single missing step (`PC11`):
 | `IC2` | the referenced claim is not `contradicted`/`killed` and every referenced object is `valid` — the display class cannot outrun `claims[].status` or `validity` |
 | `IC3` | the card carries the prediction–observation packet for **that** prediction with a matching `observation_digest`, and the unified gate qualifies it with verdict `PREDICTION_HELD` (in branch mode, on the selected branch) |
 | `IC4` | a consistent R9.O receipt for the same experiment: `POSITIVE_EVIDENCE`, `verification_tier ≥ T2`, and a `positive` + `identification: PASS` update for one of the referenced targets |
-| `IC5` | canonical evidence at `T2` or above, `Observed`/`Supported`, `valid`, inside the claimed boundary, bound to that experiment, `supports` one of the referenced mechanisms, contradicts none, and (when an explicit `prediction_ref` is present) bound to **that** prediction |
+| `IC5` | canonical evidence at `T2` or above, `Observed`/`Supported`, `valid`, **covering** the claimed boundary (see §6.1), bound to that experiment, **bound to that prediction** (§6.2), `supports` one of the referenced mechanisms, contradicts none |
 | `IC6` | an `assurance[]` entry with `attack_type: structural-equivalence`, tier ≥ `T1`, a real `discriminating_test`, a valid `validity`, whose `audit_ref` resolves to a SENA artifact that passes `structural_equivalence_check` and whose `verdict` is neither `equivalent`/`subsumed-by-prior`/`reframing-only`/`uncertain` nor about a different candidate |
 
 Consequences worth stating explicitly:
 
 * "same experiment" is not "same prediction": two cards sharing one experiment are certified
   separately, and an evidence object bound to another prediction of the same experiment is
-  refused;
+  refused (see §6.2);
 * an audit that merely **exists** is not an audit that **passed**: its actual verdict is loaded
   from the artifact its owner validates, so `assurance[]` without `audit_ref` keeps the card at
   the lower class;
 * a card without fine-grained references keeps the lower class and says what is missing —
   provenance is reported, never guessed.
+
+#### 6.1 Scientific scope coverage
+
+Applicability is not a word-similarity question. `scope_covers(evidence, claim)` has exactly
+two auditable routes and refuses everything else:
+
+| Route | Rule | Reasons |
+|---|---|---|
+| **structured regions** on both sides | the evidence region's constraints must be a **subset** of the claim's: an extra evidence constraint means the evidence covers *less* than the claim and must not be generalised; a shared axis with a different value means neither contains the other. A claim constraint the evidence does not make is fine — the evidence is broader and covers the claim | `region_covers`, `region_narrower`, `region_conflict` |
+| **plain strings** on both sides | whitespace-collapsed, case-folded **exact equality** | `exact_scope_match`, `not_equal` |
+| anything else (one side structured, the other textual; missing or malformed) | refused, never guessed | `unknown_scope_shape` |
+
+The previous rule was `left in right or right in left`, which matched `"MRI"` to `"MRI-3D"`,
+`"brain"` to `"brain-shifted"`, and — worst — treated a single-centre evidence scope
+(`"数据集 A / 中心 C"`) as covering the whole dataset. Scope is carried by
+`evidence[].scope` (string) plus the optional structured `evidence[].scope_region`
+(`{axis: value}`, registered in `research-state-policy.md` §3.2), and by the card's
+`scope_boundary` plus optional `scope_boundary_region`.
+
+#### 6.2 Prediction-level evidence binding
+
+"Same experiment", "same claim", "same mechanism" and "same metric" are **not** prediction
+identity. Evidence declares the prediction it came from with `prediction_ref` (`"<XID>:<OID>"`),
+which must equal the card's prediction exactly. The only other admissible route is a freeze
+with **exactly one** outcome: then there is nothing to choose between, so the prediction is
+uniquely determined by canonical state. A multi-outcome experiment with unbound evidence is
+refused, and old evidence is never retro-fitted with a `prediction_ref` it never had — it
+keeps the lower class and the missing ingredient is reported.
 
 Declaring `evidence_supported_insight` without those canonical facts is a hard violation
 (`PC7`) — self-certified novelty is exactly what the pipeline is built to prevent. A mismatch

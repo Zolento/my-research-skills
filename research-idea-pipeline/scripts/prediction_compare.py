@@ -1134,6 +1134,12 @@ def qualify_evidence(
 
     # --- PQ3 decision-set integrity ---------------------------------------------
     decision_failures: List[str] = []
+    declared = assessment.get("declared_outcome")
+    frozen_ids = list(assessment.get("frozen_outcome_ids") or [])
+    if isinstance(declared, str) and declared.strip() and declared not in frozen_ids:
+        decision_failures.append(
+            f"观测包声明 observed_outcome={declared!r}，但它不是冻结结果之一："
+            "分支选择必须指向预注册")
     unexpected = assessment.get("unexpected_observations") or []
     if unexpected:
         decision_failures.append("观测包含未冻结结果：" + ", ".join(str(item) for item in unexpected))
@@ -1155,11 +1161,16 @@ def qualify_evidence(
         "PQ3", "decision_set_integrity", decision_failures,
         path=f"experiments[{experiment_id}].preregistration.outcomes"))
 
-    # --- PQ4 observation source binding -----------------------------------------
+    # --- PQ4 observation schema and source binding -------------------------------
+    # The gate consumes the *whole* authoritative observation report, not just the source
+    # half. Previously a wrong `schema` id (and an illegal `observed_outcome` type) were
+    # reported as `PC2` while eligibility was decided by a disjoint chain of checks, so the
+    # packet was diagnosed and still qualified. The invariant is now structural: whatever
+    # `observation_errors()` refuses, the gate refuses.
     checks.append(_qualification_check(
-        "PQ4", "observation_source_binding",
-        [item.detail for item in observation_source_errors(packet)],
-        path="observation.outcomes[].source"))
+        "PQ4", "observation_schema_and_sources",
+        [item.detail for item in observation_errors(packet)],
+        path="observation"))
 
     # --- PQ5 branch selector traceability ---------------------------------------
     if assessment.get("mode") == "branch":
@@ -1221,8 +1232,12 @@ def qualify_evidence(
                     state, experiment, str(experiment_id),
                     f"experiments[{experiment_id}].preregistration.amended"))
     if revisions:
+        # Same root cause as the observation gap: every *hard* freeze-integrity finding must
+        # reach the gate. `PC4` is a detected rewrite; `PC5` is an integrity check that could
+        # not be completed (no recorded digest, or a freeze registered in a different round).
+        # Either way the freeze cannot be trusted, so the comparison is not evidence.
         for diagnostic in check_freezes(state, revisions):
-            if diagnostic.rule in ("PC4",):
+            if not cg.is_warning(diagnostic.rule):
                 tamper.append(diagnostic.detail)
     if tamper:
         checks.append(_qualification_check(
@@ -2317,6 +2332,13 @@ def _insight_certification(
     targets = list(refs.get("claims") or []) + list(refs.get("hypotheses") or [])
     missing: List[str] = []
     failures: List[str] = []
+    # "Same experiment" is not prediction identity. The one freeze that *does* determine the
+    # prediction on its own is a freeze with a single outcome; anything else needs an explicit
+    # `prediction_ref` on the evidence.
+    frozen_outcomes = ((view.get("experiments", experiment_id) or {}).get("preregistration")
+                       or {}).get("outcomes") or []
+    frozen_ids = [item.get("id") for item in frozen_outcomes if isinstance(item, dict)]
+    uniquely_determined = len(frozen_ids) == 1
 
     # --- IC1 explicit binding: prediction_ref + experiment_ref + mechanism -----------
     declared_experiment = prediction.get("experiment_ref")
@@ -2412,13 +2434,24 @@ def _insight_certification(
                             f"{evidence.get('epistemic_status')!r} 不能作为支持性证据")
             continue
         scope = evidence.get("scope")
-        if not isinstance(scope, str) or not scope.strip() or not _scope_within(scope, boundary):
-            failures.append(f"IC5 evidence[{evidence_id}] 的范围 {scope!r} 不在卡片边界 {boundary!r} 内")
+        covered, scope_reason = scope_covers(scope, boundary,
+                                            evidence.get("scope_region"),
+                                            card.get("scope_boundary_region"))
+        if not covered:
+            failures.append(
+                f"IC5 evidence[{evidence_id}] 的适用范围不足以支持卡片边界"
+                f"（{scope_reason}）：evidence scope={scope!r}"
+                + (f" region={evidence.get('scope_region')!r}"
+                   if evidence.get("scope_region") else "")
+                + f"，卡片边界={boundary!r}"
+                + (f" region={card.get('scope_boundary_region')!r}"
+                   if card.get("scope_boundary_region") else ""))
             continue
         if experiment_id not in [str(dep) for dep in evidence.get("depends_on") or []]:
             missing.append(f"evidence[{evidence_id}] 未绑定到预测的实验 {experiment_id}")
             continue
-        point = _evidence_prediction_point(evidence, prediction, experiment_id, outcome_id)
+        point = _evidence_prediction_point(evidence, experiment_id, outcome_id,
+                                          uniquely_determined)
         if point:
             failures.append(f"IC5 evidence[{evidence_id}] {point}")
             continue
@@ -2491,21 +2524,31 @@ def _insight_certification(
 
 def _evidence_prediction_point(
     evidence: Dict[str, Any],
-    prediction: Dict[str, Any],
     experiment_id: str,
     outcome_id: str,
+    uniquely_determined: bool,
 ) -> str:
-    """Cross-prediction borrowing guard: an explicit prediction ref must match exactly."""
+    """Cross-prediction borrowing guard: the evidence must name a prediction, or have one.
+
+    "Same experiment", "same claim", "same mechanism" and "same metric" are not prediction
+    identity. An explicit `prediction_ref` is the verifiable route; the only other route is a
+    freeze that has exactly one outcome, where there is nothing to choose between. Otherwise
+    the binding is unknown, and unknown provenance is refused rather than guessed — old
+    evidence is not retro-fitted with a `prediction_ref` it never had.
+    """
     declared = evidence.get("prediction_ref")
-    if not isinstance(declared, str) or not declared.strip():
+    if isinstance(declared, str) and declared.strip():
+        parsed = parse_ref(declared.strip())
+        if parsed is None:
+            return f"的 prediction_ref={declared!r} 不是 `<XID>:<OID>`"
+        if parsed != (experiment_id, outcome_id):
+            return (f"绑定到预测 {declared}，而卡片认证的是 {experiment_id}:{outcome_id}："
+                    "同一实验的不同预测不能互相借用证据")
         return ""
-    parsed = parse_ref(declared.strip())
-    if parsed is None:
-        return f"的 prediction_ref={declared!r} 不是 `<XID>:<OID>`"
-    if parsed != (experiment_id, outcome_id):
-        return (f"绑定到预测 {declared}，而卡片认证的是 {experiment_id}:{outcome_id}："
-                "同一实验的不同预测不能互相借用证据")
-    return ""
+    if uniquely_determined:
+        return ""
+    return (f"没有 prediction_ref，而实验 {experiment_id} 有多个冻结预测："
+            "无法唯一、可验证地确定它支持哪一个预测（禁止跨预测借用）")
 
 
 def _r9o_receipt(experiment: Any) -> Optional[Tuple[str, str, str]]:
@@ -2628,12 +2671,77 @@ def _certification_attempted(card: Dict[str, Any]) -> bool:
     return bool(refs.get("evidence"))
 
 
-def _scope_within(evidence_scope: str, boundary: str) -> bool:
-    """Conservative scope containment: one scope must textually contain the other."""
-    if not boundary.strip():
-        return False
-    left, right = evidence_scope.strip(), boundary.strip()
-    return left in right or right in left
+def normalize_scope(value: Any) -> str:
+    """Whitespace-collapsed, case-folded scope text. No punctuation or substring games."""
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.split()).casefold()
+
+
+def normalize_region(region: Any) -> Optional[Dict[str, Any]]:
+    """A structured scope region: `{axis: value}` with scalar values, or `None` if unusable.
+
+    The axis/value map is what makes applicability *computable*: a region with more
+    constraints is narrower, so `evidence ⊇ claim` is decided by comparing constraint sets
+    rather than by comparing words.
+    """
+    if not isinstance(region, dict) or not region:
+        return None
+    normalized: Dict[str, Any] = {}
+    for axis, value in region.items():
+        if not isinstance(axis, str) or not axis.strip():
+            return None
+        if value is None or isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            return None
+        key = " ".join(axis.split()).casefold()
+        normalized[key] = normalize_scope(value) if isinstance(value, str) else value
+    return normalized
+
+
+def scope_covers(
+    evidence_scope: Any,
+    claim_scope: Any,
+    evidence_region: Any = None,
+    claim_region: Any = None,
+) -> Tuple[bool, str]:
+    """Whether the evidence's applicability contains the claim's applicability.
+
+    Returns `(covered, reason)`. Two auditable routes, and nothing else:
+
+    * **structured regions** on both sides — every constraint the *evidence* makes must also
+      be made by the claim. An extra evidence constraint means the evidence covers less than
+      the claim (`region_narrower`: refuse to generalise); a shared axis with a different
+      value means neither contains the other (`region_conflict`); a claim constraint the
+      evidence does not make is fine — the evidence is broader, so it covers the claim.
+    * **plain strings** on both sides — normalized **exact** equality. Substring containment
+      is not a scope relation: `"brain"` is not `"brain-shifted"`, and an evidence scope of
+      `"数据集 A / 中心 C"` does not cover `"数据集 A"`.
+
+    Anything else (one side structured, the other textual; missing or malformed) is
+    `unknown_scope_shape`: refused, never guessed. This replaces the previous
+    `left in right or right in left`, which matched `"MRI"` to `"MRI-3D"` and silently
+    generalised a single-centre result to the whole dataset.
+    """
+    evidence_normalized = normalize_region(evidence_region)
+    claim_normalized = normalize_region(claim_region)
+    if evidence_normalized is not None and claim_normalized is not None:
+        extra = sorted(axis for axis in evidence_normalized if axis not in claim_normalized)
+        if extra:
+            return False, "region_narrower"
+        conflict = sorted(axis for axis, value in claim_normalized.items()
+                          if axis in evidence_normalized and evidence_normalized[axis] != value)
+        if conflict:
+            return False, "region_conflict"
+        return True, "region_covers"
+    if evidence_normalized is not None or claim_normalized is not None:
+        return False, "unknown_scope_shape"
+    evidence_text = normalize_scope(evidence_scope)
+    claim_text = normalize_scope(claim_scope)
+    if not evidence_text or not claim_text:
+        return False, "unknown_scope_shape"
+    if evidence_text == claim_text:
+        return True, "exact_scope_match"
+    return False, "not_equal"
 
 
 # ---------------------------------------------------------------------------
@@ -3476,6 +3584,7 @@ def selftest() -> int:
                                      "audit_ref": ".research-idea-pipeline/routes/A/assurance/"
                                                   "structural-equivalence/H1.json"}]
     certified_state["evidence"][0]["supports"] = ["C1"]
+    certified_state["evidence"][0]["prediction_ref"] = "X1:O1"
     result_packet = {
         "schema": "evidence-result@1", "experiment_id": "X1",
         "experiment_digest": "sha256:synthetic", "execution_status": "completed",

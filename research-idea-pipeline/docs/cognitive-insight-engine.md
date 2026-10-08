@@ -144,7 +144,7 @@ python3 scripts/release_check.py
 
 ## 8. Verification status
 
-Verified offline and mechanically, by the fifteen-step release gate and 1258 unit tests:
+Verified offline and mechanically, by the fifteen-step release gate and 1284 unit tests:
 
 * the canonical state, scheduler template and the four schemas are unchanged, and
   `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
@@ -165,6 +165,18 @@ Verified offline and mechanically, by the fifteen-step release gate and 1258 uni
   own* prediction, an R9.O receipt in the supporting direction, evidence bound to that
   prediction and mechanism, and an audit whose actual verdict is loaded from the artifact its
   owner validates;
+* the observation validator is the gate: `PQ4` consumes its complete result, so a wrong
+  `schema` id, a missing required field, an illegal field type or an illegal
+  `observed_outcome` type closes the gate instead of qualifying the packet; a declared
+  `observed_outcome` that is not a frozen outcome is a decision-set defect (`PQ3`), and an
+  unverifiable freeze (`PC5`) blocks it too, while informational extra keys keep qualifying;
+* prediction identity is explicit: evidence carries `prediction_ref`, and the only other
+  admissible route is a freeze with exactly one outcome. "Same experiment", "same claim" and
+  "same mechanism" are refused, and old evidence is never retro-fitted with a binding;
+* applicability is not word similarity: scope coverage is exact normalized equality for
+  legacy string scopes, or constrained-subset coverage for structured
+  `evidence[].scope_region` / card `scope_boundary_region`. `"MRI"` does not cover
+  `"MRI-3D"`, and a single-centre evidence scope no longer generalises to the whole dataset;
 * an `UNKNOWN` execution keeps its diagnostic comparison but cannot occupy the scientific
   verdict slot, and `evidence_transition_allowed` blocks the transition;
 * distinguishability requires a comparable observable, a conflicting prediction, enough

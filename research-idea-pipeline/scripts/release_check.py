@@ -505,6 +505,68 @@ def step_prediction_comparator() -> Tuple[bool, str]:
     self_certified["declared_class"] = "evidence_supported_insight"
     if not any(d.rule == "PC7" for d in pc.insight_card_errors(self_certified, state)):
         return False, "a self-certified insight card escaped PC7"
+    # P0 (final round): the whole observation schema is inside the gate. A diagnosed hard
+    # error must never leave `evidence_eligible: true` behind.
+    for label, mutate in (
+            ("wrong schema", lambda p: p.update({"schema": "not-a-schema"})),
+            ("missing schema", lambda p: p.pop("schema")),
+            ("illegal validity type",
+             lambda p: p.update({"execution": {"status": "completed", "validity": 7}})),
+            ("illegal observed_outcome type", lambda p: p.update({"observed_outcome": 123})),
+            ("unfrozen observed_outcome", lambda p: p.update({"observed_outcome": "O9"}))):
+        mutated = json.loads(json.dumps(packet))
+        mutate(mutated)
+        assessed, _ = pc.assess_experiment(state, mutated)
+        failed = {item["id"] for item in assessed["qualification"]["checks"]
+                  if not item["passed"]}
+        if assessed["evidence_eligible"] or not failed:
+            return False, f"{label}: a diagnosed hard error still qualified"
+        if pc.evidence_transition_allowed(state, assessed)[0]:
+            return False, f"{label}: the transition was still allowed"
+    # Warnings keep their role: informational keys are not schema errors.
+    informative = json.loads(json.dumps(packet))
+    informative["_note"] = "SYNTHETIC FIXTURE"
+    if not pc.assess_experiment(state, informative)[0]["evidence_eligible"]:
+        return False, "an informational extra key closed the gate"
+
+    # P1 (final round): scope is not a word-similarity question.
+    if pc.scope_covers("MRI", "MRI-3D")[0] or pc.scope_covers("brain", "brain-shifted")[0]:
+        return False, "scope containment still matches a substring"
+    if pc.scope_covers("数据集 A / 中心 C", "数据集 A")[0]:
+        return False, "a narrower evidence scope was generalised to a broader claim"
+    if not pc.scope_covers("数据集 A", "数据集 A")[0]:
+        return False, "an identical scope was refused"
+    if pc.scope_covers("MRI", "MRI", evidence_region={"modality": "MRI", "population": "P1"},
+                       claim_region={"modality": "MRI"})[0]:
+        return False, "a narrow structured region covered a broader claim"
+    if not pc.scope_covers("MRI", "MRI / P1", evidence_region={"modality": "MRI"},
+                           claim_region={"modality": "MRI", "population": "P1"})[0]:
+        return False, "a broad structured region did not cover a narrower claim"
+    if pc.scope_covers("MRI", "MRI", evidence_region={"modality": "MRI"})[0]:
+        return False, "a mixed structured/textual scope was guessed"
+
+    # P1 (final round): prediction-level binding. `X1` freezes two outcomes, so evidence
+    # without `prediction_ref` cannot say which prediction it belongs to.
+    binding_card = json.loads(json.dumps(card))
+    binding_card["declared_class"] = "predictive_insight_insight"
+    binding_card["declared_class"] = "evidence_supported_insight"
+    binding_card["novel_prediction"] = {"ref": "X1:O1", "statement": "x", "experiment_ref": "X1"}
+    binding_card["refs"] = {"claims": ["C1"], "hypotheses": ["H2"], "evidence": ["E1"],
+                            "experiments": ["X1"]}
+    # Align the scopes so the assertion measures the *binding*, not the scope rule.
+    binding_card["scope_boundary"] = state["evidence"][0]["scope"]
+    binding_state = json.loads(json.dumps(state))
+    binding_state["evidence"][0]["supports"] = ["C1"]
+    _, reasons = pc.classify_insight(binding_card, binding_state)
+    if not any("没有 prediction_ref" in item
+               for item in reasons["certification"]["failures"]):
+        return False, "unbound evidence in a multi-outcome experiment was not refused"
+    binding_state["evidence"][0]["prediction_ref"] = "X1:O1"
+    _, bound_reasons = pc.classify_insight(binding_card, binding_state)
+    if any("没有 prediction_ref" in item
+           for item in bound_reasons["certification"]["failures"]):
+        return False, "an explicit prediction_ref was not accepted"
+
     # P1: the audit's result is not in the state, so the fixture (whose assurance entry has
     # no `audit_ref`) may never reach the top class — with or without the evidence refs.
     attested = json.loads(json.dumps(card))
@@ -521,7 +583,8 @@ def step_prediction_comparator() -> Tuple[bool, str]:
         return False, "an unbound certification attempt escaped PC7/PC11"
     return True, ("criterion mutation + missing criterion + invalid run + partial submission "
                   "+ unfrozen/conflicting/non-exclusive branch selection + source and selector "
-                  "mutations + hand-written eligibility + UNKNOWN eligibility + "
+                  "mutations + observation schema mutations + hand-written eligibility + "
+                  "UNKNOWN eligibility + prediction-level binding + scope coverage + "
                   "comparability/conflict/resolution/rule + uncertifiable insight 全部判红")
 
 

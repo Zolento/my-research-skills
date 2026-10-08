@@ -112,6 +112,7 @@
       "contradicts": [],
       "strength": "strong",
       "scope": "brain MRI / acceleration=4",
+      "scope_region": null,
       "epistemic_status": "Observed",
       "source_ref": "X7（seed=0）的跨中心对照结果（示例占位）",
       "verification_tier": "T2",

@@ -391,3 +391,68 @@ Unchanged: `state_check.py`, `evidence_outcome.py`, `execution_gate.py`, `experi
   comparator proves partition, freeze and traceability only.
 * `load_audits` resolves `audit_ref` as `route_dir / assurance/structural-equivalence/<basename>`,
   mirroring `structural_equivalence_check`; an artifact stored elsewhere is not found (fail closed).
+
+
+## 6d. Final round — observation schema gate, prediction-level binding, scope coverage
+
+### Root causes (all reproduced before the fix)
+
+| # | Symptom | Root cause |
+|---|---|---|
+| P0 | A packet with a wrong/missing `schema` id was reported as `PC2` and still returned `evidence_eligible: true` (also: illegal `observed_outcome` type; an `observed_outcome` naming a non-existent outcome was silently ignored) | `qualify_evidence`'s `PQ4` only consumed the *source* half of the observation validator; the rest of the schema report never reached eligibility |
+| P1a | One evidence object (no `prediction_ref`) certified **both** `X1:O1` and `X1:O2` cards | `_evidence_prediction_point` returned "no finding" when `prediction_ref` was absent, so "same experiment + same claim + same mechanism + same metric" stood in for prediction identity |
+| P1b | `_scope_within` was `left in right or right in left`: `"brain"` matched `"brain-shifted"`, `"MRI"` matched `"MRI-3D"`, and a single-centre evidence scope (`"数据集 A / 中心 C"`) was treated as covering the whole dataset | substring containment is not a scope relation, and it was symmetric, so it could not even express direction |
+| same class | A `prediction_freeze` record with no `freeze_digest`, or registered in a different round (`PC5`), was reported hard and did not block the gate | `PQ8` took only `PC4` from `check_freezes` |
+
+### Fixes
+
+* `PQ4` = the complete `observation_errors()` result (`observation_schema_and_sources`). The
+  invariant is structural: whatever the validator refuses, the gate refuses. Informational
+  extra keys are not schema errors and keep qualifying; the diagnostic comparison is still
+  computed into `diagnostic_outcome_class`.
+* `PQ3` also fails when a declared `observed_outcome` is not one of the frozen outcomes.
+* `PQ8` consumes every non-warning `check_freezes` finding (`PC4` rewrite **and** `PC5`
+  unverifiable freeze).
+* `_evidence_prediction_point(evidence, experiment_id, outcome_id, uniquely_determined)`:
+  an explicit `prediction_ref` must match exactly; the only other route is a freeze with
+  exactly one outcome. No retro-fitting of legacy evidence.
+* `scope_covers()` + `normalize_scope()` + `normalize_region()` replace `_scope_within`:
+  structured regions decide constrained-subset coverage (extra evidence constraint →
+  `region_narrower`; conflicting axis → `region_conflict`), legacy strings require normalized
+  exact equality, mixed/unknown shapes are `unknown_scope_shape` and refused.
+  `evidence[].scope_region` is registered as an optional additive slot
+  (`research-state-policy.md` §3.2 + template).
+
+### Before/after (`.dev` probe, same inputs)
+
+| Case | Before | After |
+|---|---|---|
+| wrong `schema` id | `evidence_eligible: true`, transition allowed | `PQ4` failed, not eligible |
+| missing `schema` | eligible | `PQ4` failed |
+| illegal `observed_outcome` type | eligible | `PQ4` failed |
+| `observed_outcome` not frozen | eligible, no diagnostic | `PQ3` failed |
+| evidence without `prediction_ref`, 2-outcome freeze | certified `X1:O1` **and** `X1:O2` | both stay `predictive_insight_candidate` |
+| `"brain"` vs `"brain-shifted"` | covered | `not_equal` |
+| `"MRI"` vs `"MRI-3D"` | covered | `not_equal` |
+| `"数据集 A / 中心 C"` vs `"数据集 A"` | covered (generalised) | `not_equal` |
+| structured evidence narrower than claim | n/a | `region_narrower` |
+| structured evidence broader than claim | n/a | `region_covers` |
+| freeze digest not recorded (`PC5`) | eligible | `PQ8` failed |
+
+### Compatibility
+
+* Old string scopes still read and still certify on exact match; old evidence without a
+  binding keeps the lower class (no auto-fill).
+* `evidence[].scope_region` is optional; the template entry is `null` and `state_check`
+  ignores it, so S1—S7 / V1—V24 are untouched.
+* The real legacy project (`3D_ZS_SSL`, 26 experiments, no `criterion`) still re-reads,
+  `audit blocking = 0`, `check` exit 0, `take` idempotent, canonical byte-identical.
+
+### Remaining, not fixed in this round
+
+* `PC5` only reaches the gate when the caller supplies the revision log (`op_compare` does,
+  the library call `assess_experiment(state, packet)` does not). Documented, low severity.
+* `min_separation` remains meaningful only for quantitative criteria; `measurement` remains a
+  declared-string equality check.
+* No real Agent A/B, no real observation packet: the positive certification path is exercised
+  against in-memory synthetic SENA artifacts.

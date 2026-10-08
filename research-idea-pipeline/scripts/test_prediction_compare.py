@@ -1180,6 +1180,9 @@ class TestInsightCards(unittest.TestCase):
         self.assertEqual(len(packet), 2)
         state = clone(self.state)
         state["evidence"][0]["supports"] = ["C1"]
+        # The explicit, verifiable binding: `X1` freezes two outcomes, so "same experiment"
+        # alone cannot say which prediction this evidence came from.
+        state["evidence"][0]["prediction_ref"] = "X1:O1"
         state["assurance"] = [{
             "id": "A1", "target": "H1", "attack_type": "structural-equivalence",
             "verification_tier": "T1", "kill_condition": "若与 LIT1 结构等价则杀死",
@@ -1443,6 +1446,369 @@ class TestInsightCards(unittest.TestCase):
             cards, diagnostics = pc.load_cards(path)
             self.assertEqual(len(cards), 1)
             self.assertIn("PC8", {d.rule for d in diagnostics})
+
+
+def certified_fixture():
+    """The fully bound certified card + state + audits from `TestInsightCards._certified()`."""
+    case = TestInsightCards("setUp")
+    case.setUp()
+    return case._certified()
+
+
+# ---------------------------------------------------------------------------
+# P0 (final round): the whole observation schema is inside the gate
+# ---------------------------------------------------------------------------
+
+class TestObservationSchemaGate(unittest.TestCase):
+    """A hard schema error must never leave `evidence_eligible: true` behind.
+
+    `observation_errors()` reported `PC2` while the qualification gate decided eligibility
+    from a disjoint set of checks, so a wrong `schema` id (and two other malformations) were
+    diagnosed and still qualified. The invariant below is the contract: if the authoritative
+    observation validator reports anything, the gate is closed.
+    """
+
+    def setUp(self):
+        self.state, self.observation = pc._fixture()
+        self.state["evidence"][0]["supports"] = ["C1"]
+        self.complete = {
+            "schema": pc.SCHEMA_OBSERVATION, "experiment_id": "X1",
+            "execution": {"status": "completed", "validity": "VALID"},
+            "outcomes": [{"id": "O1", "value": 0.8, "source": bound_source("落差 0.8 dB")},
+                         {"id": "O2", "value": 0.05, "source": bound_source("落差 0.05 dB")}],
+        }
+
+    def _gate(self, packet):
+        assessment, _ = pc.assess_experiment(self.state, packet)
+        allowed, reasons = pc.evidence_transition_allowed(self.state, assessment)
+        failed = {item["id"] for item in assessment["qualification"]["checks"]
+                  if not item["passed"]}
+        return assessment, allowed, reasons, failed
+
+    def test_a_legal_packet_still_qualifies(self):
+        assessment, allowed, reasons, failed = self._gate(self.complete)
+        self.assertTrue(assessment["evidence_eligible"], reasons)
+        self.assertTrue(allowed, reasons)
+        self.assertEqual(failed, set())
+
+    def test_a_wrong_schema_id_cannot_qualify_evidence(self):
+        packet = clone(self.complete)
+        packet["schema"] = "research-idea-pipeline/prediction-observation@9"
+        assessment, allowed, _, failed = self._gate(packet)
+        self.assertFalse(assessment["evidence_eligible"])
+        self.assertFalse(allowed)
+        self.assertIn("PQ4", failed)
+        self.assertNotEqual(assessment["evidence_class"], "QUALIFIED_EVIDENCE")
+
+    def test_a_missing_schema_cannot_qualify_evidence(self):
+        packet = clone(self.complete)
+        del packet["schema"]
+        assessment, allowed, _, failed = self._gate(packet)
+        self.assertFalse(allowed)
+        self.assertIn("PQ4", failed)
+
+    def test_every_hard_observation_error_closes_the_gate(self):
+        """The mechanical invariant: reported by the validator ⇒ not eligible."""
+        mutations = {}
+        packet = clone(self.complete)
+        packet["schema"] = "nope"
+        mutations["wrong schema"] = packet
+        packet = clone(self.complete)
+        del packet["schema"]
+        mutations["missing schema"] = packet
+        packet = clone(self.complete)
+        packet["execution"] = {"status": "completed", "validity": 7}
+        mutations["illegal validity type"] = packet
+        packet = clone(self.complete)
+        del packet["execution"]
+        mutations["missing execution"] = packet
+        packet = clone(self.complete)
+        packet["outcomes"] = {"O1": 0.8}
+        mutations["outcomes not a list"] = packet
+        packet = clone(self.complete)
+        packet["outcomes"] = "O1"
+        mutations["outcomes not a container"] = packet
+        packet = clone(self.complete)
+        packet["outcomes"][0] = "O1"
+        mutations["outcome not an object"] = packet
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["id"]
+        mutations["outcome without id"] = packet
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["source"]
+        mutations["missing source"] = packet
+        packet = clone(self.complete)
+        packet["outcomes"][0]["source"]["digest"] = "0" * 64
+        mutations["digest mismatch"] = packet
+        packet = clone(self.complete)
+        packet["outcomes"][0]["source"]["kind"] = "guess"
+        mutations["illegal source kind"] = packet
+        packet = clone(self.complete)
+        packet["observed_outcome"] = 123
+        mutations["illegal observed_outcome type"] = packet
+        packet = clone(self.complete)
+        packet["observed_outcome"] = "O9"
+        mutations["observed_outcome not frozen"] = packet
+        packet = clone(self.complete)
+        del packet["experiment_id"]
+        mutations["missing experiment_id"] = packet
+        packet = self.complete
+        mutations["not an object"] = []
+        for label, mutated in mutations.items():
+            reported = pc.observation_errors(mutated)
+            assessment, allowed, _, failed = self._gate(mutated)
+            if not reported and label not in ("observed_outcome not frozen",
+                                              "missing experiment_id"):
+                self.fail(f"{label}: the validator reported nothing, the test is stale")
+            self.assertTrue(reported or label == "observed_outcome not frozen", label)
+            self.assertFalse(assessment["evidence_eligible"],
+                             f"{label}: a diagnosed hard error still qualified")
+            self.assertFalse(allowed, label)
+            self.assertTrue(failed, label)
+            self.assertNotEqual(assessment["evidence_class"], "QUALIFIED_EVIDENCE", label)
+            self.assertNotEqual(assessment["outcome_class"], "PREDICTION_HELD", label)
+
+    def test_an_outcome_reference_that_is_not_frozen_closes_the_gate(self):
+        packet = clone(self.complete)
+        packet["observed_outcome"] = "O9"
+        assessment, allowed, reasons, failed = self._gate(packet)
+        self.assertFalse(allowed)
+        self.assertIn("PQ3", failed)
+        self.assertTrue(any("O9" in reason for reason in reasons), reasons)
+
+    def test_informational_extra_keys_do_not_block(self):
+        """Warnings keep their diagnostic role: an unknown note is not a schema error."""
+        packet = clone(self.complete)
+        packet["_note"] = "SYNTHETIC FIXTURE"
+        packet["notes"] = ["collected on machine h12"]
+        assessment, allowed, reasons, _ = self._gate(packet)
+        self.assertTrue(assessment["evidence_eligible"], reasons)
+        self.assertTrue(allowed)
+        self.assertEqual(pc.observation_errors(packet), [])
+
+    def test_the_diagnostic_comparison_stays_available(self):
+        """Separation: the comparison is still computed, the evidence is not qualified."""
+        packet = clone(self.complete)
+        packet["schema"] = "nope"
+        assessment, _, _, _ = self._gate(packet)
+        self.assertEqual(assessment["diagnostic_outcome_class"], "PREDICTION_HELD")
+        self.assertNotIn(assessment["outcome_class"], pc.WORLD_CLAIMING_CLASSES)
+        self.assertEqual(assessment["outcome_class_downgraded_from"], "PREDICTION_HELD")
+
+    def test_for_transition_uses_the_same_authority(self):
+        """`--for-transition` is a strict superset of the ordinary check, never a bypass."""
+        for label, packet in (("legal", self.complete),
+                              ("wrong schema", {**clone(self.complete), "schema": "nope"}),
+                              ("missing source", self._without_source())):
+            with tempfile.TemporaryDirectory() as temp:
+                root = pathlib.Path(temp)
+                state_path = root / cg.STATE_NAME
+                state_path.write_text(json.dumps(self.state, ensure_ascii=False), encoding="utf-8")
+                packet_path = root / "packet.json"
+                packet_path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
+                assessment, _ = pc.assess_experiment(self.state, packet)
+                qualified = pc.evidence_transition_allowed(self.state, assessment)[0]
+                proc = subprocess.run(
+                    [sys.executable, str(SCRIPT), "compare", "--state", str(state_path),
+                     "--packet", str(packet_path), "--for-transition"],
+                    capture_output=True, text=True, cwd=str(ROOT))
+                self.assertEqual(proc.returncode, pc.EXIT_OK if qualified else pc.EXIT_HARD, label)
+                payload = json.loads(proc.stdout)
+                self.assertEqual(payload["transition_allowed"], qualified, label)
+                self.assertEqual(payload["evidence_eligible"], qualified, label)
+                self.assertEqual(payload["qualification"]["eligible"], qualified, label)
+
+    def _without_source(self):
+        packet = clone(self.complete)
+        del packet["outcomes"][0]["source"]
+        return packet
+
+
+# ---------------------------------------------------------------------------
+# P1 (final round): prediction-level evidence binding
+# ---------------------------------------------------------------------------
+
+class TestPredictionLevelEvidenceBinding(unittest.TestCase):
+    """Evidence must name the prediction it belongs to, or be uniquely determined by it.
+
+    Without that, two cards on the same experiment could both be certified from one evidence
+    object: `X1` freezes `O1` and `O2`, and E1 (no `prediction_ref`) certified both.
+    """
+
+    def setUp(self):
+        self.card, self.state, self.audits = certified_fixture()
+
+    def _without_binding(self):
+        state = clone(self.state)
+        state["evidence"][0].pop("prediction_ref", None)
+        return state
+
+    def test_an_explicit_prediction_ref_certifies(self):
+        self.assertEqual(self.state["evidence"][0]["prediction_ref"], "X1:O1")
+        derived, _ = pc.classify_insight(self.card, self.state, self.audits)
+        self.assertEqual(derived, "evidence_supported_insight")
+
+    def test_missing_binding_in_a_multi_outcome_experiment_cannot_certify(self):
+        state = self._without_binding()
+        self.assertGreater(len(state["experiments"][0]["preregistration"]["outcomes"]), 1)
+        derived, reasons = pc.classify_insight(self.card, state, self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("prediction_ref" in item
+                            for item in reasons["certification"]["failures"]))
+
+    def test_the_other_prediction_cannot_borrow_the_evidence(self):
+        """The exploit: E1 came from O1's result, the card is about O2.
+
+        Measured both ways: with the explicit binding the mismatch is caught by the ref, and
+        without any binding the multi-outcome freeze makes the reference unknowable.
+        """
+        card = clone(self.card)
+        card["novel_prediction"] = {**clone(self.card["novel_prediction"]), "ref": "X1:O2"}
+        card["novel_prediction"]["observation_digest"] = cg.digest_of(
+            card["novel_prediction"]["observation"])
+        derived, _ = pc.classify_insight(card, self.state, self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        derived, reasons = pc.classify_insight(card, self._without_binding(), self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(reasons["certification"]["failures"], reasons["certification"])
+
+    def test_same_mechanism_and_metric_do_not_imply_the_same_prediction(self):
+        """A shared claim/mechanism/metric is not prediction identity."""
+        state = self._without_binding()
+        self.assertEqual(state["evidence"][0]["supports"], ["C1"])
+        self.assertEqual(state["evidence"][0]["kind"], "experiment")
+        derived, reasons = pc.classify_insight(self.card, state, self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("prediction_ref" in item
+                            for item in reasons["certification"]["failures"]))
+
+    def test_a_single_outcome_experiment_uniquely_determines_the_prediction(self):
+        """No guessing: with exactly one frozen outcome there is nothing to choose between."""
+        state = self._without_binding()
+        preregistration = state["experiments"][0]["preregistration"]
+        preregistration["outcomes"] = [
+            item for item in preregistration["outcomes"] if item["id"] == "O1"]
+        card = clone(self.card)
+        card["novel_prediction"]["observation"]["outcomes"] = [
+            item for item in card["novel_prediction"]["observation"]["outcomes"]
+            if item["id"] == "O1"]
+        card["novel_prediction"]["observation_digest"] = cg.digest_of(
+            card["novel_prediction"]["observation"])
+        derived, reasons = pc.classify_insight(card, state, self.audits)
+        self.assertEqual(derived, "evidence_supported_insight", reasons["certification"])
+
+    def test_a_subset_outcome_reference_still_has_to_match(self):
+        state = self._without_binding()
+        state["evidence"][0]["prediction_ref"] = "X1:O2"
+        derived, _ = pc.classify_insight(self.card, state, self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_an_unparseable_binding_is_refused(self):
+        state = self._without_binding()
+        state["evidence"][0]["prediction_ref"] = "X1"
+        derived, _ = pc.classify_insight(self.card, state, self.audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+
+    def test_legacy_evidence_without_binding_keeps_the_lower_class(self):
+        state = self._without_binding()
+        derived, reasons = pc.classify_insight(self.card, state, self.audits)
+        self.assertEqual(derived, "predictive_insight_candidate")
+        self.assertTrue(reasons["certification"]["missing"]
+                        or reasons["certification"]["failures"])
+
+
+# ---------------------------------------------------------------------------
+# P1 (final round): scientific scope coverage
+# ---------------------------------------------------------------------------
+
+class TestScientificScope(unittest.TestCase):
+
+    def test_identical_scope_is_covered(self):
+        ok, reason = pc.scope_covers("数据集 A / acceleration=4", "数据集 A / acceleration=4")
+        self.assertTrue(ok, reason)
+        ok, reason = pc.scope_covers("数据集  A", "数据集 A")
+        self.assertTrue(ok, reason)
+
+    def test_a_substring_is_not_a_scope_relation(self):
+        for left, right in (("brain", "brain-shifted"), ("brain-shifted", "brain"),
+                            ("MRI", "MRI-3D"), ("MRI-3D", "MRI"),
+                            ("T2fse", "T2fse + 3D"), ("3D TV", "3D TV (FISTA)")):
+            ok, reason = pc.scope_covers(left, right)
+            self.assertFalse(ok, f"{left!r} vs {right!r} matched by containment")
+            self.assertIn(reason, ("not_equal", "unknown_scope_shape"))
+
+    def test_population_protocol_and_operator_are_not_matched_by_name(self):
+        for left, right in (("patients A", "patients A + B"),
+                            ("sampling: radial", "sampling: radial-3D"),
+                            ("operator: TV", "operator: TV-TV")):
+            self.assertFalse(pc.scope_covers(left, right)[0], (left, right))
+
+    def test_a_narrower_evidence_scope_cannot_be_generalised(self):
+        ok, reason = pc.scope_covers("数据集 A / 中心 C", "数据集 A")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "not_equal")
+
+    def test_an_explicit_region_relation_is_directional(self):
+        broad = {"modality": "MRI"}
+        narrow = {"modality": "MRI", "acceleration": 4}
+        ok, reason = pc.scope_covers("MRI", "MRI / acceleration=4",
+                                     evidence_region=broad, claim_region=narrow)
+        self.assertTrue(ok, reason)
+        ok, reason = pc.scope_covers("MRI / acceleration=4", "MRI",
+                                     evidence_region=narrow, claim_region=broad)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "region_narrower")
+        ok, reason = pc.scope_covers("MRI", "MRI",
+                                     evidence_region={"modality": "MRI"},
+                                     claim_region={"modality": "MRI", "acceleration": 4})
+        self.assertTrue(ok, reason)
+
+    def test_a_conflicting_axis_is_not_coverage(self):
+        ok, reason = pc.scope_covers(
+            "MRI", "CT", evidence_region={"modality": "MRI"}, claim_region={"modality": "CT"})
+        self.assertFalse(ok)
+        self.assertEqual(reason, "region_conflict")
+
+    def test_an_unknown_scope_shape_is_refused_not_guessed(self):
+        for evidence_scope, claim_scope, er, cr in (
+                (None, "数据集 A", None, None),
+                ("数据集 A", None, None, None),
+                (["数据集 A"], "数据集 A", None, None),
+                ("数据集 A", "数据集 A", {"modality": "MRI"}, None),
+                ("数据集 A", "数据集 A", None, {"modality": "MRI"})):
+            ok, reason = pc.scope_covers(evidence_scope, claim_scope, er, cr)
+            self.assertFalse(ok, (evidence_scope, claim_scope, er, cr))
+            self.assertEqual(reason, "unknown_scope_shape")
+
+    def test_narrow_evidence_cannot_be_generalised_to_a_broader_claim(self):
+        """Evidence on `MRI / population P1` cannot certify a claim about all of `MRI`."""
+        card, state, audits = certified_fixture()
+        card["scope_boundary_region"] = {"modality": "MRI"}
+        state["evidence"][0]["scope_region"] = {"modality": "MRI", "population": "P1"}
+        state["evidence"][0]["scope"] = "MRI / population P1"
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
+        self.assertTrue(any("region_narrower" in item
+                            for item in reasons["certification"]["failures"]),
+                        reasons["certification"])
+
+    def test_broad_evidence_covers_a_narrower_claim(self):
+        card, state, audits = certified_fixture()
+        card["scope_boundary_region"] = {"modality": "MRI", "population": "P1"}
+        state["evidence"][0]["scope_region"] = {"modality": "MRI"}
+        state["evidence"][0]["scope"] = "MRI"
+        derived, reasons = pc.classify_insight(card, state, audits)
+        self.assertEqual(derived, "evidence_supported_insight", reasons["certification"])
+
+    def test_legacy_string_scopes_still_read_and_still_certify_by_exact_match(self):
+        card, state, audits = certified_fixture()
+        state["evidence"][0]["scope"] = "数据集 A"
+        card["scope_boundary"] = "数据集 A"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertEqual(derived, "evidence_supported_insight")
+        state["evidence"][0]["scope"] = "数据集 A / 中心 C"
+        derived, _ = pc.classify_insight(card, state, audits)
+        self.assertNotEqual(derived, "evidence_supported_insight")
 
 
 # ---------------------------------------------------------------------------

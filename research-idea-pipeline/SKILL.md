@@ -791,13 +791,15 @@ completeness 判定（旧项目无需迁移）；分支规则缺失、冲突、�
 **不得产生 `PREDICTION_HELD`**，未选分支也要以可核验的排除条件记录（`PC10`）。
 
 **证据资格只有一个入口。** `qualify_evidence` 的 `PQ1`—`PQ8` 同时检查执行有效性、
-预注册冻结与判据形状、判定集合完整性或合法 branch mode、观测来源绑定（
-`{kind, location, content, digest}` 且 `digest == digest(content)`）、分支选择的可追溯性、
-实验与预测绑定、终态收据、时间顺序与事后篡改。**任何一项不过就 fail closed**
+预注册冻结与判据形状、判定集合完整性或合法 branch mode、**观测包 schema 与结构校验
+（`PQ4` 直接消费观测校验器的完整结论：schema 错误 / 缺字段 / 类型非法 / 来源缺失 /
+摘要不符一律 fail closed）**、分支选择的可追溯性、实验与预测绑定、终态收据、时间顺序与
+事后篡改（含不可核验的冻结 `PC5`）。**任何一项不过就 fail closed**
 （`evidence_eligible: false`）：不得标记 `QUALIFIED_EVIDENCE`、不得授权 Claim 状态升级、
-不得用于机制否证或 Insight 认证；诊断性比较照常保留。Insight 只有绑定到**具体预测**、
-具有合格判定、方向一致的证据与**已通过**的结构等价审计时才能成为
-`evidence_supported_insight`（`PC11`）。
+不得用于机制否证或 Insight 认证；诊断性比较照常保留。Insight 只有绑定到**具体预测**（evidence 必须带 `prediction_ref`，
+或该实验只冻结了一个结果）、具有合格判定、方向一致的证据、**范围覆盖**（字符串 scope 规范化
+精确相等；结构化 `scope_region` 按约束子集判定，禁止子串包含与外推）与**已通过**的结构等价
+审计时才能成为 `evidence_supported_insight`（`PC11`）。
 
 机制竞争必须逐对检验**可比性 → 冲突 → 分辨率 → 预先声明的判别规则**：
 不同观测变量、不同测量口径、区间重叠、`noise/√n` 吃掉间隔、间隔小于 `min_separation`、
