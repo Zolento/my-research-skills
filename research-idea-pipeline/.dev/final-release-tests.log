@@ -1,4 +1,4 @@
-[ok  ] 离线测试（含 golden path / parity / linter / deprecated / links） —— Ran 621 tests in 3.388s · OK (skipped=3)
+[ok  ] 离线测试（含 golden path / parity / linter / deprecated / links） —— Ran 628 tests in 3.193s · OK (skipped=3)
 [ok  ] state_check --selftest —— selftest OK（exit=0）
 [ok  ] 模板自身通过校验 —— exit=0
 [ok  ] 规则表逐字比对（S1—S7 + V1—V24） —— 31 条（S+V）逐字一致

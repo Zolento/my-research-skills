@@ -29,6 +29,8 @@
        —— 文本攻击注入测试必须能把发布闸门判红
     9. Evidence Outcome 的五份来源绑定示例、状态回写和 Assurance 决策
        —— 原始结果变异必须让发布闸门判红
+    10. PEIG/AALG schema、模板和 CT→MRI 对照变异
+        —— 漏掉容量对照必须拒绝正式执行；启动路径仅用 mock/dry-run 测试
 
 退出码
 ------

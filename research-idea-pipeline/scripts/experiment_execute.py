@@ -118,8 +118,11 @@ def manifest_binding(state, experiment, manifest):
 
 def execution_review_digest(state, experiment, manifest):
     binding = manifest_binding(state,experiment,manifest)
+    targets = set(eg.target_lineage(state,experiment['claim_targeted'] + experiment.get('hypothesis_targeted',[]) + experiment.get('alternative_targeted',[])))
+    scientific_targets = {collection:sorted([obj for obj in state[collection] if obj['id'] in targets],key=lambda obj:obj['id']) for collection in ('claims','hypotheses')}
     return eo.digest({'design':eg.review_digest(experiment['execution_protocol']),
                       'experiment_design':binding['experiment_design'],
+                      'scientific_targets':scientific_targets,
                       'preregistration':experiment['preregistration'],
                       'manifest':manifest,'files':binding['files']})
 
@@ -134,8 +137,9 @@ def diagnose(state, diagnostic, ledger):
 
 
 def diagnostic_for(state, x, ledger):
-    targeted = [r for r in state.get('repairs', []) if set(r.get('targets', [])) & set(x['claim_targeted']) and r.get('disposition') in ('RUN_TEST','NARROW_SCOPE','FIX_IMPLEMENTATION')]
-    prior_negative = any(old.get('outcome_analysis') and old['outcome_analysis']['analysis']['outcome'] != 'POSITIVE_EVIDENCE' and set(old['claim_targeted']) & set(x['claim_targeted']) for old in state['experiments'])
+    lineage = set(eg.target_lineage(state,x['claim_targeted']))
+    targeted = [r for r in state.get('repairs', []) if set(eg.target_lineage(state,r.get('targets', []))) & lineage and r.get('disposition') in ('RUN_TEST','NARROW_SCOPE','FIX_IMPLEMENTATION')]
+    prior_negative = any(old.get('outcome_analysis') and old['outcome_analysis']['analysis']['outcome'] != 'POSITIVE_EVIDENCE' and set(eg.target_lineage(state,old['claim_targeted'])) & lineage for old in state['experiments'])
     diagnoses = [r['diagnostic_protocol'] for r in targeted if r.get('diagnostic_protocol') and r['diagnostic_protocol']['experiment_id'] == x['id']]
     if not targeted and not prior_negative: return None, []
     if len(diagnoses) != 1: return None, ['AALG_REQUIRED: register one decision-bearing diagnosis in the R10 repair']
@@ -248,12 +252,12 @@ def verify_result_execution(state, ledger):
         for x in state['experiments']:
             if not x.get('execution_protocol') or x['status'] == 'planned': continue
             record = x.get('execution_record')
-            if not record:
+            if not isinstance(record,dict) or set(record) != {'receipt','launch_seal','dry_run'} or not isinstance(record['receipt'],dict) or not record['receipt'].get('id'):
                 errors.append(x['id'] + ': missing execution record'); continue
             receipt = record['receipt']
             issued = any(e.get('kind') == 'issue' and e['receipt'] == receipt for e in ledger.events)
-            consumed = any(e.get('kind') == 'consume' and e['receipt_id'] == receipt['id'] and e['seal'] == record['launch_seal'] for e in ledger.events)
-            if not issued or not consumed or record['dry_run']: errors.append(x['id'] + ': unexecuted or forged execution provenance')
+            consumed = any(e.get('kind') == 'consume' and e['receipt_id'] == receipt['id'] and e['seal'] == record['launch_seal'] and e['experiment_id'] == x['id'] and e['dry_run'] is False for e in ledger.events)
+            if not issued or not consumed or record['dry_run'] is not False: errors.append(x['id'] + ': unexecuted or forged execution provenance')
     return errors
 
 

@@ -59,8 +59,9 @@ def protocol_signature(experiment):
     """Seed and implementation commit do not turn an unchanged scientific design into a new design."""
     if experiment.get('execution_protocol'):
         import execution_gate
-        return digest({'targets': sorted(experiment['claim_targeted'] + experiment.get('hypothesis_targeted', [])),
-                       'design': execution_gate.design_projection(experiment['execution_protocol'])})
+        # Target ancestry is checked independently by _check_plan. Labels do not
+        # release a stop rule against the same scientific design.
+        return digest({'design': execution_gate.design_projection(experiment['execution_protocol'])})
     design = {k: experiment.get(k) for k in ('stage', 'data_split', 'metric', 'claim_targeted',
                                              'hypothesis_targeted', 'alternative_targeted', 'outcome_protocol')}
     preregistration = experiment.get('preregistration')

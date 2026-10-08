@@ -25,6 +25,9 @@ effect/statistics, and four outcome criteria with decisions. It includes stop,
 failure and redesign conditions. Criteria are prospective. The independent
 scientific review binds the actual design digest; PASS/UNKNOWN/FAIL judgments
 are distinct from syntactic completeness.
+Risk inventory includes the exact target, all of its ancestors and all competing
+hypotheses. Narrowing to a child claim does not drop either child-specific or
+inherited attacks. R10 diagnosis requirements also follow claim ancestry.
 
 Each risk has exactly one disposition:
 
@@ -69,6 +72,10 @@ remains available to obtain independent evidence. Targetless X1/X2 exploration
 has separate design/mode budgets so calibration does not consume sanity permission. No auto-generated followup chain. Independent evidence
 or a human-reviewed new mechanism protocol can reopen a diagnosis; it cannot
 silently release a scientific stop rule.
+Managed protocol stop signatures bind the scientific design; target overlap is
+checked separately through claim/hypothesis ancestry. Renaming a hypothesis or
+using a child claim cannot evade an unchanged-design stop rule. Legacy protocol
+signatures keep their original semantics.
 
 R10 `RUN_TEST`, `FIX_IMPLEMENTATION` and diagnostic `NARROW_SCOPE` actions attach
 `repairs[].diagnostic_protocol`. Its schema is
@@ -160,6 +167,8 @@ the frozen outcome observation. The runner returns execution_record (receipt,
 launch_seal, dry_run); R9 persists it before outcome analysis. The outcome CLI
 checks consumed provenance against the ledger, including --execution-ledger for
 an explicit route path. Library clients call verify_result_execution themselves.
+The launch flag must be a boolean and agree with the authenticated consumption
+event. Changing a dry-run record to false cannot turn telemetry into evidence.
 
 Diagnostic review_digest binds the proposal, tested protocol and hypothesis
 snapshot. A preregistered diagnosis must have its digest in the original
@@ -169,7 +178,8 @@ with kind/location/content/digest. Only source-bound observations count as new
 scientific evidence; a new E ID or source locator does not reset budgets.
 
 The scientific_review.execution_digest binds the exact command manifest, resource
-request and code/config/split/preregistration file bytes. Compute it with
+request, targeted claim/hypothesis content and ancestry, and
+code/config/split/preregistration file bytes. Compute it with
 experiment_execute.execution_review_digest only after reviewing those artifacts;
 issue refuses an unreviewed command even when the abstract design passed PEIG.
 Config files contain execution_design (arms/intervention/evaluation), and split

@@ -71,6 +71,16 @@ class PEIGTests(unittest.TestCase):
 
     def test_fair_comparison_pass(self): self.assertEqual(self.gate()['status'],'PASS',self.gate());self.assertTrue(sc.check_state(self.s).ok)
     def test_critical_capacity_no_control(self): self.p['risk_controls'][0]['comparison_ids']=[];reviewed(self.s);self.reject('MISSING_RISK_CONTROL')
+    def test_child_claim_keeps_own_and_ancestor_risks(self):
+        child=copy.deepcopy(self.s['claims'][0]);child.update(id='C-child',parent='C1');self.s['claims'].append(child)
+        self.x['claim_targeted']=['C-child'];self.p['claims']=['C-child']
+        attack=copy.deepcopy(self.s['assurance'][0]);attack.update(id='child-risk',target='C-child');self.s['assurance'].append(attack)
+        reviewed(self.s);self.reject('RISK_TRACEABILITY')
+        control=copy.deepcopy(self.p['risk_controls'][0]);control['risk_id']='child-risk';self.p['risk_controls'].append(control)
+        reviewed(self.s);self.assertEqual(self.gate()['status'],'PASS',self.gate())
+    def test_competing_hypothesis_risk_cannot_disappear(self):
+        attack=copy.deepcopy(self.s['assurance'][0]);attack.update(id='competitor-risk',target='H2');self.s['assurance'].append(attack)
+        reviewed(self.s);self.reject('RISK_TRACEABILITY')
     def test_control_id_does_not_resolve_missing_comparison(self): self.p['risk_controls'][0]['comparison_ids']=['fake'];reviewed(self.s);self.reject('MISSING_RISK_CONTROL')
     def test_psi_added_capacity_not_controlled(self): self.p['arms'][0]['trainable_parameters']*=2;reviewed(self.s);self.reject('INEFFECTIVE_RISK_CONTROL')
     def test_omitted_capacity_attack_is_not_ignored(self): self.s['assurance']=[];self.p['risk_controls']=[];self.p['arms'][0]['trainable_parameters']*=2;reviewed(self.s);self.reject('UNREGISTERED_CAPACITY_RISK')
@@ -196,6 +206,9 @@ class ExecutionTests(unittest.TestCase):
     def test_command_different_from_review_rejected(self):
         self.manifest['argv'].append('--lr=100')
         self.assertTrue(any('EXECUTION_REVIEW_MISMATCH' in e for e in self.issue()['errors']))
+    def test_changed_scientific_claim_requires_new_execution_review(self):
+        self.s['claims'][0]['statement']='Unreviewed universal MRI mechanism claim'
+        self.assertTrue(any('EXECUTION_REVIEW_MISMATCH' in e for e in self.issue()['errors']))
     def test_deleted_ledger_tail_fails_closed(self):
         self.issue();path=self.root/'ledger/events.jsonl';path.write_text(path.read_text().splitlines()[0]+'\n')
         with self.assertRaisesRegex(ValueError,'LEDGER_TRUNCATED'): self.issue()
@@ -267,6 +280,12 @@ class AALGTests(unittest.TestCase):
     def test_r10_cannot_schedule_unregistered_diagnosis(self):
         self.s['repairs'].append(dict(flaw='Need another diagnosis',disposition='RUN_TEST',state_delta='Queue same comparison',closure='RESOLVED',targets=['C1']))
         m=resources(self.s,self.root);out=issue(self.s,'X1',m,self.ledger);self.assertEqual(out['status'],'HOLD');self.assertTrue(any('AALG_REQUIRED' in e for e in out['errors']))
+    def test_child_claim_cannot_escape_parent_r10_diagnosis(self):
+        child=copy.deepcopy(self.s['claims'][0]);child.update(id='C-child',parent='C1');self.s['claims'].append(child)
+        x=self.s['experiments'][-1];x['claim_targeted']=['C-child'];x['execution_protocol']['claims']=['C-child'];reviewed(self.s)
+        self.s['repairs'].append(dict(flaw='Parent capacity uncertainty',disposition='RUN_TEST',state_delta='Queue comparison',closure='RESOLVED',targets=['C1']))
+        _,errors=ex.diagnostic_for(self.s,x,self.ledger)
+        self.assertTrue(any('AALG_REQUIRED' in error for error in errors))
     def test_r10_registered_diagnosis_grants_one_issue(self):
         self.s['repairs'].append(dict(flaw='Capacity check',disposition='RUN_TEST',state_delta='Queue identifying comparison',closure='RESOLVED',targets=['C1'],diagnostic_protocol=self.d))
         m=resources(self.s,self.root);self.assertEqual(self.check()['status'],'PASS');out=issue(self.s,'X1',m,self.ledger);self.assertEqual(out['status'],'PASS',out)
@@ -346,6 +365,32 @@ class EndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             m=resources(s,directory);ledger=ex.Ledger(Path(directory)/'ledger');r=issue(s,'X1',m,ledger,now=100)['receipt'];launched=managed_run(s,'X1',m,r,ledger,now=101)
             args=outcome_case(fixture(),s,launched['execution_record'],'positive');self.assertFalse(sc.check_state(args[0]).ok);self.assertTrue(ex.verify_result_execution(args[0],ledger))
+    def test_rewritten_dry_run_flag_cannot_forge_actual_execution(self):
+        s=fixture()['state']
+        with tempfile.TemporaryDirectory() as directory:
+            m=resources(s,directory);ledger=ex.Ledger(Path(directory)/'ledger');r=issue(s,'X1',m,ledger,now=100)['receipt'];launched=managed_run(s,'X1',m,r,ledger,now=101)
+            launched['execution_record']['dry_run']=False
+            args=outcome_case(fixture(),s,launched['execution_record'],'positive')
+            self.assertTrue(ex.verify_result_execution(args[0],ledger))
+            root=Path(directory);paths=[]
+            for name,value in zip(('state','packet','analysis','audit'),args):
+                path=root/(name+'.json');path.write_text(json.dumps(value));paths.extend(['--'+name,str(path)])
+            output=root/'applied.json'
+            result=subprocess.run([sys.executable,str(ROOT/'scripts/evidence_outcome.py'),'apply',*paths,'--execution-ledger',str(ledger.directory),'--output',str(output)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,4,result.stdout);self.assertIn('forged execution provenance',result.stdout);self.assertFalse(output.exists())
+    def test_nonboolean_launch_flag_rejected(self):
+        out,ledger,_=self.simulate('positive');out['experiments'][-1]['execution_record']['dry_run']=None
+        self.assertFalse(sc.check_state(out).ok);self.assertTrue(ex.verify_result_execution(out,ledger))
+    def test_protocol_stop_not_bypassed_by_new_hypothesis_id(self):
+        s=fixture()['state'];x=s['experiments'][-1]
+        sr=dict(id='SR-protocol',target_ids=['C1'],scope=s['claims'][0]['scope'],kind='protocol',rule='Stop unchanged design',protocol_signature=eo.protocol_signature(x),revisit_conditions=['New independently reviewed design'])
+        s['failures'].append(dict(id='F-stop',stop_rules=[sr]))
+        x['hypothesis_targeted']=['H3'];x['execution_protocol']['competitors']=['H3','H2'];x['execution_protocol']['comparisons'][0]['predictions'][0]['hypothesis_id']='H3'
+        self.assertEqual(eo._check_plan(s,x['id'])['status'],'FAIL')
+        child=copy.deepcopy(s['claims'][0]);child.update(id='C-child',parent='C1');s['claims'].append(child);x['claim_targeted']=['C-child'];x['execution_protocol']['claims']=['C-child']
+        self.assertEqual(eo._check_plan(s,x['id'])['status'],'FAIL')
+        x['execution_protocol']['arms'][0]['intervention']['dose']=2;x['execution_protocol']['intervention']['dose_levels']=[0,2]
+        self.assertEqual(eo._check_plan(s,x['id'])['status'],'PASS')
     def test_full_negative_loop_stops_and_new_evidence_reopens(self):
         out,ledger,_=self.simulate('negative');x=copy.deepcopy(out['experiments'][-1])
         for k in ('outcome_analysis','execution_record','result_pending'): x.pop(k,None)

@@ -136,3 +136,18 @@ CT→MRI fixture 全链测试包括：R7 critical capacity attack → R8 protoco
 139c9e907e437443b640b57271c85236023616e7。最终 git status 应为空。
 
 `.dev` 分类：本报告、baseline-tests.log、final-unit-tests.log、final-release-tests.log、installed-copy-tests.log、skill-validator.log 全部 KEEP_BRANCH_ONLY。正式运行文件不依赖它们；临时中间日志已删除。实现、完整测试、安装候选验证与 Git 核验后停止，不追加科研流程或优化任务。
+
+## 最终合并审查（用户后续授权覆盖原本地交付限制）
+
+用户随后明确要求「最后审查一遍，然后 merge 到 main 并 push」。本节为该审查记录；上面的未合并退出状态是此前交付快照。远端 origin/main 在审查开始时与原基线 139c9e9 一致。
+
+最终审查发现并修复四类边界：
+
+- dry_run 字段改写或非布尔值：结果 CLI 现在同时核验认证账本中的 consume.dry_run=False、实验身份、launch seal，不能将 dry-run 改成正式科学结果。CLI 反例退出 4 且不产生输出状态。
+- 子 claim 与竞争假设风险：风险清单覆盖精确目标、全祖先和全部 competitors；子 claim 也继承父 claim 的 R10/AALG 要求。
+- 假设或子 claim 换 ID：managed stop signature 只绑定科学设计，目标重叠通过祖先关系单独核验；改名无法释放停止规则，实际不同设计仍可通过既有 planning 检查。旧 legacy signature 不变。
+- 审查后改写科学目标：execution_review_digest 现在绑定目标 claim/H 的内容与祖先对象，静默改写 statement 不能沿用原命令审查。
+
+先加入反例复现（5 项失败；随后目标语义绑定反例亦失败），修复后新增模块 77/77 PASS。完整测试 628 项：625 PASS、0 FAIL、3 既有 skip；release_check 10/10 PASS；排除 .dev 的完整安装副本同样通过。此前通用 Skill validator 的既有 frontmatter FAIL 仍未变更，不宣称其通过。
+
+合并时六份 .dev 文件全部 KEEP_BRANCH_ONLY，仅保留在功能分支；main 最终 tree 与 merge diff 不包含这些开发产物。不启动真实 GPU、不创建 PR、不发布 release。

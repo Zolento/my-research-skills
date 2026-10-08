@@ -80,7 +80,7 @@ def evidence_snapshot(state):
     return eo.digest(sorted({eo.digest(r) for r in records}))
 
 
-def target_roots(state, targets):
+def target_lineage(state, targets):
     claims, hypotheses = eo.index(state,'claims'), eo.index(state,'hypotheses')
     visited = set(); pending = list(targets)
     while pending:
@@ -89,11 +89,17 @@ def target_roots(state, targets):
         visited.add(target)
         parent = claims.get(target,{}).get('parent')
         pending.extend(([parent] if parent else []) + hypotheses.get(target,{}).get('parents',[]))
-    return sorted(t for t in visited if not claims.get(t,{}).get('parent') and not hypotheses.get(t,{}).get('parents'))
+    return sorted(visited)
+
+
+def target_roots(state, targets):
+    claims, hypotheses = eo.index(state,'claims'), eo.index(state,'hypotheses')
+    return [t for t in target_lineage(state,targets) if not claims.get(t,{}).get('parent') and not hypotheses.get(t,{}).get('parents')]
 
 
 def risks(state, claims):
     selected = []
+    claims = target_lineage(state,claims)
     for r in state.get('assurance', []) + state.get('uncertainties', []):
         targets = r.get('target', [])
         if isinstance(targets, str): targets = [targets]
@@ -201,7 +207,7 @@ def peig(state, experiment_id):
             if sum(a['compute_hours'] for a in arms.values()) > p['budget_hours']: errors.append('BUDGET_MISMATCH: arms exceed frozen formal budget')
         for arm in arms.values():
             if arm['data_split'] != p['evaluation']['data_split'] or arm['intervention']['dose'] not in p['intervention']['dose_levels']: errors.append('ARM_PROTOCOL_MISMATCH')
-        inventory = risks(state, target_roots(state,p['claims'] + x.get('hypothesis_targeted', [])))
+        inventory = risks(state, p['claims'] + x.get('hypothesis_targeted', []) + x.get('alternative_targeted', []))
         risk_ids = [r.get('id') for r in inventory]
         if any(not eo.text(r.get('id')) or r.get('severity', r.get('importance')) not in ('critical','high','medium','low') or not eo.text(r.get('risk_type')) for r in inventory): errors.append('UNTYPED_R7_RISK: id/severity/risk_type required')
         controls = {r['risk_id']: r for r in p['risk_controls']}
@@ -260,8 +266,9 @@ def diagnostic_check(state, d, history, policy):
         x = eo.index(state, 'experiments')[d['experiment_id']]
         h = eo.index(state, 'hypotheses')[d['hypothesis_id']]
         if not set(d['claim_ids']) <= set(x['claim_targeted']): errors.append('DIAGNOSTIC_TARGET_MISMATCH')
-        if not d['risk_ids'] and risks(state,d['claim_ids'] + x.get('hypothesis_targeted',[])): errors.append('DIAGNOSTIC_RISK_BINDING_REQUIRED')
-        if not set(d['risk_ids']) <= {r.get('id') for r in risks(state, target_roots(state,d['claim_ids'] + x.get('hypothesis_targeted', [])))}: errors.append('DIAGNOSTIC_RISK_MISMATCH')
+        inventory = risks(state,d['claim_ids'] + x.get('hypothesis_targeted',[]) + x.get('alternative_targeted',[]))
+        if not d['risk_ids'] and inventory: errors.append('DIAGNOSTIC_RISK_BINDING_REQUIRED')
+        if not set(d['risk_ids']) <= {r.get('id') for r in inventory}: errors.append('DIAGNOSTIC_RISK_MISMATCH')
         evidence = eo.index(state, 'evidence')
         bound_observations = {e['id'] for e in state.get('evidence',[]) if source_observation(e)} | {e['id'] for e in state.get('evidence',[]) if e.get('outcome_observations') and any(old.get('outcome_analysis') and old['id'] in e.get('depends_on',[]) for old in state['experiments'])}
         for eid in d['evidence_ids'] + d['generating_evidence_ids']:
@@ -284,7 +291,7 @@ def diagnostic_check(state, d, history, policy):
         p = x.get('execution_protocol')
         if p and d['hypothesis_id'] not in p['competitors']: errors.append('NEW_HYPOTHESIS_NEEDS_INDEPENDENT_PROTOCOL')
         if not p or schema_errors(p, 'preflight-protocol.schema.json'): errors.append('NEW_HYPOTHESIS_NEEDS_INDEPENDENT_PROTOCOL')
-        key = eo.digest({'claims': target_roots(state,d['claim_ids']), 'risks': sorted({r.get('risk_type') for r in risks(state,target_roots(state,d['claim_ids'] + x.get('hypothesis_targeted',[]))) if r.get('id') in d['risk_ids']}), 'evidence': evidence_snapshot(state),
+        key = eo.digest({'claims': target_roots(state,d['claim_ids']), 'risks': sorted({r.get('risk_type') for r in inventory if r.get('id') in d['risk_ids']}), 'evidence': evidence_snapshot(state),
                          'design': design_projection(p) if p else None})
         attempts = sum(e.get('kind') == 'diagnosis' and e.get('key') == key for e in history)
         review = d['scientific_review']
@@ -312,6 +319,7 @@ def state_errors(state):
             if not isinstance(execution, dict) or set(execution) != {'receipt','launch_seal','dry_run'}:
                 errors.append(x['id'] + ': executed protocol requires managed execution record')
             else:
+                if type(execution['dry_run']) is not bool: errors.append(x['id'] + ': execution dry_run flag must be boolean')
                 binding = execution['receipt']['binding']
                 design = {k: x.get(k) for k in ('stage','claim_targeted','hypothesis_targeted','alternative_targeted','code_commit','data_split','seed','metric','outcome_protocol')}
                 if binding.get('protocol_digest') != eo.digest(p) or binding.get('preregistration_digest') != eo.digest(x['preregistration']) or binding.get('experiment_id') != x['id'] or binding.get('experiment_design') != design:
