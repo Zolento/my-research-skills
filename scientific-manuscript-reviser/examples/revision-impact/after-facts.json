@@ -1,0 +1,78 @@
+{
+  "schema": "manuscript-invariants@1",
+  "manuscript_digest": "c2565003cb67ca83c35c120dd471adb1ab9c7a3123e866703100c9abe68f9e76",
+  "covered_categories": [
+    "claims",
+    "numbers",
+    "metrics",
+    "datasets",
+    "methods",
+    "baselines",
+    "comparators",
+    "statistical_statements",
+    "causal_status",
+    "novelty",
+    "scope",
+    "assumptions",
+    "limitations",
+    "uncertainty",
+    "figure_references",
+    "table_references",
+    "section_references",
+    "citation_keys",
+    "equation_references",
+    "technical_terminology"
+  ],
+  "absent_categories": [
+    "assumptions",
+    "baselines",
+    "causal_status",
+    "citation_keys",
+    "comparators",
+    "datasets",
+    "equation_references",
+    "figure_references",
+    "methods",
+    "novelty",
+    "numbers",
+    "scope",
+    "section_references",
+    "statistical_statements",
+    "table_references",
+    "technical_terminology",
+    "uncertainty"
+  ],
+  "facts": [
+    {
+      "id": "F0",
+      "category": "claims",
+      "statement": "We report X improves Y.",
+      "location": {
+        "start": 12,
+        "end": 35
+      },
+      "source_span": "We report X improves Y."
+    },
+    {
+      "id": "F1",
+      "category": "metrics",
+      "statement": "Under protocol Z on the tested subset, X improves Y by 0.8 dB.",
+      "location": {
+        "start": 48,
+        "end": 110
+      },
+      "source_span": "Under protocol Z on the tested subset, X improves Y by 0.8 dB."
+    },
+    {
+      "id": "F2",
+      "category": "limitations",
+      "statement": "This applies only to the tested protocol.",
+      "location": {
+        "start": 127,
+        "end": 168
+      },
+      "source_span": "This applies only to the tested protocol."
+    }
+  ],
+  "unresolved": []
+}

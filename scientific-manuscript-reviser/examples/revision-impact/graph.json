@@ -1,0 +1,73 @@
+{
+  "schema": "scientific-argument-graph@1",
+  "manuscript_digest": "6af4e3711108e167c454a623c1a04cf933fd0e4909bb21aec1d993171827f003",
+  "document_scope": "section",
+  "missing_context": [],
+  "nodes": [
+    {
+      "id": "C",
+      "type": "Claim",
+      "label": "We report that X improves Y.",
+      "source_span": "We report that X improves Y.",
+      "location": {
+        "start": 12,
+        "end": 40
+      },
+      "context": "Abstract"
+    },
+    {
+      "id": "O",
+      "type": "Observation",
+      "label": "Under protocol Z, X improves Y by 0.8 dB.",
+      "source_span": "Under protocol Z, X improves Y by 0.8 dB.",
+      "location": {
+        "start": 53,
+        "end": 94
+      },
+      "context": "Results"
+    },
+    {
+      "id": "L",
+      "type": "Limitation",
+      "label": "This applies only to the tested protocol.",
+      "source_span": "This applies only to the tested protocol.",
+      "location": {
+        "start": 111,
+        "end": 152
+      },
+      "context": "Limitations"
+    }
+  ],
+  "edges": [
+    {
+      "id": "G1",
+      "source": "O",
+      "target": "C",
+      "type": "supports",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 12,
+        "end": 40
+      },
+      "source_span": "We report that X improves Y."
+    },
+    {
+      "id": "G2",
+      "source": "L",
+      "target": "C",
+      "type": "qualifies",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 111,
+        "end": 152
+      },
+      "source_span": "This applies only to the tested protocol."
+    }
+  ],
+  "central_claim_ids": [
+    "C"
+  ],
+  "main_chain": [
+    "C"
+  ]
+}

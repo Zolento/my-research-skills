@@ -1,0 +1,28 @@
+[
+  {
+    "id": "E1",
+    "location": {
+      "start": 12,
+      "end": 26
+    },
+    "original_span": "We report that",
+    "replacement": "We report",
+    "depth": "language_layer",
+    "scientific_risk": "low",
+    "new_reference_ids": [],
+    "loses_limitation": false
+  },
+  {
+    "id": "E2",
+    "location": {
+      "start": 53,
+      "end": 94
+    },
+    "original_span": "Under protocol Z, X improves Y by 0.8 dB.",
+    "replacement": "Under protocol Z on the tested subset, X improves Y by 0.8 dB.",
+    "depth": "scientific_content",
+    "scientific_risk": "medium",
+    "new_reference_ids": [],
+    "loses_limitation": false
+  }
+]

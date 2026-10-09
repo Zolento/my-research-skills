@@ -1,0 +1,59 @@
+{
+  "schema": "bounded-revision-loop@1",
+  "goal": "Restate the abstract claim at the located evidence strength and resolve the missing control.",
+  "problems": [
+    {
+      "id": "P1",
+      "statement": "The abstract asserts improvement more strongly than the located observation supports.",
+      "severity": "major",
+      "state": "resolved",
+      "iterations": [
+        "I1"
+      ],
+      "resolution": "The abstract claim was restated at the strength of the located observation."
+    },
+    {
+      "id": "P2",
+      "statement": "The mechanism claim has no control that rules out the alternative explanation.",
+      "severity": "critical",
+      "state": "blocked",
+      "iterations": [
+        "I2"
+      ],
+      "resolution": ""
+    }
+  ],
+  "iterations": [
+    {
+      "id": "I1",
+      "problem_ids": [
+        "P1"
+      ],
+      "target_change": "Restate the abstract claim at the strength of the located observation.",
+      "completion_criteria": "The abstract claim matches the located observation scope.",
+      "scientific_disagreement": "no",
+      "result": "progress"
+    },
+    {
+      "id": "I2",
+      "problem_ids": [
+        "P2"
+      ],
+      "target_change": "Add a control that distinguishes the alternative explanation.",
+      "completion_criteria": "The control isolates the claimed mechanism.",
+      "scientific_disagreement": "yes",
+      "result": "blocked"
+    }
+  ],
+  "stop_reason": "scientific_disagreement",
+  "completion_condition": "Every problem is resolved and no escalation is pending.",
+  "completion_met": false,
+  "new_evidence": false,
+  "escalations": [
+    {
+      "problem_id": "P2",
+      "issue": "scientific_disagreement",
+      "status": "pending"
+    }
+  ]
+}
