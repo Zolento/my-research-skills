@@ -64,6 +64,15 @@ still executes for real afterwards. A real `--execute` consumes atomically befor
 command starts. Ledgers written before this fix keep their historical `dry_run: true` events
 readable and those events no longer count against the budget.
 
+**R7 reviews are authored by the agent, never by the loop:** `evidence_outcome.py assurance-store`
+takes the reviewer's four verdicts (PASS/FAIL/UNKNOWN) with source-bound reasons, validates them
+(missing checks, empty or placeholder reasons and arbitrary output paths are refused), binds the
+review to the current `state_digest`/`analysis_digest` plus experiment/analysis/reviewer, stores it
+atomically under `assurance/outcome/<analysis_id>.json` and then reports the **real**
+`decision_gate()`. It never fills in a PASS. An `UNKNOWN` verdict parks the loop with the recorded
+blocker and re-review conditions instead of asking again. See
+[references/loop-assurance-review.md](references/loop-assurance-review.md).
+
 **Loop completion is validator-backed:** a terminal experiment is done with R10/R11 only when its
 `outcome_analysis` transaction passes `evidence_outcome.state_errors()` — not when a `repairs[]`
 entry happens to exist (`NEGATIVE_EVIDENCE`, `INVALID_EXPERIMENT`, hypothesis-only and partial-scope

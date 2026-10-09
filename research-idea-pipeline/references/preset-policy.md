@@ -178,15 +178,18 @@ Meta-Controller（`CIE`）负责写入，R14 只提出建议（`SV6`）。写入
 `telemetry` 保存在 `priors` 与 `note` 中）。同一 `(kind, subject, at_state_version, after)` 事件幂等，
 重复提交不产生重复记录。
 
-**post-update Assurance 生命周期。** 正式审核产物放在
+**post-update Assurance 生命周期。** 操作手册见 [loop-assurance-review.md](loop-assurance-review.md)
+（R7 如何取上下文、四项检查各自审什么、如何用 `assurance-store` 提交、如何处理 STALE/SUPERSEDED/复审；
+`UNKNOWN` 记录阻断与复审条件、不重复送审）。正式审核产物放在
 `<route>/assurance/outcome/<analysis_id>.json`（派生产物，canonical 仍是唯一科学权威，R7 拥有审核）：
 
 | 状态 | 判据 | Loop 行为 |
 |---|---|---|
-| `PENDING` | 无产物 / 产物非法 / `decision_gate` 仍 `NEEDS_REVIEW`（含 `UNKNOWN`） | 报为待办；依赖它的 planned 实验必须等 |
+| `PENDING` | 无产物 / 产物非法 | R7 审查任务；依赖它的 planned 实验必须等 |
 | `VERIFIED` | 真实 `decision_gate()` 返回 `PASS` | 消费并推进到下一项合法动作 |
 | `FAILED` | 有检查项 FAIL | `HOLD`（`assurance_failed`），不得继续 |
 | `STALE` | state/analysis 摘要与当前状态不再匹配 | 视为需重新审核（待办），**不得复用** |
+| `UNKNOWN` | 产物存在但结论未决 | `HOLD`（`assurance_unknown`）：记录阻断原因与复审条件，**不重复送审**；只有摘要变化、相关证据/分析变化或显式 `--force` 才重新触发 |
 | `SUPERSEDED` | `decision_gate` 判定已有更晚结果重评其目标 | 无需自身审核，不阻塞后续动作 |
 
 阶段顺序：凭证受损 → 缺失分析(R9.O) → Assurance FAIL → **依赖未完成审核的 planned 实验（HOLD）** →

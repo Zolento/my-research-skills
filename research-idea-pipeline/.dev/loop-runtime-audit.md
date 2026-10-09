@@ -40,3 +40,16 @@
   的 `SV6` 允许集改为引用 `cognition.STRATEGY_REVISION_ACTORS`（取值与原实现相同）。
 * 未改动：R0—R14、四入口、16 预设与 Intent Router、八类状态对象、证据资格/PEIG/AALG/预测冻结/
   Insight 认证门禁、canonical 语义。
+
+## R7 Assurance 作者工具与活性（追加）
+
+| 项 | 内容 |
+|---|---|
+| 需求 | R7 Agent 有权产出 T0 Assurance；Loop/CLI 不得自我认证；不得让 UNKNOWN 变成无限复审 |
+| 实现 | `evidence_outcome.assurance-store`（校验→绑定→原子写+锁→真实 `decision_gate`）；`preset_router` 增加 `UNKNOWN` 生命周期与 `assurance_unknown` HOLD；PENDING 才是 R7 审查任务 |
+| 权威形状 | `decision_gate` 由"恰好四键"改为"**必需四键 + 白名单可追溯字段**"，并在存在时校验 `experiment_id`/`analysis_id`/`verification_tier(T0)` 与记录一致（新增绑定校验，未放宽摘要与 checks 判据） |
+| 拒绝规则 | 缺项、非法状态、空理由、占位理由（TBD/无/未知…）、过短理由、非法 reviewer、任意输出路径、错误实验/分析绑定、摘要过期保留但不复用 |
+| 覆盖规则 | 同内容 → `already_stored`（不重写）；过期 → `replaced_stale`；当前有效但结论不同 → 拒绝，需 `--force` |
+| 活性 | UNKNOWN → `HOLD/assurance_unknown` + 记录阻断原因与复审条件；仅摘要变化(STALE)/相关证据变化/显式 `--force` 才重新送审；PASS → 下一项合法动作；FAIL → HOLD 或既有修复协议；SUPERSEDED → 跳过 |
+| 不可越权 | tier 恒 `T0`；PASS 只释放已记录决策，不启动实验、不改锚点、不绕 R8 预注册与 Execution Gate；审查工具不写 canonical |
+| 文档 | 新增 `references/loop-assurance-review.md`（R7 操作手册），并从 `preset-policy.md §5.3`、`evidence-outcome-contract.md`、组件 README 链接 |

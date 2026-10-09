@@ -11,6 +11,7 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -599,7 +600,20 @@ def decision_gate(state, experiment_id, assurance=None):
         checks = ('integrity', 'claim_calibration', 'reproducibility', 'stop_rule_compliance')
         if assurance is None:
             return {'status': 'NEEDS_REVIEW', 'decisions': [{'action': 'HOLD', 'reason': 'Post-update Assurance is required.'}]}
-        if set(assurance) != {'schema', 'state_digest', 'analysis_digest', 'checks'} or assurance['schema'] != 'evidence-outcome-assurance@1' or assurance['state_digest'] != digest(state) or assurance['analysis_digest'] != digest(record['analysis']) or set(assurance['checks']) != set(checks):
+        # The four documented fields are mandatory and authoritative. Traceability metadata
+        # (which analysis/experiment/reviewer produced the review, its tier and re-review
+        # conditions) is accepted from a known allowlist and, when present, must agree with the
+        # record — so extra keys can never smuggle a decision past the digests.
+        assurance_keys = {'schema', 'state_digest', 'analysis_digest', 'checks'}
+        unexpected = set(assurance) - assurance_keys - ASSURANCE_EXTRA_KEYS
+        misplaced = (assurance.get('experiment_id') not in (None, experiment_id)
+                     or assurance.get('analysis_id') not in (None, record['analysis'].get('id'))
+                     or assurance.get('verification_tier') not in (None, 'T0'))
+        if not assurance_keys <= set(assurance) or unexpected or misplaced or \
+                assurance['schema'] != 'evidence-outcome-assurance@1' or \
+                assurance['state_digest'] != digest(state) or \
+                assurance['analysis_digest'] != digest(record['analysis']) or \
+                set(assurance['checks']) != set(checks):
             return {'status': 'FAIL', 'errors': ['invalid or stale post-update Assurance']}
         unknown = []
         for name, c in assurance['checks'].items():
@@ -704,6 +718,204 @@ def state_errors(state):
     return errors
 
 
+# ---------------------------------------------------------------------------
+# R7 post-update Assurance: authoring, validation, durable storage
+#
+# This is a *reviewer* tool. It never fills in a verdict, never defaults to PASS and never
+# changes scientific state: it validates that a review is complete and source-bound, binds it to
+# the exact state/analysis digests, stores it durably, and then reports what the real
+# `decision_gate()` says. Passing this format check does NOT make the scientific judgement
+# correct — the four reasons are the reviewer's, and a human can always audit them.
+# ---------------------------------------------------------------------------
+
+SCHEMA_ASSURANCE = 'evidence-outcome-assurance@1'
+ASSURANCE_CHECKS = ('integrity', 'claim_calibration', 'reproducibility', 'stop_rule_compliance')
+ASSURANCE_STATUSES = ('PASS', 'FAIL', 'UNKNOWN')
+ASSURANCE_DIR = ('assurance', 'outcome')
+#: Reviewer identities allowed to author a post-update Assurance, and their tier ceiling. An LLM
+#: reviewer is `T0`: the review is procedural and cannot raise support for any claim or evidence.
+ASSURANCE_REVIEWERS = {'R7': 'T0', 'CIE': 'T0', 'R10': 'T0', 'R11': 'T0'}
+#: Traceability fields a stored review may carry next to the four authoritative ones.
+ASSURANCE_EXTRA_KEYS = {'experiment_id', 'analysis_id', 'reviewer', 'verification_tier', 'scope',
+                        're_review_conditions', 'note', 'reviewed_at'}
+ASSURANCE_MIN_REASON = 8
+ASSURANCE_PLACEHOLDERS = ('', '-', '?', 'n/a', 'na', 'none', 'null', 'ok', 'pass', 'tbd', 'todo',
+                          'unknown?', '待补', '待定', '无', '未知', '同上', '略')
+ASSURANCE_DEFAULT_RE_REVIEW = (
+    'state_digest 或 analysis_digest 变化（等价于 STALE）后重新审查',
+    '相关 canonical 证据/分析发生变化后重新审查',
+    '用户显式要求复审（assurance-store --force）',
+)
+
+
+def assurance_binding(state, experiment_id):
+    """Bind a review to the committed outcome transaction it reviews, or explain why not."""
+    identifier = str(experiment_id)
+    experiment = index(state, 'experiments').get(identifier)
+    if experiment is None:
+        raise ValueError(identifier + ': unknown experiment')
+    receipt = experiment.get('outcome_analysis')
+    if not isinstance(receipt, dict):
+        raise ValueError(identifier + ': no committed outcome analysis to review')
+    analysis = receipt.get('analysis') if isinstance(receipt.get('analysis'), dict) else {}
+    if not text(analysis.get('id')):
+        raise ValueError(identifier + ': outcome analysis has no id')
+    if analysis.get('experiment_id') != experiment.get('id'):
+        raise ValueError(identifier + ': analysis belongs to another experiment')
+    if experiment.get('status') not in ('done', 'failed'):
+        raise ValueError(identifier + ': experiment is not terminal')
+    return {'experiment_id': identifier, 'analysis_id': analysis['id'],
+            'state_digest': digest(state), 'analysis_digest': digest(analysis)}
+
+
+def assurance_errors(checks, reviewer):
+    """Format and traceability validation of a reviewer-authored check set."""
+    errors = []
+    if not text(reviewer):
+        errors.append('a reviewer identity is required')
+    elif str(reviewer) not in ASSURANCE_REVIEWERS:
+        errors.append('reviewer must be one of ' + str(list(ASSURANCE_REVIEWERS)))
+    if not isinstance(checks, dict):
+        return errors + ['checks must be an object keyed by check name']
+    missing = [name for name in ASSURANCE_CHECKS if name not in checks]
+    extra = [name for name in checks if name not in ASSURANCE_CHECKS]
+    if missing:
+        errors.append('missing checks: ' + ', '.join(missing))
+    if extra:
+        errors.append('unknown checks: ' + ', '.join(extra))
+    for name in ASSURANCE_CHECKS:
+        item = checks.get(name)
+        if item is None:
+            continue
+        if not isinstance(item, dict):
+            errors.append(name + ': check must be an object')
+            continue
+        if set(item) != {'status', 'reason'}:
+            errors.append(name + ': exactly status and reason are required')
+        if item.get('status') not in ASSURANCE_STATUSES:
+            errors.append(name + ': status must be one of ' + str(list(ASSURANCE_STATUSES)))
+        reason = item.get('reason')
+        if not text(reason):
+            errors.append(name + ': a source-bound reason is required')
+        elif str(reason).strip().lower() in ASSURANCE_PLACEHOLDERS:
+            errors.append(name + ': reason is a placeholder, not a review')
+        elif len(str(reason).strip()) < ASSURANCE_MIN_REASON:
+            errors.append(name + f': reason is shorter than {ASSURANCE_MIN_REASON} characters')
+    return errors
+
+
+def assurance_path(route_dir, analysis_id):
+    """The conventional, derived location of the review for one analysis."""
+    return Path(route_dir).joinpath(*ASSURANCE_DIR, str(analysis_id) + '.json')
+
+
+def _assurance_output(state, experiment_id, analysis_id, output, route_dir):
+    """Resolve the output path, refusing anything outside the assurance/outcome area."""
+    if output is None:
+        base = Path(route_dir) if route_dir is not None else Path('.')
+        return assurance_path(base, analysis_id)
+    candidate = Path(output).expanduser()
+    resolved = candidate.resolve()
+    parts = resolved.parts
+    if tuple(parts[-2:]) != (ASSURANCE_DIR[0], ASSURANCE_DIR[1]) or resolved.name != \
+            str(analysis_id) + '.json':
+        raise ValueError('output must be <route>/' + '/'.join(ASSURANCE_DIR)
+                         + '/' + str(analysis_id) + '.json')
+    return candidate
+
+
+def _same_review(left, right):
+    return {key: left.get(key) for key in ('state_digest', 'analysis_digest', 'checks', 'reviewer',
+                                           're_review_conditions')} == \
+           {key: right.get(key) for key in ('state_digest', 'analysis_digest', 'checks', 'reviewer',
+                                            're_review_conditions')}
+
+
+def store_assurance(state, experiment_id, checks, reviewer, output=None, route_dir=None,
+                    re_review_conditions=(), force=False, now=None):
+    """Validate, bind, store and then *report* the real decision-gate verdict.
+
+    Overwrite rules (nothing is ever silently replaced):
+    * an identical review for this state+analysis is reported as already stored;
+    * a review whose digests no longer match the state is stale, so re-reviewing replaces it;
+    * a current, valid and *different* review is kept unless the caller passes `force`.
+    """
+    import fcntl
+    errors = assurance_errors(checks, reviewer)
+    if errors:
+        return {'status': 'INVALID', 'errors': errors, 'stored': False}
+    try:
+        binding = assurance_binding(state, experiment_id)
+    except ValueError as exc:
+        return {'status': 'INVALID', 'errors': [str(exc)], 'stored': False}
+    try:
+        path = _assurance_output(state, experiment_id, binding['analysis_id'], output, route_dir)
+    except ValueError as exc:
+        return {'status': 'INVALID', 'errors': [str(exc)], 'stored': False}
+    conditions = [str(item) for item in re_review_conditions if text(item)] or \
+        list(ASSURANCE_DEFAULT_RE_REVIEW)
+    payload = {
+        'schema': SCHEMA_ASSURANCE,
+        'experiment_id': binding['experiment_id'], 'analysis_id': binding['analysis_id'],
+        'reviewer': str(reviewer), 'verification_tier': ASSURANCE_REVIEWERS[str(reviewer)],
+        'state_digest': binding['state_digest'], 'analysis_digest': binding['analysis_digest'],
+        'checks': {name: {'status': checks[name]['status'], 'reason': str(checks[name]['reason'])}
+                   for name in ASSURANCE_CHECKS},
+        're_review_conditions': conditions,
+        'note': ('T0 procedural R7 review: it releases the recorded decisions only. It does not '
+                 'start a run, raise any claim/evidence support level, or bypass R8 '
+                 'preregistration and the execution gate.'),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix('.lock')
+    outcome = 'stored'
+    with lock_path.open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding='utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+                existing = None
+            if isinstance(existing, dict):
+                if _same_review(existing, payload):
+                    stored_payload = existing
+                    outcome = 'already_stored'
+                elif existing.get('state_digest') != payload['state_digest'] or \
+                        existing.get('analysis_digest') != payload['analysis_digest']:
+                    stored_payload = payload
+                    outcome = 'replaced_stale'
+                elif force:
+                    stored_payload = payload
+                    outcome = 'replaced_forced'
+                else:
+                    return {'status': 'INVALID', 'stored': False, 'path': str(path), 'outcome':
+                            'current_review_kept',
+                            'errors': ['ASSURANCE_ALREADY_CURRENT: a valid review for this state '
+                                       'and analysis exists; pass --force to re-review']}
+            else:
+                stored_payload = payload
+                outcome = 'replaced_invalid'
+            if outcome not in ('already_stored',):
+                pending = path.with_name(path.name + '.pending')
+                pending.write_text(json.dumps(stored_payload, ensure_ascii=False, indent=2) + '\n',
+                                   encoding='utf-8')
+                os.replace(pending, path)
+        else:
+            stored_payload = payload
+            pending = path.with_name(path.name + '.pending')
+            pending.write_text(json.dumps(stored_payload, ensure_ascii=False, indent=2) + '\n',
+                               encoding='utf-8')
+            os.replace(pending, path)
+    verdict = decision_gate(state, binding['experiment_id'], stored_payload)
+    return {'status': verdict.get('status'), 'stored': True, 'outcome': outcome,
+            'path': str(path), 'reviewer': str(reviewer),
+            'verification_tier': ASSURANCE_REVIEWERS[str(reviewer)],
+            'state_digest': payload['state_digest'], 'analysis_digest': payload['analysis_digest'],
+            're_review_conditions': stored_payload.get('re_review_conditions'),
+            'decision_gate': verdict}
+
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -717,6 +929,18 @@ def main(argv=None):
         p = sub.add_parser(command); p.add_argument('--state', type=Path, required=True)
         if command != 'constraints': p.add_argument('--experiment', required=True)
         if command == 'decision': p.add_argument('--assurance', type=Path)
+    reviewer = sub.add_parser('assurance-store')
+    reviewer.add_argument('--state', type=Path, required=True)
+    reviewer.add_argument('--experiment', required=True)
+    reviewer.add_argument('--reviewer', required=True,
+                          help='reviewer identity; ' + str(list(ASSURANCE_REVIEWERS)))
+    reviewer.add_argument('--check', action='append', default=[], metavar='NAME=STATUS:REASON',
+                          help='one per check: ' + ', '.join(ASSURANCE_CHECKS))
+    reviewer.add_argument('--re-review-condition', action='append', default=[])
+    reviewer.add_argument('--output', type=Path,
+                          help='defaults to <state_dir>/assurance/outcome/<analysis_id>.json')
+    reviewer.add_argument('--force', action='store_true',
+                          help='replace a current valid review (explicit re-review)')
     args = parser.parse_args(argv)
     read = lambda p: json.loads(p.read_text(encoding='utf-8')) if p else None
     try:
@@ -738,6 +962,16 @@ def main(argv=None):
             report = state_check.check_state(state)
             result = {'status': 'PASS', 'constraints': constraints(state)} if report.ok else {'status': 'FAIL', 'errors': ['Failure Memory must come from a passing Research State'], 'state_report': report.as_dict()}
         elif args.command == 'check-plan': result = check_plan(state, args.experiment)
+        elif args.command == 'assurance-store':
+            checks = {}
+            for raw in args.check:
+                name, _, rest = str(raw).partition('=')
+                status, _, reason = rest.partition(':')
+                checks[name.strip()] = {'status': status.strip(), 'reason': reason.strip()}
+            result = store_assurance(state, args.experiment, checks, args.reviewer,
+                                     output=args.output, route_dir=args.state.parent,
+                                     re_review_conditions=args.re_review_condition,
+                                     force=args.force)
         else: result = decision_gate(state, args.experiment, read(args.assurance))
     except (OSError, UnicodeError, ValueError, TypeError, KeyError) as exc:
         result = {'status': 'INVALID', 'errors': [str(exc)]}

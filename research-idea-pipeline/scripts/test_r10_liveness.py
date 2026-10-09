@@ -255,7 +255,8 @@ class TestLoopStepLiveness(unittest.TestCase):
         self.assertEqual(step["step"], "Assurance")
         self.assertEqual(step["assurance_pending"], ["X1"])
         self.assertFalse(step["hold"])
-        self.assertIn("Decision Gate", step["phase"])
+        self.assertTrue(step.get("assurance_task"))
+        self.assertIn("assurance-store", step["action"])
 
     @staticmethod
     def _write_assurance(route, state, experiment_id="X1"):
