@@ -1,0 +1,7 @@
+{
+  "split": "held_out",
+  "sensor_families": ["alpha", "beta", "gamma"],
+  "precision": 0.91,
+  "recall": 0.84,
+  "n_test_windows": 720
+}

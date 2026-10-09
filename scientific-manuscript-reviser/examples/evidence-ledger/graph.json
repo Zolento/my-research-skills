@@ -1,0 +1,146 @@
+{
+  "schema": "scientific-argument-graph@1",
+  "manuscript_digest": "fbcbac1404a418ce045afda4f129501b1b8aafeccaddee12c3259d9c3c78550c",
+  "document_scope": "section",
+  "missing_context": [],
+  "nodes": [
+    {
+      "id": "RQ1",
+      "type": "Research question",
+      "label": "Does the drift detector generalise beyond the measured split?",
+      "context": "Results paragraph 1",
+      "location": {
+        "start": 39,
+        "end": 66
+      },
+      "source_span": "evaluate the drift detector"
+    },
+    {
+      "id": "ED1",
+      "type": "Experimental design",
+      "label": "Evaluation on the held-out split of three released logs.",
+      "context": "Results paragraph 1",
+      "location": {
+        "start": 74,
+        "end": 113
+      },
+      "source_span": "held-out split of three released sensor"
+    },
+    {
+      "id": "OBS1",
+      "type": "Statistical result",
+      "label": "Held-out precision 0.91 and recall 0.84.",
+      "context": "Results paragraph 1",
+      "location": {
+        "start": 155,
+        "end": 185
+      },
+      "source_span": "precision 0.91 and recall 0.84"
+    },
+    {
+      "id": "C1",
+      "type": "Claim",
+      "label": "The detector reaches precision 0.91 and recall 0.84 on the held-out split.",
+      "context": "Results paragraph 1",
+      "location": {
+        "start": 134,
+        "end": 185
+      },
+      "source_span": "the detector reaches precision 0.91 and recall 0.84"
+    },
+    {
+      "id": "C2",
+      "type": "Claim",
+      "label": "Every run used the same hyperparameters.",
+      "context": "Results paragraph 1",
+      "location": {
+        "start": 187,
+        "end": 226
+      },
+      "source_span": "Every\nrun used the same hyperparameters"
+    },
+    {
+      "id": "C3",
+      "type": "Claim",
+      "label": "A prior study reported comparable precision on a related task.",
+      "context": "Results paragraph 2",
+      "location": {
+        "start": 303,
+        "end": 364
+      },
+      "source_span": "a prior study observed comparable precision on a related\ntask"
+    },
+    {
+      "id": "LIM1",
+      "type": "Limitation",
+      "label": "The result is bounded to the measured sensor families.",
+      "context": "Results paragraph 3",
+      "location": {
+        "start": 415,
+        "end": 482
+      },
+      "source_span": "only the three sensor families present in the log set were measured"
+    }
+  ],
+  "edges": [
+    {
+      "id": "EG1",
+      "source": "OBS1",
+      "target": "C1",
+      "type": "supports",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 155,
+        "end": 185
+      },
+      "source_span": "precision 0.91 and recall 0.84"
+    },
+    {
+      "id": "EG2",
+      "source": "ED1",
+      "target": "RQ1",
+      "type": "tests",
+      "reasoning_type": "statistical",
+      "location": {
+        "start": 74,
+        "end": 113
+      },
+      "source_span": "held-out split of three released sensor"
+    },
+    {
+      "id": "EG3",
+      "source": "OBS1",
+      "target": "ED1",
+      "type": "measures",
+      "reasoning_type": "empirical generalization",
+      "location": {
+        "start": 155,
+        "end": 185
+      },
+      "source_span": "precision 0.91 and recall 0.84"
+    },
+    {
+      "id": "EG4",
+      "source": "LIM1",
+      "target": "C1",
+      "type": "qualifies",
+      "reasoning_type": "inductive",
+      "location": {
+        "start": 501,
+        "end": 526
+      },
+      "source_span": "bounded to those families"
+    }
+  ],
+  "central_claim_ids": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "main_chain": [
+    "RQ1",
+    "ED1",
+    "OBS1",
+    "C1"
+  ]
+}

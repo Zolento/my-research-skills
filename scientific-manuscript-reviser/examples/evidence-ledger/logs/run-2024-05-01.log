@@ -1,0 +1,4 @@
+2024-05-01 09:12:03 INFO  loaded 3 sensor logs (alpha, beta, gamma)
+2024-05-01 09:12:05 INFO  held-out split: 720 test windows
+2024-05-01 09:12:31 INFO  precision=0.91 recall=0.84
+2024-05-01 09:12:31 INFO  wrote data/metrics.json

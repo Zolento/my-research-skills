@@ -1,0 +1,7 @@
+{
+  "learning_rate": 0.001,
+  "batch_size": 64,
+  "epochs": 30,
+  "seed": 7,
+  "applies_to_runs": ["run-2024-05-01"]
+}

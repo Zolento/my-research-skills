@@ -1,0 +1,140 @@
+{
+  "schema": "claim-evidence-ledger@1",
+  "claims": [
+    {
+      "id": "C1",
+      "statement": "Held-out precision 0.91 and recall 0.84.",
+      "presented_as_established": true,
+      "location": {
+        "start": 134,
+        "end": 185
+      },
+      "source_span": "the detector reaches precision 0.91 and recall 0.84"
+    },
+    {
+      "id": "C2",
+      "statement": "The same hyperparameters were used for every run.",
+      "presented_as_established": true,
+      "location": {
+        "start": 187,
+        "end": 226
+      },
+      "source_span": "Every\nrun used the same hyperparameters"
+    },
+    {
+      "id": "C3",
+      "statement": "A prior study reported comparable precision on a related task.",
+      "presented_as_established": false,
+      "location": {
+        "start": 303,
+        "end": 364
+      },
+      "source_span": "a prior study observed comparable precision on a related\ntask"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "A-METRICS",
+      "type": "experiment_data",
+      "reference": "examples/evidence-ledger/data/metrics.json",
+      "digest": "d0d24470f3f42fbca42f0b134f28fb6f5d648dff100f195a5d917f6988058a95",
+      "origin": "recomputed from the held-out split by scripts/reproduce_metrics.py",
+      "locator": "fields precision and recall"
+    },
+    {
+      "id": "A-RUNLOG",
+      "type": "run_log",
+      "reference": "examples/evidence-ledger/logs/run-2024-05-01.log",
+      "digest": "4d9a8cd2f326d02ade949cbff61e824bf1457e62367abb7b15c7851aaac45738",
+      "origin": "captured stdout of the evaluation run",
+      "locator": "lines 1-4"
+    },
+    {
+      "id": "A-CONFIG",
+      "type": "config",
+      "reference": "examples/evidence-ledger/config/run-config.json",
+      "digest": "dd8e07e4b1d49b62bc01f429d056780812b4cb6c4d499b3dd93a9db7216df5fa",
+      "origin": "checked-in experiment configuration",
+      "locator": "key learning_rate"
+    },
+    {
+      "id": "A-CODE",
+      "type": "code",
+      "reference": "examples/evidence-ledger/scripts/reproduce_metrics.py",
+      "digest": "875524317136039d8f835752e3175e21b893e1a5d61f7b032e085bc1db94a2a7",
+      "origin": "evaluation entry point",
+      "locator": "function summarize"
+    },
+    {
+      "id": "A-PRIOR",
+      "type": "literature",
+      "reference": "examples/evidence-ledger/notes/prior-study.md",
+      "digest": "8c083e76f1bb6361c92bedbeb9259eaddf8b608a51fa0654b9fd636e57bf950c",
+      "origin": "reading notes on the cited prior study",
+      "locator": "paragraph 2"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "claim_id": "C1",
+      "artifact_id": "A-METRICS",
+      "locator": "precision, recall",
+      "statement": "Held-out precision 0.91 and recall 0.84 were recomputed from the released logs.",
+      "state": "verified",
+      "verification_method": "recomputed",
+      "headline": true,
+      "scope": "held-out split, three sensor families",
+      "conditions": [
+        "three released sensor logs present"
+      ],
+      "note": "Recomputation used the checked-in entry point, not the manuscript numbers."
+    },
+    {
+      "id": "E2",
+      "claim_id": "C1",
+      "artifact_id": "A-RUNLOG",
+      "locator": "lines 3-4",
+      "statement": "The run that produced the metrics is recorded.",
+      "state": "verified",
+      "verification_method": "provenance_audit",
+      "headline": false,
+      "scope": "run provenance only, not the metric values"
+    },
+    {
+      "id": "E3",
+      "claim_id": "C2",
+      "artifact_id": "A-CONFIG",
+      "locator": "key learning_rate",
+      "statement": "One configuration file with one learning rate applies to every run.",
+      "state": "verified",
+      "verification_method": "hash_match",
+      "headline": true,
+      "scope": "hyperparameters declared for run-2024-05-01"
+    },
+    {
+      "id": "E4",
+      "claim_id": "C2",
+      "artifact_id": "A-CODE",
+      "locator": "function summarize",
+      "statement": "The entry point reads one configuration for the summarised run.",
+      "state": "verified",
+      "verification_method": "test_suite",
+      "headline": false,
+      "scope": "the evaluation entry point only"
+    },
+    {
+      "id": "E5",
+      "claim_id": "C3",
+      "artifact_id": "A-PRIOR",
+      "locator": "paragraph 2",
+      "statement": "The prior study reports precision 0.89 on two sensor families.",
+      "state": "reported",
+      "verification_method": "unverified",
+      "headline": true,
+      "scope": "one related task in one prior study",
+      "note": "Reading the note is not reproducing the result."
+    }
+  ],
+  "missing_context": []
+}
