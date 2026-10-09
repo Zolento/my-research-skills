@@ -456,3 +456,103 @@ Unchanged: `state_check.py`, `evidence_outcome.py`, `execution_gate.py`, `experi
   declared-string equality check.
 * No real Agent A/B, no real observation packet: the positive certification path is exercised
   against in-memory synthetic SENA artifacts.
+
+
+## 9. v2.3.1 — Research Preset Library, Intent Router, Loop Recovery, Self-Evolution
+
+### Reuse inventory (audited before writing code)
+
+| Existing capability | Reused as |
+|---|---|
+| `state_check.py` (`S1`—`S7`/`V1`—`V24`) | preset/trigger hard gate (`PR1`, `PR4`) |
+| `cognition.py` (`CM0`—`CM10`, `projection_inputs`) | drift/memory signals, projection rebuild |
+| `prediction_compare.py` (`PQ1`—`PQ8`, `diagnosis_switch`, `trailing_zero_streak`) | stagnation/conflict signals, behaviour switch |
+| `strategy_memory.py` (`recommend_strategy`, `operator_priors`, `strategy_updates`) | self-evolution |
+| `research_replay.py` | `discovery-replay` preset |
+| `legacy_handoff.py` | `research-recovery` preset |
+| `execution_gate.py` / `experiment_execute.py` | action legality, PEIG/AALG in recovery plans |
+| `evidence_outcome.py` | R9.O/R10/R11 routing for failure and conflict repair |
+
+### Gap found by the audit
+
+`recommend_strategy()` produced menu/operator/shift but **nothing consumed them**; the scheduler
+ordered `next_actions[]` by its own `EIG ÷ cost` rule; `strategy_memory.py apply` only printed
+suggestions. The loop was therefore open: a strategy update could not reach a dispatch.
+
+### Added
+
+* `scripts/preset_router.py` — 16-preset registry, intent resolver (explicit/alias/intent/entry/auto,
+  negation, exact-tie least privilege, expert `phase=` passthrough, read-only safety, descriptive →
+  diagnose + confirm), 11 machine signals, recovery guard + ledger, 16 handlers, CLI
+  (`list`/`resolve`/`inspect`/`check`/`trigger`/`run`/`record`), selftest.
+* `presets/*.md` — 9 files, 16 protocols, nine fixed sections; §6 is generated from what the handler
+  actually returns, and `test_preset_router` asserts the parity.
+* Strategy Decision Adapter in `strategy_memory.py`: `strategy_decision()`,
+  `record_strategy_decision()`, `latest_strategy_decision()`, CLI `decide [--record]`; `apply` is now
+  explicitly recommendation-only (`writes: []` + note).
+* `references/preset-policy.md` (`PR1`—`PR9`), `scheduler-policy.md` §4.2, `SKILL.md` §1.10,
+  component README, root README, `invocation-prompts.md` §0.1.
+* `scripts/test_preset_router.py` — 53 tests in four groups.
+* `release_check.py` step 16.
+
+### Bugs found and fixed while building
+
+1. Generator wrote the throwaway fixture path into shipped protocol files → templated `<state>`.
+2. `context_drift` could never fire (the context used the in-memory rebuild *as* the stored index) →
+   the adapter now separates the on-disk index (drift) from the projection (content).
+3. `paradigm-escape` returned fixed prose → now derived from the project's claim/mechanism/unknowns/
+   recommended shift, and flagged `candidate_is_a_scaffold`.
+4. Ambiguity threshold was too loose (0.5 score gap) → exact ties only.
+5. The first demo fixtures were invalid states; the trigger correctly refused them (V4/V21) — kept as
+   evidence that recovery refuses to run on a broken canonical state.
+
+### Verification levels
+
+* **L1** ✅ static review + 53 unit tests + selftest (≈120 checks) + registry/protocol parity.
+* **L2** ✅ synthetic end-to-end on the real CLI/interfaces: trigger → select → guard → record;
+  adapter with/without memory; telemetry record; next-round consumption; cross-session replay.
+* **L3** ❌ **not performed**: no real research A/B; adoption ≠ capability.
+
+### `.dev/` disposition
+
+`plan.md`, `architecture.md`, `agent-handoff.md`, `phase-report.md`, `adversarial-probe.py`,
+`gen_presets.py` → `KEEP_BRANCH_ONLY` (no runtime dependency; the protocol files were generated once
+and are asserted by tests, so deleting `.dev/` cannot break the build).
+
+
+## 10. v2.3.1 integration of the provided CIE Preset Library
+
+### What was integrated as data (not pasted as prose)
+
+| Provided file | Placement | Authority |
+|---|---|---|
+| `shared-contract.md` | skill root | common execution/evidence/memory contract loaded before any preset |
+| `preset-registry.json` | skill root | source of truth for ids, entries, triggers, scopes, protocol paths, 16×3 intent examples |
+| `presets/<id>.md` (16) | `presets/` | protocol prose kept **verbatim**, re-hosted inside the repo's nine machine-checked sections |
+| `router-fixtures.json` | skill root | intent base test: 48 positive + 5 guarded cases |
+| `ALL-PRESETS.md`, `INTEGRATION.md` | `.dev/provided/` | branch-local reference (a combined 16-in-one file would invite bulk injection) |
+
+### What was kept from this repository (stricter, not replaced)
+
+privilege tiers over the provider's scope labels, clause-scoped negation, ambiguity → least
+privilege, one-protocol loading, machine signals + cooldown/attempt guard + ledger, engineering-
+failure-never-science, the Strategy Decision Adapter, `PR1`—`PR9` checks and the release gate step.
+
+### Defects found and fixed during integration
+
+1. **Negation leaked across clauses** ("不要审查，我只想知道下一步方案" was refused entirely) →
+   negation is decided inside one clause.
+2. **Duplicate `scope_rank`** (the older one referenced the removed `SCOPE_RANK`) → single definition.
+3. **Signal firing ignored registry-declared signals** (paradigm-escape could never be recommended) →
+   firing follows the preset's declared signals; `AUTO_SIGNAL_MAP` is a parity anchor only.
+4. **Confirmation rule used the raw scope** (`execute` only) → now privilege-based, so repair
+   protocols also ask before acting on a symptom-only report.
+5. **User presets would have auto-executed** if the registry trigger were honoured naively → a
+   user preset can only be `recommended_only`.
+
+### Verification levels
+
+* **L1** ✅ 63 router tests (intent/registry/loop/scientific/adapter/integration) + selftest.
+* **L2** ✅ synthetic end-to-end through the real CLI: 53/53 provided fixtures, one-protocol load,
+  trigger → guard → record, adapter with/without memory, telemetry, cross-session replay.
+* **L3** ❌ not performed (no real research A/B).

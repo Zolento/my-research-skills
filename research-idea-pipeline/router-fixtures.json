@@ -1,0 +1,221 @@
+{
+  "fixtures": [
+    {
+      "input": "继续自动科研",
+      "expected_preset_id": "research-loop"
+    },
+    {
+      "input": "按现有授权持续跑 loop",
+      "expected_preset_id": "research-loop"
+    },
+    {
+      "input": "continue autonomous research",
+      "expected_preset_id": "research-loop"
+    },
+    {
+      "input": "跳出当前思路",
+      "expected_preset_id": "paradigm-escape"
+    },
+    {
+      "input": "换一个完全不同的数学建模角度",
+      "expected_preset_id": "paradigm-escape"
+    },
+    {
+      "input": "escape local paradigm",
+      "expected_preset_id": "paradigm-escape"
+    },
+    {
+      "input": "恢复之前的科研工作",
+      "expected_preset_id": "research-recovery"
+    },
+    {
+      "input": "上下文没了，恢复项目状态",
+      "expected_preset_id": "research-recovery"
+    },
+    {
+      "input": "resume research context",
+      "expected_preset_id": "research-recovery"
+    },
+    {
+      "input": "重新规划当前路线",
+      "expected_preset_id": "scientific-replanning"
+    },
+    {
+      "input": "这条路线被否证了，重新制定计划",
+      "expected_preset_id": "scientific-replanning"
+    },
+    {
+      "input": "replan research",
+      "expected_preset_id": "scientific-replanning"
+    },
+    {
+      "input": "审查论文方案",
+      "expected_preset_id": "research-audit"
+    },
+    {
+      "input": "找出当前实验的致命缺陷",
+      "expected_preset_id": "research-audit"
+    },
+    {
+      "input": "audit my method",
+      "expected_preset_id": "research-audit"
+    },
+    {
+      "input": "现在研究进展怎么样",
+      "expected_preset_id": "research-review"
+    },
+    {
+      "input": "总结当前真实发现，不要执行",
+      "expected_preset_id": "research-review"
+    },
+    {
+      "input": "review research progress",
+      "expected_preset_id": "research-review"
+    },
+    {
+      "input": "Skill 规则丢了，恢复上下文",
+      "expected_preset_id": "context-drift-recovery"
+    },
+    {
+      "input": "上下文压缩以后重新确认规则",
+      "expected_preset_id": "context-drift-recovery"
+    },
+    {
+      "input": "recover from context drift",
+      "expected_preset_id": "context-drift-recovery"
+    },
+    {
+      "input": "一直在重复归因",
+      "expected_preset_id": "stagnation-breaker"
+    },
+    {
+      "input": "检查是不是陷入局部最优",
+      "expected_preset_id": "stagnation-breaker"
+    },
+    {
+      "input": "detect scientific stagnation",
+      "expected_preset_id": "stagnation-breaker"
+    },
+    {
+      "input": "训练 OOM 了",
+      "expected_preset_id": "experiment-failure-recovery"
+    },
+    {
+      "input": "实验 NaN 了，检查并恢复",
+      "expected_preset_id": "experiment-failure-recovery"
+    },
+    {
+      "input": "recover failed experiment",
+      "expected_preset_id": "experiment-failure-recovery"
+    },
+    {
+      "input": "实验结果和 evidence 对不上",
+      "expected_preset_id": "evidence-conflict-repair"
+    },
+    {
+      "input": "修复 claim 和 memory 冲突",
+      "expected_preset_id": "evidence-conflict-repair"
+    },
+    {
+      "input": "repair evidence conflict",
+      "expected_preset_id": "evidence-conflict-repair"
+    },
+    {
+      "input": "GPU 不够了",
+      "expected_preset_id": "resource-recovery"
+    },
+    {
+      "input": "环境崩溃，恢复执行",
+      "expected_preset_id": "resource-recovery"
+    },
+    {
+      "input": "recover resource block",
+      "expected_preset_id": "resource-recovery"
+    },
+    {
+      "input": "整理认知记忆",
+      "expected_preset_id": "memory-consolidation"
+    },
+    {
+      "input": "State 更新后刷新 Cognitive Memory",
+      "expected_preset_id": "memory-consolidation"
+    },
+    {
+      "input": "consolidate research memory",
+      "expected_preset_id": "memory-consolidation"
+    },
+    {
+      "input": "检查科研 loop 健康度",
+      "expected_preset_id": "loop-health-check"
+    },
+    {
+      "input": "有在真正推进科研吗",
+      "expected_preset_id": "loop-health-check"
+    },
+    {
+      "input": "check research loop health",
+      "expected_preset_id": "loop-health-check"
+    },
+    {
+      "input": "根据历史结果改进探索策略",
+      "expected_preset_id": "strategy-evolution"
+    },
+    {
+      "input": "让策略记忆真正影响下一轮决策",
+      "expected_preset_id": "strategy-evolution"
+    },
+    {
+      "input": "evolve exploration strategy",
+      "expected_preset_id": "strategy-evolution"
+    },
+    {
+      "input": "所有 idea 都一样",
+      "expected_preset_id": "hypothesis-rebalance"
+    },
+    {
+      "input": "重新平衡假设组合",
+      "expected_preset_id": "hypothesis-rebalance"
+    },
+    {
+      "input": "rebalance hypothesis portfolio",
+      "expected_preset_id": "hypothesis-rebalance"
+    },
+    {
+      "input": "做一次历史研究回放",
+      "expected_preset_id": "discovery-replay"
+    },
+    {
+      "input": "检验自进化策略是否真的更好",
+      "expected_preset_id": "discovery-replay"
+    },
+    {
+      "input": "evaluate discovery replay",
+      "expected_preset_id": "discovery-replay"
+    },
+    {
+      "input": "不要审查，我只想知道下一步方案",
+      "expected_preset_id": "research-review",
+      "guard": "no_audit_no_execution"
+    },
+    {
+      "input": "只总结研究结果，不要跑 GPU",
+      "expected_preset_id": "research-review",
+      "guard": "read_only"
+    },
+    {
+      "input": "我想继续科研，但是不能启动新实验",
+      "expected_preset_id": "research-loop",
+      "guard": "no_new_experiment_without_authorization"
+    },
+    {
+      "input": "OOM 之后是不是说明理论失败了",
+      "expected_preset_id": "experiment-failure-recovery",
+      "guard": "engineering_failure_not_science_falsification"
+    },
+    {
+      "input": "把已否证的机制直接标记为支持",
+      "expected_preset_id": null,
+      "guard": "deny_unauthorized_evidence_upgrade"
+    }
+  ]
+}

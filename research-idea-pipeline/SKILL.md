@@ -23,7 +23,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
-  version: "2.3.0"
+  version: "2.3.1"
   upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 
@@ -869,6 +869,56 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 ```
 
 ---
+
+### 1.10 Research Preset Library 与 Intent Router（`PR1`—`PR9`）
+
+**用户说人话，Router 选协议。** 内容包（`shared-contract.md` + `preset-registry.json` +
+`presets/<id>.md` 16 份独立协议 + `router-fixtures.json`）已集成；`scripts/preset_router.py` 是可执行
+Router/触发器，[references/preset-policy.md](references/preset-policy.md) 是政策。
+
+**加载规则：** 每次只加载当前 `SKILL.md`、`shared-contract.md`、**选中那一个** Preset 和必要 references
+（`preset_router.py load --preset <id>` 会报告 `load` 与 `not_loaded`）；**不要一次注入 16 份**。
+
+| preset | 入口 | 授权（权限层） | registry trigger |
+|---|---|---|---|
+| `research-loop` | `continue-research` | `execute`（execute） | manual |
+| `paradigm-escape` | `explore` | `discover_only`（discovery） | manual_or_stagnation |
+| `research-recovery` | `continue-research` | `recover_no_experiment`（derived） | manual |
+| `scientific-replanning` | `continue-research` | `plan`（advisory） | manual_or_blocked |
+| `research-audit` | `audit` | `audit`（advisory） | manual |
+| `research-review` | `continue-research` | `read_only`（read_only） | manual |
+| `evidence-conflict-repair` | `audit` | `evidence_repair`（discovery） | event_or_manual |
+| `context-drift-recovery` | `continue-research` | `recover_no_experiment`（derived） | event |
+| `memory-consolidation` | `continue-research` | `derived_only`（derived） | event_or_manual |
+| `resource-recovery` | `continue-research` | `runtime_recovery`（derived） | event_or_manual |
+| `experiment-failure-recovery` | `continue-research` | `engineering_recovery`（derived） | event_or_manual |
+| `loop-health-check` | `continue-research` | `inspect_only`（read_only） | event_or_manual |
+| `stagnation-breaker` | `continue-research` | `decision_only`（advisory） | event_or_manual |
+| `strategy-evolution` | `continue-research` | `strategy_update`（strategy） | manual_or_scheduled |
+| `hypothesis-rebalance` | `explore` | `portfolio`（strategy） | manual_or_scheduled |
+| `discovery-replay` | `continue-research` | `evaluation_only`（read_only） | manual_or_scheduled |
+
+```sh
+python3 scripts/preset_router.py list                       # 一览
+python3 scripts/preset_router.py resolve --text "继续自动科研"  # 自然语言 → 预设（中/英/别名/id）
+python3 scripts/preset_router.py load --preset research-review  # 只加载这一份协议
+python3 scripts/preset_router.py inspect --preset paradigm-escape
+python3 scripts/preset_router.py check --fixtures            # 注册表 ↔ 协议 + 提供版 53 条 fixtures
+python3 scripts/preset_router.py trigger --state <research-state.json>   # 机器信号 → 恢复/推荐/HOLD
+python3 scripts/preset_router.py run --preset loop-health-check --state <research-state.json>
+```
+
+**自动触发的真实边界（不得含糊）：** 事件监听、派遣与后台常驻由**调用方**——既有 Scheduler、运行时
+或平台 Hook——负责。本 skill 提供的是可执行、幂等、带冷却与上限的触发/记录接口
+（`trigger` / `record` / `cognition/recovery-log.jsonl`），**不安装守护进程，也不声称无人值守自动执行**；
+环境若不调用它，只能得到推荐。用户主动预设即使被 registry
+标为事件可触发，也只产生 `recommended_only` 建议，绝不自动启动。
+
+**四条硬规则：** ① 只读提问不升级为执行、否定表达不触发（否定按**分句**作用，逗号后的请求不被吞掉）；
+② 同一 `(state_version, preset, 信号指纹)` 只允许一次，冷却/上限超限即 `HOLD` 交人裁决，且**不刷新 AALG 预算**；
+③ 工程故障（OOM/NaN/崩溃）只做修复路由，**不得写成科学否证**；④ 自进化只改既有授权的策略记忆，
+必须经 Strategy Decision Adapter 改变下一轮**真实动作选择**（同 `EIG ÷ cost` 层内重排 + `scheduler.strategy_decisions[]` 遥测），
+改不动就记录原因；被采纳 ≠ 研究能力提升。
 
 ## 2. 共享资源索引
 

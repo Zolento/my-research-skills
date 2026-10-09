@@ -1,0 +1,214 @@
+{
+  "schema_version": "0.1",
+  "base_contract": "shared-contract.md",
+  "presets": [
+    {
+      "preset_id": "research-loop",
+      "title": "Autonomous Research Loop",
+      "entry": "continue-research",
+      "trigger": "manual",
+      "execution_scope": "execute",
+      "path": "presets/research-loop.md",
+      "intent_examples": [
+        "继续自动科研",
+        "按现有授权持续跑 loop",
+        "continue autonomous research"
+      ]
+    },
+    {
+      "preset_id": "paradigm-escape",
+      "title": "Paradigm Escape",
+      "entry": "explore",
+      "trigger": "manual_or_stagnation",
+      "execution_scope": "discover_only",
+      "path": "presets/paradigm-escape.md",
+      "intent_examples": [
+        "跳出当前思路",
+        "换一个完全不同的数学建模角度",
+        "escape local paradigm"
+      ]
+    },
+    {
+      "preset_id": "research-recovery",
+      "title": "Research Recovery",
+      "entry": "continue-research",
+      "trigger": "manual",
+      "execution_scope": "recover_no_experiment",
+      "path": "presets/research-recovery.md",
+      "intent_examples": [
+        "恢复之前的科研工作",
+        "上下文没了，恢复项目状态",
+        "resume research context"
+      ]
+    },
+    {
+      "preset_id": "scientific-replanning",
+      "title": "Scientific Replanning",
+      "entry": "continue-research",
+      "trigger": "manual_or_blocked",
+      "execution_scope": "plan",
+      "path": "presets/scientific-replanning.md",
+      "intent_examples": [
+        "重新规划当前路线",
+        "这条路线被否证了，重新制定计划",
+        "replan research"
+      ]
+    },
+    {
+      "preset_id": "research-audit",
+      "title": "Adversarial Research Audit",
+      "entry": "audit",
+      "trigger": "manual",
+      "execution_scope": "audit",
+      "path": "presets/research-audit.md",
+      "intent_examples": [
+        "审查论文方案",
+        "找出当前实验的致命缺陷",
+        "audit my method"
+      ]
+    },
+    {
+      "preset_id": "research-review",
+      "title": "Research Review",
+      "entry": "continue-research",
+      "trigger": "manual",
+      "execution_scope": "read_only",
+      "path": "presets/research-review.md",
+      "intent_examples": [
+        "现在研究进展怎么样",
+        "总结当前真实发现，不要执行",
+        "review research progress"
+      ]
+    },
+    {
+      "preset_id": "context-drift-recovery",
+      "title": "Context Drift Recovery",
+      "entry": "continue-research",
+      "trigger": "event",
+      "execution_scope": "recover_no_experiment",
+      "path": "presets/context-drift-recovery.md",
+      "intent_examples": [
+        "Skill 规则丢了，恢复上下文",
+        "上下文压缩以后重新确认规则",
+        "recover from context drift"
+      ]
+    },
+    {
+      "preset_id": "stagnation-breaker",
+      "title": "Stagnation Breaker",
+      "entry": "continue-research",
+      "trigger": "event_or_manual",
+      "execution_scope": "decision_only",
+      "path": "presets/stagnation-breaker.md",
+      "intent_examples": [
+        "一直在重复归因",
+        "检查是不是陷入局部最优",
+        "detect scientific stagnation"
+      ]
+    },
+    {
+      "preset_id": "experiment-failure-recovery",
+      "title": "Experiment Failure Recovery",
+      "entry": "continue-research",
+      "trigger": "event_or_manual",
+      "execution_scope": "engineering_recovery",
+      "path": "presets/experiment-failure-recovery.md",
+      "intent_examples": [
+        "训练 OOM 了",
+        "实验 NaN 了，检查并恢复",
+        "recover failed experiment"
+      ]
+    },
+    {
+      "preset_id": "evidence-conflict-repair",
+      "title": "Evidence Conflict Repair",
+      "entry": "audit",
+      "trigger": "event_or_manual",
+      "execution_scope": "evidence_repair",
+      "path": "presets/evidence-conflict-repair.md",
+      "intent_examples": [
+        "实验结果和 evidence 对不上",
+        "修复 claim 和 memory 冲突",
+        "repair evidence conflict"
+      ]
+    },
+    {
+      "preset_id": "resource-recovery",
+      "title": "Resource & Execution Recovery",
+      "entry": "continue-research",
+      "trigger": "event_or_manual",
+      "execution_scope": "runtime_recovery",
+      "path": "presets/resource-recovery.md",
+      "intent_examples": [
+        "GPU 不够了",
+        "环境崩溃，恢复执行",
+        "recover resource block"
+      ]
+    },
+    {
+      "preset_id": "memory-consolidation",
+      "title": "Cognitive Memory Consolidation",
+      "entry": "continue-research",
+      "trigger": "event_or_manual",
+      "execution_scope": "derived_only",
+      "path": "presets/memory-consolidation.md",
+      "intent_examples": [
+        "整理认知记忆",
+        "State 更新后刷新 Cognitive Memory",
+        "consolidate research memory"
+      ]
+    },
+    {
+      "preset_id": "loop-health-check",
+      "title": "Research Loop Health Check",
+      "entry": "continue-research",
+      "trigger": "event_or_manual",
+      "execution_scope": "inspect_only",
+      "path": "presets/loop-health-check.md",
+      "intent_examples": [
+        "检查科研 loop 健康度",
+        "有在真正推进科研吗",
+        "check research loop health"
+      ]
+    },
+    {
+      "preset_id": "strategy-evolution",
+      "title": "Strategy Evolution",
+      "entry": "continue-research",
+      "trigger": "manual_or_scheduled",
+      "execution_scope": "strategy_update",
+      "path": "presets/strategy-evolution.md",
+      "intent_examples": [
+        "根据历史结果改进探索策略",
+        "让策略记忆真正影响下一轮决策",
+        "evolve exploration strategy"
+      ]
+    },
+    {
+      "preset_id": "hypothesis-rebalance",
+      "title": "Hypothesis Portfolio Rebalance",
+      "entry": "explore",
+      "trigger": "manual_or_scheduled",
+      "execution_scope": "portfolio",
+      "path": "presets/hypothesis-rebalance.md",
+      "intent_examples": [
+        "所有 idea 都一样",
+        "重新平衡假设组合",
+        "rebalance hypothesis portfolio"
+      ]
+    },
+    {
+      "preset_id": "discovery-replay",
+      "title": "Discovery Replay Evaluation",
+      "entry": "continue-research",
+      "trigger": "manual_or_scheduled",
+      "execution_scope": "evaluation_only",
+      "path": "presets/discovery-replay.md",
+      "intent_examples": [
+        "做一次历史研究回放",
+        "检验自进化策略是否真的更好",
+        "evaluate discovery replay"
+      ]
+    }
+  ]
+}

@@ -36,6 +36,7 @@ Exit codes: 0 pass, 1 argument error, 3 hard violation, 4 environment not satisf
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -826,6 +827,240 @@ def _refs_for(identifiers: Sequence[str], state: Dict[str, Any]) -> Dict[str, Li
 
 
 # ---------------------------------------------------------------------------
+# 3.5 Strategy Decision Adapter (advice -> existing action-selection flow)
+#
+# The audit that produced this section found the loop was open: `recommend_strategy()`
+# produced a menu, an operator and a structural shift, but nothing consumed them. The
+# scheduler's `next_actions[]` were ranked by its own rule (`EIG ÷ cost`, scheduler-policy
+# §4) and `strategy_memory apply` only *printed* suggestions, so no strategy decision ever
+# reached a dispatch.
+#
+# The adapter closes the loop without introducing a second scheduler, a Research State
+# object or a strategy database:
+#
+# * the priority rule is untouched — the best tier is still chosen by `EIG ÷ cost`;
+# * the advice may only reorder candidates **inside that tier**, and only among candidates
+#   that already pass the hard gates;
+# * affinity is derived from declared fields (a hypothesis' `operator`/`island`, an
+#   uncertainty's `cheapest_discriminating_test`) — never from prose;
+# * the outcome is recorded in the existing scheduler telemetry (`strategy_decisions[]`),
+#   together with the candidates, the advice, the choice, whether it was adopted and why not.
+# ---------------------------------------------------------------------------
+
+SCHEMA_STRATEGY_DECISION = "research-idea-pipeline/strategy-decision@1"
+
+#: The scheduler's own weights for its own rule (`EIG ÷ cost`). Reused, not re-invented.
+EIG_WEIGHT: Dict[str, int] = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+COST_WEIGHT: Dict[str, int] = {"high": 3, "medium": 2, "low": 1}
+
+#: How many decisions the scheduler telemetry keeps. Telemetry, not history of record:
+#: the append-only cognition log remains the durable record.
+DECISION_LOG_LIMIT = 20
+
+
+def action_tier(action: Dict[str, Any]) -> Dict[str, Any]:
+    """A scheduler action's priority tier under the scheduler's own `EIG ÷ cost` rule."""
+    eig = str(action.get("eig") or "unknown")
+    cost = str(action.get("cost") or "medium")
+    numerator = EIG_WEIGHT.get(eig, 0)
+    denominator = COST_WEIGHT.get(cost, 1) or 1
+    return {"eig": eig if eig in EIG_WEIGHT else "unknown",
+            "cost": cost if cost in COST_WEIGHT else "medium",
+            "label": f"eig={eig}/cost={cost}",
+            "rank": round(numerator / denominator, 6)}
+
+
+def _action_target_kind(action: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
+    """What the action points at, read from canonical objects (never from prose)."""
+    target = action.get("target")
+    hypotheses = _hypothesis_table(state)
+    if isinstance(target, str) and target in hypotheses:
+        entry = hypotheses[target]
+        return {"kind": "hypothesis", "id": target, "operator": entry.get("operator"),
+                "island": entry.get("island"), "status": entry.get("status")}
+    if isinstance(target, str):
+        for uncertainty in state.get("uncertainties") or []:
+            if isinstance(uncertainty, dict) and uncertainty.get("id") == target:
+                return {"kind": "uncertainty", "id": target,
+                        "discriminating_test": uncertainty.get("cheapest_discriminating_test"),
+                        "importance": uncertainty.get("importance")}
+    return {"kind": "other", "id": target}
+
+
+def action_affinity(action: Dict[str, Any], state: Dict[str, Any],
+                    advice: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether the advice *prefers* this action, from declared fields only.
+
+    Two mechanical routes: the action targets a hypothesis whose `operator` or `island` is
+    the advised one, or it targets an uncertainty whose declared cheapest discriminating test
+    is this very action. Anything else is `unaligned` — the adapter will not invent a link,
+    and an unaligned candidate keeps its original order.
+    """
+    target = _action_target_kind(action, state)
+    if target["kind"] == "hypothesis":
+        if target.get("operator") and target["operator"] == advice.get("operator"):
+            return {"aligned": True, "basis": f"hypotheses[{target['id']}].operator"}
+        if target.get("island") and target["island"] == advice.get("island"):
+            return {"aligned": True, "basis": f"hypotheses[{target['id']}].island"}
+        return {"aligned": False, "basis": "operator/island mismatch"}
+    if target["kind"] == "uncertainty":
+        if target.get("discriminating_test") == action.get("action"):
+            return {"aligned": True, "basis": f"uncertainties[{target['id']}].cheapest_discriminating_test"}
+        return {"aligned": False, "basis": "uncertainty names another test"}
+    return {"aligned": False, "basis": "no declared link to the advice"}
+
+
+def _legal_actions(
+    state: Dict[str, Any],
+    scheduler: Optional[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """The action set that already passes the hard gates, plus the blocked ids."""
+    import execution_gate as eg
+    actions = [action for action in (scheduler or {}).get("next_actions") or []
+               if isinstance(action, dict)]
+    report = eg.scheduler_check(state, scheduler or {})
+    errors = list(report.get("errors") or [])
+    blocked = sorted({error.split(": ", 1)[1] for error in errors if ": " in error})
+    legal = [action for action in actions if str(action.get("action")) not in blocked]
+    return legal, blocked
+
+
+def _order_actions(
+    state: Dict[str, Any],
+    actions: Sequence[Dict[str, Any]],
+    advice: Optional[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Order the action set: tier first (scheduler rule), then advice, then declaration order."""
+    annotated = []
+    for index, action in enumerate(actions):
+        tier = action_tier(action)
+        affinity = action_affinity(action, state, advice) if advice else \
+            {"aligned": False, "basis": "no advice"}
+        annotated.append({**action, "tier": tier["label"], "tier_rank": tier["rank"],
+                          "aligned": affinity["aligned"], "affinity_basis": affinity["basis"],
+                          "declared_order": index,
+                          "legal": True})
+    best = max((item["tier_rank"] for item in annotated), default=0)
+    top = [item for item in annotated if item["tier_rank"] == best]
+    rest = [item for item in annotated if item["tier_rank"] != best]
+    top.sort(key=lambda item: (0 if item["aligned"] else 1, item["declared_order"]))
+    return top + rest
+
+
+def strategy_decision(
+    state: Dict[str, Any],
+    index: Dict[str, Any],
+    scheduler: Optional[Dict[str, Any]] = None,
+    revisions: Optional[Sequence[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Turn the strategy advice into a decision inside the existing selection flow.
+
+    The comparison that matters is `with_memory` vs `without_memory` on the **same** state and
+    the **same** legal action set: the difference, if any, is attributable to the strategy
+    memory alone. When the hard gates leave no room (a single legal candidate in the best tier,
+    or no aligned candidate), the decision reports `strategy_applied: false` and the reason
+    instead of manufacturing a difference.
+    """
+    import prediction_compare as pc
+    advice = recommend_strategy(state, index, scheduler, revisions)
+    legal, blocked = _legal_actions(state, scheduler)
+    without = _order_actions(state, legal, None)
+    with_memory = _order_actions(state, legal, advice)
+    before_first = without[0] if without else None
+    after_first = with_memory[0] if with_memory else None
+    top_tier_size = len([item for item in with_memory
+                         if before_first and item["tier_rank"] == before_first["tier_rank"]])
+    adopted = bool(before_first and after_first
+                   and before_first.get("action") != after_first.get("action"))
+    if not legal:
+        reason = "no_legal_action"
+    elif not adopted and top_tier_size <= 1:
+        reason = "single_candidate_in_tier"
+    elif not adopted and not any(item["aligned"] for item in with_memory):
+        reason = "no_aligned_candidate_in_tier"
+    elif not adopted:
+        reason = "advice_agrees_with_existing_order"
+    else:
+        reason = None
+    switch = pc.diagnosis_switch(state, index.get("competitions", []), scheduler,
+                                 index.get("mechanisms"))
+    return {
+        "schema": SCHEMA_STRATEGY_DECISION,
+        "state_version": state.get("state_version"),
+        "advice": {"menu": advice.get("menu"), "operator": advice.get("operator"),
+                   "island": advice.get("island"), "shift": advice.get("shift"),
+                   "basis": advice.get("basis"), "reason": advice.get("reason")},
+        "discovery_operator": advice.get("operator"),
+        "hard_gates": {"scheduler_check": "PASS" if not blocked else "FAIL",
+                       "blocked_actions": blocked,
+                       "switch_action": switch.get("action")},
+        "candidates_before": [{key: item.get(key) for key in
+                               ("action", "type", "target", "tier", "tier_rank", "aligned",
+                                "affinity_basis", "declared_order")} for item in without],
+        "candidates_after": [{key: item.get(key) for key in
+                              ("action", "type", "target", "tier", "tier_rank", "aligned",
+                               "affinity_basis", "declared_order")} for item in with_memory],
+        "chosen_without_memory": before_first.get("action") if before_first else None,
+        "chosen": after_first.get("action") if after_first else None,
+        "chosen_detail": ({key: after_first.get(key) for key in
+                           ("action", "type", "target", "tier", "aligned", "affinity_basis")}
+                          if after_first else None),
+        "adopted": adopted,
+        "strategy_applied": adopted,
+        "decision_changed": adopted,
+        "reason_if_not": reason,
+        "dispatch": {"action": after_first.get("action") if after_first else None,
+                     "type": after_first.get("type") if after_first else None,
+                     "target": after_first.get("target") if after_first else None},
+        "note": ("建议只在同一优先级层内重排，且只重排已通过硬门禁的动作；"
+                 "优先级规则（EIG ÷ cost）、AALG 预算、锚点与执行权限均未被改动；"
+                 "被采纳 ≠ 研究能力提升，真实收益仍由 Discovery Replay 与科学结果验证"),
+    }
+
+
+def record_strategy_decision(
+    scheduler: Dict[str, Any],
+    decision: Dict[str, Any],
+    dispatch_result: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Append the decision to the existing scheduler telemetry (no second authority).
+
+    Returns a copy; the caller decides whether to persist it. Only `strategy_decisions[]` is
+    touched — `eig_calibration`, `operator_stats`, `next_actions` and the execution ledger's
+    policy are left byte-identical, so a strategy decision can never refresh a diagnostic
+    budget.
+    """
+    updated = copy.deepcopy(scheduler) if isinstance(scheduler, dict) else {}
+    entry = {
+        "state_version": decision.get("state_version"),
+        "advice": decision.get("advice"),
+        "discovery_operator": decision.get("discovery_operator"),
+        "candidates_before": decision.get("candidates_before"),
+        "chosen": decision.get("chosen"),
+        "adopted": decision.get("adopted"),
+        "strategy_applied": decision.get("strategy_applied"),
+        "decision_changed": decision.get("decision_changed"),
+        "reason_if_not": decision.get("reason_if_not"),
+        "hard_gates": decision.get("hard_gates"),
+        "dispatch": decision.get("dispatch"),
+        "dispatch_result": dispatch_result,
+    }
+    history = updated.get("strategy_decisions")
+    history = list(history) if isinstance(history, list) else []
+    history.append(entry)
+    updated["strategy_decisions"] = history[-DECISION_LOG_LIMIT:]
+    return updated
+
+
+def latest_strategy_decision(scheduler: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """What the next round reads: the last recorded decision, if any."""
+    history = (scheduler or {}).get("strategy_decisions")
+    if isinstance(history, list) and history and isinstance(history[-1], dict):
+        return history[-1]
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Validation of recorded strategy updates
 # ---------------------------------------------------------------------------
 
@@ -1221,10 +1456,14 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(description="Scientific value, taste memory and adaptive discovery")
     parser.add_argument("command", nargs="?",
-                        choices=["value", "taste", "operators", "recommend", "apply", "validate"])
+                        choices=["value", "taste", "operators", "recommend", "decide",
+                                 "apply", "validate"])
     parser.add_argument("--state", help="path to research-state.json")
     parser.add_argument("--cognition", help="path to the cognition directory")
     parser.add_argument("--scheduler", help="path to scheduler.json")
+    parser.add_argument("--record", action="store_true",
+                        help="decide: append the decision to scheduler telemetry")
+    parser.add_argument("--dispatch-result", help="decide: what the dispatch actually did")
     parser.add_argument("--target", help="hypothesis or claim id for value")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--list-menus", action="store_true")
@@ -1266,8 +1505,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.command == "recommend":
             recommendation = recommend_strategy(state, index, scheduler, revisions)
             return _emit(recommendation, validate_recommendation(recommendation))
+        if args.command == "decide":
+            decision = strategy_decision(state, index, scheduler, revisions)
+            diagnostics: List[Diagnostic] = []
+            if args.record:
+                updated = record_strategy_decision(scheduler or {}, decision,
+                                                   dispatch_result=args.dispatch_result)
+                if args.scheduler:
+                    path = Path(args.scheduler).expanduser()
+                else:
+                    path = state_path.parent / "scheduler.json"
+                path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+                                encoding="utf-8")
+                decision = {**decision, "recorded_to": str(path)}
+            return _emit(decision, diagnostics)
         if args.command == "apply":
-            return _emit(strategy_updates(state, index, scheduler), [])
+            payload = strategy_updates(state, index, scheduler)
+            payload["note"] = ("apply 只输出建议，不写入任何文件；要让它进入调度选择，"
+                               "请用 `decide`（同优先级层内重排已通过硬门禁的动作）")
+            payload["writes"] = []
+            return _emit(payload, [])
         if args.command == "validate":
             diagnostics = validate_strategy_revisions(state, revisions)
             return _emit({"strategy_updates": sum(1 for record in revisions

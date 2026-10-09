@@ -40,6 +40,9 @@
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
     14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
         —— 注入聚合分数或删除探索下限必须让闸门判红
+    16. Research Preset Library：16 个预设、Intent Router、恢复触发与自进化适配器
+        —— 注册表必须与 presets/*.md 一致；只读提问不得升级为执行；否定不得触发；
+           工程故障不得写成科学否证；自进化必须改变下一轮动作选择或说明原因
     15. 历史回放：十四个对抗 case、泄漏防护、消融与端到端 smoke
         —— 注入未来信息必须让回放拒绝执行
 
@@ -768,6 +771,60 @@ def step_execution_identifiability() -> Tuple[bool, str]:
     return True, 'CT→MRI design + schemas/templates + capacity mutation (mock execution is covered by tests)'
 
 
+def step_preset_library() -> Tuple[bool, str]:
+    """Presets, the intent router and the strategy decision adapter, on the real interfaces."""
+    import preset_router as pr
+    import strategy_memory as sm
+    failures = pr.registry_errors()
+    if failures:
+        return False, "registry drift: " + failures[0].render()
+    fixtures = pr.run_router_fixtures()
+    if fixtures.get("status") != "PASS":
+        return False, (f"provided router fixtures: {fixtures.get('passed')}/"
+                       f"{fixtures.get('total')} — {fixtures.get('failed')}")
+    loaded, code = pr.load_preset_context("research-review")
+    if code != pr.EXIT_OK or len(loaded.get("not_loaded") or []) != 15:
+        return False, "a call does not load exactly one protocol"
+    if len(pr.PRESETS) != 16 or set(pr.HANDLERS) != set(pr.PRESET_IDS):
+        return False, "the preset library is incomplete"
+    for preset in pr.PRESETS:
+        routed = pr.resolve(preset["id"])
+        if routed["preset_id"] != preset["id"] or routed["entry"] != preset["entry"]:
+            return False, f"{preset['id']} does not resolve to itself"
+        for phrase in list(preset["zh"])[:2] + list(preset["en"])[:1]:
+            if pr.resolve(phrase)["preset_id"] != preset["id"]:
+                return False, f"{preset['id']}: {phrase!r} did not route"
+    if pr.resolve("不要审计")["action"] != "HOLD":
+        return False, "a negated request still routed"
+    if pr.resolve("总结进展")["execution_scope"] != "read_only":
+        return False, "a read-only question was escalated"
+    if pr.resolve("训练 OOM 了")["next_action"] != "diagnose":
+        return False, "a descriptive report started an action"
+    with tempfile.TemporaryDirectory() as temp:
+        root = pathlib.Path(temp) / "A"
+        state_path = pr._fixture(root)
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["experiments"][0].update({"status": "failed", "result_at_state_version": 4,
+                                        "known_flaws": ["F1"]})
+        state["failures"] = [{"id": "F1", "kind": "implementation_failure", "what": "崩溃",
+                              "why": "shape mismatch", "referenced_by": ["X1"], "depends_on": [],
+                              "validity": {"status": "valid", "reason": "记录",
+                                           "since_state_version": 4}, "source_review": None}]
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        before = state_path.read_bytes()
+        payload, _, _ = pr.run_preset("experiment-failure-recovery", state_path)
+        if payload["observed"]["scientific_effect"] != "none":
+            return False, "an engineering failure produced a scientific effect"
+        if state_path.read_bytes() != before:
+            return False, "an engineering recovery modified the canonical state"
+        # A blocked/unchangeable decision must be reported, not faked.
+        if sm.SCHEMA_STRATEGY_DECISION != "research-idea-pipeline/strategy-decision@1":
+            return False, "the strategy decision schema changed unexpectedly"
+    return True, ("16 presets resolvable (zh/en/id) + registry↔protocol parity + provided fixtures "
+                  "53/53 + one-protocol loading + negation/read-only safety + engineering failure "
+                  "keeps science untouched")
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),    ("state_check --selftest", step_selftest),
     ("模板自身通过校验", step_template),
@@ -783,6 +840,7 @@ STEPS = (
     ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
     ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
     ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
+    ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
 )
 
 

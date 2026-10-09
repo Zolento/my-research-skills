@@ -122,6 +122,41 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
 
 ---
 
+### 4.2 `strategy_decisions[]`（Strategy Decision Adapter 的遥测）
+
+`next_actions[]` 由它自己的规则排序（`EIG ÷ cost`）。策略记忆给出的菜单/算子/结构轴**不替换**该规则，
+而是通过 **Strategy Decision Adapter**（`scripts/strategy_memory.py` 的 `strategy_decision()`）
+在**同一优先级层内**、且仅在**已通过硬门禁**的动作之间重排，并把这次决策写进本文件的遥测。
+
+```json
+{"strategy_decisions": [{
+  "state_version": 51,
+  "advice": {"menu": "replace_problem_representation", "operator": "reframe",
+             "island": "P1", "shift": "representation-shift", "basis": ["operator:reframe"]},
+  "discovery_operator": "reframe",
+  "candidates_before": [{"action": "H1", "tier": "eig=high/cost=low", "aligned": false}],
+  "chosen": "H2", "adopted": true, "strategy_applied": true, "decision_changed": true,
+  "reason_if_not": null,
+  "hard_gates": {"scheduler_check": "PASS", "blocked_actions": []},
+  "dispatch": {"action": "H2", "type": "repair", "target": "H2"},
+  "dispatch_result": "dispatched H2"}]}
+```
+
+**硬边界：**
+
+1. **优先级规则不动**：`next_action_policy.priority` 与 `EIG ÷ cost` 都不被策略影响；适配器只在
+   最优层内部重排。
+2. **不得越层、不得解阻**：低层动作不得被提前；`scheduler_check` 报错或被 stop rule 阻塞的动作
+   不得入选。
+3. **只写这一个键**：`eig_calibration` / `operator_stats` / `next_actions` 与 `.execution/policy.json`
+   在决策路径上逐字节不变——策略决策**永远不能刷新 AALG 预算**。
+4. **改变不了就记录原因**：`reason_if_not ∈ {{single_candidate_in_tier,
+   no_aligned_candidate_in_tier, advice_agrees_with_existing_order, no_legal_action}}`。
+5. **下一轮消费**：`continue-research` 的 Loop 读取 `strategy_decisions[-1]`；`state_version` 变化即视为
+   过期（`stale`），需重新决策。
+6. **被采纳 ≠ 能力提升**：真实收益仍由 Discovery Replay 与科学结果验证（见
+   [preset-policy.md](preset-policy.md) §7 的 L1/L2/L3）。
+
 ### 4.1 `operator_stats`（system-level Meta-Memory）
 
 **它记录「系统自己哪种算子有效」，不是领域的科学知识。** 因此它**出 state**，落
