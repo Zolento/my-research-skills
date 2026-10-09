@@ -810,18 +810,25 @@ def assurance_path(route_dir, analysis_id):
 
 
 def _assurance_output(state, experiment_id, analysis_id, output, route_dir):
-    """Resolve the output path, refusing anything outside the assurance/outcome area."""
+    """Resolve the output path: exactly the review location of *this* route, or nothing.
+
+    The previous check compared the last two path components with `("assurance", "outcome")`,
+    but a valid path ends with `("outcome", "<analysis_id>.json")` — so passing the documented
+    path explicitly was rejected. The decision is now made against the expected path derived
+    from the state's route: same file ⇒ accepted, anything else (another route, another file,
+    traversal or a symlink that leaves the route) ⇒ refused.
+    """
+    base = (Path(route_dir) if route_dir is not None else Path('.')).resolve()
+    expected = assurance_path(base, analysis_id).resolve()
+    if base != expected and base not in expected.parents:
+        raise ValueError('refusing to write a review outside the state route: ' + str(expected))
     if output is None:
-        base = Path(route_dir) if route_dir is not None else Path('.')
-        return assurance_path(base, analysis_id)
-    candidate = Path(output).expanduser()
-    resolved = candidate.resolve()
-    parts = resolved.parts
-    if tuple(parts[-2:]) != (ASSURANCE_DIR[0], ASSURANCE_DIR[1]) or resolved.name != \
-            str(analysis_id) + '.json':
-        raise ValueError('output must be <route>/' + '/'.join(ASSURANCE_DIR)
-                         + '/' + str(analysis_id) + '.json')
-    return candidate
+        return expected
+    requested = Path(output).expanduser()
+    resolved = requested.resolve()
+    if resolved != expected:
+        raise ValueError('output must be ' + str(expected) + ' (bound to this state route)')
+    return expected
 
 
 def _same_review(left, right):

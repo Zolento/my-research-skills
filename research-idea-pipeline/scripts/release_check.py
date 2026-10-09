@@ -40,6 +40,8 @@
         —— 接管必须拒绝 Bootstrap、保持 state/scheduler 逐字节不变
     14. 科学价值与自适应发现：无总分、锚点不可改、算子不被永久封禁
         —— 注入聚合分数或删除探索下限必须让闸门判红
+    17. Release metadata：SKILL.md / 两个 README / CHANGELOG / Release Notes 版本一致，
+        Schema 与协议 id 不随发行版本漂移
     16. Research Preset Library：16 个预设、Intent Router、恢复触发与自进化适配器
         —— 注册表必须与 presets/*.md 一致；只读提问不得升级为执行；否定不得触发；
            工程故障不得写成科学否证；自进化必须改变下一轮动作选择或说明原因
@@ -825,6 +827,50 @@ def step_preset_library() -> Tuple[bool, str]:
                   "keeps science untouched")
 
 
+def step_release_metadata() -> Tuple[bool, str]:
+    """One release version across SKILL.md, both READMEs, CHANGELOG and the release notes."""
+    import re
+    import subprocess as sub
+    root = pathlib.Path(__file__).resolve().parent.parent
+    text = (root / 'SKILL.md').read_text(encoding='utf-8')
+    match = re.search(r'version:\s*"([^"]+)"', text)
+    if not match:
+        return False, 'SKILL.md declares no metadata.version'
+    version = match.group(1)
+    if not re.match(r'^\d+\.\d+\.\d+$', version):
+        return False, f'metadata.version {version!r} is not semantic'
+    root_readme = (root.parent / 'README.md').read_text(encoding='utf-8')
+    if f'当前为 **{version}**' not in root_readme:
+        return False, f'root README does not declare the current version {version}'
+    if version not in (root / 'README.md').read_text(encoding='utf-8'):
+        return False, 'component README does not mention the declared version'
+    for required in (root / 'CHANGELOG.md', root / 'docs' / 'releases' / f'v{version}.md'):
+        if not required.is_file():
+            return False, f'missing release document: {required.name}'
+    notes = (root / 'docs' / 'releases' / f'v{version}.md').read_text(encoding='utf-8')
+    if version not in notes.splitlines()[0]:
+        return False, 'release notes heading does not name the version'
+    registry = json.loads((root / 'preset-registry.json').read_text(encoding='utf-8'))
+    if registry.get('schema_version') != '0.1':
+        return False, 'the preset registry schema version must not track the release'
+    # Once the tag exists it must point *exactly* at this commit (never merely an ancestor).
+    tag = f'research-idea-pipeline/v{version}'
+    tagged = sub.run(['git', 'rev-parse', f'{tag}^{{}}'], capture_output=True, text=True,
+                     cwd=str(root.parent))
+    if tagged.returncode == 0:
+        head = sub.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True,
+                       cwd=str(root.parent)).stdout.strip()
+        if tagged.stdout.strip() != head:
+            return False, (f'{tag} points at {tagged.stdout.strip()[:8]}, not at the release '
+                           f'commit {head[:8]}')
+    proc = sub.run([sys.executable, str(root / 'scripts' / 'test_release_metadata.py')],
+                   capture_output=True, text=True, cwd=str(root))
+    if proc.returncode != 0:
+        return False, (proc.stdout + proc.stderr).strip().splitlines()[-1]
+    return True, (f'version {version} consistent across SKILL.md, both READMEs, CHANGELOG, '
+                  f'release notes and the metadata test suite')
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),    ("state_check --selftest", step_selftest),
     ("模板自身通过校验", step_template),
@@ -841,6 +887,7 @@ STEPS = (
     ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
     ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
     ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
+    ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )
 
 

@@ -17,7 +17,7 @@ Declare the project anchor rather than assuming that higher benchmark performanc
 is the goal. Supporting routes must explain how they affect that anchor. Changing
 the project direction requires the user's instruction.
 
-## Preset library and intent router (v2.3.1)
+## Preset library and intent router
 
 Sixteen rehearsed protocols inside the four semantic entries. You do not memorise ids: say what
 you mean, and the router resolves it (explicit id > alias > intent + entry > intent > loop
@@ -29,6 +29,10 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | User-invoked (6) | `research-loop`, `paradigm-escape`, `research-recovery`, `scientific-replanning`, `research-audit`, `research-review` | `continue-research` / `explore` / `audit` |
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
+
+**Current release: v1.0.0** — first stable release. Capability documentation below is version-free;
+historical iterations (v1.2.0—v2.3.3) are recorded in [CHANGELOG.md](CHANGELOG.md) and the current
+release notes are [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
 
 The package is data-driven: `preset-registry.json` is the source of truth for ids, entries,
 triggers, execution scopes, protocol paths and the 16×3 intent examples; `shared-contract.md` is the
@@ -54,12 +58,19 @@ python3 scripts/preset_router.py check                           # registry ↔ 
 scientific loop — Recall → Understand → Discover → Predict → Intervene → Verify → Revise →
 Consolidate → Loop — inside the existing stages and gates.
 
-**v2.3.2 — R10/R11 loop liveness:**
+**Outcome transactions and loop liveness:**
 
-**v2.3.3 — runtime correctness:** scheduling is fail-closed (a scheduler that is not PASS yields
-no dispatch and is never reported as PASS), execution previews consume nothing, strategy revisions
-are written by the authorised Meta-Controller and pass both validators, and post-update Assurance is
-discovered, verified through the real `decision_gate` and consumed — with dependent work held.
+A terminal experiment is done with R10/R11 only when its `outcome_analysis` transaction passes
+`evidence_outcome.state_errors()` — a repair is not required. The loop classifies every
+experiment (`NEEDS_ANALYSIS` / `COMMITTED` / `BLOCKED` / `PENDING_EXECUTION`), asks R9.O only for
+the ones missing a receipt, holds on damaged or conflicting receipts, and after consolidation
+passes through the Assurance / Decision Gate before consuming the Scheduler's next legal action.
+
+**Runtime correctness:** scheduling is fail-closed (a scheduler that is not PASS yields no
+dispatch and is never reported as PASS), execution previews consume nothing, strategy revisions are
+written by the authorised Meta-Controller and pass both validators, and post-update Assurance is
+authored by the R7 reviewer, verified through the real `decision_gate` and consumed — with
+dependent work held until it is.
 
 **Execution previews are side-effect free:** `experiment_execute.py run` without
 `--execute` re-checks every gate under the ledger lock and returns
