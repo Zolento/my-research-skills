@@ -9,6 +9,11 @@ import sys
 import architect
 import audit_coherence
 import compare_invariants
+import counterfactual_eval
+import evidence_core
+import evidence_ledger
+import revision_impact
+import revision_loop
 import validate_style
 import validate_suggestions
 
@@ -53,6 +58,69 @@ def examples():
     return errors
 
 
+def evidence_examples():
+    """Run the v0.2.0 gates on their bundled examples and check the honest invariants.
+
+    These are deterministic contract and provenance checks. They never measure semantic
+    detection ability and never certify a scientific claim.
+    """
+    errors = []
+    if evidence_core.self_check() != 0:
+        errors.append('evidence_core contract self-check failed')
+
+    def cli(script, args):
+        proc = subprocess.run([sys.executable, str(ROOT / 'scripts' / script), *args],
+                              cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.stderr.strip():
+            errors.append(script + ' wrote to stderr')
+        return proc.returncode
+
+    folder = ROOT / 'examples' / 'evidence-ledger'
+    if cli('evidence_ledger.py', [str(folder / 'manuscript.md'), '--ledger', str(folder / 'ledger.json'),
+                                  '--graph', str(folder / 'graph.json')]) not in (0, 4):
+        errors.append('evidence ledger example did not run cleanly')
+    else:
+        ledger = read(folder / 'ledger.json')
+        for artifact in ledger['artifacts']:
+            path = (ROOT / artifact['reference']).resolve()
+            if not path.is_file() or evidence_core.source_digest(path) != artifact['digest']:
+                errors.append('ledger artifact is unresolvable or stale: ' + artifact['id'])
+        for record in ledger['evidence']:
+            artifact = next(a for a in ledger['artifacts'] if a['id'] == record['artifact_id'])
+            if not evidence_core.defensible_verification(artifact['type'], record['verification_method'],
+                                                         record['state']):
+                errors.append('unsound evidence state: ' + record['id'])
+
+    folder = ROOT / 'examples' / 'counterfactual'
+    case_set = read(folder / 'evaluation.json')
+    classes = {case['class'] for case in case_set['cases']}
+    if not set(evidence_core.FAULTY_CLASSES) <= classes:
+        errors.append('counterfactual example does not cover every faulty class')
+    if not set(evidence_core.ROBUSTNESS_CLASSES) <= classes:
+        errors.append('counterfactual example lacks a robustness case of each kind')
+    for case in case_set['cases']:
+        if case['class'] in evidence_core.DEFECT_CLASSES and case['faulty_defect'] not in case['faulty']:
+            errors.append('declared defect is absent from the faulty variant: ' + case['id'])
+        if case['class'] == 'robustness_paraphrase' and (case['faulty_defect'] or any(case['faulty_span'].values())):
+            errors.append('a wording-only robustness case must declare no defect: ' + case['id'])
+    if cli('counterfactual_eval.py', [str(folder / 'evaluation.json')]) not in (0, 4):
+        errors.append('counterfactual harness did not run cleanly')
+    if cli('counterfactual_eval.py', [str(folder / 'evaluation.json'),
+                                      '--detection', str(folder / 'detection.json')]) not in (0, 4):
+        errors.append('counterfactual harness rejected the bundled detection artifact')
+
+    folder = ROOT / 'examples' / 'revision-impact'
+    if cli('revision_impact.py', [str(folder / 'after.md'), '--before', str(folder / 'before.md'),
+                                  '--original-facts', str(folder / 'before-facts.json'),
+                                  '--revised-facts', str(folder / 'after-facts.json'),
+                                  '--plan', str(folder / 'plan.json'),
+                                  '--graph', str(folder / 'graph.json')]) not in (0, 4):
+        errors.append('revision impact example did not run cleanly')
+    if cli('revision_loop.py', [str(folder / 'loop.json')]) not in (0, 3, 4):
+        errors.append('bounded revision loop example did not run cleanly')
+    return errors
+
+
 def main():
     checks = []
     proc = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'],
@@ -62,7 +130,9 @@ def main():
     if proc.returncode:
         print(proc.stdout)
     try:
-        for name, function in (('Self-contained reference links', links), ('Real section and Architect examples', examples)):
+        for name, function in (('Self-contained reference links', links),
+                               ('Real section and Architect examples', examples),
+                               ('Evidence grounding examples and contract', evidence_examples)):
             errors = function()
             checks.append((name, not errors, str(errors) if errors else 'ok'))
     except (OSError, ValueError, KeyError, TypeError) as exc:

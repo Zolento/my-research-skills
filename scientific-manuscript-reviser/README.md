@@ -22,6 +22,8 @@ Materials → normalization and sufficiency → the same scientific audit → su
 thesis/hierarchy → architecture alternatives → paragraph blueprint → independent
 outline/alignment audit → explicit approval → section drafting and post-edit gates.
 
+With supplied source evidence, optional revision cycles run as evidence ledger → bounded
+revision loop → revision impact analysis → pre-edit and post-edit gates → ledger update.
 Scientific coherence uses a located typed graph and separate evidence, theory,
 experiment, entailment, cross-section and counterfactual passes. Aggregation only
 combines existing findings. No scientific validity is inferred from fluent prose.
@@ -64,6 +66,12 @@ python3 scripts/compare_invariants.py before.tex after.tex \
   --original-facts before-facts.json --revised-facts after-facts.json --audit audit.json
 python3 scripts/architect.py check --material materials.json --graph graph.json \
   --report report.json --blueprint blueprint.json --audit outline-audit.json
+python3 scripts/evidence_ledger.py manuscript.md --ledger ledger.json --graph graph.json
+python3 scripts/counterfactual_eval.py evaluation.json --detection detection.json
+python3 scripts/revision_impact.py manuscript.md --before before.md \
+  --original-facts before-facts.json --revised-facts after-facts.json --plan plan.json
+python3 scripts/revision_loop.py loop.json
+python3 scripts/evidence_core.py --self-check
 python3 scripts/release_check.py
 ```
 
@@ -79,6 +87,33 @@ Exit 0 means the applicable gate passed, 3 means failed, 4 means review/input er
 Pattern candidates and proposed revisions are explicitly labeled as non-verdicts.
 Release check exits 0 only when all package checks pass. A clean release tests the
 software/protocol, not scientific correctness of every future paper.
+
+## Evidence grounding
+
+Version 0.2.0 adds four optional layers over the same scientific audit. Their contract is in
+[evidence-grounding.md](references/evidence-grounding.md), and none of them replaces the
+coherence audit or the semantic trust boundary.
+
+- **Evidence Ledger** binds a claim to the source artifact that carries its evidence, with
+  content location, state, applicability and a verifiable digest. Verified, reported,
+  contradicted and unknown are different things, a cited paper cannot be `verified` by being
+  read, and missing evidence stays distinct from unknown science.
+- **Counterfactual Evaluation** validates paired correct/faulty cases across causal
+  overreach, conclusion inflation, invalid controls, missing theoretical assumptions,
+  unidentifiable experiments, evidence mismatch and cross-section contradiction, plus
+  wording-only robustness cases. It scores a separately supplied detection result and never
+  runs a detector, so detection and miss counts measure that artifact, not this skill.
+- **Revision Impact Analysis** maps an edited location to the claims, evidence, theory,
+  experiments and cross sections that depend on it. Language-layer edits take minimal
+  sufficient verification, scientific edits take the full audit, and a lost limitation, a
+  new unsupported assertion or an unverified inference raised to verified blocks acceptance.
+- **Bounded Revision Loop** ties every round to a problem, a target change and completion
+  criteria, does not re-propose resolved problems without new evidence, and distinguishes a
+  met completion condition from a stop for no progress, disagreement or an iteration limit.
+
+These layers bound the verification a change requires and surface what a human must decide.
+They never certify a claim, promote an UNKNOWN to supported, or convert a disagreement into
+a conclusion. Nothing here replaces scientific judgment with extra schemas.
 
 ## Examples
 
@@ -98,6 +133,17 @@ Partial manuscripts cannot establish whole-paper coherence. Semantic contract te
 verify coverage and verdict handling, not automatic detection accuracy. No benchmark
 against independent reviewer models, AI detectors or human editors is claimed.
 
+Version 0.2.0 adds no scientific evaluator, and its limits are explicit.
+The ledger gate verifies provenance, digests and declared states. It cannot decide whether
+a source actually supports a claim, and it trusts the recorded state, so a mislabeled
+verification stays mislabeled. The counterfactual harness is structurally tested, including
+that it never runs a detector, but this skill's **semantic detection of faulty reasoning
+remains unvalidated**: the bundled case set is author-constructed and the bundled detection
+file is an illustrative placeholder, not a benchmark result. Impact analysis requires
+declared edit metadata because a deterministic tool cannot infer that two differently
+worded spans mean the same thing. The bounded loop enforces problem and stop bookkeeping,
+not scientific progress; a loop can be well formed and still be scientifically wrong.
+
 ## Recommended next evaluation
 
 Use held-out, consented manuscripts and expert-labeled faulty/valid reasoning pairs.
@@ -105,3 +151,6 @@ Measure localized errors, false positives, preserved strengths, source coverage,
 author voice and post-edit fact drift. Compare separate-pass audits to holistic review
 without using reviewer scores as an objective. Evaluate TeX constructs with compilation
 and improve domain-specific proof verification only when actual evidence warrants it.
+For the evidence layers, the next step is an independently produced detection artifact over
+held-out cases, and a ledger built from real experiment data rather than a constructed
+example, so the structural gates gain measured semantic backing.

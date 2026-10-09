@@ -6,7 +6,7 @@ description: >-
   Use for 论文大纲, detailed paper blueprints, scientific coherence, manuscript audits,
   去 AI 味, or section revisions. Default to suggestions, not full rewriting.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Scientific Manuscript Reviser
@@ -68,8 +68,28 @@ Improve scientific communication without changing scientific content.
    and new assertions. Re-extract facts after editing. Validate artifact provenance
    and exact mechanical invariants with `scripts/compare_invariants.py`.
 10. Accept a revision only when semantic audit and mechanical checks PASS, hard style
-   rules pass and ambiguous technical spans are resolved. FAIL means return to the
-   proposed edit, never silently repair the facts. NEEDS_REVIEW remains visible.
+   rules pass and ambiguous technical spans are resolved. FAIL returns to the proposed
+   edit; never repair the facts silently. NEEDS_REVIEW remains visible.
+
+## Evidence grounding
+
+Read [evidence-grounding.md](references/evidence-grounding.md) for supplied source evidence,
+self-evaluation or multi-round revision. All four v0.2.0 layers are additive, none replaces
+the scientific audit, and each one bounds verification rather than certifying a claim.
+
+- **Evidence Ledger** records where a claim's evidence lives, its state
+  (verified/reported/contradicted/unknown) and applicability. A cited paper stays reported,
+  because reading a text is not verifying a claim.
+- **Counterfactual Evaluation** validates a paired correct/faulty case set and separately
+  scores a supplied detection result, never running a detector itself. Passing it proves the
+  case set is well formed, not that this skill detects faulty reasoning.
+- **Revision Impact Analysis** maps each edited location to dependent claim, evidence,
+  theory, experiment and cross-section elements, choosing minimal sufficient verification
+  for language edits and the full audit for scientific edits. A lost limitation or an
+  unverified inference raised to verified blocks auto-acceptance.
+- **Bounded Revision Loop** ties each round to a problem, target change and completion
+  criteria, never re-proposes a resolved problem without new evidence, and stops on a met
+  condition, no progress or unresolvable disagreement.
 
 ## Output contract
 
@@ -94,9 +114,6 @@ matrix, logic chain, 2–4 real architecture alternatives when warranted, recomm
 Compact/Full blueprint, experiment portfolio, literature roles, outline choices and
 outline/alignment audit. Do not fill missing science with polished sketches.
 
-Supported strengths should become visible. Novelty, significance, robustness,
-causality and generality cannot grow through wording. Do not optimize reviewer or
-AI detector scores, hide weaknesses, or use recursive score-driven rewriting.
-Generate with the same rules used to audit. Every central claim needs a traceable
-evidence path; every important paragraph needs a scientific role. Theory constrains
-or explains claims; drafting never upgrades planned evidence into completed evidence.
+World-class communication without inflating science. Novelty, robustness, causality and
+generality cannot grow through wording. Every central claim needs a traceable evidence path.
+Theory constrains or explains claims, and drafting never upgrades planned evidence.
