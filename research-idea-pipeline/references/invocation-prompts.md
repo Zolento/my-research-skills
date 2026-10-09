@@ -27,6 +27,35 @@
 
 ---
 
+## 0.1 预设：入口内部的协议（自然语言即可，不必记 id）
+
+四个入口解决"从哪进"；**预设**解决"进去以后按哪套协议做"。用户直接用自然语言表达，
+Router 负责解析（显式 id > 别名 > 意图词 + 入口 > 意图词 > Loop 自动建议），
+政策见 [preset-policy.md](preset-policy.md)；共同约束见 [shared-contract.md](../shared-contract.md)；元数据见 [preset-registry.json](../preset-registry.json)；基准用例见 [router-fixtures.json](../router-fixtures.json)（`preset_router.py check --fixtures`）。
+
+| preset | 入口 | 授权 | 用户可能这样说（registry `intent_examples`） |
+|---|---|---|---|
+| `research-loop` | `continue-research` | `execute` | 「继续自动科研」、「按现有授权持续跑 loop」 |
+| `paradigm-escape` | `explore` | `discover_only` | 「跳出当前思路」、「换一个完全不同的数学建模角度」 |
+| `research-recovery` | `continue-research` | `recover_no_experiment` | 「恢复之前的科研工作」、「上下文没了，恢复项目状态」 |
+| `scientific-replanning` | `continue-research` | `plan` | 「重新规划当前路线」、「这条路线被否证了，重新制定计划」 |
+| `research-audit` | `audit` | `audit` | 「审查论文方案」、「找出当前实验的致命缺陷」 |
+| `research-review` | `continue-research` | `read_only` | 「现在研究进展怎么样」、「总结当前真实发现，不要执行」 |
+| `evidence-conflict-repair` | `audit` | `evidence_repair` | 「实验结果和 evidence 对不上」、「修复 claim 和 memory 冲突」 |
+| `context-drift-recovery` | `continue-research` | `recover_no_experiment` | 「Skill 规则丢了，恢复上下文」、「上下文压缩以后重新确认规则」 |
+| `memory-consolidation` | `continue-research` | `derived_only` | 「整理认知记忆」、「State 更新后刷新 Cognitive Memory」 |
+| `resource-recovery` | `continue-research` | `runtime_recovery` | 「GPU 不够了」、「环境崩溃，恢复执行」 |
+| `experiment-failure-recovery` | `continue-research` | `engineering_recovery` | 「训练 OOM 了」、「实验 NaN 了，检查并恢复」 |
+| `loop-health-check` | `continue-research` | `inspect_only` | 「检查科研 loop 健康度」、「有在真正推进科研吗」 |
+| `stagnation-breaker` | `continue-research` | `decision_only` | 「一直在重复归因」、「检查是不是陷入局部最优」 |
+| `strategy-evolution` | `continue-research` | `strategy_update` | 「根据历史结果改进探索策略」、「让策略记忆真正影响下一轮决策」 |
+| `hypothesis-rebalance` | `explore` | `portfolio` | 「所有 idea 都一样」、「重新平衡假设组合」 |
+| `discovery-replay` | `continue-research` | `evaluation_only` | 「做一次历史研究回放」、「检验自进化策略是否真的更好」 |
+
+**安全规则（`PR1`—`PR9`）：** 否定不触发（「不要审计」→ `HOLD`）；歧义取最小授权并要求确认；
+只给 `phase=R<n>` 时交回既有阶段；只陈述问题先只读诊断；**只读提问绝不升级为执行**；
+工程故障不写成科学否证。
+
 ## 1. `start-project` — 第一次进入现有项目
 
 **用途：** 把「一个已有代码/数据的仓库」变成「有 Research State 的项目」。

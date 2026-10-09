@@ -94,6 +94,7 @@ The `cognition/` directory sits in the route control plane, beside `populations/
 | `CM0`—`CM10` | `scripts/cognition.py` | cognitive projection, provenance, revision authority |
 | `PC1`—`PC11` | `scripts/prediction_compare.py` | criteria, observation binding, freeze integrity, the frozen branch mode (`PC10`), evidence eligibility (`PC7`, sub-checks `PQ1`—`PQ8`), adjudication completeness (`PC8`), competition, insight cards and their per-prediction evidence binding (`PC11`) |
 | `LH1`—`LH16` | `scripts/legacy_handoff.py` | takeover compatibility audit |
+| `PR1`—`PR9` | `scripts/preset_router.py` | provided-registry ↔ protocol parity, intent routing (clause-scoped negation, ambiguity → least privilege), one-protocol loading, loop triggers, recovery guard, permission tiers |
 | `SV1`—`SV8` | `scripts/strategy_memory.py` | value judgment, taste authority, anti-lock-in, isolation |
 | `RP1`—`RP5` | `scripts/research_replay.py` | case schema, leak guard, decision schema, independent novelty |
 
@@ -144,7 +145,7 @@ python3 scripts/release_check.py
 
 ## 8. Verification status
 
-Verified offline and mechanically, by the fifteen-step release gate and 1284 unit tests:
+Verified offline and mechanically, by the sixteen-step release gate and 1347 unit tests:
 
 * the canonical state, scheduler template and the four schemas are unchanged, and
   `state_check.py` still enforces the same `S1`—`S7` / `V1`—`V24`;
@@ -186,6 +187,16 @@ Verified offline and mechanically, by the fifteen-step release gate and 1284 uni
   is idempotent even when the rebuild reports `warning`-severity CM diagnostics — the severity
   table is enforced, so a legacy note never flips an exit code or blocks a takeover;
 * no value judgment or strategy update contains an aggregate score, and no operator is banned;
+* the provided `router-fixtures.json` passes 53/53 (48 positive + 5 guarded), every protocol file is
+  independent, and one call loads the shared contract plus exactly one protocol;
+* the sixteen presets resolve from Chinese, English, aliases, ids and the registry's intent examples; a negated request and an
+  ambiguous request cannot start an execution; a descriptive report starts read-only; the loop
+  trigger selects at most one recovery per `(state_version, preset, signal)` and ends in `HOLD`
+  instead of repeating; an engineering failure never changes `claims[]`/`hypotheses[]`;
+* strategy advice reaches the real action selection through the Strategy Decision Adapter, which
+  may only reorder inside one `EIG ÷ cost` tier among actions that already pass the hard gates,
+  records candidates/adoption/reason in `scheduler.strategy_decisions[]`, and reports
+  `strategy_applied: false` with a reason when nothing can change;
 * the offline ablation reproduces the capability ladder, and the fourteen adversarial cases are
   satisfied by the full arm and not by the baseline.
 

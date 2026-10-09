@@ -17,6 +17,80 @@ Declare the project anchor rather than assuming that higher benchmark performanc
 is the goal. Supporting routes must explain how they affect that anchor. Changing
 the project direction requires the user's instruction.
 
+## Preset library and intent router (v2.3.1)
+
+Sixteen rehearsed protocols inside the four semantic entries. You do not memorise ids: say what
+you mean, and the router resolves it (explicit id > alias > intent + entry > intent > loop
+suggestion). Policy: [references/preset-policy.md](references/preset-policy.md); protocols:
+[presets/](presets/).
+
+| Group | Presets | Entry |
+|---|---|---|
+| User-invoked (6) | `research-loop`, `paradigm-escape`, `research-recovery`, `scientific-replanning`, `research-audit`, `research-review` | `continue-research` / `explore` / `audit` |
+| Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
+| Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
+
+The package is data-driven: `preset-registry.json` is the source of truth for ids, entries,
+triggers, execution scopes, protocol paths and the 16×3 intent examples; `shared-contract.md` is the
+common contract every protocol loads first; `presets/<id>.md` are 16 independent protocols;
+`router-fixtures.json` is the intent-routing base test (48 positive + 5 guarded cases).
+A call loads the shared contract plus **one** protocol — never all sixteen.
+
+```sh
+python3 scripts/preset_router.py list                            # 16 presets, groups, scopes, auto signals
+python3 scripts/preset_router.py load --preset research-review    # what one call loads (+ not_loaded)
+python3 scripts/preset_router.py check --fixtures                 # registry ↔ protocol + provided fixtures
+python3 scripts/preset_router.py resolve --text "继续自动科研"     # natural language → preset
+python3 scripts/preset_router.py resolve --text "训练 OOM 了"      # → experiment-failure-recovery (diagnose first)
+python3 scripts/preset_router.py resolve --text "不要审计"         # → HOLD (negation respected)
+python3 scripts/preset_router.py inspect --preset paradigm-escape  # full machine-readable contract
+python3 scripts/preset_router.py trigger --state <research-state.json>   # machine signals → recovery, or HOLD
+python3 scripts/preset_router.py run --preset loop-health-check --state <research-state.json>
+python3 scripts/preset_router.py record --state <research-state.json> --preset stagnation-breaker
+python3 scripts/preset_router.py check                           # registry ↔ protocol parity
+```
+
+**Start the autonomous loop:** `resolve --text "继续自动科研"` (or `--preset research-loop`) runs the CIE
+scientific loop — Recall → Understand → Discover → Predict → Intervene → Verify → Revise →
+Consolidate → Loop — inside the existing stages and gates.
+
+**Who triggers what:** the event listener, dispatcher and any background loop belong to the
+caller — the existing Scheduler, the runtime, or a platform hook. This skill ships an executable,
+idempotent trigger/record interface (`trigger`, `record`, `cognition/recovery-log.jsonl`) with
+cooldown and per-fingerprint attempt caps; it does **not** install a daemon and does not claim
+unattended auto-triggering. A user preset the registry marks as event-triggerable follows its
+privilege tier: planning/diagnosis protocols (which cannot change scientific facts) may auto-start;
+`paradigm-escape` (controlled discovery) needs an explicit loop authorization
+(`preset_router.py authorize --scope discovery_only`) and is otherwise only *recommended*;
+`authorize` never covers execution, so no preset can auto-start a GPU job, change the anchor or
+bypass the evidence gates. `research-audit` is read-only by default — writing `assurance[]`
+requires the explicit R7 write-back flow.
+
+**When the loop stalls:** the trigger engine reads machine-readable state only and proposes
+`stagnation-breaker` (behaviour switch and smallest decision-changing intervention) or
+`hypothesis-rebalance` / `paradigm-escape` when candidates have converged on one representation.
+Recovery is guarded: the same `(state_version, preset, signal fingerprint)` runs once, then cooldown
+and a per-fingerprint attempt cap apply, and the loop ends in an explicit `HOLD` instead of repeating.
+Hard gates are never relaxed, and the AALG diagnostic budget is never refreshed.
+
+**Engineering failure vs scientific failure:** OOM, NaN, crashes, broken dependencies and budget
+exhaustion route to `resource-recovery` / `experiment-failure-recovery`, which classify the failure
+and plan the repair. They never touch `claims[].status`, never write an experiment's scientific
+verdict, and never re-run the same experiment without a fresh PEIG/AALG receipt.
+
+**Cross-session memory:** `research-recovery` and `context-drift-recovery` rebuild the skill contract,
+canonical state and CIE projections **from disk** (never from chat history), and `memory-consolidation`
+rebuilds projections after legal revisions without touching canonical science.
+
+**Self-evolution limits:** `strategy-evolution` may only update already-authorised strategy memory and
+exploration advice. Its advice enters the real action selection through the Strategy Decision Adapter
+(`strategy_memory.py decide`), which may reorder **inside one `EIG ÷ cost` tier** and only among actions
+that already pass the hard gates; it records candidates, advice, choice, adoption and reason in
+`scheduler.strategy_decisions[]`, and the next round consumes it. It cannot change the fixed priority
+rules, the Research Contract, evidence qualification, the AALG budget, anchors or execution permissions.
+Adoption is **not** evidence of research capability: that is measured by Discovery Replay and by
+scientific results (see [references/preset-policy.md](references/preset-policy.md) §7 for L1/L2/L3).
+
 ## Workflow
 
 Research contract → field mapping → Discovery and Assurance → evidence contract
