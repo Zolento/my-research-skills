@@ -114,6 +114,19 @@ class DeterministicTests(RegistryTestBase):
         self.assertIsNone(profile_obj)
         self.assertIsNone(name)
         self.assertEqual(missing['year'], 2026)
+
+    def test_resolution_miss_carries_a_status_so_the_cli_exits_cleanly(self):
+        """A rejected lookup must be a verdict, not a traceback.
+
+        The CLI maps the result status to its exit code; a miss that omitted
+        'status' crashed instead of reporting the documented review exit.
+        """
+        root = self.build([source_file('s1', 'NeurIPS', 2025)], {'n.json': profile()})
+        _profile, _name, missing = vr.Registry(root).resolve('ECCV', 2025, 'main')
+        self.assertIn('status', missing)
+        self.assertEqual(missing['status'], 'UNRESOLVED')
+        self.assertTrue(missing['available'])
+        self.assertIn('never applied', missing['reason'])
         self.assertIn(('NeurIPS', 2025), missing['available'])
 
     def test_resolution_never_inherits_a_previous_year(self):

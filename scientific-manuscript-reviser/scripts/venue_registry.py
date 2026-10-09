@@ -116,7 +116,10 @@ class Registry:
                 return profile, path.name, None
         available = sorted({(p['venue'], p['year']) for p in self.profiles()
                             if 'venue' in p and 'year' in p})
-        return None, None, {'venue': venue, 'year': year, 'track': track, 'available': available}
+        return None, None, {'status': 'UNRESOLVED', 'venue': venue, 'year': year, 'track': track,
+                            'available': available,
+                            'reason': 'no policy profile for this exact venue, year and track; '
+                                      'a policy from another year or track is never applied'}
 
 
 def _check_fields(obj, required, optional, label, errors):
