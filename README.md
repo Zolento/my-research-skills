@@ -66,8 +66,10 @@ npx skills add "Zolento/my-research-skills#<分支>@<skill>" -g -y
 ## 版本与发布
 
 每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-idea-pipeline`
-当前为 **2.3.2**）。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
+当前为 **2.3.3**）。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
 的提交上；tag 消息里写清 merge commit、升级注意、验收读数与安装结果。
+2.3.3 = 运行时正确性修复：执行预览零副作用（不消耗预算与一次性收据）、Scheduler 硬门禁
+fail-closed、策略修订写入权限统一、post-update Assurance 可被真实 `decision_gate` 消费。
 
 ```bash
 git tag -l 'research-idea-pipeline/v*'          # 看已发布版本

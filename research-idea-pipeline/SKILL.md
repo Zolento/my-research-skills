@@ -23,7 +23,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-idea-pipeline
-  version: "2.3.2"
+  version: "2.3.3"
   upstream-spec: "顶会研究创意流水线（Research Idea Pipeline）"
 ---
 

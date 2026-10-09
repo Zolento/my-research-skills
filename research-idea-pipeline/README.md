@@ -56,7 +56,12 @@ Consolidate → Loop — inside the existing stages and gates.
 
 **v2.3.2 — R10/R11 loop liveness:**
 
-**Execution previews are side-effect free (v2.3.3):** `experiment_execute.py run` without
+**v2.3.3 — runtime correctness:** scheduling is fail-closed (a scheduler that is not PASS yields
+no dispatch and is never reported as PASS), execution previews consume nothing, strategy revisions
+are written by the authorised Meta-Controller and pass both validators, and post-update Assurance is
+discovered, verified through the real `decision_gate` and consumed — with dependent work held.
+
+**Execution previews are side-effect free:** `experiment_execute.py run` without
 `--execute` re-checks every gate under the ledger lock and returns
 `preview: true / consumed: false / would_execute / budget` without writing a `consume` event — so a
 preview can no longer burn GPU hours, pilot runs or the single-use receipt, and the same receipt
