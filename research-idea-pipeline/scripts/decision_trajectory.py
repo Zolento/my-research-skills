@@ -112,7 +112,76 @@ def head_path(path: Path) -> Path:
     The hash chain alone protects every line *except* the most recent one; a head file
     mirrors `experiment_execute.Ledger` and closes that gap.
     """
-    return Path(path).parent / (TRAJECTORY_NAME + TRAJECTORY_HEAD_SUFFIX)
+    return Path(path).parent / (Path(path).name + TRAJECTORY_HEAD_SUFFIX)
+
+
+# ---------------------------------------------------------------------------
+# Generic append-only chained store, shared by the other Skill-RSI control records
+# ---------------------------------------------------------------------------
+
+def load_chained(path: Path, *, tolerant: bool = False
+                 ) -> Tuple[List[Dict[str, Any]], List[cg.Diagnostic]]:
+    """Read any append-only JSONL store, verifying its hash chain and tail digest."""
+    path = Path(path)
+    name = path.name
+    diagnostics: List[cg.Diagnostic] = []
+    if not path.exists():
+        return [], diagnostics
+    records: List[Dict[str, Any]] = []
+    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            diagnostics.append(_diag("DT0", f"{name}:{index + 1}",
+                                     f"不是合法 JSON（拒绝截断/损坏的日志）：{exc.msg}"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render()) from exc
+            continue
+        if not isinstance(record, dict):
+            diagnostics.append(_diag("DT0", f"{name}:{index + 1}", "记录必须是对象"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render())
+            continue
+        expected_previous = _digest(records[-1]) if records else None
+        if record.get("previous") != expected_previous:
+            diagnostics.append(_diag("DT0", f"{name}:{index + 1}",
+                                     "哈希链断裂：历史行被改写或被删除"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render())
+        if record.get("seq") != index + 1:
+            diagnostics.append(_diag("DT0", f"{name}:{index + 1}",
+                                     f"seq 不连续：期望 {index + 1}，实际 {record.get('seq')!r}"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render())
+        records.append(record)
+    if diagnostics and not tolerant:
+        raise TrajectoryError(diagnostics[0].render())
+    head = head_path(path)
+    expected_head = _digest(records[-1]) if records else None
+    if head.exists():
+        if head.read_text(encoding="ascii").strip() != expected_head:
+            diagnostics.append(_diag("DT0", str(head),
+                                     "尾部摘要与 head 不一致：最后一行被改写或历史被截断"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render())
+    elif records:
+        diagnostics.append(_diag("DT0", str(head), "日志有记录但缺少 head 摘要文件"))
+        if not tolerant:
+            raise TrajectoryError(diagnostics[-1].render())
+    return records, diagnostics
+
+
+def append_chained(path: Path, record: Dict[str, Any]) -> Dict[str, Any]:
+    """Durably append one record to a chained store, returning the stored record."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    records, _ = load_chained(path)
+    stored = copy.deepcopy(record)
+    stored["seq"] = len(records) + 1
+    stored["previous"] = _digest(records[-1]) if records else None
+    _append_line(path, stored)
+    return stored
 
 
 def _digest(value: Any) -> str:
@@ -134,61 +203,10 @@ def _as_text(value: Any) -> str:
 def load_records(path: Path, *, tolerant: bool = False) -> Tuple[List[Dict[str, Any]], List[cg.Diagnostic]]:
     """Read the trajectory, verifying the hash chain.
 
-    A broken chain raises `TrajectoryError` unless `tolerant` is set, in which case the
-    diagnostics are returned for reporting. A truncated tail (a partial JSON line) is
-    always an error: silently dropping it would make an append-only log look shorter.
+    Delegates to the shared chained store loader; kept as the trajectory-specific name so
+    callers do not need to know about the generic helper.
     """
-    path = Path(path)
-    diagnostics: List[cg.Diagnostic] = []
-    if not path.exists():
-        return [], diagnostics
-    records: List[Dict[str, Any]] = []
-    raw = path.read_text(encoding="utf-8")
-    lines = raw.splitlines()
-    for index, line in enumerate(lines):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            diagnostics.append(_diag("DT0", f"{TRAJECTORY_NAME}:{index + 1}",
-                                     f"轨迹行不是合法 JSON（拒绝截断/损坏的日志）：{exc.msg}"))
-            if not tolerant:
-                raise TrajectoryError(diagnostics[-1].render()) from exc
-            continue
-        if not isinstance(record, dict):
-            diagnostics.append(_diag("DT0", f"{TRAJECTORY_NAME}:{index + 1}", "轨迹行必须是对象"))
-            if not tolerant:
-                raise TrajectoryError(diagnostics[-1].render())
-            continue
-        expected_previous = _digest(records[-1]) if records else None
-        if record.get("previous") != expected_previous:
-            diagnostics.append(_diag("DT0", f"{TRAJECTORY_NAME}:{index + 1}",
-                                     "轨迹哈希链断裂：历史行被改写或被删除"))
-            if not tolerant:
-                raise TrajectoryError(diagnostics[-1].render())
-        if record.get("seq") != index + 1:
-            diagnostics.append(_diag("DT0", f"{TRAJECTORY_NAME}:{index + 1}",
-                                     f"seq 不连续：期望 {index + 1}，实际 {record.get('seq')!r}"))
-            if not tolerant:
-                raise TrajectoryError(diagnostics[-1].render())
-        records.append(record)
-    if diagnostics and not tolerant:
-        raise TrajectoryError(diagnostics[0].render())
-    head = head_path(path)
-    expected_head = _digest(records[-1]) if records else None
-    if head.exists():
-        actual_head = head.read_text(encoding="ascii").strip()
-        if actual_head != expected_head:
-            diagnostics.append(_diag("DT0", str(head),
-                                     "轨迹尾部摘要与 head 不一致：最后一行被改写或历史被截断"))
-            if not tolerant:
-                raise TrajectoryError(diagnostics[-1].render())
-    elif records:
-        diagnostics.append(_diag("DT0", str(head), "轨迹有记录但缺少 head 摘要文件"))
-        if not tolerant:
-            raise TrajectoryError(diagnostics[-1].render())
-    return records, diagnostics
+    return load_chained(path, tolerant=tolerant)
 
 
 def _append_line(path: Path, record: Dict[str, Any]) -> None:
