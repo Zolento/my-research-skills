@@ -1133,25 +1133,41 @@ class TestReviewFixes(unittest.TestCase):
             self.assertEqual(missing, pr.EXIT_ENV)
 
     def test_r10_completion_stops_the_revise_loop(self):
+        """A *real* transaction is the completion receipt — a repair is not required.
+
+        The hand-built receipt that used to live here proved nothing: `r10_status` validates the
+        receipt against `evidence_outcome.state_errors()`, so a fabricated block is BLOCKED, and
+        the legal repair-less transactions (`test_r10_liveness.py`) are COMMITTED.
+        """
+        import test_evidence_outcome as teo
+        import evidence_outcome as eo
+        result = eo.apply(*teo.fixture("negative"), timestamp=teo.TIMESTAMP)
+        self.assertEqual(result["status"], "PASS", result)
+        state = result["state"]
+        self.assertEqual(state["repairs"], [], "NEGATIVE_EVIDENCE commits without a repair")
+        self.assertEqual(pr.r10_pending(state), [])
+        self.assertEqual(pr.r10_status(state)["X1"]["status"], pr.R10_COMMITTED)
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pathlib.Path(temp) / "research-state.json"
+            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            payload, _, _ = pr.run_preset("research-loop", state_path)
+            self.assertNotEqual(payload["observed"]["current"]["step"], "Revise")
+
+    def test_a_fabricated_receipt_is_blocked_not_completed(self):
+        """The validator, not the presence of a dict, decides completion."""
         with tempfile.TemporaryDirectory() as temp:
             state_path = pr._fixture(pathlib.Path(temp) / "A")
             state = json.loads(state_path.read_text(encoding="utf-8"))
             state["experiments"][0].update({
                 "status": "done", "result_at_state_version": 4,
-                "outcome_analysis": {"packet": {}, "analysis": {"id": "AN1", "outcome": "POSITIVE_EVIDENCE"},
-                                     "audit": None}})
-            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
-            self.assertEqual(pr.r10_pending(state), ["X1"])
-            payload, _, _ = pr.run_preset("research-loop", state_path)
-            self.assertEqual(payload["observed"]["current"]["step"], "Revise")
-            state["repairs"] = [{"flaw": "f", "disposition": "REPAIR_CLAIM", "state_delta": "d",
-                                 "closure": "RESOLVED", "targets": ["C1"],
-                                 "source_review": None, "outcome_analysis_id": "AN1"}]
+                "outcome_analysis": {"packet": {}, "analysis": {"id": "AN1"}, "audit": None}})
             state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
             self.assertEqual(pr.r10_pending(state), [])
-            payload, _, _ = pr.run_preset("research-loop", state_path)
-            self.assertNotEqual(payload["observed"]["current"]["step"], "Revise")
-            self.assertEqual(payload["observed"]["current"]["step"], "Consolidate")
+            self.assertEqual(pr.r10_status(state)["X1"]["status"], pr.R10_BLOCKED)
+            payload, _, code = pr.run_preset("research-loop", state_path)
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertEqual(code, pr.EXIT_ENV)
+            self.assertEqual(payload["hold_reason"], "outcome_receipt_blocked")
 
     def test_a_plain_audit_never_writes_and_proposes_only_on_request(self):
         with tempfile.TemporaryDirectory() as temp:

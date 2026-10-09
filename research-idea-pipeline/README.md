@@ -54,6 +54,18 @@ python3 scripts/preset_router.py check                           # registry ↔ 
 scientific loop — Recall → Understand → Discover → Predict → Intervene → Verify → Revise →
 Consolidate → Loop — inside the existing stages and gates.
 
+**v2.3.2 — R10/R11 loop liveness:**
+
+**Loop completion is validator-backed:** a terminal experiment is done with R10/R11 only when its
+`outcome_analysis` transaction passes `evidence_outcome.state_errors()` — not when a `repairs[]`
+entry happens to exist (`NEGATIVE_EVIDENCE`, `INVALID_EXPERIMENT`, hypothesis-only and partial-scope
+transactions commit legally without any repair). The loop classifies every experiment individually
+(`NEEDS_ANALYSIS` / `COMMITTED` / `BLOCKED` / `PENDING_EXECUTION`), asks R9.O only for the ones
+missing a receipt, holds on damaged or conflicting receipts, and after consolidation passes through
+the Assurance / Decision Gate before consuming the Scheduler's next legal action. A terminal
+experiment is therefore never re-analysed because a repair happens to be missing, and a damaged or
+version-conflicting receipt produces an explicit `HOLD` instead of silent retries.
+
 **Who triggers what:** the event listener, dispatcher and any background loop belong to the
 caller — the existing Scheduler, the runtime, or a platform hook. This skill ships an executable,
 idempotent trigger/record interface (`trigger`, `record`, `cognition/recovery-log.jsonl`) with
