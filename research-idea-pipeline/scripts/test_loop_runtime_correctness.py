@@ -678,6 +678,38 @@ class TestAssuranceStore(unittest.TestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertFalse(payload.get('stored'))
 
+    def test_the_explicit_canonical_output_path_is_accepted(self):
+        """The documented path must work when passed explicitly (Phase 1.1 regression)."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        proc, payload = self.run_cli(*self.all_checks(), output=self.path)
+        self.assertEqual(proc.returncode, 0, payload)
+        self.assertTrue(payload['stored'])
+        self.assertEqual(pathlib.Path(payload['path']).resolve(), self.path.resolve())
+        self.assertTrue(self.path.is_file())
+
+    def test_an_output_path_from_another_route_is_refused(self):
+        with tempfile.TemporaryDirectory() as other:
+            foreign = pathlib.Path(other) / 'assurance' / 'outcome' / f'{self.analysis_id}.json'
+            proc, payload = self.run_cli(*self.all_checks(), output=foreign)
+            self.assertNotEqual(proc.returncode, 0, payload)
+            self.assertIn('output must be', payload['errors'][0])
+            self.assertFalse(foreign.exists())
+            self.assertFalse(self.path.exists())
+
+    def test_path_traversal_and_symlink_escapes_are_refused(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        traversal = self.path.parent / '..' / '..' / 'escape.json'
+        proc, payload = self.run_cli(*self.all_checks(), output=traversal)
+        self.assertNotEqual(proc.returncode, 0, payload)
+        self.assertFalse((self.route / 'escape.json').exists())
+        with tempfile.TemporaryDirectory() as elsewhere:
+            link = self.path.parent / 'linked-outcome'
+            link.symlink_to(pathlib.Path(elsewhere), target_is_directory=True)
+            escaped = link / f'{self.analysis_id}.json'
+            proc, payload = self.run_cli(*self.all_checks(), output=escaped)
+            self.assertNotEqual(proc.returncode, 0, payload)
+            self.assertFalse((pathlib.Path(elsewhere) / f'{self.analysis_id}.json').exists())
+
     def test_an_arbitrary_output_path_is_refused(self):
         target = pathlib.Path(self.tmp.name) / 'research-state.json'
         proc, payload = self.run_cli(*self.all_checks(), output=target)
