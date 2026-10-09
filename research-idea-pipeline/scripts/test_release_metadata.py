@@ -35,11 +35,19 @@ class TestReleaseMetadata(unittest.TestCase):
         self.assertRegex(version, SEMVER)
 
     def test_both_readmes_agree_with_the_skill(self):
+        """The repository root README is checked only when this copy sits inside the repository.
+
+        An installed skill (e.g. `~/.agents/skills/research-idea-pipeline`) has no repository
+        root, and a release check must not fail there.
+        """
         version = declared_version()
-        root_readme = (REPO / 'README.md').read_text(encoding='utf-8')
         component_readme = (ROOT / 'README.md').read_text(encoding='utf-8')
-        self.assertIn(f'当前为 **{version}**', root_readme)
         self.assertRegex(component_readme, rf'v?{re.escape(version)}')
+        root_readme = REPO / 'README.md'
+        if root_readme.is_file():
+            self.assertIn(f'当前为 **{version}**', root_readme.read_text(encoding='utf-8'))
+        else:
+            self.skipTest('installed copy: no repository root README to cross-check')
 
     def test_the_changelog_and_release_notes_cover_the_version(self):
         version = declared_version()
@@ -54,6 +62,8 @@ class TestReleaseMetadata(unittest.TestCase):
     def test_no_document_claims_a_different_current_version(self):
         version = declared_version()
         for path in (REPO / 'README.md', ROOT / 'README.md', ROOT / 'SKILL.md'):
+            if not path.is_file():
+                continue
             text = path.read_text(encoding='utf-8')
             for match in re.finditer(r'当前(?:正式)?版本[^\n]{0,40}', text):
                 self.assertIn(version, match.group(0), f'{path.name}: {match.group(0)}')

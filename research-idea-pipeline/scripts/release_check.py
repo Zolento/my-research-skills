@@ -839,9 +839,10 @@ def step_release_metadata() -> Tuple[bool, str]:
     version = match.group(1)
     if not re.match(r'^\d+\.\d+\.\d+$', version):
         return False, f'metadata.version {version!r} is not semantic'
-    root_readme = (root.parent / 'README.md').read_text(encoding='utf-8')
-    if f'当前为 **{version}**' not in root_readme:
-        return False, f'root README does not declare the current version {version}'
+    root_readme = root.parent / 'README.md'
+    if root_readme.is_file():
+        if f'当前为 **{version}**' not in root_readme.read_text(encoding='utf-8'):
+            return False, f'root README does not declare the current version {version}'
     if version not in (root / 'README.md').read_text(encoding='utf-8'):
         return False, 'component README does not mention the declared version'
     for required in (root / 'CHANGELOG.md', root / 'docs' / 'releases' / f'v{version}.md'):
