@@ -706,6 +706,170 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 
 ---
 
+### 1.8 认知记忆：跨会话恢复科学理解（Cognitive Insight Engine）
+
+> **记录事实 ≠ 积累理解。** Research State 回答「我们目前认为世界是什么样」；
+> 认知记忆回答「我们持有哪些机制、它们如何被证据改写、下一位执行者必须先恢复什么」。
+
+**定位：** 它是**已有系统的认知增强层**，不是第 16 个阶段，不是第九类一等对象，
+也不是第二份事实来源。权威定义见
+[cognitive-memory-policy.md](references/cognitive-memory-policy.md)。
+
+**三层，一个方向：**
+
+```text
+Canonical  .research-idea-pipeline/routes/<R>/research-state.json   ← 唯一权威
+Event      .research-idea-pipeline/routes/<R>/cognition/model-revisions.jsonl
+           结构断言 + canonical 指针，append-only                  ← 不承载支持度
+Derived    .research-idea-pipeline/routes/<R>/cognition/index.json
+           .research-idea-pipeline/routes/<R>/cognition/context-brief.md
+           可由前两层重建                                         ← 永不是权威
+```
+
+**四条硬边界（违反即与 §1.6 / §1.7 冲突）：**
+
+1. **支持度是算出来的，不是声明的。** 机制的支持等级由 canonical 事实推出
+   （`speculative` / `hypothesis` / `literature_supported` / `experiment_supported` /
+   `refuted`）。修订事件**不得**声明 `epistemic_status`、支持等级或 Claim 状态（`CM2`）；
+   自评只被记成冲突（`CM7`），不被采用。
+2. **认知记忆不写 canonical。** 它不写 `claims[].status`、不写 `contract`、不写锚点、
+   不写 `evidence[]` / `failures[]`。构建前后对 `research-state.json` 做字节比对（`CM0`）。
+3. **失效即过期。** 引用的证据或对象 `validity` 变成 `stale` / `invalid` / `pending` 时，
+   派生条目自动标记过期、退出 hot memory，并保留原因；不补写推测。
+4. **记忆不等于事实。** 每条机制必须带支持等级、适用范围与来源引用。Context Brief
+   不得把推测写成结论。
+
+**记忆生命周期：** `Recall → Reason → Test → Revise → Consolidate → Recall`。
+每次启动先恢复：研究契约与目标 / 仍有效的机制 / 未解释异常 / 被否证机制及其边界 /
+未完成的机制竞争 / 上一轮决策与未完成操作。**三级加载，不得无差别注入全部历史：**
+
+| 层 | 内容 | 选择依据 |
+|---|---|---|
+| **Hot** | 与当前焦点挂钩的机制、高重要度未复现异常、开放竞争、失败约束、上一轮决策 | 引用与焦点集相交 |
+| **Warm** | 被否证 / 被削弱的机制与相关历史 | 非 hot，但有支持理由 |
+| **Cold** | 其余一切，含全部过期条目 | 只给 id 与过期原因 |
+
+焦点集取自 canonical：`open` 且 `importance ∈ {critical, high}` 的 `U` 及其判别测试、
+存活的 `C`、`planned` / `running` 的 `X`、存活候选、`ACCEPTED_LIMITATION` 的 `repairs[].targets`。
+另有去重（同一 canonical 锚点集合 = 实质等价解释，`CM9`）、来源引用、版本检查和
+上下文预算（`--budget`，默认 6000 字符，截断必须显式标注）。
+
+**读写协议（逐阶段）：** R3—R6 写 `mechanism_*` / `competition_*` 并读策略先验；
+R8 写 `prediction_freeze`；R9.O 写 `anomaly_record` / `prediction_assessment`；
+R10 写 `mechanism_refute` / `mechanism_weaken` / `mechanism_reactivate`；
+R11 写 `mechanism_merge` / `mechanism_revise` 后重建；R12 / R13 **只读**（叙事与审阅是
+state 的视图）；R14 只读 Context Brief。详见该政策 §8。
+
+**机械闸门 `CM1`—`CM10`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
+
+```sh
+python3 scripts/cognition.py build --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/cognition.py check --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/research-state.json --budget 4000
+```
+
+退出码同仓库约定：`0` 通过 / `1` 参数错误 / `3` 硬违规 / `4` 环境不满足。
+**不新增 state 槽位**：S1—S7 / V1—V24、state 模板与 `state_check.py` 一律不变。
+
+**预测必须可判定（Phase 2）。** `preregistration.outcomes[].criterion` 把「什么算预测成立」
+在冻结时写成机器可读判据（`quantitative` / `directional` / `discrete`）。
+没有判据的结果只能返回 `UNTESTABLE`，**不得宣告预测成立或失败**；
+执行无效只能返回 `INVALID_EXECUTION`，不是异常；没有预注册的观察只能是
+`EXPLORATORY_ANOMALY`。
+
+**冻结的 `outcomes[]` 是完整判定集合**：观测包是「关于它」的证据，不是「要判定哪些结果」的
+清单。只提交一部分只能得到 `PARTIALLY_ASSESSED`，**永远不能读成「全部预测成立」**；
+`execution.validity=UNKNOWN` 时比较结果保留在 `diagnostic_outcome_class`，
+但**不占据科学判定栏**、不是合格证据，也不得触发 R10/R11 状态迁移
+（`evidence_transition_allowed`）。
+
+**互斥分支必须由预注册打开，不能由观测包声明。** 只有在冻结时写入
+`outcome_mode: "branch"` + `branch_rule`（`selector` / `quantity` / `branches` 完整划分），
+且分支判据**可证互斥**时，比较器才进入 branch mode；所选分支由冻结规则作用于**原始观测**
+导出，packet 里的 `observed_outcome` 只是必须与之一致的声明。未声明 mode 的预注册一律按
+completeness 判定（旧项目无需迁移）；分支规则缺失、冲突、不可验证或事后追加时，
+**不得产生 `PREDICTION_HELD`**，未选分支也要以可核验的排除条件记录（`PC10`）。
+
+**证据资格只有一个入口。** `qualify_evidence` 的 `PQ1`—`PQ8` 同时检查执行有效性、
+预注册冻结与判据形状、判定集合完整性或合法 branch mode、**观测包 schema 与结构校验
+（`PQ4` 直接消费观测校验器的完整结论：schema 错误 / 缺字段 / 类型非法 / 来源缺失 /
+摘要不符一律 fail closed）**、分支选择的可追溯性、实验与预测绑定、终态收据、时间顺序与
+事后篡改（含不可核验的冻结 `PC5`）。**任何一项不过就 fail closed**
+（`evidence_eligible: false`）：不得标记 `QUALIFIED_EVIDENCE`、不得授权 Claim 状态升级、
+不得用于机制否证或 Insight 认证；诊断性比较照常保留。Insight 只有绑定到**具体预测**（evidence 必须带 `prediction_ref`，
+或该实验只冻结了一个结果）、具有合格判定、方向一致的证据、**范围覆盖**（字符串 scope 规范化
+精确相等；结构化 `scope_region` 按约束子集判定，禁止子串包含与外推）与**已通过**的结构等价
+审计时才能成为 `evidence_supported_insight`（`PC11`）。
+
+机制竞争必须逐对检验**可比性 → 冲突 → 分辨率 → 预先声明的判别规则**：
+不同观测变量、不同测量口径、区间重叠、`noise/√n` 吃掉间隔、间隔小于 `min_separation`、
+没有 `discrimination_rule`，**都不能算可区分**。判别干预必须可执行（`planned` / `running`）。
+只有 `DISTINGUISHABLE` / `CONDITIONALLY_DISTINGUISHABLE` / `NOT_DISTINGUISHABLE` /
+`INSUFFICIENT_INFORMATION` 四值，且**不接受文本相似度或 LLM 自评分**。行为切换与
+Insight Card 规则见
+[prediction-anomaly-competition.md](references/prediction-anomaly-competition.md)。
+
+**科学价值不等于 EIG（Phase 3）。** 研究候选的**决策价值**与**发现潜力**分开判断，
+每个维度都带 canonical 依据与不确定性，**没有总分**（`SV1` 拒绝任何聚合分数）。
+科学品味分成**用户所有**（`contract`，agent 只读）与**证据校准**（从真实结果归纳，
+可修订）两部分；自动学习**只影响探索建议**，不得改锚点（`SV3`）。
+探索策略复用既有 `P1`—`P6` / `local` 与 QD archive：算子只能 `encouraged` /
+`neutral` / `discouraged` / `dormant`，**没有永久封禁**，降级必须有范围与重启条件，
+且至少两次独立失败（`SV5`）。规则见
+[scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md)。
+
+---
+
+### 1.9 旧项目接管：Legacy Research Handoff
+
+> **已有 canonical `research-state.json` ＝ 已初始化项目。** 载入新版 Skill **不是**新项目，
+> **不得跑全新 Bootstrap（`B0`—`B6`）**。
+
+入口**仍然是 `continue-research`**（只有四个入口，接管不新增第五个）。
+首次接管执行**只读**兼容性审计并重建认知记忆：
+
+```sh
+python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/<R>/research-state.json
+```
+
+**五条硬约束：**
+
+1. **不重置** `state_version` / `claims[].status` / `evidence` / 实验 ID / 锚点 /
+   诊断预算 / 历史决策；`research-state.json`、`scheduler.json` 与 `.execution` ledger
+   在接管前后**逐字节相同**。
+2. **不补造历史。** 历史上没有预注册的终态实验是**阻塞级兼容性错误**（`LH7`），
+   不得事后补一份冻结预测；没有可判定判据的冻结结果标 `retrospective`，
+   契约 / 失败条件 / 文档缺失标 `unknown`。
+3. **可从 canonical 重建认知记忆**：机制 / 异常 / 竞争 / 失效边界全部由 `claims[]` /
+   `hypotheses[]` / `experiments[]` / `failures[]` 投影得到，每条带
+   `origin: legacy_derivation` + `retrospective: true`，并在 Context Brief 标
+   `[RETROSPECTIVE]`。有修订记录覆盖同一对象时，重建条目自动让位。
+4. **严重兼容性错误一律不写回**（退出码 3，什么都不写），
+   **不得通过重建一份新 Research State 绕过问题**。`LH1`—`LH16` 见
+   [legacy-handoff.md](references/legacy-handoff.md)。
+5. **可重复、可追溯、可回滚。** 同样输入产出逐字节相同的文件；第二次接管只报
+   `already_initialized`；`rollback` 只删本层创建的文件，遇到未知文件即拒绝。
+
+接管产生 `cognition/handoff-report.md`（已恢复 / 未恢复 / 重要机制 / 未解异常 /
+禁止重复方向 / 进行中实验 / 下一条有价值动作）。接管后进入正常 `continue-research`，
+默认读取 `cognition/context-brief.md`，**不需要用户指定记忆文件**。
+
+**发现能力必须可验证（Phase 4）。** 历史回放用**当时可见的信息**重放一次研究决策，
+再拿系统从未见过的隐藏答案评分：七个维度**各自独立**，**不做加权总分**；
+`null` 表示该 case 不可评，不得当作 0。消融四个 arm（baseline / memory_only /
+memory_prediction / full_cie）只报实测值与不确定性，**样本不足时明确声明不得宣称提升**；
+两个 arm 在所有维度上无法区分时也要写明。novelty **只认独立标签或文献近邻**，
+agent 自评被拒绝。回放前必须证明隐藏信息不可达（`RP2`）。
+规则见 [discovery-replay.md](references/discovery-replay.md)。
+
+```sh
+python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2
+python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
+```
+
+---
+
 ## 2. 共享资源索引
 
 | 资源 | 位置 | 内容 |
@@ -743,6 +907,17 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 | 根级索引模板 | [templates/INDEX.root.md](templates/INDEX.root.md) | 根 `INDEX.md` 骨架（**路线总表投影**：`Route | Goal | Status | Thesis | Blocker` + 项目主锚点声明 + 全局 Warnings） |
 | 路线级说明模板 | [templates/README.route.md](templates/README.route.md) | `routes/<R>/README.md` 骨架（**路线身份证**：Research Question / Why / Relation / Thesis / Scope / Lineage / Resources / Entry points） |
 | 串联示例 | [examples/](examples/) | 主链路串联（`R3—R6 → R8 → R12 → R7`）、接续复核、单独文献调研、多路线目录管理的示例；**受控中文两档对照（asd-ste100 改写样例）见 [example-writing-tier.md](examples/example-writing-tier.md)** |
+| **认知记忆政策（CIE Phase 1）** | [references/cognitive-memory-policy.md](references/cognitive-memory-policy.md) | 四类认知记忆（机制 / 异常 / 竞争 / 科学价值）、三层权威边界、支持等级推导阶梯、`CM1`—`CM10` 规则（`CM7`—`CM10` 为 warning，不翻转退出码）、记忆生命周期与 hot/warm/cold 加载、写入禁止项 |
+| **认知记忆脚本** | [scripts/cognition.py](scripts/cognition.py) | Memory Builder + Validator + Recall / Context Brief；`build` / `check` / `brief` / `recall` / `--selftest` / `--list-kinds`；**只读 canonical，从不写 `research-state.json`** |
+| 认知记忆测试与示例 | [scripts/test_cognition.py](scripts/test_cognition.py)、[examples/cognition/](examples/cognition/README.md) | 离线测试（兼容性 / 可重建性 / 支持度推导 / 写入禁止 / 失效过滤 / CLI / fixture）+ 合成 fixture（**不是真实科研证据**） |
+| **预测 / 异常 / 机制竞争（CIE Phase 2）** | [references/prediction-anomaly-competition.md](references/prediction-anomaly-competition.md) | 可判定判据 `criterion`、**冻结的 branch mode**（`outcome_mode`/`branch_rule`）、观测包来源绑定、七类结果、**统一证据资格门（`PQ1`—`PQ8`，fail closed）**、竞争区分力、诊断→干预行为切换、Insight Card 与**按预测逐个绑定**的认证；规则 `PC1`—`PC11`；**不得自我认证创新性** |
+| **预测比较器脚本** | [scripts/prediction_compare.py](scripts/prediction_compare.py) | `freeze` / `compare` / `compete` / `switch` / `insight` / `--selftest`；判据形状、来源绑定、冻结完整性（`PC4`/`PC5`）、分支规则（`PC10`）、**唯一证据资格入口 `qualify_evidence`**、Insight 证据绑定（`PC11`）、区分力与行为切换 |
+| **旧项目接管（Legacy Handoff）** | [references/legacy-handoff.md](references/legacy-handoff.md)、[scripts/legacy_handoff.py](scripts/legacy_handoff.py) | 已初始化项目**禁止重新 Bootstrap**；只读兼容性审计 `LH1`—`LH16`、`canonical` 无损、重建认知记忆、`unknown`/`retrospective` 标注、接管报告、幂等与回滚；**严重错误阻止写回** |
+| 接管回归测试 | [scripts/test_legacy_handoff.py](scripts/test_legacy_handoff.py) | 无损接管 / 跨会话重启 / 重复接管 / 缺失历史 / 失效传播 / 预测时间泄漏 / 多路线隔离 / 下一轮复用旧知识 / 严重错误阻止写回 |
+| **科学价值与自适应发现（CIE Phase 3）** | [references/scientific-value-adaptive-discovery.md](references/scientific-value-adaptive-discovery.md) | Decision Value / Discovery Potential 分维判断（**无总分**，`SV1`—`SV8`）、Taste Memory 双层权限、八种探索菜单到既有算子的映射、防锁死规则、`P4` 上下文隔离 |
+| **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
+| **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十四个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
+| **回放脚本与 fixture** | [scripts/research_replay.py](scripts/research_replay.py)、[examples/replay/](examples/replay/README.md) | `validate` / `show` / `run` / `suite` / `ablate` / `adversarial` / `smoke`；可插拔 `--runner module:function`；fixture 为**合成**，不是真实科研证据 |
 
 ---
 

@@ -177,6 +177,103 @@ Detailed contracts are in the [experiment loop](references/phase-r9-r11-experime
 [equivalence policy](references/rhetoric-equivalence-policy.md) and
 [structural equivalence policy](references/structural-equivalence-policy.md).
 
+## Cognitive memory across sessions
+
+Research State records what we believe about the world. It does not record how our
+understanding of a mechanism changed, or what the next session must recover before it can
+reason. The Cognitive Insight Engine adds that layer without adding a state slot.
+
+```
+canonical   research-state.json + frozen preregistration      sole authority
+event       cognition/model-revisions.jsonl                   append-only, no epistemics
+derived     cognition/index.json, cognition/context-brief.md  rebuildable
+```
+
+A mechanism's support level is computed from canonical facts, never declared by the agent
+that proposes it. Lifecycle decisions such as dormant or merged are recorded explicitly;
+they are decisions, not measurements. Recall is tiered into hot, warm and cold memory and
+bounded by a context budget, so a session does not receive the whole history.
+
+```sh
+python3 scripts/cognition.py build --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/cognition.py check --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/A/research-state.json --budget 4000
+```
+
+The builder never writes `research-state.json`; `check` compares the stored projection
+against a fresh rebuild and fails on drift. See the
+[cognitive memory policy](references/cognitive-memory-policy.md) and the
+[architecture note](docs/cognitive-insight-engine.md).
+
+Predictions become decidable through a frozen `criterion` inside the existing
+`preregistration.outcomes[]`. An observation is compared with it and classified as held,
+deviated, within tolerance, exploratory, invalid or untestable. Two mechanisms compete only
+when each owns a frozen prediction with a different criterion; rewording is not a
+distinction. See the
+[prediction and competition contract](references/prediction-anomaly-competition.md).
+
+```sh
+python3 scripts/prediction_compare.py compare --state <state.json> --packet observation.json
+python3 scripts/prediction_compare.py compete --state <state.json> --competition CP1
+python3 scripts/prediction_compare.py switch  --state <state.json>
+```
+
+## Taking over an existing project
+
+A project that already has a canonical `research-state.json` is **initialized**. Loading a
+newer skill must not look like a fresh start, so the entry stays `continue-research` and no
+Bootstrap runs. The takeover is read-only: state, scheduler and the execution ledger are
+byte-identical afterwards, versions, claim statuses, experiment ids, the anchor and the
+diagnostic budget are untouched, and no prediction is invented for an experiment that never
+froze one. Cognitive memory is reconstructed from canonical evidence and every
+reconstructed entry is marked retrospective.
+
+```sh
+python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/A/research-state.json
+```
+
+A severe compatibility error writes nothing and exits 3. Rebuilding a new Research State to
+work around it is not an option. See the [handoff contract](references/legacy-handoff.md).
+
+## Scientific value and adaptive discovery
+
+Ordering by `EIG ÷ cost` alone rewards cheap diagnostics that change no decision. Decision
+value and discovery potential are therefore judged separately, per dimension, each with a
+canonical source and an explicit uncertainty — and with no aggregate score by design. Taste
+memory splits into what the user owns (`contract`, read-only) and what outcomes calibrated,
+and the discovery menus reuse the existing `P1`—`P6` operators rather than adding an
+Exploration Agent.
+
+```sh
+python3 scripts/strategy_memory.py value     --state <state.json> --target H1
+python3 scripts/strategy_memory.py operators --state <state.json> --scheduler scheduler.json
+python3 scripts/strategy_memory.py recommend --state <state.json> --scheduler scheduler.json
+```
+
+No operator is ever permanently banned: a downgrade needs at least two independent failures,
+is scoped to the problem structure where they happened, and always carries reactivation
+conditions. `scheduler.json` stays read-only. See the
+[value and strategy contract](references/scientific-value-adaptive-discovery.md).
+
+## Replay and verification
+
+Claims about better discovery are easy to make, so the repository ships the means to check
+them offline. Replay cases carry the state, revisions and observations as they were, plus a
+hidden answer that never reaches the runner — a leak is detected rather than assumed away.
+Seven dimensions are scored independently with no weighted total, four ablation arms are
+compared, and an undersized sample reports that no improvement may be claimed. The ten
+adversarial cases reward correct stopping as much as correct continuing.
+
+```sh
+python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2
+python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
+```
+
+**No real Agent A/B test has been run.** The fixtures are synthetic, no model is called, and
+the ablation deltas are properties of the offline runner. See the
+[replay contract](references/discovery-replay.md).
+
 ## Examples
 
 | Example | What it demonstrates |
@@ -190,6 +287,7 @@ Detailed contracts are in the [experiment loop](references/phase-r9-r11-experime
 | [Rhetorical realization](examples/narrative-realization/README.md) | Frozen sources, four expression profiles, recovery probes and fragility checks |
 | [Evidence outcomes](examples/evidence-outcome/README.md) | Positive, negative, invalid, pivot and mixed state transitions |
 | [Structural equivalence fixtures](examples/structural-equivalence/) | Near-neighbor audits and structural deltas |
+| [Cognitive memory fixture](examples/cognition/README.md) | Mechanisms, a competition and an anomaly derived from a synthetic state |
 | [Literature library](docs/refs/README.md) | Portable PDF metadata, sidecars and indexing |
 
 Structural equivalence fixtures cover

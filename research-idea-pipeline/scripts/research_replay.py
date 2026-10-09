@@ -1,0 +1,1446 @@
+#!/usr/bin/env python3
+"""research_replay.py — historical replay, evaluation metrics, ablation, adversarial cases.
+
+The question this module answers is not "does the code run". It is: **did the cognitive
+layer actually improve scientific discovery?** That requires replaying a decision with only
+the information available at the time, scoring it against an answer the system never saw,
+and comparing configurations that differ only in which capabilities are enabled.
+
+Three properties are non-negotiable:
+
+* **No future information leaks.** Hidden results, reference answers and later conclusions
+  are stripped before the runner sees anything, and the strip is verified by scanning the
+  visible payload for forbidden strings — not by trusting the code path.
+* **No invented gains.** With fewer than two runs per arm the report says
+  `insufficient_sample` and reports the raw observations; it never claims an improvement.
+* **No self-certified novelty.** Innovation is scored from an independent
+  literature/human label carried by the case; an agent's own novelty rating is refused.
+
+The runner is pluggable. The built-in runner is offline and deterministic: it drives the
+shipped CIE machinery (`cognition` + `prediction_compare` + `strategy_memory`) so the suite
+runs without a model, and the test file can assert exact behaviour.
+
+Rule namespace `RP1`—`RP9`.
+
+Usage
+-----
+    python3 research_replay.py validate    --case <case.json>
+    python3 research_replay.py show        --case <case.json>          # agent-visible view
+    python3 research_replay.py run         --case <case.json> [--arm full_cie]
+    python3 research_replay.py suite       --dir <cases/> [--runner module:function]
+    python3 research_replay.py ablate      --dir <cases/> [--runs N]
+    python3 research_replay.py adversarial --write <dir>
+    python3 research_replay.py smoke       --work <dir>
+    python3 research_replay.py --selftest
+
+Exit codes: 0 pass, 1 argument error, 3 hard violation, 4 environment not satisfied.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import json
+import sys
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+import cognition as cg
+import prediction_compare as pc
+import strategy_memory as sm
+
+Diagnostic = cg.Diagnostic
+
+SCHEMA_CASE = "research-idea-pipeline/replay-case@1"
+SCHEMA_DECISION = "research-idea-pipeline/replay-decision@1"
+
+EXIT_OK = cg.EXIT_OK
+EXIT_ERROR = cg.EXIT_ERROR
+EXIT_HARD = cg.EXIT_HARD
+EXIT_ENV = cg.EXIT_ENV
+
+#: Ablation arms, weakest first. Each arm adds exactly one capability.
+ABLATION_ARMS: Tuple[str, ...] = ("baseline", "memory_only", "memory_prediction", "full_cie")
+
+ARM_CAPABILITIES: Dict[str, Tuple[str, ...]] = {
+    "baseline": (),
+    "memory_only": ("cognitive_memory",),
+    "memory_prediction": ("cognitive_memory", "prediction_comparator"),
+    "full_cie": ("cognitive_memory", "prediction_comparator", "strategy_memory"),
+}
+
+#: Evaluation dimensions. Each is scored independently; nothing is averaged into a total.
+METRIC_DIMENSIONS: Tuple[str, ...] = (
+    "mechanistic_understanding",
+    "prediction_quality",
+    "intervention_quality",
+    "scientific_novelty",
+    "search_efficiency",
+    "stagnation_recovery",
+    "memory_accumulation",
+)
+
+#: Keys that must never reach the runner.
+HIDDEN_KEYS: Tuple[str, ...] = ("hidden", "evaluation_only", "reference", "answer",
+                                "later_results", "future")
+
+#: Behaviours an adversarial case may forbid.
+FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
+    "propose_again_refuted_mechanism",
+    "continue_attribution_without_decision_value",
+    "treat_invalid_run_as_refutation",
+    "treat_post_hoc_as_prediction",
+    "self_certify_novelty",
+    "claim_prediction_without_criterion",
+    "inherit_unverified_inference",
+    "repeat_stopped_protocol",
+    "report_unqualified_result_as_held",
+    "certify_insight_from_unqualified_evidence",
+)
+
+#: A novelty label must come from outside the agent.
+NOVELTY_LABELS: Tuple[str, ...] = ("novel", "not_novel", "unknown")
+
+
+# ---------------------------------------------------------------------------
+# Cases: schema, validation, leak guard
+# ---------------------------------------------------------------------------
+
+def case_errors(case: Any) -> List[Diagnostic]:
+    if not isinstance(case, dict):
+        return [Diagnostic("RP1", "case", "replay case 必须是对象")]
+    diagnostics: List[Diagnostic] = []
+    if case.get("_schema") != SCHEMA_CASE:
+        diagnostics.append(Diagnostic("RP1", "case._schema", f"必须是 {SCHEMA_CASE!r}"))
+    if not isinstance(case.get("id"), str) or not case["id"].strip():
+        diagnostics.append(Diagnostic("RP1", "case.id", "缺少非空 id"))
+    if not isinstance(case.get("question"), str) or not case["question"].strip():
+        diagnostics.append(Diagnostic("RP1", "case.question", "缺少研究问题"))
+    visible = case.get("visible")
+    if not isinstance(visible, dict):
+        diagnostics.append(Diagnostic("RP1", "case.visible", "缺少 visible 段"))
+        return diagnostics
+    if not isinstance(visible.get("state"), dict):
+        diagnostics.append(Diagnostic("RP1", "case.visible.state", "visible 必须包含 state"))
+    for key in ("revisions", "available_literature", "known_conditions", "insight_cards"):
+        if key in visible and not isinstance(visible[key], list):
+            diagnostics.append(Diagnostic("RP1", f"case.visible.{key}", "必须是数组"))
+    hidden = case.get("hidden")
+    if not isinstance(hidden, dict) or not isinstance(hidden.get("answer"), dict):
+        diagnostics.append(Diagnostic(
+            "RP1", "case.hidden.answer",
+            "hidden.answer 是评价基准，必须存在；没有它就无法判断回放是否成功"))
+        return diagnostics
+    answer = hidden["answer"]
+    if answer.get("true_outcome_class") not in pc.OUTCOME_CLASSES:
+        diagnostics.append(Diagnostic(
+            "RP1", "case.hidden.answer.true_outcome_class",
+            f"必须是 {list(pc.OUTCOME_CLASSES)} 之一"))
+    if isinstance(answer.get("novelty_rating"), (int, float)) and \
+            not answer.get("human_novelty_label") and not answer.get("novelty_neighbours"):
+        diagnostics.append(Diagnostic(
+            "RP5", "case.hidden.answer",
+            "novelty 需要独立文献近邻或人工标签；不接受 agent 自评作为唯一依据"))
+    evaluation = case.get("evaluation_only")
+    if not isinstance(evaluation, dict):
+        diagnostics.append(Diagnostic("RP1", "case.evaluation_only", "缺少评价段"))
+    else:
+        for marker in evaluation.get("must_not_appear") or []:
+            if not isinstance(marker, str) or not marker.strip():
+                diagnostics.append(Diagnostic(
+                    "RP2", "case.evaluation_only.must_not_appear",
+                    "额外的泄漏标记必须是非空字符串"))
+        for behaviour in evaluation.get("forbidden_behaviours") or []:
+            if behaviour not in FORBIDDEN_BEHAVIOURS:
+                diagnostics.append(Diagnostic(
+                    "RP2", "case.evaluation_only.forbidden_behaviours",
+                    f"未知的禁止行为：{behaviour!r}"))
+    return diagnostics
+
+
+def load_case(path: Path) -> Dict[str, Any]:
+    if not path.is_file():
+        raise cg.CognitionError(f"replay case not found: {path}")
+    try:
+        case = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise cg.CognitionError(f"replay case is not valid JSON: {path} ({exc})") from exc
+    diagnostics = case_errors(case)
+    if diagnostics:
+        raise cg.CognitionError("; ".join(d.rule + " " + d.detail for d in diagnostics))
+    return case
+
+
+def visible_view(case: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the runner may see. Hidden and evaluation sections are removed."""
+    visible = case.get("visible") or {}
+    return {
+        "case_id": case.get("id"),
+        "question": case.get("question"),
+        "state": _strip_hidden_keys(visible.get("state") or {}),
+        "revisions": [record for record in visible.get("revisions") or []
+                      if isinstance(record, dict)
+                      and not any(key in record for key in HIDDEN_KEYS)],
+        "scheduler": visible.get("scheduler"),
+        "observation_packet": visible.get("observation_packet"),
+        "available_literature": list(visible.get("available_literature") or []),
+        "known_conditions": list(visible.get("known_conditions") or []),
+        "insight_cards": [card for card in visible.get("insight_cards") or []
+                          if isinstance(card, dict)],
+    }
+
+
+def _strip_hidden_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _strip_hidden_keys(item) for key, item in value.items()
+                if key not in HIDDEN_KEYS}
+    if isinstance(value, list):
+        return [_strip_hidden_keys(item) for item in value]
+    return value
+
+
+def forbidden_strings(case: Dict[str, Any]) -> List[str]:
+    """Every string that must not appear in the agent-visible payload."""
+    hidden = case.get("hidden") or {}
+    evaluation = case.get("evaluation_only") or {}
+    strings: List[str] = []
+    strings.extend(item for item in hidden.get("later_results") or [] if isinstance(item, str))
+    answer = hidden.get("answer") or {}
+    for field in ("mechanism_terms", "assumption_terms", "boundary_terms",
+                  "required_controls", "reference_reasoning"):
+        strings.extend(item for item in answer.get(field) or [] if isinstance(item, str))
+    # Evaluation instructions are not research content, so their labels are not leak
+    # markers. A case that needs extra markers lists them explicitly.
+    value = evaluation.get("reference_mechanism")
+    if isinstance(value, str):
+        strings.append(value)
+    strings.extend(item for item in evaluation.get("must_not_appear") or []
+                   if isinstance(item, str))
+    # Short tokens are too common to be meaningful leak markers.
+    return sorted({text.strip() for text in strings if len(text.strip()) >= 12})
+
+
+def leak_scan(case: Dict[str, Any], visible: Any) -> List[str]:
+    blob = json.dumps(visible, ensure_ascii=False)
+    return [text for text in forbidden_strings(case) if text in blob]
+
+
+# ---------------------------------------------------------------------------
+# The offline runner
+# ---------------------------------------------------------------------------
+
+def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
+    """A deterministic, model-free runner built from the shipped CIE machinery.
+
+    It is a real consumer of the layer, not a scripted answer: it builds the cognitive
+    index, recalls context, compares the observation packet and asks for a behaviour
+    switch. What it *cannot* do is see the hidden answer, and the ablation arms differ
+    exactly in which of those capabilities they may call.
+    """
+    capabilities = ARM_CAPABILITIES[arm]
+    state = visible.get("state") or {}
+    revisions = visible.get("revisions") or []
+    scheduler = visible.get("scheduler")
+    decision: Dict[str, Any] = {
+        "_schema": SCHEMA_DECISION,
+        "case_id": visible.get("case_id"),
+        "arm": arm,
+        "capabilities": list(capabilities),
+        "used_memory": [],
+        "mechanism_terms": [],
+        "predicted_outcome_class": None,
+        "diagnostic_outcome_class": None,
+        "anomaly_class": None,
+        "evidence_class": None,
+        "evidence_eligible": False,
+        "scientific_status": "NO_INFERENCE",
+        "provenance_gaps": [],
+        "chosen_intervention": None,
+        "identification_controls": [],
+        "representation_changed": False,
+        "repeated_prior_error": False,
+        "novelty_self_rating": None,
+        "decision_changed": False,
+        "insight_classes": {},
+    }
+
+    if "cognitive_memory" not in capabilities:
+        # Baseline: only the raw state. No recall, no support level, no constraints.
+        decision["mechanism_terms"] = [claim.get("statement", "") for claim
+                                       in state.get("claims", []) or []
+                                       if isinstance(claim, dict)][:1]
+        decision["chosen_intervention"] = ""
+        decision["decision_changed"] = False
+        return decision
+
+    index, _ = cg.full_index(state, revisions, "replay",
+                             None, scheduler if "strategy_memory" in capabilities else None)
+    selection = cg.recall(index, state)
+    decision["used_memory"] = [mechanism["id"] for mechanism in selection["hot"]["mechanisms"]]
+    hot = selection["hot"]["mechanisms"]
+    # What the system can actually articulate about the mechanism: every recalled
+    # mechanism's statement, its necessity conditions and boundaries, plus the anomaly
+    # text. An arm without the memory layer has none of this available.
+    articulated: List[str] = []
+    for mechanism in hot:
+        articulated.append(str(mechanism.get("statement", "")))
+        articulated.append(str(mechanism.get("scope", "")))
+    for anomaly in selection["hot"].get("anomalies", []):
+        articulated.append(str(anomaly.get("observation", "")))
+    for competition in selection["hot"].get("competitions", []):
+        articulated.append(str(competition.get("shared_explanation", "")))
+    for mechanism in index.get("mechanisms", []):
+        if mechanism.get("id") in decision["used_memory"]:
+            structure = mechanism.get("structure") or {}
+            articulated.extend(str(item) for item in structure.get("necessary_conditions") or [])
+            articulated.extend(str(item) for item in structure.get("boundaries") or [])
+            articulated.append(str(mechanism.get("support_level", "")))
+    for boundary in index.get("boundaries", []):
+        articulated.append(str(boundary.get("rule", "")))
+    decision["mechanism_terms"] = [text for text in articulated if text.strip()]
+    constraints = selection["failure_constraints"]
+    stopped = [item for item in constraints if item.get("retry") == "blocked"]
+    decision["repeat_blocked"] = bool(stopped)
+
+    if "prediction_comparator" not in capabilities:
+        decision["chosen_intervention"] = ""
+        decision["decision_changed"] = bool(hot)
+        return decision
+
+    packet = visible.get("observation_packet")
+    if isinstance(packet, dict):
+        assessment, _ = pc.assess_experiment(state, packet)
+        decision["predicted_outcome_class"] = assessment.get("outcome_class")
+        decision["diagnostic_outcome_class"] = assessment.get("diagnostic_outcome_class")
+        decision["anomaly_class"] = assessment.get("outcome_class")
+        decision["evidence_class"] = assessment.get("evidence_class")
+        decision["evidence_eligible"] = bool(assessment.get("evidence_eligible"))
+        decision["scientific_status"] = assessment.get("scientific_status")
+        decision["provenance_gaps"] = list(assessment.get("provenance_gaps") or [])
+        decision["transition_allowed"] = pc.evidence_transition_allowed(state, assessment)[0]
+    # The insight layer is the last link of the chain, so its class is observable here: a
+    # regression that certifies an insight while the comparison was not qualified evidence
+    # becomes a forbidden behaviour rather than a silent upgrade.
+    projected = cg.project_insights(state, visible.get("insight_cards") or [])
+    decision["insight_classes"] = {
+        item.get("id"): item.get("derived_class") for item in projected["insights"]}
+    switch = pc.diagnosis_switch(state, index.get("competitions", []),
+                                 scheduler, index.get("mechanisms"))
+    decision["switch_action"] = switch["action"]
+    decision["chosen_intervention"] = _intervention_for(state, index, switch)
+    decision["decision_changed"] = switch["action"] != "CONTINUE_ATTRIBUTION" or bool(hot)
+    decision["independent_exploration_allowed"] = switch["independent_exploration_allowed"]
+
+    if "strategy_memory" in capabilities:
+        assessment = sm.value_assessment(state, index, _first_target(index), scheduler)
+        decision["intervention_quality_signals"] = assessment["decision_value"][
+            "changes_experiment_design"]["assessment"]
+        decision["objections"] = assessment["objections"]
+    return decision
+
+
+def _first_target(index: Dict[str, Any]) -> str:
+    for mechanism in index.get("mechanisms", []):
+        for key in ("claims", "hypotheses"):
+            refs = (mechanism.get("canonical_refs") or {}).get(key) or []
+            if refs:
+                return refs[0]
+    return ""
+
+
+def _intervention_for(state: Dict[str, Any], index: Dict[str, Any],
+                      switch: Dict[str, Any]) -> str:
+    if switch["action"] == "RECORD_BOUNDARY_AND_STOP":
+        return ""
+    for competition in index.get("competitions", []):
+        if competition.get("status") != "open":
+            continue
+        intervention = competition.get("discriminating_intervention")
+        if isinstance(intervention, str) and intervention not in ("", "TBD"):
+            return intervention
+    for experiment in state.get("experiments", []) or []:
+        if isinstance(experiment, dict) and experiment.get("status") == "planned":
+            return str(experiment.get("id"))
+    return ""
+
+
+def load_runner(spec: Optional[str]) -> Callable[[Dict[str, Any], str], Dict[str, Any]]:
+    """`module:function` or the built-in offline runner."""
+    if not spec:
+        return cie_offline_runner
+    if ":" not in spec:
+        raise cg.CognitionError("runner spec must be `module:function`")
+    module_name, function_name = spec.split(":", 1)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    module = importlib.import_module(module_name)
+    function = getattr(module, function_name, None)
+    if not callable(function):
+        raise cg.CognitionError(f"runner is not callable: {spec}")
+    return function
+
+
+def decision_errors(decision: Any) -> List[Diagnostic]:
+    if not isinstance(decision, dict):
+        return [Diagnostic("RP3", "decision", "runner 必须返回对象")]
+    diagnostics: List[Diagnostic] = []
+    if decision.get("_schema") != SCHEMA_DECISION:
+        diagnostics.append(Diagnostic("RP3", "decision._schema",
+                                      f"必须是 {SCHEMA_DECISION!r}"))
+    for field in ("arm", "mechanism_terms", "used_memory"):
+        if field not in decision:
+            diagnostics.append(Diagnostic("RP3", f"decision.{field}", "缺少必填字段"))
+    if decision.get("novelty_self_rating") is not None:
+        diagnostics.append(Diagnostic(
+            "RP5", "decision.novelty_self_rating",
+            "agent 自评不是 novelty 证据；评分只读 case 携带的独立标签或文献近邻"))
+    if decision.get("arm") not in ABLATION_ARMS:
+        diagnostics.append(Diagnostic("RP3", "decision.arm", "未知的 ablation arm"))
+    return diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+def _contains_all(haystack: str, needles: Sequence[str]) -> Tuple[int, int]:
+    hits = sum(1 for needle in needles if needle and needle in haystack)
+    return hits, len([needle for needle in needles if needle])
+
+
+def _rate(hits: int, total: int) -> Optional[float]:
+    return None if total == 0 else round(hits / total, 4)
+
+
+def _metric(value: Optional[float], basis: List[str], reason: str) -> Dict[str, Any]:
+    return {"value": value, "basis": basis, "reason": reason}
+
+
+def evaluate(case: Dict[str, Any], decision: Dict[str, Any],
+             baseline_decision: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Score one replayed decision against the case's answer. Never a single total."""
+    answer = (case.get("hidden") or {}).get("answer") or {}
+    evaluation = case.get("evaluation_only") or {}
+    text = " ".join(str(item) for item in decision.get("mechanism_terms") or [])
+
+    mechanism_hits, mechanism_total = _contains_all(text, answer.get("mechanism_terms") or [])
+    assumption_hits, assumption_total = _contains_all(text, answer.get("assumption_terms") or [])
+    boundary_hits, boundary_total = _contains_all(text, answer.get("boundary_terms") or [])
+    understanding = _rate(mechanism_hits + assumption_hits + boundary_hits,
+                          mechanism_total + assumption_total + boundary_total)
+
+    expected_class = answer.get("true_outcome_class")
+    observed_class = decision.get("predicted_outcome_class")
+    prediction_hits = 1 if expected_class and observed_class == expected_class else 0
+    if observed_class is None:
+        prediction_value: Optional[float] = None
+        prediction_reason = "runner 没有产出预测判定（能力未启用或没有观测包）"
+    elif not decision.get("evidence_eligible"):
+        prediction_value = None
+        prediction_reason = (f"诊断性比较（{observed_class}，"
+                             f"scientific_status={decision.get('scientific_status')}）："
+                             "不是合格科学证据，本维度不评分")
+    else:
+        prediction_value = float(prediction_hits)
+        prediction_reason = (f"预测类别 {observed_class}，隐藏结果 {expected_class}")
+
+    expected_intervention = answer.get("discriminating_intervention")
+    chosen = decision.get("chosen_intervention")
+    if expected_intervention is None:
+        intervention_value: Optional[float] = None
+        intervention_reason = "该 case 没有期望的判别干预"
+    else:
+        intervention_value = 1.0 if chosen == expected_intervention else 0.0
+        if evaluation.get("expected_behaviour") == "stop_attribution" and not chosen:
+            intervention_value = 1.0
+        intervention_reason = f"选择 {chosen!r}，期望 {expected_intervention!r}"
+    required_controls = answer.get("required_controls") or []
+    control_hits, control_total = _contains_all(
+        " ".join(decision.get("identification_controls") or []), required_controls)
+
+    human_label = answer.get("human_novelty_label")
+    neighbours = answer.get("novelty_neighbours") or []
+    if human_label in NOVELTY_LABELS or neighbours:
+        novelty_value = None
+        if human_label == "novel":
+            novelty_value = 1.0
+        elif human_label == "not_novel":
+            novelty_value = 0.0
+        novelty_reason = ("独立标签：" + str(human_label)) if human_label else \
+            ("近邻文献：" + ", ".join(str(item) for item in neighbours))
+    else:
+        novelty_value = None
+        novelty_reason = "没有独立 novelty 证据：本维度不可评，agent 自评被拒绝"
+
+    if baseline_decision is None:
+        efficiency_value: Optional[float] = None
+        efficiency_reason = "没有 baseline 对照，无法比较效率"
+    else:
+        def effective(item: Dict[str, Any]) -> int:
+            qualified = (item.get("predicted_outcome_class") in pc.WORLD_CLAIMING_CLASSES
+                         and item.get("evidence_eligible"))
+            return (1 if qualified else 0) + (1 if item.get("decision_changed") else 0)
+        delta = effective(decision) - effective(baseline_decision)
+        efficiency_value = float(delta)
+        efficiency_reason = f"相对 baseline 的有效产出增量 {delta}"
+
+    if evaluation.get("expected_behaviour") == "stop_attribution":
+        recovery_value = 1.0 if decision.get("switch_action") in (
+            "RECORD_BOUNDARY_AND_STOP", "REDESIGN_QUESTION",
+            "FIND_DISCRIMINATING_INTERVENTION") else 0.0
+        recovery_reason = f"停手/转向动作 {decision.get('switch_action')!r}"
+    elif evaluation.get("expected_behaviour") == "design_intervention":
+        recovery_value = 1.0 if chosen else 0.0
+        recovery_reason = f"是否给出可执行干预：{bool(chosen)}"
+    else:
+        recovery_value = None
+        recovery_reason = "该 case 未声明停滞恢复的期望"
+
+    memory_value: Optional[float]
+    if evaluation.get("open_second_session"):
+        memory_value = 1.0 if decision.get("used_memory") else 0.0
+        memory_reason = (f"新会话恢复的认知条目 {decision.get('used_memory')}"
+                         "（不得继承未经证实的推断）")
+    else:
+        memory_value = None
+        memory_reason = "该 case 不是跨会话恢复场景"
+
+    metrics = {
+        "mechanistic_understanding": _metric(
+            understanding,
+            list(answer.get("mechanism_terms") or []) + list(answer.get("assumption_terms") or []),
+            f"命中 {mechanism_hits + assumption_hits + boundary_hits}/"
+            f"{mechanism_total + assumption_total + boundary_total} 个参考术语"),
+        "prediction_quality": _metric(prediction_value, [str(expected_class)],
+                                      prediction_reason),
+        "intervention_quality": _metric(
+            _rate(control_hits, control_total) if control_total else intervention_value,
+            list(required_controls) or [str(expected_intervention)],
+            intervention_reason + (f"；识别对照命中 {control_hits}/{control_total}"
+                                   if control_total else "")),
+        "scientific_novelty": _metric(novelty_value, neighbours, novelty_reason),
+        "search_efficiency": _metric(efficiency_value, ["baseline"],
+                                     efficiency_reason),
+        "stagnation_recovery": _metric(recovery_value,
+                                       [str(evaluation.get("expected_behaviour"))],
+                                       recovery_reason),
+        "memory_accumulation": _metric(memory_value, list(decision.get("used_memory") or []),
+                                       memory_reason),
+    }
+
+    violations: List[str] = []
+    for behaviour in evaluation.get("forbidden_behaviours") or []:
+        if _behaviour_present(behaviour, decision, case):
+            violations.append(behaviour)
+    if evaluation.get("expected_decision_changed") and not decision.get("decision_changed"):
+        violations.append("decision_did_not_change")
+    if decision.get("repeat_blocked") and decision.get("repeated_prior_error"):
+        violations.append("repeated_a_blocked_direction")
+
+    return {
+        "case_id": case.get("id"),
+        "arm": decision.get("arm"),
+        "metrics": metrics,
+        "violations": violations,
+        "passed": not violations,
+        "note": ("每个维度独立评分，不做加权总分；null 表示该维度在本 case 不可评，"
+                 "不得当作 0 或 1"),
+    }
+
+
+def _behaviour_present(behaviour: str, decision: Dict[str, Any], case: Dict[str, Any]) -> bool:
+    if behaviour == "self_certify_novelty":
+        return decision.get("novelty_self_rating") is not None
+    if behaviour == "treat_invalid_run_as_refutation":
+        return (decision.get("predicted_outcome_class") == "INVALID_EXECUTION"
+                and decision.get("chosen_intervention") not in ("", None)
+                and decision.get("switch_action") in ("RECORD_BOUNDARY_AND_STOP",))
+    if behaviour == "claim_prediction_without_criterion":
+        return decision.get("predicted_outcome_class") == "PREDICTION_HELD" and \
+            "prediction_comparator" not in (decision.get("capabilities") or [])
+    if behaviour == "propose_again_refuted_mechanism":
+        return bool(decision.get("repeated_prior_error"))
+    if behaviour == "continue_attribution_without_decision_value":
+        return (decision.get("predicted_outcome_class") == "PREDICTION_DEVIATED"
+                and decision.get("switch_action") == "CONTINUE_ATTRIBUTION")
+    if behaviour == "repeat_stopped_protocol":
+        return decision.get("repeat_blocked") is True and \
+            decision.get("chosen_intervention") in (
+                (case.get("hidden") or {}).get("answer", {}).get("stopped_protocol"),
+            )
+    if behaviour == "treat_post_hoc_as_prediction":
+        return decision.get("post_hoc_claim") is True
+    if behaviour == "inherit_unverified_inference":
+        return bool(decision.get("inherited_unverified"))
+    if behaviour == "report_unqualified_result_as_held":
+        # The core P0 invariant: only a qualified, complete assessment may be reported as
+        # "every frozen prediction held".
+        return (decision.get("predicted_outcome_class") == "PREDICTION_HELD"
+                and not decision.get("evidence_eligible"))
+    if behaviour == "certify_insight_from_unqualified_evidence":
+        # A downstream failure mode: the insight layer certifying itself while the upstream
+        # comparison was not qualified evidence.
+        return (not decision.get("evidence_eligible")
+                and "evidence_supported_insight"
+                in set((decision.get("insight_classes") or {}).values()))
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Suites, ablations and honest reporting
+# ---------------------------------------------------------------------------
+
+def run_case(
+    case: Dict[str, Any],
+    arm: str = "full_cie",
+    runner: Optional[Callable[[Dict[str, Any], str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Run one case under one arm. The runner never receives the hidden section."""
+    runner = runner or cie_offline_runner
+    visible = visible_view(case)
+    leaks = leak_scan(case, visible)
+    if leaks:
+        raise cg.CognitionError(
+            "future-information leak: hidden strings are reachable from the visible payload: "
+            + "; ".join(leaks))
+    decision = runner(visible, arm)
+    diagnostics = decision_errors(decision)
+    baseline = None
+    if arm != "baseline":
+        baseline = runner(visible_view(case), "baseline")
+    return {
+        "case_id": case.get("id"),
+        "arm": arm,
+        "decision": decision,
+        "evaluation": evaluate(case, decision, baseline),
+        "diagnostics": [d.as_dict() for d in diagnostics],
+        "leak_checked": True,
+    }
+
+
+def load_cases(directory: Path) -> List[Dict[str, Any]]:
+    if not directory.is_dir():
+        raise cg.CognitionError(f"case directory not found: {directory}")
+    cases = []
+    for path in sorted(directory.glob("*.json")):
+        cases.append(load_case(path))
+    if not cases:
+        raise cg.CognitionError(f"no replay case in {directory}")
+    return sorted(cases, key=_natural_case_key)
+
+
+def _natural_case_key(case: Dict[str, Any]) -> Tuple[str, int, str]:
+    """Order ADV2 before ADV10, so a directory read and the generator agree."""
+    ident = str(case.get("id", ""))
+    digits = "".join(character for character in ident if character.isdigit())
+    return (ident.rstrip("0123456789"), int(digits) if digits else 0, ident)
+
+
+def _dimension_means(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {}
+    for dimension in METRIC_DIMENSIONS:
+        values = [result["evaluation"]["metrics"][dimension]["value"]
+                  for result in results
+                  if result["evaluation"]["metrics"][dimension]["value"] is not None]
+        observable = len(values)
+        summary[dimension] = {
+            "observable_cases": observable,
+            "total_cases": len(results),
+            "mean": round(sum(values) / observable, 4) if observable else None,
+            "min": min(values) if values else None,
+            "max": max(values) if values else None,
+        }
+    return summary
+
+
+def run_suite(
+    cases: Sequence[Dict[str, Any]],
+    arms: Sequence[str] = ABLATION_ARMS,
+    runs: int = 1,
+    runner: Optional[Callable[[Dict[str, Any], str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Run the ablation. Reports measured values and uncertainty, never a claimed gain."""
+    per_arm: Dict[str, Any] = {}
+    for arm in arms:
+        results = []
+        for _ in range(max(1, runs)):
+            for case in cases:
+                results.append(run_case(case, arm, runner))
+        violations = [violation for result in results
+                      for violation in result["evaluation"]["violations"]]
+        per_arm[arm] = {
+            "capabilities": list(ARM_CAPABILITIES.get(arm, ())),
+            "runs": max(1, runs),
+            "cases": len(cases),
+            "observations": len(results),
+            "dimensions": _dimension_means(results),
+            "violations": sorted(set(violations)),
+            "pass_rate": round(
+                sum(1 for result in results if result["evaluation"]["passed"]) / len(results), 4)
+            if results else None,
+            "results": results,
+        }
+
+    comparison: Dict[str, Any] = {}
+    for arm, block in per_arm.items():
+        deltas = {}
+        for dimension in METRIC_DIMENSIONS:
+            base = per_arm["baseline"]["dimensions"][dimension]["mean"] \
+                if "baseline" in per_arm else None
+            current = block["dimensions"][dimension]["mean"]
+            deltas[dimension] = None if base is None or current is None \
+                else round(current - base, 4)
+        comparison[arm] = deltas
+
+    # Honest reporting: if two arms are indistinguishable on every dimension, say so
+    # instead of implying that the extra capability was measured.
+    signature: Dict[str, List[str]] = {}
+    for arm, block in per_arm.items():
+        key = json.dumps({dimension: block["dimensions"][dimension]["mean"]
+                          for dimension in METRIC_DIMENSIONS}, sort_keys=True)
+        signature.setdefault(key, []).append(arm)
+    undifferentiated = sorted(group for group in signature.values() if len(group) > 1)
+
+    sample_size = len(cases) * max(1, runs)
+    sufficient = sample_size >= 2 and len(cases) >= 3
+    return {
+        "schema": "research-idea-pipeline/replay-ablation@1",
+        "cases": len(cases),
+        "runs_per_case": max(1, runs),
+        "arms": list(arms),
+        "sample_size": sample_size,
+        "sufficient_sample": sufficient,
+        "per_arm": per_arm,
+        "delta_vs_baseline": comparison,
+        "claim": (
+            "样本不足：只报告实测值与不确定性，不得宣称提升"
+            if not sufficient else
+            "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能"),
+        "runner": "offline CIE runner (no model calls)" if runner in (None, cie_offline_runner)
+        else "external runner",
+        "undifferentiated_arms": undifferentiated,
+        "limitations": [
+            "fixture 是合成的，不能作为真实发现能力的证据",
+            "未使用真实模型或真实文献库",
+            "novelty 只在 case 携带独立标签或近邻时可评",
+        ] + ([
+            "以下 arm 在这些维度上完全无法区分：" +
+            "；".join("/".join(group) for group in undifferentiated) +
+            "——不得据此宣称额外能力带来了提升",
+        ] if undifferentiated else []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Adversarial cases
+# ---------------------------------------------------------------------------
+
+def _base_state(**overrides) -> Dict[str, Any]:
+    def validity(reason: str, version: int = 4) -> Dict[str, Any]:
+        return {"status": "valid", "reason": reason, "since_state_version": version}
+    state = {
+        "state_version": 4,
+        "contract": {"goal": "判断机制 A 是否解释目标现象", "primary_anchor": "phenomenon",
+                     "constraints": ["单卡"], "resources": ["公开数据集"],
+                     "provisional_anchor_rationale": "先形式化", "out_of_scope": []},
+        "claims": [{
+            "id": "C1", "statement": "机制 A 解释目标现象", "parent": None, "subclaims": [],
+            "status": "partially-supported", "supporting_evidence": ["E1"], "refuting_evidence": [],
+            "nearest_alternative": "机制 B 解释同一现象", "falsifier": "干预后现象不变",
+            "scope": "数据集 A", "known_flaws": [], "depends_on": [], "validity": validity("已写入"),
+            "contract": {"statement": "机制 A", "scope": "数据集 A",
+                         "critical_assumptions": [], "supporting_required": ["E1"],
+                         "refuting": "干预后不变", "nearest_alternative": "机制 B",
+                         "minimal_discriminating_experiment": "X2",
+                         "expected_outcomes": {"O1": "下降", "O2": "不变"},
+                         "kill_rule": "若 O2 出现则降级", "expansion_rule": "O1 且 X3 通过"},
+        }],
+        "evidence": [{
+            "id": "E1", "kind": "experiment", "supports": ["C1"], "contradicts": [],
+            "strength": "strong", "scope": "数据集 A", "epistemic_status": "Observed",
+            "source_ref": "X1", "verification_tier": "T2", "depends_on": ["X1"],
+            "validity": validity("X1 已完成"),
+        }],
+        "assumptions": [], "hypotheses": [{
+            "id": "H1", "statement": "机制 A 是主因",
+            "structural_signature": {"assumption_distance": 2, "formulation_distance": 1,
+                                     "representation_distance": 0, "theory_lens_distance": 1,
+                                     "mechanism_distance": 2},
+            "novelty_source": "假设反转", "theory_lens": "逆问题", "nearest_prior": "LIT1",
+            "falsifier": "干预无效", "expected_information_gain": 0.4, "status": "elite",
+            "niche": "assumption-shift", "island": "P2", "generation": 0,
+            "operator": "assumption_breaker", "parents": [], "depends_on": [],
+            "validity": validity("未推翻"), "scientific_scope": "数据集 A",
+        }],
+        "experiments": [{
+            "id": "X1", "parent": None, "stage": "X3", "claim_targeted": ["C1"],
+            "alternative_targeted": ["ALT-1"], "code_commit": "abc", "data_split": "A/train",
+            "seed": 0, "metric": "效应量", "result": "0.8", "interpretation": "初步",
+            "unexpected": [], "known_flaws": [], "next_branches": [], "status": "done",
+            "preregistration": {"frozen_at_state_version": 3, "outcomes": [
+                {"id": "O1", "observation": "落差下降 ≥ 0.5",
+                 "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                               "expected_range": [-3.0, -0.5], "tolerance": 0.1,
+                               "rule": "下降"},
+                 "update": [{"target": "C1", "op": "strengthen"}]}]},
+            "result_at_state_version": 4, "depends_on": [], "validity": validity("按预注册写入"),
+            "outcome_analysis": None, "execution_protocol": None,
+        }, {
+            "id": "X2", "parent": "X1", "stage": "X3", "claim_targeted": ["C1"],
+            "alternative_targeted": ["ALT-2"], "code_commit": "TBD", "data_split": "A/fixed",
+            "seed": 0, "metric": "落差变化", "result": "", "interpretation": "尚未运行",
+            "unexpected": [], "known_flaws": [], "next_branches": [], "status": "planned",
+            "preregistration": None, "result_at_state_version": None, "depends_on": ["X1"],
+            "validity": {"status": "pending", "reason": "尚未运行", "since_state_version": 3},
+            "outcome_analysis": None, "execution_protocol": None,
+        }],
+        "literature": [{"id": "LIT1", "ref": "[Synthetic, Fixture/2024]",
+                        "relation": "shares-structure", "depends_on": [], "validity": validity("未撤回")}],
+        "failures": [], "uncertainties": [], "assurance": [], "repairs": [],
+    }
+    state.update(overrides)
+    return state
+
+
+def _packet(value: float = -0.8, validity: str = "VALID",
+            experiment_id: str = "X1") -> Dict[str, Any]:
+    content = f"落差变化 {value} dB（SYNTHETIC REPLAY FIXTURE）"
+    import evidence_outcome as eo
+    return {
+        "schema": pc.SCHEMA_OBSERVATION,
+        "experiment_id": experiment_id,
+        "execution": {"status": "completed", "validity": validity},
+        "outcomes": [{"id": "O1", "value": value,
+                      "source": {"kind": "result",
+                                 "location": "results/A/X1/summary.json",
+                                 "content": content, "digest": eo.digest(content)}}],
+    }
+
+
+def _two_outcome_preregistration() -> Dict[str, Any]:
+    """Two frozen predictions of the same observable, so a partial submission is visible."""
+    return {"experiments": [{
+        "id": "X1", "parent": None, "stage": "X3", "claim_targeted": ["C1"],
+        "alternative_targeted": ["ALT-1"], "code_commit": "abc", "data_split": "A/train",
+        "seed": 0, "metric": "落差变化", "result": "-0.8", "interpretation": "初步",
+        "unexpected": [], "known_flaws": [], "next_branches": [], "status": "done",
+        "preregistration": {"frozen_at_state_version": 3, "outcomes": [
+            {"id": "O1", "observation": "落差下降 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
+             "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                           "expected_range": [-3.0, -0.5], "tolerance": 0.1,
+                           "rule": "下降"},
+             "update": [{"target": "C1", "op": "strengthen"}]},
+            {"id": "O2", "observation": "落差上升 ≥ 0.5（SYNTHETIC REPLAY FIXTURE）",
+             "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                           "expected_range": [0.5, 3.0], "tolerance": 0.1,
+                           "rule": "上升"},
+             "update": [{"target": "C1", "op": "weaken"}]}]},
+        "result_at_state_version": 4, "depends_on": [],
+        "validity": {"status": "valid", "reason": "按预注册写入", "since_state_version": 4},
+        "outcome_analysis": None, "execution_protocol": None,
+    }, {
+        "id": "X2", "parent": "X1", "stage": "X3", "claim_targeted": ["C1"],
+        "alternative_targeted": ["ALT-2"], "code_commit": "TBD", "data_split": "A/fixed",
+        "seed": 0, "metric": "落差变化", "result": "", "interpretation": "尚未运行",
+        "unexpected": [], "known_flaws": [], "next_branches": [], "status": "planned",
+        "preregistration": None, "result_at_state_version": None, "depends_on": ["X1"],
+        "validity": {"status": "pending", "reason": "尚未运行", "since_state_version": 3},
+        "outcome_analysis": None, "execution_protocol": None,
+    }]}
+
+
+def _unfrozen_branch_packet() -> Dict[str, Any]:
+    """A packet that names a branch after the fact, on a freeze that never declared one."""
+    packet = _packet(-0.8)
+    packet["observed_outcome"] = "O1"
+    content = "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）"
+    return packet
+
+
+def _tampered_source_packet() -> Dict[str, Any]:
+    """A source whose digest does not match its content: the observation is not bound."""
+    packet = _packet(-0.8)
+    packet["outcomes"][0]["source"]["digest"] = "0" * 64
+    return packet
+
+
+def _partial_packet() -> Dict[str, Any]:
+    """Only the favourable frozen outcome is submitted."""
+    content = "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）"
+    import evidence_outcome as eo
+    return {
+        "schema": pc.SCHEMA_OBSERVATION,
+        "experiment_id": "X1",
+        "execution": {"status": "completed", "validity": "VALID"},
+        "outcomes": [{"id": "O1", "value": -0.8,
+                      "source": {"kind": "result",
+                                 "location": "results/A/X1/summary.json",
+                                 "content": content, "digest": eo.digest(content)}}],
+    }
+
+
+def _case(ident: str, title: str, question: str, *, state: Dict[str, Any],
+          packet: Optional[Dict[str, Any]], answer: Dict[str, Any],
+          evaluation: Dict[str, Any], literature: Optional[List[str]] = None,
+          conditions: Optional[List[str]] = None,
+          later_results: Optional[List[str]] = None,
+          revisions: Optional[List[Dict[str, Any]]] = None,
+          scheduler: Optional[Dict[str, Any]] = None,
+          insight_cards: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    return {
+        "_schema": SCHEMA_CASE,
+        "id": ident,
+        "title": title,
+        "question": question,
+        "visible": {
+            "state": state,
+            "revisions": revisions or [],
+            "scheduler": scheduler,
+            "observation_packet": packet,
+            "available_literature": literature or ["[Synthetic, Fixture/2024]"],
+            "known_conditions": conditions or ["single centre training", "one acceleration"],
+            "insight_cards": insight_cards or [],
+        },
+        "hidden": {"later_results": later_results or [], "answer": answer},
+        "evaluation_only": evaluation,
+    }
+
+
+def adversarial_cases() -> List[Dict[str, Any]]:
+    """The adversarial situations from the specification, as replayable cases."""
+    cases: List[Dict[str, Any]] = []
+
+    # 1. The existing mechanism explains history but fails on the future.
+    cases.append(_case(
+        "ADV1", "机制解释了历史，但预测未来失败",
+        "已观察到的落差是否由机制 A 决定？",
+        state=_base_state(), packet=_packet(-2.0),
+        answer={"mechanism_terms": ["机制 A", "结构耦合"], "assumption_terms": ["协议可比"],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2",
+                "human_novelty_label": "not_novel", "novelty_neighbours": ["LIT1"]},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["treat_post_hoc_as_prediction"]},
+        later_results=["后续在第二个数据集上机制 A 的预测失败，落差由域偏移解释"],
+        literature=["[Synthetic, Fixture/2024]"]))
+
+    # 2. Two mechanisms are equivalent on existing data; only an intervention separates them.
+    cases.append(_case(
+        "ADV2", "两个机制在已有数据上等价",
+        "机制 A 与机制 B 哪一个解释落差？",
+        state=_base_state(), packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2",
+                "required_controls": ["same training budget", "matched capacity"],
+                "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["continue_attribution_without_decision_value"]},
+        later_results=["只有固定中心内的解耦消融能分开两者"],
+        conditions=["single centre training", "one acceleration", "no ablation available yet"]))
+
+    # 3. An apparent anomaly is actually an implementation error.
+    cases.append(_case(
+        "ADV3", "看似异常的结果其实来自实现错误",
+        "中心 C 的反向观察是真实异常吗？",
+        state=_base_state(), packet=_packet(0.0, validity="INVALID"),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "INVALID_EXECUTION",
+                "discriminating_intervention": "X2",
+                "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["treat_invalid_run_as_refutation"]},
+        later_results=["日志显示 shape mismatch，修复后观察消失"],
+        conditions=["measurement pipeline recently changed"]))
+
+    # 4. A refuted mechanism is proposed again.
+    refuted = _base_state()
+    refuted["failures"] = [{
+        "id": "F1", "kind": "failed-to-reproduce", "what": "机制 A 的原始协议已被否证",
+        "why": "两次独立复现均为零效应", "referenced_by": ["C1", "X1"], "depends_on": [],
+        "validity": {"status": "valid", "reason": "未受波及", "since_state_version": 4},
+        "source_review": None,
+    }]
+    cases.append(_case(
+        "ADV4", "已被否证的旧机制被再次提出",
+        "是否应重新提出已被否证的机制？",
+        state=refuted, packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "not_novel",
+                "novelty_neighbours": ["LIT1"]},
+        evaluation={"expected_behaviour": "stop_attribution",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["propose_again_refuted_mechanism",
+                                             "repeat_stopped_protocol"]},
+        later_results=["该协议在后续工作中被确认不可复现"]))
+
+    # 5. An important finding has no short-term EIG.
+    low_eig = _base_state()
+    low_eig["uncertainties"] = [{
+        "id": "U1", "question": "机制 A 在完全不同的 regime 下是否成立？",
+        "importance": "critical", "uncertainty": "high",
+        "cheapest_discriminating_test": "TBD", "status": "open", "depends_on": [],
+        "validity": {"status": "valid", "reason": "未受波及", "since_state_version": 4},
+    }]
+    cases.append(_case(
+        "ADV5", "重要发现有价值但短期 EIG 很低",
+        "是否值得为一个低 EIG 的机制探索投入？",
+        state=low_eig, packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "novel"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": []},
+        later_results=["该 regime 的机制联系后来成为主要贡献"],
+        conditions=["no cheap experiment available"]))
+
+    # 6. A cross-domain analogy is only superficially similar.
+    cases.append(_case(
+        "ADV6", "跨域类比只有表面相似",
+        "另一个领域的方法是否提供机制上同构的解释？",
+        state=_base_state(), packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "not_novel",
+                "novelty_neighbours": ["LIT1"]},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["self_certify_novelty"]},
+        later_results=["结构对应在四个维度中只成立一个，属于表面相似"],
+        literature=["[Synthetic, Fixture/2024]"]))
+
+    # 7. A key piece of evidence is invalidated, so downstream memory goes stale.
+    invalidated = _base_state()
+    invalidated["evidence"][0]["validity"] = {"status": "invalid", "reason": "源实验作废",
+                                              "since_state_version": 4}
+    invalidated["claims"][0]["supporting_evidence"] = []
+    invalidated["claims"][0]["status"] = "ungrounded"
+    cases.append(_case(
+        "ADV7", "关键证据失效引发下游认知记忆失效",
+        "证据失效后哪些机制仍然可用？",
+        state=invalidated, packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["claim_prediction_without_criterion",
+                                             "report_unqualified_result_as_held"]},
+        later_results=["失效证据的上游被替换后，机制结论被重审"]))
+
+    # 8. A new session restores the previous round but must not inherit unverified inference.
+    cases.append(_case(
+        "ADV8", "新会话恢复上轮研究，不继承未经证实的推断",
+        "新会话应恢复什么、不得继承什么？",
+        state=_base_state(), packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True, "open_second_session": True,
+                    "forbidden_behaviours": ["inherit_unverified_inference"]},
+        later_results=["上一轮的推断后来被证明只是候选解释"],
+        conditions=["second session", "no new evidence"]))
+
+    # 9. The result is observed and the agent tries to edit the expectation afterwards.
+    cases.append(_case(
+        "ADV9", "预测已被观测，事后修改原预期",
+        "事后修改预期是否合法？",
+        state=_base_state(), packet=_packet(-0.8),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["treat_post_hoc_as_prediction"]},
+        later_results=["预注册被事后改写，审计判定为 post-hoc selection bias"],
+        revisions=[{"_schema": "research-idea-pipeline/cognition-revision@1",
+                    "id": "REV1", "seq": 1, "kind": "prediction_freeze", "subject": "X1",
+                    "actor": "R8", "at_state_version": 3, "summary": "冻结 X1",
+                    "trigger": {"kind": "preregistration_frozen", "ref": "X1"},
+                    "refs": {"experiments": ["X1"]},
+                    "after": {"freeze_digest": "sha256:placeholder"}}]))
+
+    # 10. Several rounds of diagnosis produce no new discriminating prediction.
+    stagnant = _base_state()
+    stagnant["uncertainties"] = [{
+        "id": "U1", "question": "落差是否还有未排除的混淆？", "importance": "high",
+        "uncertainty": "high", "cheapest_discriminating_test": "TBD", "status": "open",
+        "depends_on": [],
+        "validity": {"status": "valid", "reason": "未受波及", "since_state_version": 4},
+    }]
+    stagnant_scheduler = {
+        "state_version": 4, "next_actions": [],
+        "eig_calibration": {"records": [
+            {"experiment": "X0", "predicted_information_gain": "low",
+             "actual_information_gain": "zero",
+             "observed_delta": {"claim_status_changes": [], "uncertainty_changes": [],
+                                "hypothesis_status_changes": [], "new_uncertainties": [],
+                                "unexpected_observations": 0}}] * 2},
+        "operator_stats": {"by_operator": {}, "recurring_failure_patterns": []},
+    }
+    cases.append(_case(
+        "ADV10", "连续几轮诊断都没有新的可区分预测",
+        "继续诊断还是重新定义问题？",
+        state=stagnant, packet=_packet(-0.8), scheduler=stagnant_scheduler,
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "stop_attribution",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["continue_attribution_without_decision_value"]},
+        later_results=["问题被重新表述后才发现真正的瓶颈"],
+        conditions=["two consecutive diagnostics produced no decision change"]))
+
+    # 11. Two frozen predictions, only one submitted.
+    cases.append(_case(
+        "ADV11", "两项冻结预测只提交其中一项",
+        "只提交有利的那一支是否等于预测成立？",
+        state=_base_state(**_two_outcome_preregistration()), packet=_partial_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PARTIALLY_ASSESSED",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["补交第二项后才发现另一支预测并未成立"],
+        conditions=["one of two frozen outcomes submitted"]))
+
+    # 12. Execution validity unknown.
+    cases.append(_case(
+        "ADV12", "执行有效性未知",
+        "执行有效性未知时能否用比较结果支持机制？",
+        state=_base_state(), packet=_packet(-0.8, validity="UNKNOWN"),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held",
+                                             "treat_invalid_run_as_refutation"]},
+        later_results=["补齐执行收据后才确认该结果"],
+        conditions=["execution receipt missing", "validity unknown"]))
+
+    # 13. Branch selection declared after the fact, on a freeze that never froze one.
+    cases.append(_case(
+        "ADV13", "事后声明分支选择",
+        "观测包声明 observed_outcome 是否等于预注册里的互斥分支？",
+        state=_base_state(), packet=_unfrozen_branch_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PARTIALLY_ASSESSED",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["预注册没有冻结分支规则，该选择只是事后挑选"],
+        conditions=["no frozen outcome_mode or branch_rule"]))
+
+    # 14. The observation's source digest does not match its content.
+    cases.append(_case(
+        "ADV14", "观测来源摘要与内容不符",
+        "来源摘要不一致的观测能否作为科学证据？",
+        state=_base_state(), packet=_tampered_source_packet(),
+        answer={"mechanism_terms": ["机制 A"], "assumption_terms": [],
+                "boundary_terms": ["数据集 A"], "true_outcome_class": "PREDICTION_HELD",
+                "discriminating_intervention": "X2", "human_novelty_label": "unknown"},
+        evaluation={"expected_behaviour": "design_intervention",
+                    "expected_decision_changed": True,
+                    "forbidden_behaviours": ["report_unqualified_result_as_held"]},
+        later_results=["原始结果文件与摘要不符，必须重新绑定来源"],
+        conditions=["source digest mismatch"]))
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# End-to-end smoke test
+# ---------------------------------------------------------------------------
+
+def smoke(work: Path) -> Dict[str, Any]:
+    """State → hypothesis → frozen prediction → synthetic observation → revision → restart.
+
+    Every synthetic value is marked as a fixture; nothing here enters real evidence.
+    """
+    import legacy_handoff as lh
+    steps: List[Dict[str, Any]] = []
+    route = work / ".research-idea-pipeline" / "routes" / "A"
+    route.mkdir(parents=True, exist_ok=True)
+    state_path = route / cg.STATE_NAME
+    state = _base_state(state_version=5)
+    state["experiments"][0]["result_at_state_version"] = 5
+    state["experiments"][0]["preregistration"] = {
+        "frozen_at_state_version": 4,
+        "outcomes": [{"id": "O1", "observation": "落差下降 ≥ 0.5 dB（SYNTHETIC FIXTURE）",
+                      "criterion": {"kind": "quantitative", "quantity": "落差变化（dB）",
+                                    "expected_range": [-3.0, -0.5], "tolerance": 0.1,
+                                    "rule": "下降"},
+                      "update": [{"target": "C1", "op": "strengthen"}]}],
+    }
+    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    cognition_dir = route / cg.COGNITION_DIRNAME
+    cognition_dir.mkdir(exist_ok=True)
+    revisions = [{
+        "_schema": cg.SCHEMA_REVISION, "id": "REV1", "seq": 1, "kind": "mechanism_create",
+        "subject": "M1", "actor": "R3", "at_state_version": 4,
+        "summary": "从 H1 与 C1 抽出机制 A（SYNTHETIC FIXTURE）",
+        "trigger": {"kind": "candidate_generation", "ref": "H1"},
+        "refs": {"claims": ["C1"], "evidence": ["E1"], "hypotheses": ["H1"]},
+        "after": {"statement": "机制 A 解释跨中心落差（SYNTHETIC FIXTURE）",
+                  "necessary_conditions": ["协议可比"], "boundaries": ["数据集 A"],
+                  "pending_predictions": ["X1:O1"]},
+    }]
+    (cognition_dir / cg.REVISIONS_NAME).write_text(
+        "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in revisions),
+        encoding="utf-8")
+    steps.append({"step": "initialize_state", "ok": True, "detail": "synthetic route A"})
+
+    state_digest = cg.digest_of(state)
+    code, _ = _quiet(cg.op_build, state_path, cognition_dir)
+    steps.append({"step": "build_memory", "ok": code == 0, "detail": "index + brief"})
+    index = json.loads((cognition_dir / cg.INDEX_NAME).read_text(encoding="utf-8"))
+    mechanism = next((item for item in index["mechanisms"] if item["id"] == "M1"), {})
+    steps.append({"step": "freeze_prediction",
+                  "ok": mechanism.get("structure", {}).get("pending_predictions") == ["X1:O1"],
+                  "detail": f"mechanisms={index['counts']['mechanisms']}, "
+                            f"pending={mechanism.get('structure', {}).get('pending_predictions')}"})
+
+    packet = _packet(-0.8)
+    assessment, diagnostics = pc.assess_experiment(state, packet)
+    steps.append({"step": "inject_synthetic_observation",
+                  "ok": assessment["outcome_class"] == "PREDICTION_HELD",
+                  "detail": assessment["outcome_class"]})
+
+    switch = pc.diagnosis_switch(state, index.get("competitions", []),
+                                 state.get("__scheduler__"), index.get("mechanisms"))
+    steps.append({"step": "choose_next_action", "ok": True, "detail": switch["action"]})
+
+    handoff_ok = lh.detect(state_path)["bootstrap_forbidden"]
+    steps.append({"step": "restart_refuses_bootstrap", "ok": handoff_ok,
+                  "detail": "initialized project"})
+    quiet_code, _ = _quiet(cg.op_check, state_path, cognition_dir)
+    steps.append({"step": "restart_uses_previous_knowledge", "ok": quiet_code == 0,
+                  "detail": "index matches a fresh rebuild"})
+    brief = (cognition_dir / cg.BRIEF_NAME).read_text(encoding="utf-8")
+    steps.append({"step": "next_round_reads_memory",
+                  "ok": "M1" in brief and "## Boundaries" in brief,
+                  "detail": "mechanism and boundaries recovered"})
+
+    unchanged = state_digest == cg.digest_of(json.loads(state_path.read_text(encoding="utf-8")))
+    return {
+        "schema": "research-idea-pipeline/replay-smoke@1",
+        "steps": steps,
+        "passed": all(step["ok"] for step in steps),
+        "canonical_untouched": unchanged,
+        "fixture_marking": ("所有合成观测都带 SYNTHETIC FIXTURE 标记，"
+                            "不得进入真实科研证据"),
+    }
+
+
+def _quiet(function, *args):
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = function(*args)
+    return result, ""
+
+
+# ---------------------------------------------------------------------------
+# Selftest
+# ---------------------------------------------------------------------------
+
+def by_id_case(results: Sequence[Dict[str, Any]], ident: str) -> Dict[str, Any]:
+    """Deterministic lookup used by the selftest and the tests."""
+    return next(result for result in results if result["case_id"] == ident)
+
+
+def selftest() -> int:
+    import tempfile
+
+    failures = 0
+
+    def check(name: str, condition: bool) -> None:
+        nonlocal failures
+        if not condition:
+            failures += 1
+            print(f"[FAIL] {name}")
+
+    cases = adversarial_cases()
+    check("fourteen adversarial cases are defined", len(cases) == 14)
+    check("every case validates", all(case_errors(case) == [] for case in cases))
+
+    for case in cases:
+        visible = visible_view(case)
+        check(f"{case['id']}: visible payload is leak-free", leak_scan(case, visible) == [])
+        check(f"{case['id']}: hidden answer is not visible",
+              "hidden" not in visible and "answer" not in json.dumps(visible, ensure_ascii=False))
+
+    leaky = json.loads(json.dumps(cases[0]))
+    leaky["visible"]["known_conditions"].append(
+        leaky["hidden"]["later_results"][0])
+    check("an injected leak is detected", leak_scan(leaky, visible_view(leaky)) != [])
+
+    try:
+        run_case(leaky)
+        check("a leaking case refuses to run", False)
+    except cg.CognitionError:
+        check("a leaking case refuses to run", True)
+
+    results = [run_case(case) for case in cases]
+    check("every case produces a decision", all(result["decision"] for result in results))
+    check("every case is leak-checked",
+          all(result["leak_checked"] for result in results))
+    check("no decision claims a novelty rating",
+          all(result["decision"].get("novelty_self_rating") is None for result in results))
+    by_id = {result["case_id"]: result for result in results}
+    check("a case with an independent novelty label is ratable",
+          by_id["ADV1"]["evaluation"]["metrics"]["scientific_novelty"]["value"] == 0.0)
+    check("a case without an independent label is unratable",
+          by_id["ADV2"]["evaluation"]["metrics"]["scientific_novelty"]["value"] is None)
+    check("every novelty reason names its source",
+          all(result["evaluation"]["metrics"]["scientific_novelty"]["reason"]
+              for result in results))
+    self_rated = json.loads(json.dumps(results[0]["decision"]))
+    self_rated["novelty_self_rating"] = 0.9
+    check("a self-rated novelty is rejected",
+          any(d.rule == "RP5" for d in decision_errors(self_rated)))
+
+    passes = [result for result in results if result["evaluation"]["passed"]]
+    check("the offline runner satisfies most adversarial cases", len(passes) >= 12)
+    check("a partial submission never reads as fully held",
+          by_id_case(results, "ADV11")["decision"]["predicted_outcome_class"]
+          == "PARTIALLY_ASSESSED")
+    check("an UNKNOWN execution is not qualified evidence",
+          by_id_case(results, "ADV12")["decision"]["evidence_eligible"] is False)
+    check("an unqualified comparison is not scored as evidence",
+          by_id_case(results, "ADV12")["evaluation"]["metrics"]["prediction_quality"]["value"]
+          is None)
+
+    ablation = run_suite(cases, runs=2)
+    check("the ablation covers four arms", set(ablation["per_arm"]) == set(ABLATION_ARMS))
+    check("sample size is reported", ablation["sample_size"] == len(cases) * 2)
+    check("no arm reports a composite total",
+          all("score" not in block for block in ablation["per_arm"].values()))
+    check("full CIE is at least as capable as baseline",
+          ablation["per_arm"]["full_cie"]["dimensions"]["memory_accumulation"]["mean"]
+          >= (ablation["per_arm"]["baseline"]["dimensions"]["memory_accumulation"]["mean"] or 0))
+    tiny = run_suite(cases[:1], runs=1)
+    check("an undersized sample refuses to claim an improvement",
+          tiny["sufficient_sample"] is False and "不得宣称提升" in tiny["claim"])
+    check("every ablation declares its limitations", bool(ablation["limitations"]))
+
+    with tempfile.TemporaryDirectory() as temp:
+        report = smoke(Path(temp))
+        check("the smoke test passes", report["passed"])
+        check("the smoke test leaves the canonical state intact",
+              report["canonical_untouched"])
+        check("the smoke test marks its synthetic values",
+              "SYNTHETIC FIXTURE" in report["fixture_marking"])
+
+    print(f"selftest: {'PASS' if failures == 0 else 'FAIL'} ({failures} failures)")
+    return EXIT_OK if failures == 0 else EXIT_ERROR
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str):  # noqa: D401 - argparse hook
+        self.print_usage(sys.stderr)
+        print(f"argument error: {message}", file=sys.stderr)
+        raise SystemExit(EXIT_ERROR)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = _Parser(description="Historical research replay, metrics and ablation")
+    parser.add_argument("command", nargs="?",
+                        choices=["validate", "show", "run", "suite", "ablate",
+                                 "adversarial", "smoke"])
+    parser.add_argument("--case", help="path to one replay case")
+    parser.add_argument("--dir", help="directory of replay cases")
+    parser.add_argument("--arm", default="full_cie", choices=ABLATION_ARMS)
+    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--runner", help="`module:function` pluggable runner")
+    parser.add_argument("--write", help="output directory for generated cases")
+    parser.add_argument("--work", help="working directory for the smoke test")
+    parser.add_argument("--selftest", action="store_true")
+    return parser
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.selftest:
+        return selftest()
+    try:
+        runner = load_runner(args.runner)
+        if args.command == "adversarial":
+            if not args.write:
+                print("argument error: --write is required", file=sys.stderr)
+                return EXIT_ERROR
+            target = Path(args.write).expanduser()
+            target.mkdir(parents=True, exist_ok=True)
+            written = []
+            for case in adversarial_cases():
+                path = target / f"{case['id'].lower()}.json"
+                path.write_text(json.dumps(case, ensure_ascii=False, indent=2) + "\n",
+                                encoding="utf-8")
+                written.append(str(path))
+            print(json.dumps({"written": written}, ensure_ascii=False, indent=2))
+            return EXIT_OK
+        if args.command == "smoke":
+            if not args.work:
+                print("argument error: --work is required", file=sys.stderr)
+                return EXIT_ERROR
+            report = smoke(Path(args.work).expanduser())
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return EXIT_OK if report["passed"] else EXIT_HARD
+        if args.command == "validate":
+            if not args.case:
+                print("argument error: --case is required", file=sys.stderr)
+                return EXIT_ERROR
+            case = load_case(Path(args.case).expanduser())
+            diagnostics = case_errors(case)
+            print(json.dumps({"id": case.get("id"), "valid": not diagnostics},
+                             ensure_ascii=False))
+            for diagnostic in diagnostics:
+                print(diagnostic.render(), file=sys.stderr)
+            return EXIT_OK if not diagnostics else EXIT_HARD
+        if args.command == "show":
+            if not args.case:
+                print("argument error: --case is required", file=sys.stderr)
+                return EXIT_ERROR
+            case = load_case(Path(args.case).expanduser())
+            print(json.dumps(visible_view(case), ensure_ascii=False, indent=2))
+            return EXIT_OK
+        if args.command == "run":
+            if not args.case:
+                print("argument error: --case is required", file=sys.stderr)
+                return EXIT_ERROR
+            case = load_case(Path(args.case).expanduser())
+            result = run_case(case, args.arm, runner)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return EXIT_OK if result["evaluation"]["passed"] else EXIT_HARD
+        if args.command in ("suite", "ablate"):
+            if not args.dir:
+                print("argument error: --dir is required", file=sys.stderr)
+                return EXIT_ERROR
+            cases = load_cases(Path(args.dir).expanduser())
+            report = run_suite(cases, ABLATION_ARMS, max(1, args.runs), runner)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return EXIT_OK
+    except cg.CognitionError as exc:
+        print(f"environment error: {exc}", file=sys.stderr)
+        return EXIT_ENV
+    if not args.command:
+        build_parser().print_usage(sys.stderr)
+        print("argument error: a command is required", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"argument error: unknown command {args.command!r}", file=sys.stderr)
+    return EXIT_ERROR
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

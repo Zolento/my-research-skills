@@ -112,6 +112,7 @@
       "contradicts": [],
       "strength": "strong",
       "scope": "brain MRI / acceleration=4",
+      "scope_region": null,
       "epistemic_status": "Observed",
       "source_ref": "X7（seed=0）的跨中心对照结果（示例占位）",
       "verification_tier": "T2",
@@ -280,6 +281,13 @@
           {
             "id": "O1",
             "observation": "跨中心 PSNR 落差 ≥ 0.5 dB",
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "跨中心 PSNR 差（dB）",
+              "expected_range": [0.5, 3.0],
+              "tolerance": 0.1,
+              "rule": "落差 ≥ 0.5 dB 视为「落差存在」（示例占位）"
+            },
             "update": [
               {
                 "target": "C0",
@@ -290,6 +298,13 @@
           {
             "id": "O2",
             "observation": "落差 < 0.1 dB，解耦前后无差异",
+            "criterion": {
+              "kind": "quantitative",
+              "quantity": "跨中心 PSNR 差（dB）",
+              "expected_range": [0.0, 0.1],
+              "tolerance": 0.1,
+              "rule": "落差 < 0.1 dB 视为「无差异」（示例占位）"
+            },
             "update": [
               {
                 "target": "C0",

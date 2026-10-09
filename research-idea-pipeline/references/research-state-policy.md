@@ -256,6 +256,7 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `contradicts` | `C` id 数组，可为 `[]` | ✅ | |
 | `strength` | `partial` \| `strong` \| `weak` | ✅ | |
 | `scope` | 字符串（例 `brain MRI / acceleration=4`） | ✅ | 证据自身的适用范围，不得越界 |
+| `scope_region` | 对象 `{轴: 值}`，值为字符串 / 数值 | ❌ | 可选加性槽位（2026-10 CIE 终轮登记）：把适用范围写成**可机械求包含关系**的约束集。`{轴: 值}` 越多 = 范围越窄；`evidence[].scope_region` 只有在**每一个约束都能在主张的 region 里找到相同值**时才覆盖该主张。缺省时按 `scope` 字符串**规范化精确相等**判定，**不做子串包含** |
 | `epistemic_status` | `Observed` \| `Supported` \| `Hypothesized` \| `Planned` \| `Unknown` | ✅ | V5；↔ 措辞等级见 [evidence-policy.md](evidence-policy.md) §3 |
 | `source_ref` | 字符串 | ✅ | 具体位置（实验 id / 文献 / 定理 / 数据路径） |
 | `verification_tier` | `T0` \| `T1` \| `T2` \| `T3` \| `T4` \| `T5` | ✅ | 证据的**来源强度**（§2.5）；与 `epistemic_status` **正交**；**V20** |
@@ -337,6 +338,71 @@ R0 Research Contract ─▶ R1 Research World Model ─▶ R2 Field Mapping
 | `status` | `planned` \| `running` \| `done` \| `failed` | ✅ | 失败实验**必须**保留（spec §4） |
 | `preregistration` | 对象 或 `null` | 见 V21 | **结果冻结前**写下的「观察 → state delta」映射；R8 冻结、R9 执行、R13 逐条核 |
 | `result_at_state_version` | 整数 ≥ 0 或 `null` | ✅ | 结果写入时的 `state_version`；未产生结果为 `null`；**V21** |
+
+**`preregistration.outcomes[].criterion`（可选加性槽位，2026-10 CIE Phase 2 登记）**
+
+`outcomes[].observation` 是给人读的预测陈述；**机器无法从自由文本判定预测是否成立**。
+因此允许每个预注册结果带一个 `criterion` 对象，把「什么算预测成立」在**冻结时**写成
+可机械判定的判据。它不改变 `outcomes[].id` / `observation` / `update` 的语义，也不新增
+state 集合。
+
+| 字段 | 取值 / 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `kind` | `quantitative` \| `directional` \| `discrete` | ✅ | 判据类型；与 `observation` 措辞无关 |
+| `quantity` | 非空字符串 | ✅ | 被测量的量，含单位口径 |
+| `expected_range` | `[下界, 上界]`（数值） | 仅 `quantitative` | 落入区间 = 预测成立 |
+| `tolerance` | 数值 ≥ 0 | `quantitative` / `directional` | 测量噪声容差；超出区间但在容差内 = 未决而非失败 |
+| `direction` | `increase` \| `decrease` \| `no_change` | 仅 `directional` | |
+| `held_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测成立 |
+| `failed_labels` | 非空字符串数组 | 仅 `discrete` | 观测标签落在其中 = 预测失败 |
+| `measurement` | 非空字符串 | ❌ | 测量口径（采集与聚合方式）；两个机制只有在口径一致时才可比较 |
+| `noise` | 数值 ≥ 0 | ❌ | 单次测量的噪声（单位同 `quantity`）；用于**判别力**分析，不参与成立判定 |
+| `sample_size` | 整数 ≥ 1 | ❌ | 计划的测量次数；与 `noise` 共同给出标准误 |
+| `min_effect` | 数值 ≥ 0 | ❌ | 有意义的最小效应；供判别规则引用 |
+| `rule` | 字符串 | ❌ | 给人读的判据说明；**不参与判定** |
+
+`noise` / `sample_size` / `min_effect` / `measurement` 是**可选**的，而且**只有一个消费者**：
+`prediction_compare` 的判别力分析。它们回答「这个设计能不能分开两个机制」，
+`expected_range` 与 `tolerance` 回答「什么算预测成立」——两者不得混用。
+
+**`preregistration.outcome_mode` / `preregistration.branch_rule`（可选加性槽位，2026-10 CIE 第三轮登记）**
+
+一个预注册常常列出**同一次决策的互斥分支**，而不是多个独立测量。允许在冻结时显式声明这件事；
+这也是唯一允许 `prediction_compare` 进入 branch mode 的途径。**未声明 mode 的预注册一律按
+completeness 判定**，旧项目因此不需要迁移。
+
+| 字段 | 取值 / 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `outcome_mode` | `completeness` \| `branch` | ❌ | 缺省 = `completeness`；`branch` 才允许分支模式 |
+| `branch_rule.selector` | `{kind, location}`，`kind ∈ {log, metric, result}` | `branch` 时 ✅ | 决定分支的原始观测；`location` 与观测包 `source.location` 必须逐字一致 |
+| `branch_rule.quantity` | 非空字符串 | `branch` 时 ✅ | 分支共同的可观测口径；必须与每个分支 `criterion.quantity` 一致 |
+| `branch_rule.branches` | 非空字符串数组 | `branch` 时 ✅ | 冻结 `outcomes[].id` 的**完整划分**（不得遗漏、不得多余） |
+
+互斥性不是声明出来的，而是从冻结判据**算出**来的：区间必须（含 `tolerance` 与 `noise/√n` 展宽后）
+不相交，或 `held_labels` 不相交，或方向不同。不满足时 branch mode 直接不成立，退回 completeness。
+
+**硬规则：**
+
+1. **无 `criterion` 不得宣告预测成立或失败。** 比较器对该结果只能返回 `UNTESTABLE`，
+   并要求补判据；旧 state 保持兼容，**不做追溯判定**。
+2. **判据必须与冻结同轮写入。** `criterion` 属于 `preregistration`，写入时机由 V21 的
+   `frozen_at_state_version` 约束；冻结之后修改必须走 `preregistration.amended[]`。
+3. **冻结的 `outcomes[]` 是完整判定集合。** 观测包是**关于它**的证据，不是「要判定哪些
+   结果」的清单。逐条判定冻结结果；缺失即未完成评价，**不得**因为只提交了一部分就宣称
+   全部预测成立。
+4. **形状由专用检查器强制。** 按 §3.11 的例外：`criterion`、`outcome_mode` / `branch_rule`
+   与证据资格的形状和判定由 `scripts/prediction_compare.py`（规则 `PC1`—`PC11`）强制，
+   `state_check.py` 继续忽略未知键，**S1—S7 / V1—V24 不改号、不改义**。规则见
+   [prediction-anomaly-competition.md](prediction-anomaly-competition.md)。
+5. **分支模式不能由观测包打开。** `observed_outcome` 只是声明；分支由冻结规则作用于原始观测
+   导出（规则 `PC10`）。分支选择与原始观测冲突、分支集合不是完整划分、分支不互斥、来源不在
+   冻结 `selector` 上时，一律不得产生 `PREDICTION_HELD` 或合格科学证据。
+6. **证据资格只有一个入口。** `qualify_evidence`（检查 `PQ1`—`PQ8`）是唯一判定；source 缺失、
+   digest 不符、判定集合不完整、分支未解析、时间顺序破坏都 **fail closed**
+   （`evidence_eligible: false`），不得只记一条诊断。
+7. **冻结摘要覆盖分支声明。** `prediction_freeze` 登记的 `freeze_digest` 覆盖
+   `outcome_mode` 与 `branch_rule`；事后追加分支规则的摘要必然不匹配（`PC4`）。
+   旧格式摘要仅在预注册未声明 mode/rule 时继续被接受。
 
 **实验树六段（固定，`stage` 取值，逐字）：**
 

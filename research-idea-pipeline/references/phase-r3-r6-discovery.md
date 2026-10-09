@@ -682,3 +682,30 @@ R6: Recombine            才允许不同世界互相借东西
 
 > 权威定义见 [research-state-policy.md](research-state-policy.md) §5；本节与它**必须逐字一致**。
 > 回写后跑 `python3 scripts/state_check.py --check .research-idea-pipeline/routes/<R>/research-state.json`，**硬违规须为 0**。
+
+---
+
+## CIE 接入：认知修订的写入点
+
+Discovery 是机制的**产生地**，因此也是认知记忆的主要写入方。开工前先读
+`.research-idea-pipeline/routes/<R>/cognition/context-brief.md`；
+它给出已持有的机制、尚未收口的竞争与失败约束。规则见
+[cognitive-memory-policy.md](cognitive-memory-policy.md)。
+
+| 阶段 | 读认知层 | 写认知层 |
+|---|---|---|
+| **R3** | Context Brief 的 hot / warm 机制、`CM9` 实质等价告警 | `mechanism_create`（每个候选机制一条，带核心变量、必要条件、适用范围、待检验预测与 canonical 引用）、`competition_open`（当两个机制解释同一批事实时） |
+| **R4** | — | —（QD archive 只动 `hypotheses[].status`） |
+| **R6** | 失败约束与 `operator` 先验 | `mechanism_weaken` / `mechanism_merge` / `competition_resolve` |
+
+**三条硬约束：**
+
+1. 修订事件**只写结构 + 指针**，不写支持等级、不写 `claims[].status`、不写 `contract`
+   （`CM2`）。支持等级由 canonical 事实推出。
+2. `competition_open` 必须同时给出**冲突预测**与**判别干预**；只并列多个可能原因不算
+   机制竞争（`CM8`）。判别干预应在 R8 变成真实的 `planned` `X`。
+3. 与已有机制共享同一 canonical 锚点集合的新机制是**重述**，不是进展（`CM9`）。
+   此时应改写已有机制，或明确登记它新增了哪条独立预测。
+
+**`P3` 与 `P4` 的隔离不受影响：** 认知记忆可以携带**已去领域词**的规范化骨架引用，
+但不得把某个 island 的候选内容带进另一个 island 的产生过程。

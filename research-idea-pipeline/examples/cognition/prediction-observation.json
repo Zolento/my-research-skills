@@ -1,0 +1,22 @@
+{
+  "schema": "research-idea-pipeline/prediction-observation@1",
+  "experiment_id": "X1",
+  "execution": {
+    "status": "completed",
+    "validity": "VALID"
+  },
+  "outcomes": [
+    {
+      "id": "O1",
+      "value": 0.8,
+      "source": {
+        "kind": "result",
+        "location": "results/A/X1/summary.json#cross_centre_gap",
+        "content": "跨中心 PSNR 差 0.8 dB（SYNTHETIC FIXTURE）",
+        "digest": "11de1bb264dcddc3111ffc945a86106e27b455c0c1473e611842d375b5f84060"
+      }
+    }
+  ],
+  "observed_outcome": "O1",
+  "_note": "Branch mode: X1 的 O1/O2 是同一次观测的互斥分支，因此声明 observed_outcome 而不要求逐个提交（SYNTHETIC FIXTURE）"
+}

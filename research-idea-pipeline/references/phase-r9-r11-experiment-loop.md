@@ -360,3 +360,21 @@ new source observations are the progress criterion.
 R11 records actual EIG from its immutable outcome transaction and invokes
 `scripts/experiment_execute.py scheduler-check`. The launch boundary checks the
 same telemetry and seals its digest. Do not invent deltas to upgrade the rating.
+
+## CIE 接入：异常登记与机制修订
+
+| 阶段 | 写认知层 | 说明 |
+|---|---|---|
+| **R9.O** | `anomaly_record`、`prediction_assessment` | 冻结预测与观测的偏差只能引用 `experiments[]`（冻结侧）与 `evidence[]`（观测侧）；未冻结预测的观察必须先落 `evidence[]` 的 `diagnostic_observation`，再标为**探索性异常** |
+| **R10** | `mechanism_refute`、`mechanism_weaken`、`mechanism_reactivate` | 处置变化必须与 `repairs[].disposition` 一致；`KILL_BRANCH` 覆盖的机制在被引用的 canonical 事实推出 `refuted` 时自动转为 `refuted` |
+| **R11** | `mechanism_merge`、`mechanism_revise` | 状态事务完成后重建索引：`python3 scripts/cognition.py build --state <state.json>` |
+
+**三条硬约束：**
+
+1. **实验失败 ≠ 机制失败。** `INVALID_EXPERIMENT` 只写 `failures[]` 与执行收据，
+   不产生机制否证；只有有效负证据、`failed-to-reproduce` 或 `KILL_BRANCH` 才能让
+   canonical 事实推出 `refuted`。
+2. **不得事后改写认知历史。** 已记录的修订事件是 append-only 的；新证据只能追加新事件。
+   旧事件的引用失效时，派生条目标记 `stale` 并退出 hot memory，**不删除、不改写**。
+3. **认知层不写 canonical。** 构建前后对 `research-state.json` 做字节比对（`CM0`）；
+   索引必须可由 canonical 状态 + 修订日志重建（`CM3`）。

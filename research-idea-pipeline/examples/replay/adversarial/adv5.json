@@ -1,0 +1,291 @@
+{
+  "_schema": "research-idea-pipeline/replay-case@1",
+  "id": "ADV5",
+  "title": "重要发现有价值但短期 EIG 很低",
+  "question": "是否值得为一个低 EIG 的机制探索投入？",
+  "visible": {
+    "state": {
+      "state_version": 4,
+      "contract": {
+        "goal": "判断机制 A 是否解释目标现象",
+        "primary_anchor": "phenomenon",
+        "constraints": [
+          "单卡"
+        ],
+        "resources": [
+          "公开数据集"
+        ],
+        "provisional_anchor_rationale": "先形式化",
+        "out_of_scope": []
+      },
+      "claims": [
+        {
+          "id": "C1",
+          "statement": "机制 A 解释目标现象",
+          "parent": null,
+          "subclaims": [],
+          "status": "partially-supported",
+          "supporting_evidence": [
+            "E1"
+          ],
+          "refuting_evidence": [],
+          "nearest_alternative": "机制 B 解释同一现象",
+          "falsifier": "干预后现象不变",
+          "scope": "数据集 A",
+          "known_flaws": [],
+          "depends_on": [],
+          "validity": {
+            "status": "valid",
+            "reason": "已写入",
+            "since_state_version": 4
+          },
+          "contract": {
+            "statement": "机制 A",
+            "scope": "数据集 A",
+            "critical_assumptions": [],
+            "supporting_required": [
+              "E1"
+            ],
+            "refuting": "干预后不变",
+            "nearest_alternative": "机制 B",
+            "minimal_discriminating_experiment": "X2",
+            "expected_outcomes": {
+              "O1": "下降",
+              "O2": "不变"
+            },
+            "kill_rule": "若 O2 出现则降级",
+            "expansion_rule": "O1 且 X3 通过"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "id": "E1",
+          "kind": "experiment",
+          "supports": [
+            "C1"
+          ],
+          "contradicts": [],
+          "strength": "strong",
+          "scope": "数据集 A",
+          "epistemic_status": "Observed",
+          "source_ref": "X1",
+          "verification_tier": "T2",
+          "depends_on": [
+            "X1"
+          ],
+          "validity": {
+            "status": "valid",
+            "reason": "X1 已完成",
+            "since_state_version": 4
+          }
+        }
+      ],
+      "assumptions": [],
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "机制 A 是主因",
+          "structural_signature": {
+            "assumption_distance": 2,
+            "formulation_distance": 1,
+            "representation_distance": 0,
+            "theory_lens_distance": 1,
+            "mechanism_distance": 2
+          },
+          "novelty_source": "假设反转",
+          "theory_lens": "逆问题",
+          "nearest_prior": "LIT1",
+          "falsifier": "干预无效",
+          "expected_information_gain": 0.4,
+          "status": "elite",
+          "niche": "assumption-shift",
+          "island": "P2",
+          "generation": 0,
+          "operator": "assumption_breaker",
+          "parents": [],
+          "depends_on": [],
+          "validity": {
+            "status": "valid",
+            "reason": "未推翻",
+            "since_state_version": 4
+          },
+          "scientific_scope": "数据集 A"
+        }
+      ],
+      "experiments": [
+        {
+          "id": "X1",
+          "parent": null,
+          "stage": "X3",
+          "claim_targeted": [
+            "C1"
+          ],
+          "alternative_targeted": [
+            "ALT-1"
+          ],
+          "code_commit": "abc",
+          "data_split": "A/train",
+          "seed": 0,
+          "metric": "效应量",
+          "result": "0.8",
+          "interpretation": "初步",
+          "unexpected": [],
+          "known_flaws": [],
+          "next_branches": [],
+          "status": "done",
+          "preregistration": {
+            "frozen_at_state_version": 3,
+            "outcomes": [
+              {
+                "id": "O1",
+                "observation": "落差下降 ≥ 0.5",
+                "criterion": {
+                  "kind": "quantitative",
+                  "quantity": "落差变化（dB）",
+                  "expected_range": [
+                    -3.0,
+                    -0.5
+                  ],
+                  "tolerance": 0.1,
+                  "rule": "下降"
+                },
+                "update": [
+                  {
+                    "target": "C1",
+                    "op": "strengthen"
+                  }
+                ]
+              }
+            ]
+          },
+          "result_at_state_version": 4,
+          "depends_on": [],
+          "validity": {
+            "status": "valid",
+            "reason": "按预注册写入",
+            "since_state_version": 4
+          },
+          "outcome_analysis": null,
+          "execution_protocol": null
+        },
+        {
+          "id": "X2",
+          "parent": "X1",
+          "stage": "X3",
+          "claim_targeted": [
+            "C1"
+          ],
+          "alternative_targeted": [
+            "ALT-2"
+          ],
+          "code_commit": "TBD",
+          "data_split": "A/fixed",
+          "seed": 0,
+          "metric": "落差变化",
+          "result": "",
+          "interpretation": "尚未运行",
+          "unexpected": [],
+          "known_flaws": [],
+          "next_branches": [],
+          "status": "planned",
+          "preregistration": null,
+          "result_at_state_version": null,
+          "depends_on": [
+            "X1"
+          ],
+          "validity": {
+            "status": "pending",
+            "reason": "尚未运行",
+            "since_state_version": 3
+          },
+          "outcome_analysis": null,
+          "execution_protocol": null
+        }
+      ],
+      "literature": [
+        {
+          "id": "LIT1",
+          "ref": "[Synthetic, Fixture/2024]",
+          "relation": "shares-structure",
+          "depends_on": [],
+          "validity": {
+            "status": "valid",
+            "reason": "未撤回",
+            "since_state_version": 4
+          }
+        }
+      ],
+      "failures": [],
+      "uncertainties": [
+        {
+          "id": "U1",
+          "question": "机制 A 在完全不同的 regime 下是否成立？",
+          "importance": "critical",
+          "uncertainty": "high",
+          "cheapest_discriminating_test": "TBD",
+          "status": "open",
+          "depends_on": [],
+          "validity": {
+            "status": "valid",
+            "reason": "未受波及",
+            "since_state_version": 4
+          }
+        }
+      ],
+      "assurance": [],
+      "repairs": []
+    },
+    "revisions": [],
+    "scheduler": null,
+    "observation_packet": {
+      "schema": "research-idea-pipeline/prediction-observation@1",
+      "experiment_id": "X1",
+      "execution": {
+        "status": "completed",
+        "validity": "VALID"
+      },
+      "outcomes": [
+        {
+          "id": "O1",
+          "value": -0.8,
+          "source": {
+            "kind": "result",
+            "location": "results/A/X1/summary.json",
+            "content": "落差变化 -0.8 dB（SYNTHETIC REPLAY FIXTURE）",
+            "digest": "b3762bb58746b0ef048cba4e6b514decbd136201fd7cdb9f6c9d5f38ba16aff8"
+          }
+        }
+      ]
+    },
+    "available_literature": [
+      "[Synthetic, Fixture/2024]"
+    ],
+    "known_conditions": [
+      "no cheap experiment available"
+    ],
+    "insight_cards": []
+  },
+  "hidden": {
+    "later_results": [
+      "该 regime 的机制联系后来成为主要贡献"
+    ],
+    "answer": {
+      "mechanism_terms": [
+        "机制 A"
+      ],
+      "assumption_terms": [],
+      "boundary_terms": [
+        "数据集 A"
+      ],
+      "true_outcome_class": "PREDICTION_HELD",
+      "discriminating_intervention": "X2",
+      "human_novelty_label": "novel"
+    }
+  },
+  "evaluation_only": {
+    "expected_behaviour": "design_intervention",
+    "expected_decision_changed": true,
+    "forbidden_behaviours": []
+  }
+}

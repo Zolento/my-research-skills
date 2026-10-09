@@ -7,7 +7,7 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。本地文献源默认走 Zotero（Local API 只读），不可用时自动回落到 `docs/refs/` 旧格式；`zotero_refs.py` 可把 Zotero 元数据 / PDF 导出到该格式。内部 Evidence Outcome Analysis 区分有效负证据与无效执行，固化 scoped updates、negative knowledge 和下一步决策。PEIG/AALG 将风险对照、有限诊断与内容绑定 receipt 接入受控执行入口。 |
+| [`research-idea-pipeline/`](research-idea-pipeline/) | 以 **Research State** 为中心的科研搜索系统（`R0`—`R14` 双循环：Discovery 扩大候选并保多样性 / Assurance 对抗审核与修复），面向 CVPR / ICML / NeurIPS / MICCAI 投稿。24 条硬规则由校验器机械强制；含结构等价审计、状态投影与多源检索脚本，并配套离线回归测试。本地文献源默认走 Zotero（Local API 只读），不可用时自动回落到 `docs/refs/` 旧格式；`zotero_refs.py` 可把 Zotero 元数据 / PDF 导出到该格式。内部 Evidence Outcome Analysis 区分有效负证据与无效执行，固化 scoped updates、negative knowledge 和下一步决策。PEIG/AALG 将风险对照、有限诊断与内容绑定 receipt 接入受控执行入口。**Cognitive Insight Engine** 在路线控制平面下维护四类认知记忆（机制 / 异常 / 竞争 / 科学价值）：`cognition/index.json` 与 `cognition/context-brief.md` 完全可由 `research-state.json` 加 append-only 修订日志重建，支持等级一律由 canonical 证据推出，跨会话恢复机制模型、失败约束与未完成竞争。预测通过冻结在既有 `preregistration.outcomes[]` 里的可判定判据比较，输出成立 / 偏差 / 容差内 / 部分评价 / 探索性 / 无效 / 不可判定七类结果；互斥分支必须由预注册冻结 `outcome_mode` 与 `branch_rule` 才能进入 branch mode，所选分支由冻结规则作用于原始观测导出，事后声明 `observed_outcome` 一律按完整模式判定。证据资格只有 `qualify_evidence` 一个入口（`PQ1`—`PQ8`）：**`PQ4` 直接消费观测包校验器的完整结论**（schema 错误、缺字段、字段类型非法、越界 `observed_outcome`、来源缺失、摘要不符一律 fail closed），判定集合不完整、分支不可追溯、时间顺序被破坏或冻结登记无法核验同样阻断，不得授权 Claim 升级、机制否证或 Insight 认证；纯提示性多余键不误伤，诊断性比较仍保留在 `diagnostic_outcome_class`。Insight 只有绑定到**具体预测**——evidence 必须带 `prediction_ref`，或该实验只冻结了一个结果（禁止用"同实验 / 同 claim / 同机制 / 同指标"推断）——且**适用范围覆盖**（字符串 scope 规范化精确相等；结构化 `scope_region` 按约束子集判包含，`"MRI"` 不覆盖 `"MRI-3D"`，更窄证据不得外推）并通过结构等价审计后才能成为 `evidence_supported_insight`；机制竞争要求各机制拥有不同的冻结判据。**Legacy Research Handoff** 让已初始化项目在 `continue-research` 入口下只读接管：不重置 state version、claim 状态、证据、实验 ID、锚点或诊断预算，不补造历史预测，严重兼容性错误阻止写回。**科学价值与自适应发现** 分维判断 Decision Value 与 Discovery Potential（无总分），科学品味区分用户所有与证据校准两部分，探索策略复用既有算子并保留探索下限——算子降级需要至少两次独立失败、限定问题结构且带重启条件，`scheduler.json` 保持只读。**历史回放与验证** 用当时可见信息重放研究决策，以隐藏答案评分：七维独立指标（无加权总分，不可评记 `null`）、四个消融 arm、十四个对抗 case，并强制隐藏信息不可达；样本不足时明确声明不得宣称提升。真实 Agent A/B 评测尚未进行。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改。提供 Scientific Coherence Audit、Compact / Full Blueprint、多选 suggestion bank、作者风格保护和语义 / style 门禁；可独立安装，不依赖其他 skill。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图**字符草稿**架构师：读代码 / 论文 / 配置 / 用户说明，产出若干份结构不同的 Markdown 字符示意图 draft，作为 SVG / TikZ / Figma 代理的结构蓝图。强制四级证据（A/B/C/D）、强制区分 train / inference / frozen，禁止补造不存在的模块；含契约校验脚本与离线测试。 |
 
@@ -61,6 +61,17 @@ npx skills add Zolento/my-research-skills -g -s '*' -y
 
 ```bash
 npx skills add "Zolento/my-research-skills#<分支>@<skill>" -g -y
+```
+
+## 版本与发布
+
+每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-idea-pipeline`
+当前为 **2.3.0**）。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
+的提交上；tag 消息里写清 merge commit、升级注意、验收读数与安装结果。
+
+```bash
+git tag -l 'research-idea-pipeline/v*'          # 看已发布版本
+git show research-idea-pipeline/v2.3.0          # 看该版本的发布说明
 ```
 
 ## 日常维护
