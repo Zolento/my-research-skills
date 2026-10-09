@@ -164,7 +164,13 @@ See [../README.md](../README.md) for issue/run/diagnose/scheduler-check commands
 The managed boundary requires current scheduler input and seals its digest too.
 Each protocol outcome carries preregistration_id whose criterion exactly matches
 the frozen outcome observation. The runner returns execution_record (receipt,
-launch_seal, dry_run); R9 persists it before outcome analysis. The outcome CLI
+launch_seal, dry_run); R9 persists it before outcome analysis.
+**预览（`run` 不带 `--execute`）是零副作用**：它不写 `consume` 事件、不扣 GPU 小时或 Pilot 次数、
+不占用一次性 Receipt，并返回 `preview: true`、`consumed: false`、`would_execute` 与 `budget`
+（预览明确说明"将要执行什么"）。正式 `--execute` 在外部命令启动前**原子消费**一次 Receipt，
+防止并发双启动；历史 Ledger 中既有的 `dry_run: true` consume 事件保留原样且不参与预算扣减
+（v2.3.2 之前产生的记录因此不再阻塞合法执行）。`execution_record.launch_seal` 只有在真实执行时
+才有值，预览记录永远无法作为执行 provenance。The outcome CLI
 checks consumed provenance against the ledger, including --execution-ledger for
 an explicit route path. Library clients call verify_result_execution themselves.
 The launch flag must be a boolean and agree with the authenticated consumption
