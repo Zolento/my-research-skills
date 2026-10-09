@@ -52,7 +52,27 @@
   - `scripts/strategy_memory.py`
   - `scripts/research_replay.py`
   - `scripts/cognition.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/decision_trajectory.py`（Skill-RSI：决策轨迹，策略经验的来源）
+  - `scripts/policy_evolution.py`（Skill-RSI：有作用域的策略候选、评价、晋升、回滚）
+  - `scripts/policy_transfer.py`（Skill-RSI：跨项目迁移门）
+- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `DT0`—`DT10` / `PE1`—`PE14` /
+  `PT1`—`PT10`；科学判定仍由既有规则号给出。
+
+**Skill-RSI 生命周期命令（按需，不在每轮循环内执行）：**
+
+| # | 步骤 | 命令 |
+|---|---|---|
+| R1 | 冻结评价规则 | `python3 scripts/policy_evolution.py freeze-rules --state <state>` |
+| R2 | 提出候选 | `python3 scripts/policy_evolution.py propose --state <state> --policy <candidate.json> --trajectory <trajectory.jsonl>` |
+| R3 | Shadow 评价 | `python3 scripts/policy_evolution.py transition --state <state> --policy-id <P> --to SHADOW` |
+| R4 | 独立回放评价 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2` |
+| R5 | 记录评价结论 | `python3 scripts/policy_evolution.py evaluate --state <state> --policy-id <P> --report <report.json>` |
+| R6 | 有限试运行与晋升 | `python3 scripts/policy_evolution.py transition --state <state> --policy-id <P> --to BOUNDED_TRIAL` |
+| R7 | 回滚 | `python3 scripts/policy_evolution.py rollback --state <state> --policy-id <P> --to-policy-id <prev> --reason <why>` |
+| R8 | 真实消费 | `python3 scripts/strategy_memory.py decide --state <state> --scheduler <scheduler> --record` |
+
+> 上表是**策略演化**的操作面，不进 `preset_router.py` 的自动步骤；晋升后的策略由
+> 现有 Strategy Decision Adapter 消费。详见 [references/skill-rsi-policy.md](../references/skill-rsi-policy.md)。
 
 ## 6. 执行步骤
 
@@ -95,6 +115,9 @@ L1 建议、L2 实际调度影响证据、L3 独立效果证据，分别标记 v
 
 - 允许写入：
   - 策略修订（append-only 修订日志）
+  - Skill-RSI 策略候选与状态转移（`<route>/policy/`，append-only）
+  - Skill-RSI 决策轨迹（`<route>/decision-trajectory.jsonl`，append-only）
+  - 运行期源码完整性审计事件（`<route>/source-integrity.jsonl`）
 - canonical `research-state.json`：不写 canonical（只写策略记忆）。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 

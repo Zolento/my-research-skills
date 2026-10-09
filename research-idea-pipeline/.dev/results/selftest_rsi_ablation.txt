@@ -1,0 +1,15 @@
+  ok   the core ladder includes baseline / CIE+SE / Skill-RSI
+  ok   Skill-RSI is compared against the current CIE+SE arm
+  ok   leave-one-out arms exist
+  ok   no composite score key is reported
+  ok   the report declares its limitations
+  ok   undifferentiated arms are reported, not hidden
+  ok   prompt overhead is measured in bytes
+  ok   record sizes are measured
+  ok   latency is measured
+  ok   there is no fabricated token count
+  ok   L1 is verified
+  ok   L2 is verified
+  ok   L3 is not claimed without a real run
+  ok   the three states are explicitly not conflated
+selftest OK

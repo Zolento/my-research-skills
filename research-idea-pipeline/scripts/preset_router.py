@@ -2101,11 +2101,18 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     reason = None
     if candidate and policy["advice"]:
         conditions_ok, unmet = pe.scope_conditions_hold(candidate, ctx["state"])
-        if conditions_ok:
+        transfer = pe.cross_project_transfer_allowed(
+            candidate, ctx["state"], current_route=cg.route_of(ctx["state_path"]))
+        if conditions_ok and transfer["status"] != "BLOCK":
             decision = sm.strategy_decision(ctx["state"], ctx["index"], ctx["scheduler"],
                                             ctx["revisions"], advice=policy["advice"])
             applied = bool(decision.get("strategy_applied"))
             reason = decision.get("reason_if_not")
+        elif transfer["status"] == "BLOCK":
+            conditions_ok = False
+            unmet = list(unmet) + [f"cross_project_transfer: {item}"
+                                   for item in (transfer.get("reasons") or [])]
+            reason = "cross_project_transfer_blocked"
         else:
             reason = "scope_conditions_unmet"
     if not applied:

@@ -1,0 +1,27 @@
+  ok   manifest is deterministic
+  ok   manifest count matches protected_files
+  ok   manifest excludes .dev
+  ok   clean tree verifies PASS
+  ok   changed file is detected
+  ok   added protected file is detected
+  ok   removed protected file is detected
+  ok   guard denies SKILL.md
+  ok   guard denies scripts/*.py
+  ok   guard denies traversal
+  ok   guard denies hidden evaluation data
+  ok   guard denies canonical state
+  ok   guard allows canonical state with explicit flag
+  ok   guard allows route policy write
+  ok   guard enforces allowed_roots
+  ok   guard denies symlink escape
+  ok   guard_errors rejects SKILL.md edit
+  ok   guard_errors rejects shell command
+  ok   guard_errors rejects import os
+  ok   guard_errors rejects ../
+  ok   guard_errors accepts clean candidate
+  ok   integrity chain has two events
+  ok   integrity chain links previous line
+  ok   hold writes HOLD event
+  ok   hold does not repair source
+  ok   deployment plan states residual risk
+selftest OK

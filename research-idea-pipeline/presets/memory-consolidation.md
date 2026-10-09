@@ -52,7 +52,12 @@
   - `scripts/cognition.py`
   - `scripts/strategy_memory.py`
   - `scripts/state_check.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/policy_transfer.py`（Skill-RSI：三层记忆分离、过期经验、无损压缩检查）
+- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `PT1`—`PT10`；科学判定仍由既有规则号给出。
+
+**三层记忆不得互相替代（Skill-RSI）：** Scientific Memory 由 canonical 科学对象及其派生投影提供；
+Decision Experience 保存历史行动、选择条件、结果与执行成本（决策轨迹）；Policy Memory 保存经过
+限定和验证的科研策略。压缩记忆时**不得丢失证据与停止规则**；跨项目迁移只看声明结构，不看领域关键词。
 
 ## 6. 执行步骤
 

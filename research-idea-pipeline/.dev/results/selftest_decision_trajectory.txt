@@ -1,0 +1,16 @@
+  ok   open appends
+  ok   identical resubmission is idempotent
+  ok   one line on disk
+  ok   rewriting a recorded decision is refused
+  ok   stale state is refused
+  ok   future-result field in a decision is refused
+  ok   outcome after a real result appends
+  ok   post-hoc prediction is refused
+  ok   learning signal appends after outcome
+  ok   unqualified evidence cannot claim a scientific delta
+  ok   rebuild reconstructs the trajectory
+  ok   rebuild is deterministic
+  ok   pending list excludes observed trajectories
+  ok   supported ids require a real outcome
+  ok   hash chain detects a rewritten history line
+selftest OK

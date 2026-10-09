@@ -58,7 +58,15 @@
   - `scripts/execution_gate.py`
   - `scripts/experiment_execute.py`
   - `scripts/evidence_outcome.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/policy_evolution.py`（Skill-RSI：读取 ACTIVE 策略；只读，不在此处晋升）
+  - `scripts/decision_trajectory.py`（Skill-RSI：应用路径记录实际派遣）
+- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
+
+**策略消费（Skill-RSI，只读）：** 若存在 ACTIVE 且有作用域的策略，Loop 通过现有
+`strategy_memory.strategy_decision()` 在同一 `EIG ÷ cost` 层内重排已通过硬门禁的动作，
+并采用其结果作为下一项**实际派遣**的动作；适用范围不满足或跨项目迁移未通过时忽略该策略并记录原因。
+`apply` 路径把这次派遣写入决策轨迹与 `scheduler.strategy_decisions[]`；只读路径不写。
+输出区分 `scientific_delta` / `decision_delta` / `policy_delta`，三者均可为 `none`。
 
 ## 6. 执行步骤
 
@@ -96,7 +104,9 @@
 - 机器可读字段：
   - `loop_state`
   - `next_action`
+  - `dispatched_action` / `strategy_changed_dispatch`
   - `evidence_delta`
+  - `scientific_delta` / `decision_delta` / `policy_delta`（`policy_delta` 必须带评价等级）
   - `changed_decision`
   - `hold_reason`
   - 统一字段：`preset_id` / `status` / `entry` / `execution_scope` / `protocol` / `reused` / `observed` / `decision` / `steps` / `writes` / `changed_decision` / `next_action` / `canonical_untouched`。

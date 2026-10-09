@@ -1,0 +1,26 @@
+{
+  "schema": "research-idea-pipeline/skill-rsi-overhead@1",
+  "prompt_bytes": 11502,
+  "prompt_note": "Skill-RSI 参考文档大小（渐进加载时按需读取，不每轮注入）",
+  "trajectory_record_bytes": 1049,
+  "policy_candidate_bytes": 499,
+  "signature_latency_us": 4.5,
+  "context_build_latency_us": 78.76,
+  "extra_tool_calls_per_loop": 1,
+  "extra_tool_calls_note": "research-loop 在应用路径上多写一条决策轨迹；策略评价是离线步骤，不在每轮循环内",
+  "protected_files": 135,
+  "module_lines": {
+    "decision_trajectory.py": 976,
+    "policy_evolution.py": 1292,
+    "policy_transfer.py": 1730,
+    "research_replay.py": 1997,
+    "source_freeze.py": 846,
+    "strategy_memory.py": 1657,
+    "preset_router.py": 3625
+  },
+  "new_module_lines": 12123,
+  "notes": [
+    "没有可用的离线 token 计数器，因此报告字节数而不是编造 token 数",
+    "source-freeze 在前/后各做一次全量摘要，只在应用路径上执行"
+  ]
+}

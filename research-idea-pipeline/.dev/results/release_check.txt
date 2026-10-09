@@ -1,0 +1,20 @@
+[ok  ] 离线测试（含 golden path / parity / linter / deprecated / links） —— Ran 1590 tests in 15.837s · OK (skipped=3)
+[ok  ] state_check --selftest —— selftest OK（exit=0）
+[ok  ] 模板自身通过校验 —— exit=0
+[ok  ] 规则表逐字比对（S1—S7 + V1—V24） —— 31 条（S+V）逐字一致
+[ok  ] 三方读写表逐格比对 —— 28 行逐格一致
+[ok  ] 文档引用的脚本存在 —— 39 个脚本引用全部命中
+[ok  ] Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture —— 自检 + 8 份 artifact 全绿
+[ok  ] Rhetorical Realization（RE1–RE5）来源与正文 —— 冻结来源 + 4 份实际正文全通过 RE 门禁
+[ok  ] Evidence Outcome 来源/回写/Assurance/决策 —— 5 份来源/状态/决策全通过 EO 门禁（科学判断为示例，不是模型准确率）
+[ok  ] PEIG/AALG schemas/templates/CT→MRI mutation —— CT→MRI design + schemas/templates + capacity mutation (mock execution is covered by tests)
+[ok  ] Cognitive Insight Engine 合成 fixture（构建/校验/重建/状态不变） —— fixture build/check/rebuild green, mechanisms=4, state byte-identical
+[ok  ] 预测比较器（判据/冻结/区分力/来源绑定变异） —— criterion mutation + missing criterion + invalid run + partial submission + unfrozen/conflicting/non-exclusive branch selection + source and selector mutations + observation schema mutations + hand-written eligibility + UNKNOWN eligibility + prediction-level binding + scope coverage + comparability/conflict/resolution/rule + uncertifiable insight 全部判红
+[ok  ] Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回） —— 无损接管 + 幂等 + Bootstrap 拒绝 + 缺失预注册阻止写回 + legacy warning 不翻转退出码/不阻断接管
+[ok  ] 科学价值与自适应发现（无总分/锚点只读/算子不封禁） —— per-dimension value + no aggregate + floor kept + no ban + telemetry read-only
+[ok  ] 历史回放（对抗 case/泄漏防护/消融/端到端 smoke） —— 14 cases leak-checked; baseline 0% vs full 100%; comparator capability visible; undersized sample claims nothing; smoke green
+[ok  ] Skill-RSI（轨迹/策略生命周期/源码冻结/反事实/消融） —— 5 selftests + 7 RSI suites green; policy promotion needs an independent replay; NO_SUPPORT decisions cannot be promoted; no .dev/ runtime dependency; levels: decision_trajectory, policy_evolution, policy_transfer, source_freeze, rsi_ablation ...
+[ok  ] Research Preset Library（16 预设/Router/触发/适配器） —— 16 presets resolvable (zh/en/id) + registry↔protocol parity + provided fixtures 53/53 + one-protocol loading + negation/read-only safety + engineering failure keeps science untouched
+[ok  ] Release metadata（版本一致性/Schema 版本隔离） —— version 1.0.0 consistent across SKILL.md, both READMEs, CHANGELOG, release notes and the metadata test suite
+
+PASS

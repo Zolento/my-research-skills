@@ -1,0 +1,26 @@
+  ok   evaluation rules freeze once
+  ok   evaluation rules cannot be silently rewritten
+  ok   a valid scoped candidate is proposed
+  ok   a candidate touching the hard priority is refused
+  ok   executable content is refused
+  ok   a candidate supported by a non-existent trajectory is refused
+  ok   a candidate generated under different evaluation rules is refused
+  ok   a global slogan without structure is refused
+  ok   PROPOSED cannot jump straight to ACTIVE
+  ok   L1 moves to SHADOW
+  ok   promotion without independent evidence is refused
+  ok   an independent support verdict reaches REPLAY_EVALUATED
+  ok   flat candidate proposes
+  ok   indistinguishable arms are not promoted
+  ok   bounded trial does not expand the budget
+  ok   expanding the budget during a trial is refused
+  ok   L3 validates
+  ok   a changed evaluation rule invalidates promotion
+  ok   a validated policy becomes ACTIVE
+  ok   the ACTIVE policy yields adapter advice
+  ok   applicability conditions are checked against declared fields
+  ok   rollback keeps the failure trail
+  ok   the snapshot records the rollback
+  ok   a same-signature retry is allowed once under the cap
+  ok   renaming cannot evade the failure cap
+selftest OK

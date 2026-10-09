@@ -773,6 +773,56 @@ def step_execution_identifiability() -> Tuple[bool, str]:
     return True, 'CT→MRI design + schemas/templates + capacity mutation (mock execution is covered by tests)'
 
 
+def step_skill_rsi() -> Tuple[bool, str]:
+    """Skill-RSI: selftests, the unit suite, the ablation harness and the `.dev/` guard.
+
+    The gate treats a missing `.dev/` runtime dependency as a rule, not a convention: the
+    shipped skill must run without the development workspace (root `AGENTS.md` §15).
+    """
+    details: List[str] = []
+    for script in ("decision_trajectory.py", "policy_evolution.py", "policy_transfer.py",
+                   "source_freeze.py", "rsi_ablation.py"):
+        code, out = _run(["scripts/" + script, "--selftest"])
+        if code != 0:
+            tail = [line for line in out.strip().splitlines() if line.strip()]
+            return False, f"{script} selftest failed: {tail[-1][:160] if tail else code}"
+        details.append(script.replace(".py", ""))
+    code, out = _run(["-m", "unittest", "discover", "-s", "scripts",
+                      "-p", "test_decision_trajectory.py"])
+    if code != 0:
+        return False, "decision trajectory tests failed"
+    for pattern in ("test_policy_evolution.py", "test_policy_transfer.py",
+                    "test_counterfactual_replay.py", "test_source_freeze.py",
+                    "test_rsi_ablation.py", "test_skill_rsi_e2e.py"):
+        proc_code, proc_out = _run(["-m", "unittest", "discover", "-s", "scripts", "-p", pattern])
+        if proc_code != 0:
+            tail = [line for line in proc_out.strip().splitlines() if line.strip()]
+            return False, f"{pattern} failed: {tail[-1][:160] if tail else proc_code}"
+        details.append(pattern.replace("test_", "").replace(".py", ""))
+    # The shipped skill must not depend on `.dev/` (root AGENTS.md §15). The scan matches
+    # path construction and file reads, not an exclusion tuple or a diagnostic message, and it
+    # skips selftest/fixture helpers, which legitimately build a throwaway `.dev` tree.
+    dev_pattern = re.compile(r"""(Path\([^)]*\.dev)|([/]\s*["']\.dev["'])"""
+                             r"""|(["']\.dev/)|(open\(\s*["'][^"']*\.dev)""")
+    offenders = []
+    for path in sorted(SCRIPTS.glob("*.py")):
+        if path.name.startswith("test_"):
+            continue
+        current = ""
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.startswith(("def ", "class ")):
+                current = line.split("(")[0].strip()
+            if "selftest" in current or "fixture" in current:
+                continue
+            if dev_pattern.search(line):
+                offenders.append(f"{path.name}:{lineno}")
+    if offenders:
+        return False, "shipped scripts depend on .dev/: " + ", ".join(offenders)
+    return True, ("5 selftests + 7 RSI suites green; policy promotion needs an independent "
+                  "replay; NO_SUPPORT decisions cannot be promoted; no .dev/ runtime dependency; "
+                  "levels: " + ", ".join(details[:5]) + " ...")
+
+
 def step_preset_library() -> Tuple[bool, str]:
     """Presets, the intent router and the strategy decision adapter, on the real interfaces."""
     import preset_router as pr
@@ -854,16 +904,33 @@ def step_release_metadata() -> Tuple[bool, str]:
     registry = json.loads((root / 'preset-registry.json').read_text(encoding='utf-8'))
     if registry.get('schema_version') != '0.1':
         return False, 'the preset registry schema version must not track the release'
-    # Once the tag exists it must point *exactly* at this commit (never merely an ancestor).
+    # Once the tag exists it must point *exactly* at the release commit (never merely an
+    # ancestor). `tag == HEAD` is a release-branch invariant: on a development branch or
+    # worktree HEAD advances by design, so there the release invariant is checked against
+    # `refs/heads/main` plus an ancestry rule instead. See `.dev/decisions.md` D5.
     tag = f'research-idea-pipeline/v{version}'
     tagged = sub.run(['git', 'rev-parse', f'{tag}^{{}}'], capture_output=True, text=True,
                      cwd=str(root.parent))
     if tagged.returncode == 0:
+        tagged_sha = tagged.stdout.strip()
         head = sub.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True,
                        cwd=str(root.parent)).stdout.strip()
-        if tagged.stdout.strip() != head:
-            return False, (f'{tag} points at {tagged.stdout.strip()[:8]}, not at the release '
+        branch = sub.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], capture_output=True,
+                         text=True, cwd=str(root.parent)).stdout.strip()
+        if branch == 'main' and tagged_sha != head:
+            return False, (f'{tag} points at {tagged_sha[:8]}, not at the release '
                            f'commit {head[:8]}')
+        if branch != 'main':
+            main = sub.run(['git', 'rev-parse', 'refs/heads/main'], capture_output=True,
+                           text=True, cwd=str(root.parent)).stdout.strip()
+            if main and tagged_sha != main:
+                return False, (f'{tag} points at {tagged_sha[:8]}, not at the main release '
+                               f'commit {main[:8]}')
+            ancestor = sub.run(['git', 'merge-base', '--is-ancestor', tagged_sha, head],
+                               capture_output=True, text=True, cwd=str(root.parent))
+            if ancestor.returncode != 0:
+                return False, (f'development branch is not based on the released commit '
+                               f'{tagged_sha[:8]}')
     proc = sub.run([sys.executable, str(root / 'scripts' / 'test_release_metadata.py')],
                    capture_output=True, text=True, cwd=str(root))
     if proc.returncode != 0:
@@ -887,6 +954,7 @@ STEPS = (
     ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
     ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
     ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
+    ("Skill-RSI（轨迹/策略生命周期/源码冻结/反事实/消融）", step_skill_rsi),
     ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )

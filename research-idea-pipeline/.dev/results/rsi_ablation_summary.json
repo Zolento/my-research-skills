@@ -1,0 +1,3929 @@
+{
+  "schema": "research-idea-pipeline/skill-rsi-report@1",
+  "ablation": {
+    "schema": "research-idea-pipeline/skill-rsi-ablation@1",
+    "cases": 14,
+    "runs_per_case": 2,
+    "core": {
+      "arms": [
+        "baseline",
+        "memory_only",
+        "memory_prediction",
+        "full_cie",
+        "rsi_full"
+      ],
+      "report": {
+        "schema": "research-idea-pipeline/replay-ablation@1",
+        "cases": 14,
+        "runs_per_case": 2,
+        "arms": [
+          "baseline",
+          "memory_only",
+          "memory_prediction",
+          "full_cie",
+          "rsi_full"
+        ],
+        "sample_size": 28,
+        "sufficient_sample": true,
+        "per_arm": {
+          "baseline": {
+            "capabilities": [],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.4821,
+                "min": 0.25,
+                "max": 0.5
+              },
+              "prediction_quality": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.1429,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              }
+            },
+            "violations": [
+              "decision_did_not_change"
+            ],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 0.0
+          },
+          "memory_only": {
+            "capabilities": [
+              "cognitive_memory"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.1429,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "memory_prediction": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "full_cie": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_full": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "trajectory_evidence",
+              "replay_evaluation",
+              "promotion_gate"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          }
+        },
+        "delta_vs_baseline": {
+          "baseline": {
+            "mechanistic_understanding": 0.0,
+            "prediction_quality": null,
+            "intervention_quality": 0.0,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 0.0,
+            "memory_accumulation": 0.0
+          },
+          "memory_only": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.0,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 0.0,
+            "memory_accumulation": 1.0
+          },
+          "memory_prediction": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.7857,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          },
+          "full_cie": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.7857,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          },
+          "rsi_full": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.7857,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          }
+        },
+        "unobservable_decisions": 0,
+        "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+        "runner": "offline CIE runner (no model calls)",
+        "undifferentiated_arms": [
+          [
+            "memory_prediction",
+            "full_cie",
+            "rsi_full"
+          ]
+        ],
+        "limitations": [
+          "fixture 是合成的，不能作为真实发现能力的证据",
+          "未使用真实模型或真实文献库",
+          "novelty 只在 case 携带独立标签或近邻时可评",
+          "以下 arm 在这些维度上完全无法区分：memory_prediction/full_cie/rsi_full——不得据此宣称额外能力带来了提升"
+        ]
+      },
+      "undifferentiated_arms": [
+        [
+          "memory_prediction",
+          "full_cie",
+          "rsi_full"
+        ]
+      ],
+      "unobservable_decisions": 0
+    },
+    "leave_one_out": {
+      "arms": [
+        "full_cie",
+        "rsi_without_trajectory",
+        "rsi_without_replay",
+        "rsi_without_scope",
+        "rsi_without_promotion",
+        "rsi_shadow"
+      ],
+      "report": {
+        "schema": "research-idea-pipeline/replay-ablation@1",
+        "cases": 14,
+        "runs_per_case": 2,
+        "arms": [
+          "full_cie",
+          "rsi_without_trajectory",
+          "rsi_without_replay",
+          "rsi_without_scope",
+          "rsi_without_promotion",
+          "rsi_shadow"
+        ],
+        "sample_size": 28,
+        "sufficient_sample": true,
+        "per_arm": {
+          "full_cie": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_without_trajectory": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "replay_evaluation",
+              "promotion_gate"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_without_replay": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "trajectory_evidence",
+              "promotion_gate"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_without_scope": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "trajectory_evidence",
+              "replay_evaluation",
+              "promotion_gate"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_without_promotion": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "trajectory_evidence",
+              "replay_evaluation"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_shadow": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "trajectory_evidence",
+              "replay_evaluation",
+              "promotion_gate",
+              "shadow_only"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          }
+        },
+        "delta_vs_baseline": {
+          "full_cie": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          },
+          "rsi_without_trajectory": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          },
+          "rsi_without_replay": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          },
+          "rsi_without_scope": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          },
+          "rsi_without_promotion": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          },
+          "rsi_shadow": {
+            "mechanistic_understanding": null,
+            "prediction_quality": null,
+            "intervention_quality": null,
+            "scientific_novelty": null,
+            "search_efficiency": null,
+            "stagnation_recovery": null,
+            "memory_accumulation": null
+          }
+        },
+        "unobservable_decisions": 0,
+        "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+        "runner": "offline CIE runner (no model calls)",
+        "undifferentiated_arms": [
+          [
+            "full_cie",
+            "rsi_without_trajectory",
+            "rsi_without_replay",
+            "rsi_without_scope",
+            "rsi_without_promotion",
+            "rsi_shadow"
+          ]
+        ],
+        "limitations": [
+          "fixture 是合成的，不能作为真实发现能力的证据",
+          "未使用真实模型或真实文献库",
+          "novelty 只在 case 携带独立标签或近邻时可评",
+          "以下 arm 在这些维度上完全无法区分：full_cie/rsi_without_trajectory/rsi_without_replay/rsi_without_scope/rsi_without_promotion/rsi_shadow——不得据此宣称额外能力带来了提升"
+        ]
+      }
+    },
+    "skill_rsi_vs_current_cie": {
+      "distinguishable": false,
+      "dimensions": {
+        "mechanistic_understanding": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "prediction_quality": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "intervention_quality": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "scientific_novelty": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "search_efficiency": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "stagnation_recovery": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        },
+        "memory_accumulation": {
+          "delta": 0.0,
+          "overlapping": true,
+          "status": "UNDIFFERENTIATED"
+        }
+      },
+      "reason": "各维度差异在容差内：报告不可区分，不选胜者"
+    },
+    "with_policy_candidates": {
+      "cases": 14,
+      "note": "合成探针：给 case 附加一个已晋升的有作用域策略，用来证明机制接线；仍然不是真实科研能力证据",
+      "skill_rsi_vs_current_cie": {
+        "distinguishable": true,
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": -0.9286,
+            "overlapping": true,
+            "status": "DISTINGUISHABLE",
+            "caveat": "均值差异超过容差，但两臂区间重叠：样本量偏小，按不可区分处理为证据不足"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        },
+        "reason": "至少一个维度差异超过容差"
+      },
+      "report": {
+        "schema": "research-idea-pipeline/replay-ablation@1",
+        "cases": 14,
+        "runs_per_case": 2,
+        "arms": [
+          "baseline",
+          "memory_only",
+          "memory_prediction",
+          "full_cie",
+          "rsi_full"
+        ],
+        "sample_size": 28,
+        "sufficient_sample": true,
+        "per_arm": {
+          "baseline": {
+            "capabilities": [],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.4821,
+                "min": 0.25,
+                "max": 0.5
+              },
+              "prediction_quality": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.1429,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              }
+            },
+            "violations": [
+              "decision_did_not_change"
+            ],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 0.0
+          },
+          "memory_only": {
+            "capabilities": [
+              "cognitive_memory"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 0,
+                "total_cases": 28,
+                "mean": null,
+                "min": null,
+                "max": null
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.1429,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "memory_prediction": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "full_cie": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9286,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 28,
+              "REPLAY_SUPPORTED": 0,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          },
+          "rsi_full": {
+            "capabilities": [
+              "cognitive_memory",
+              "prediction_comparator",
+              "strategy_memory",
+              "scoped_policy",
+              "trajectory_evidence",
+              "replay_evaluation",
+              "promotion_gate"
+            ],
+            "runs": 2,
+            "cases": 14,
+            "observations": 28,
+            "dimensions": {
+              "mechanistic_understanding": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.9643,
+                "min": 0.5,
+                "max": 1.0
+              },
+              "prediction_quality": {
+                "observable_cases": 20,
+                "total_cases": 28,
+                "mean": 0.9,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "intervention_quality": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 0.0,
+                "min": 0.0,
+                "max": 0.0
+              },
+              "scientific_novelty": {
+                "observable_cases": 8,
+                "total_cases": 28,
+                "mean": 0.25,
+                "min": 0.0,
+                "max": 1.0
+              },
+              "search_efficiency": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.7143,
+                "min": 1.0,
+                "max": 2.0
+              },
+              "stagnation_recovery": {
+                "observable_cases": 28,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              },
+              "memory_accumulation": {
+                "observable_cases": 2,
+                "total_cases": 28,
+                "mean": 1.0,
+                "min": 1.0,
+                "max": 1.0
+              }
+            },
+            "violations": [],
+            "evidence_support": {
+              "OBSERVED": 0,
+              "REPLAY_SUPPORTED": 28,
+              "NO_SUPPORT": 0
+            },
+            "isolation_verified": true,
+            "pass_rate": 1.0
+          }
+        },
+        "delta_vs_baseline": {
+          "baseline": {
+            "mechanistic_understanding": 0.0,
+            "prediction_quality": null,
+            "intervention_quality": 0.0,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 0.0,
+            "memory_accumulation": 0.0
+          },
+          "memory_only": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.0,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 0.0,
+            "memory_accumulation": 1.0
+          },
+          "memory_prediction": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.7857,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          },
+          "full_cie": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": 0.7857,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          },
+          "rsi_full": {
+            "mechanistic_understanding": 0.4822,
+            "prediction_quality": null,
+            "intervention_quality": -0.1429,
+            "scientific_novelty": 0.0,
+            "search_efficiency": null,
+            "stagnation_recovery": 1.0,
+            "memory_accumulation": 1.0
+          }
+        },
+        "unobservable_decisions": 0,
+        "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+        "runner": "offline CIE runner (no model calls)",
+        "undifferentiated_arms": [
+          [
+            "memory_prediction",
+            "full_cie"
+          ]
+        ],
+        "limitations": [
+          "fixture 是合成的，不能作为真实发现能力的证据",
+          "未使用真实模型或真实文献库",
+          "novelty 只在 case 携带独立标签或近邻时可评",
+          "以下 arm 在这些维度上完全无法区分：memory_prediction/full_cie——不得据此宣称额外能力带来了提升"
+        ]
+      },
+      "guard_probes": {
+        "note": "每个探针只违反一个 guard（未晋升 / 无作用域 / 无轨迹依据 / 无独立评价）：用来测每个 guard 是否真的改变行为",
+        "variants": {
+          "unpromoted": {
+            "cases": 14,
+            "diverging_arms": [
+              "rsi_without_promotion"
+            ],
+            "leave_one_out": {
+              "schema": "research-idea-pipeline/replay-ablation@1",
+              "cases": 14,
+              "runs_per_case": 2,
+              "arms": [
+                "full_cie",
+                "rsi_without_trajectory",
+                "rsi_without_replay",
+                "rsi_without_scope",
+                "rsi_without_promotion",
+                "rsi_shadow"
+              ],
+              "sample_size": 28,
+              "sufficient_sample": true,
+              "per_arm": {
+                "full_cie": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_trajectory": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_replay": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_scope": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_promotion": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.0,
+                      "min": 0.0,
+                      "max": 0.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 0,
+                    "REPLAY_SUPPORTED": 28,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_shadow": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate",
+                    "shadow_only"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                }
+              },
+              "delta_vs_baseline": {
+                "full_cie": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_trajectory": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_replay": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_scope": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_promotion": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_shadow": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                }
+              },
+              "unobservable_decisions": 0,
+              "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+              "runner": "offline CIE runner (no model calls)",
+              "undifferentiated_arms": [
+                [
+                  "full_cie",
+                  "rsi_without_trajectory",
+                  "rsi_without_replay",
+                  "rsi_without_scope",
+                  "rsi_shadow"
+                ]
+              ],
+              "limitations": [
+                "fixture 是合成的，不能作为真实发现能力的证据",
+                "未使用真实模型或真实文献库",
+                "novelty 只在 case 携带独立标签或近邻时可评",
+                "以下 arm 在这些维度上完全无法区分：full_cie/rsi_without_trajectory/rsi_without_replay/rsi_without_scope/rsi_shadow——不得据此宣称额外能力带来了提升"
+              ]
+            }
+          },
+          "unscoped": {
+            "cases": 14,
+            "diverging_arms": [
+              "rsi_without_promotion",
+              "rsi_without_scope"
+            ],
+            "leave_one_out": {
+              "schema": "research-idea-pipeline/replay-ablation@1",
+              "cases": 14,
+              "runs_per_case": 2,
+              "arms": [
+                "full_cie",
+                "rsi_without_trajectory",
+                "rsi_without_replay",
+                "rsi_without_scope",
+                "rsi_without_promotion",
+                "rsi_shadow"
+              ],
+              "sample_size": 28,
+              "sufficient_sample": true,
+              "per_arm": {
+                "full_cie": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_trajectory": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_replay": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_scope": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.0,
+                      "min": 0.0,
+                      "max": 0.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 0,
+                    "REPLAY_SUPPORTED": 28,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_promotion": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_shadow": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate",
+                    "shadow_only"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                }
+              },
+              "delta_vs_baseline": {
+                "full_cie": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_trajectory": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_replay": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_scope": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_promotion": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_shadow": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                }
+              },
+              "unobservable_decisions": 0,
+              "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+              "runner": "offline CIE runner (no model calls)",
+              "undifferentiated_arms": [
+                [
+                  "full_cie",
+                  "rsi_without_trajectory",
+                  "rsi_without_replay",
+                  "rsi_without_promotion",
+                  "rsi_shadow"
+                ]
+              ],
+              "limitations": [
+                "fixture 是合成的，不能作为真实发现能力的证据",
+                "未使用真实模型或真实文献库",
+                "novelty 只在 case 携带独立标签或近邻时可评",
+                "以下 arm 在这些维度上完全无法区分：full_cie/rsi_without_trajectory/rsi_without_replay/rsi_without_promotion/rsi_shadow——不得据此宣称额外能力带来了提升"
+              ]
+            }
+          },
+          "unsupported": {
+            "cases": 14,
+            "diverging_arms": [
+              "rsi_without_promotion",
+              "rsi_without_scope",
+              "rsi_without_trajectory"
+            ],
+            "leave_one_out": {
+              "schema": "research-idea-pipeline/replay-ablation@1",
+              "cases": 14,
+              "runs_per_case": 2,
+              "arms": [
+                "full_cie",
+                "rsi_without_trajectory",
+                "rsi_without_replay",
+                "rsi_without_scope",
+                "rsi_without_promotion",
+                "rsi_shadow"
+              ],
+              "sample_size": 28,
+              "sufficient_sample": true,
+              "per_arm": {
+                "full_cie": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_trajectory": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.0,
+                      "min": 0.0,
+                      "max": 0.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 0,
+                    "REPLAY_SUPPORTED": 28,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_replay": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_scope": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_promotion": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_shadow": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate",
+                    "shadow_only"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                }
+              },
+              "delta_vs_baseline": {
+                "full_cie": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_trajectory": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_replay": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_scope": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_promotion": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_shadow": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                }
+              },
+              "unobservable_decisions": 0,
+              "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+              "runner": "offline CIE runner (no model calls)",
+              "undifferentiated_arms": [
+                [
+                  "full_cie",
+                  "rsi_without_replay",
+                  "rsi_without_scope",
+                  "rsi_without_promotion",
+                  "rsi_shadow"
+                ]
+              ],
+              "limitations": [
+                "fixture 是合成的，不能作为真实发现能力的证据",
+                "未使用真实模型或真实文献库",
+                "novelty 只在 case 携带独立标签或近邻时可评",
+                "以下 arm 在这些维度上完全无法区分：full_cie/rsi_without_replay/rsi_without_scope/rsi_without_promotion/rsi_shadow——不得据此宣称额外能力带来了提升"
+              ]
+            }
+          },
+          "unevaluated": {
+            "cases": 14,
+            "diverging_arms": [
+              "rsi_without_promotion",
+              "rsi_without_replay",
+              "rsi_without_scope"
+            ],
+            "leave_one_out": {
+              "schema": "research-idea-pipeline/replay-ablation@1",
+              "cases": 14,
+              "runs_per_case": 2,
+              "arms": [
+                "full_cie",
+                "rsi_without_trajectory",
+                "rsi_without_replay",
+                "rsi_without_scope",
+                "rsi_without_promotion",
+                "rsi_shadow"
+              ],
+              "sample_size": 28,
+              "sufficient_sample": true,
+              "per_arm": {
+                "full_cie": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_trajectory": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_replay": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.0,
+                      "min": 0.0,
+                      "max": 0.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 0,
+                    "REPLAY_SUPPORTED": 28,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_scope": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_without_promotion": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                },
+                "rsi_shadow": {
+                  "capabilities": [
+                    "cognitive_memory",
+                    "prediction_comparator",
+                    "strategy_memory",
+                    "scoped_policy",
+                    "trajectory_evidence",
+                    "replay_evaluation",
+                    "promotion_gate",
+                    "shadow_only"
+                  ],
+                  "runs": 2,
+                  "cases": 14,
+                  "observations": 28,
+                  "dimensions": {
+                    "mechanistic_understanding": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9643,
+                      "min": 0.5,
+                      "max": 1.0
+                    },
+                    "prediction_quality": {
+                      "observable_cases": 20,
+                      "total_cases": 28,
+                      "mean": 0.9,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "intervention_quality": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 0.9286,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "scientific_novelty": {
+                      "observable_cases": 8,
+                      "total_cases": 28,
+                      "mean": 0.25,
+                      "min": 0.0,
+                      "max": 1.0
+                    },
+                    "search_efficiency": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.7143,
+                      "min": 1.0,
+                      "max": 2.0
+                    },
+                    "stagnation_recovery": {
+                      "observable_cases": 28,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    },
+                    "memory_accumulation": {
+                      "observable_cases": 2,
+                      "total_cases": 28,
+                      "mean": 1.0,
+                      "min": 1.0,
+                      "max": 1.0
+                    }
+                  },
+                  "violations": [],
+                  "evidence_support": {
+                    "OBSERVED": 28,
+                    "REPLAY_SUPPORTED": 0,
+                    "NO_SUPPORT": 0
+                  },
+                  "isolation_verified": true,
+                  "pass_rate": 1.0
+                }
+              },
+              "delta_vs_baseline": {
+                "full_cie": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_trajectory": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_replay": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_scope": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_without_promotion": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                },
+                "rsi_shadow": {
+                  "mechanistic_understanding": null,
+                  "prediction_quality": null,
+                  "intervention_quality": null,
+                  "scientific_novelty": null,
+                  "search_efficiency": null,
+                  "stagnation_recovery": null,
+                  "memory_accumulation": null
+                }
+              },
+              "unobservable_decisions": 0,
+              "claim": "重复运行后的实测差值；合成 fixture 上的差值不是真实科研性能",
+              "runner": "offline CIE runner (no model calls)",
+              "undifferentiated_arms": [
+                [
+                  "full_cie",
+                  "rsi_without_trajectory",
+                  "rsi_without_scope",
+                  "rsi_without_promotion",
+                  "rsi_shadow"
+                ]
+              ],
+              "limitations": [
+                "fixture 是合成的，不能作为真实发现能力的证据",
+                "未使用真实模型或真实文献库",
+                "novelty 只在 case 携带独立标签或近邻时可评",
+                "以下 arm 在这些维度上完全无法区分：full_cie/rsi_without_trajectory/rsi_without_scope/rsi_without_promotion/rsi_shadow——不得据此宣称额外能力带来了提升"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "comparisons": {
+      "full_cie": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      },
+      "rsi_without_trajectory": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      },
+      "rsi_without_replay": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      },
+      "rsi_without_scope": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      },
+      "rsi_without_promotion": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      },
+      "rsi_shadow": {
+        "vs": "full_cie",
+        "distinguishable": false,
+        "reason": "各维度差异在容差内：报告不可区分，不选胜者",
+        "dimensions": {
+          "mechanistic_understanding": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "prediction_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "intervention_quality": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "scientific_novelty": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "search_efficiency": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "stagnation_recovery": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          },
+          "memory_accumulation": {
+            "delta": 0.0,
+            "overlapping": true,
+            "status": "UNDIFFERENTIATED"
+          }
+        }
+      }
+    },
+    "reading": "逐维比较；差异在容差内或区间重叠即报告不可区分。NO_SUPPORT 决策不计入任何结论。合成 fixture 上的差值不是真实科研性能。",
+    "limitations": [
+      "fixture 是合成的：只能证明机制接线正确，不能证明科研能力提升",
+      "没有真实模型、真实文献库或真实 GPU 运行",
+      "L3（真实科研改进）需要未见过的真实案例与独立盲评，本报告不作该声明"
+    ]
+  },
+  "overhead": {
+    "schema": "research-idea-pipeline/skill-rsi-overhead@1",
+    "prompt_bytes": 11502,
+    "prompt_note": "Skill-RSI 参考文档大小（渐进加载时按需读取，不每轮注入）",
+    "trajectory_record_bytes": 1049,
+    "policy_candidate_bytes": 499,
+    "signature_latency_us": 11.22,
+    "context_build_latency_us": 132.82,
+    "extra_tool_calls_per_loop": 1,
+    "extra_tool_calls_note": "research-loop 在应用路径上多写一条决策轨迹；策略评价是离线步骤，不在每轮循环内",
+    "protected_files": 135,
+    "module_lines": {
+      "decision_trajectory.py": 976,
+      "policy_evolution.py": 1299,
+      "policy_transfer.py": 1730,
+      "research_replay.py": 1997,
+      "source_freeze.py": 846,
+      "strategy_memory.py": 1657,
+      "preset_router.py": 3625
+    },
+    "new_module_lines": 12130,
+    "notes": [
+      "没有可用的离线 token 计数器，因此报告字节数而不是编造 token 数",
+      "source-freeze 在前/后各做一次全量摘要，只在应用路径上执行"
+    ]
+  },
+  "levels": {
+    "schema": "research-idea-pipeline/skill-rsi-levels@1",
+    "L1_implementation_validity": {
+      "status": "VERIFIED",
+      "evidence": [
+        "实现格式/权限/不变量单元测试",
+        "decision_trajectory / policy_evolution / source_freeze / research_replay selftest",
+        "policy candidate 越权与可执行内容拒绝测试"
+      ]
+    },
+    "L2_operational_validity": {
+      "status": "VERIFIED",
+      "evidence": [
+        "research-loop 通过现有 Strategy Decision Adapter 改变实际派遣动作（端到端测试）",
+        "决策轨迹、策略存储、replay 消融、source-freeze 均由真实 CLI/测试消费",
+        "晋升需要独立 replay 评价，且评价规则冻结后不可改动"
+      ]
+    },
+    "L3_research_improvement": {
+      "status": "NOT_VERIFIED",
+      "evidence": [],
+      "reason": "没有未见的真实科研案例 A/B：合成 fixture 与形式化单元测试不能替代，因此不宣称科研能力提升",
+      "note": "稳定策略的 L3 主张仍需独立真实评价"
+    },
+    "must_not_conflate": [
+      "策略候选已生成",
+      "策略已被应用",
+      "科研行为已改变",
+      "科研能力获得独立证据支持的改善"
+    ]
+  }
+}

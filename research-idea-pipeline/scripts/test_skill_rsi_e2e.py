@@ -252,6 +252,27 @@ class TestAdversarialDecisionCases(RsiProject):
         self.assertNotIn("NO_SUPPORT", json.dumps(verdict["comparison"]))
         self.assertEqual(verdict["unobservable_decisions"], 0)
 
+    def test_a_cross_project_policy_must_pass_the_transfer_gate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            candidate = self.propose_policy(state_path)
+            candidate["scope"]["source_route"] = "B"
+            gate = pe.cross_project_transfer_allowed(candidate, cg.load_state(state_path),
+                                                     current_route="A")
+            self.assertTrue(gate["required"])
+            self.assertEqual(gate["status"], "BLOCK")
+            self.assertTrue(gate["reasons"])
+
+    def test_a_same_route_policy_needs_no_transfer_gate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            candidate = self.propose_policy(state_path)
+            candidate["scope"]["source_route"] = "A"
+            gate = pe.cross_project_transfer_allowed(candidate, cg.load_state(state_path),
+                                                     current_route="A")
+            self.assertFalse(gate["required"])
+            self.assertEqual(gate["status"], "NOT_REQUIRED")
+
     def test_an_engineering_failure_is_not_a_scientific_delta(self):
         with tempfile.TemporaryDirectory() as temp:
             trajectory = pathlib.Path(temp) / dt.TRAJECTORY_NAME
@@ -307,6 +328,7 @@ class TestAblationHarness(unittest.TestCase):
         consumers = {
             "decision_trajectory": ["policy_evolution", "research_replay", "preset_router"],
             "policy_evolution": ["preset_router"],
+            "policy_transfer": ["policy_evolution", "rsi_ablation"],
             "research_replay": ["preset_router", "release_check"],
             "source_freeze": ["preset_router"],
         }

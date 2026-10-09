@@ -762,15 +762,22 @@ def distinguishable(report: Dict[str, Any], arm_a: str, arm_b: str,
             result[name] = {"status": "UNASSESSABLE"}
             continue
         delta = round(a["mean"] - b["mean"], 4)
-        overlapping = not (a["max"] is not None and b["min"] is not None
-                           and (a["min"] > b["max"] or b["min"] > a["max"]))
-        different = abs(delta) > tolerance and not overlapping
+        overlapping = bool(a.get("min") is not None and b.get("max") is not None
+                           and not (a["min"] > b["max"] or b["min"] > a["max"]))
+        # A *small* difference is reported as indistinguishable; the frozen tolerance, not the
+        # spread, is the decision rule. Range overlap is kept as an explicit confidence caveat
+        # so a wide but real shift is not silently rounded up to a confident win.
+        different = abs(delta) > tolerance
         any_different = any_different or different
-        result[name] = {"delta": delta, "overlapping": overlapping,
-                        "status": "DISTINGUISHABLE" if different else "UNDIFFERENTIATED"}
+        block = {"delta": delta, "overlapping": overlapping,
+                 "status": "DISTINGUISHABLE" if different else "UNDIFFERENTIATED"}
+        if different and overlapping:
+            block["caveat"] = ("均值差异超过容差，但两臂区间重叠：样本量偏小，"
+                               "按不可区分处理为证据不足")
+        result[name] = block
     return {"distinguishable": any_different, "dimensions": result,
-            "reason": ("至少一个维度可区分" if any_different
-                       else "各维度差异在容差内或区间重叠：报告不可区分，不选胜者")}
+            "reason": ("至少一个维度差异超过容差" if any_different
+                       else "各维度差异在容差内：报告不可区分，不选胜者")}
 
 
 def ablation_verdict(report: Dict[str, Any], *, candidate_arm: str = "rsi_full",
@@ -937,6 +944,31 @@ def scope_conditions_hold(candidate: Dict[str, Any], state: Dict[str, Any]) -> T
         else:
             unmet.append(f"未知条件类型 {kind!r}（不得凭自由文本判断适用性）")
     return (not unmet), unmet
+
+
+def cross_project_transfer_allowed(candidate: Dict[str, Any], target_state: Dict[str, Any], *,
+                                   current_route: Optional[str] = None,
+                                   **transfer_kwargs: Any) -> Dict[str, Any]:
+    """Whether a policy that originated in another route may act on this one.
+
+    Same-route policies are not gated. A policy that declares a different
+    `scope.source_route` / `scope.source_project` must pass the structural transfer gate
+    (`policy_transfer.PT*`); domain-keyword resemblance is never enough.
+    """
+    scope = candidate.get("scope") if isinstance(candidate.get("scope"), dict) else {}
+    source = scope.get("source_route") or scope.get("source_project")
+    if not source or not current_route or str(source) == str(current_route):
+        return {"required": False, "status": "NOT_REQUIRED", "reasons": [], "similarity": None}
+    import policy_transfer as pt
+    try:
+        decision = pt.transfer_decision(candidate, target_state,
+                                        target_project=current_route, **transfer_kwargs)
+    except Exception as exc:  # fail closed: a broken transfer check must not allow the policy
+        return {"required": True, "status": "BLOCK",
+                "reasons": [f"transfer check failed: {type(exc).__name__}: {exc}"],
+                "similarity": None}
+    return {"required": True, "status": decision.get("status"),
+            "reasons": decision.get("reasons"), "similarity": decision.get("similarity")}
 
 
 # ---------------------------------------------------------------------------

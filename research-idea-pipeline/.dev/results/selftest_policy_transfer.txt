@@ -1,0 +1,24 @@
+  ok   scientific_memory 不含策略候选
+  ok   policy_memory 与 decision_experience 分离
+  ok   合法候选 separation_ok
+  ok   PT1/PT2 捕获层次混装
+  ok   相同声明结构匹配
+  ok   同领域关键词但结构不同不匹配
+  ok   空声明结构不匹配
+  ok   否证机制被收集
+  ok   结构匹配的策略被允许
+  ok   cross_project 被标记
+  ok   PT3 缺少 scope
+  ok   PT4 结构不同
+  ok   PT5 条件不满足
+  ok   PT6 工具缺失
+  ok   PT8 重新提出被否证机制
+  ok   PT9 单一项目的 global scope
+  ok   PT10 反例覆盖目标结构
+  ok   过期轨迹被标记
+  ok   新鲜轨迹不过期
+  ok   失效主体标记轨迹
+  ok   有损压缩拒绝丢弃证据
+  ok   允许丢弃策略并报告
+  ok   protected 成员不可丢
+selftest OK

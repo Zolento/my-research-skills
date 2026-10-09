@@ -923,6 +923,39 @@ python3 scripts/preset_router.py run --preset loop-health-check --state <researc
 必须经 Strategy Decision Adapter 改变下一轮**真实动作选择**（同 `EIG ÷ cost` 层内重排 + `scheduler.strategy_decisions[]` 遥测），
 改不动就记录原因；被采纳 ≠ 研究能力提升。
 
+### 1.11 Skill-RSI：策略级自我改进（受控、可审计、可回滚）
+
+> **只在需要「从真实科研经验改进科研策略」时加载**
+> [references/skill-rsi-policy.md](references/skill-rsi-policy.md)。它不是第 16 个阶段，
+> 不是第九类 canonical 对象，也不是第二个 CIE；它是既有机制之上的**策略控制平面**。
+
+```text
+Research Experience → Policy Hypothesis → Replay Evaluation → Controlled Adaptation
+        → New Research Experience
+```
+
+**三条不可让步的边界：**
+
+1. **科研事实仍由证据裁决。** 决策轨迹与策略记忆是控制平面经验，**永不写入 `evidence[]`**，
+   也不能用「某策略在三个项目失败」去否证任何科学机制。
+2. **策略只能改策略。** 只允许调整探索算子偏好、菜单选择、同层动作排序、策略适用性、
+   候选探索顺序与保留探索下限的局部分配；八级硬优先级、`EIG ÷ cost`、执行门禁、
+   Evidence Qualification、AALG 预算、契约与锚点、GPU 授权、冻结实验计划一律不动。
+3. **运行期不得自主修改 Skill 源码。** 源码冻结与写入白名单按**规范化真实路径**判定；
+   检测到修改立即 `HOLD`、写审计事件、停止应用策略，且**不自动修订源码**。
+
+**真实消费者（缺一不可）：** 晋升后的策略只经现有 `strategy_memory.strategy_decision()`
+在同一 `EIG ÷ cost` 层内重排已通过硬门禁的动作，由 `research-loop` 实际派遣；
+选择是否被采用、是否真正改变派遣写入决策轨迹与 `scheduler.strategy_decisions[]`。
+改不动就如实记录原因，**不得制造差异**。
+
+**等级不得混淆：** L1 实现有效性、L2 运行有效性、L3 科研改进必须分别申报。
+策略候选已生成 ≠ 策略已被应用 ≠ 科研行为已改变 ≠ 科研能力获得独立证据支持的改善。
+没有独立、未见过的真实科研案例对照时，明确标记 **L3 未验证**。
+
+**不得用更多循环代替更好的决策：** 科研 Loop 不应每完成一个小动作就再跑一次 RSI；
+策略进化受既有触发规则、冷却、预算与合法调度约束。
+
 ## 2. 共享资源索引
 
 | 资源 | 位置 | 内容 |
@@ -971,6 +1004,12 @@ python3 scripts/preset_router.py run --preset loop-health-check --state <researc
 | **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
 | **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十四个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
 | **回放脚本与 fixture** | [scripts/research_replay.py](scripts/research_replay.py)、[examples/replay/](examples/replay/README.md) | `validate` / `show` / `run` / `suite` / `ablate` / `adversarial` / `smoke`；可插拔 `--runner module:function`；fixture 为**合成**，不是真实科研证据 |
+| **Skill-RSI 政策（策略级自我改进）** | [references/skill-rsi-policy.md](references/skill-rsi-policy.md) | 在既有 R0—R14 与硬门禁内让**科研策略**演化：三层记忆分离（科学 / 决策经验 / 策略）、反事实证据分级（`OBSERVED` / `REPLAY_SUPPORTED` / `NO_SUPPORT`）、有作用域的策略候选与生命周期（`PROPOSED`→…→`ACTIVE`，失败 `REJECTED`/`HOLD`/`ROLLED_BACK`）、独立评价晋升、回滚、源码冻结与写入白名单；**不新增 canonical 对象、不新增 Preset、不在运行期修改 Skill 源码** |
+| **决策轨迹脚本** | [scripts/decision_trajectory.py](scripts/decision_trajectory.py) | `<route>/decision-trajectory.jsonl`：append-only + 哈希链 + 尾部摘要；Context / Decision / Prediction / Outcome / Learning；规则 `DT0`—`DT10`（过期状态、事后预测、结果泄漏、来源悬空、未合格证据不得声称科学增量）；**轨迹不是科学证据，永不写入 `evidence[]`** |
+| **策略演化脚本** | [scripts/policy_evolution.py](scripts/policy_evolution.py) | 有作用域的策略候选（`PE1`—`PE14`）、评价规则冻结、生命周期与晋升门、回滚、失败签名上限（换 `policy_id` 无效）；晋升后只经既有 `strategy_decision()` 生效 |
+| **策略迁移脚本** | [scripts/policy_transfer.py](scripts/policy_transfer.py) | 只读的三层记忆分离视图、基于**声明结构**（不是领域关键词）的迁移门 `PT1`—`PT10`、过期经验与已否证机制的拒绝、无损记忆压缩检查 |
+| **源码冻结脚本** | [scripts/source_freeze.py](scripts/source_freeze.py) | 受保护源码清单 + 规范路径/符号链接核验 + 写入白名单 + 哈希链审计事件；运行期检测到源码被改即 `HOLD` 且**不自动修订**；如实声明残余风险（Prompt 禁令不是安全边界） |
+| **RSI 消融与开销** | [scripts/rsi_ablation.py](scripts/rsi_ablation.py) | 四臂冻结之上追加 `rsi_full` 与 leave-one-out；逐维比较、报告不可区分与 `NO_SUPPORT`；字节/延迟/额外调用开销；L1/L2/L3 分别如实申报 |
 
 ---
 

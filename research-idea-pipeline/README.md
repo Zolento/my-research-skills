@@ -393,6 +393,48 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 the ablation deltas are properties of the offline runner. See the
 [replay contract](references/discovery-replay.md).
 
+## Skill-level recursive self-improvement (Skill-RSI)
+
+Scientific facts keep being decided by the existing evidence machinery; only *research
+strategy* may evolve, and only inside a bounded, auditable, rollback-able control plane. Three
+memory kinds stay separate: canonical scientific memory, decision experience
+(`<route>/decision-trajectory.jsonl`, an append-only hash-chained record of what was visible,
+what was chosen and what was actually dispatched), and policy memory (`<route>/policy/`, scoped
+candidates with an explicit applicability boundary, counterexamples and a revalidation
+condition).
+
+A candidate may only touch the authorised strategy surface (exploration-operator preference,
+menu choice, same-tier ordering, applicability, probe order, local allocation that keeps the
+exploration floor). It advances through `PROPOSED → SHADOW → REPLAY_EVALUATED →
+BOUNDED_TRIAL → VALIDATED → ACTIVE`, and every promotion needs an independent, leakage-checked,
+reproducible replay evaluation with the evaluation rules frozen beforehand. Difference within
+tolerance is reported as indistinguishable instead of forced into a winner. Rollback restores
+an earlier valid policy, keeps the failure trail, and touches neither scientific results nor
+any budget. Renaming a failed policy does not reset its failure count.
+
+A promoted policy is consumed through the **existing** Strategy Decision Adapter: it reorders
+actions inside the same `EIG ÷ cost` tier and the same hard-gated legal set, and the research
+loop actually dispatches the result. Unobserved historical branches return `NO_SUPPORT` and can
+never be used as promotion evidence — a model prediction is not a substitute for a real result.
+
+```sh
+python3 scripts/policy_evolution.py freeze-rules --state <state>
+python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2
+python3 scripts/rsi_ablation.py report
+```
+
+Skill source is frozen during a research run: a manifest of the protected surface is verified
+before and after, writes are checked against an explicit allow-list by normalised real path, and
+a violation raises `HOLD`, records an audit event and stops applying policies without repairing
+the source. This is a checkable detection boundary, **not** an OS-level sandbox — see the
+residual-risk statement in [source_freeze.py](scripts/source_freeze.py).
+
+Levels are reported separately and never conflated: **L1** implementation validity and
+**L2** operational validity are verified by the shipped tests, while **L3** research
+improvement is **not verified** — no unseen real research A/B has been run, and synthetic
+fixtures cannot substitute for one. See the
+[Skill-RSI policy](references/skill-rsi-policy.md).
+
 ## Examples
 
 | Example | What it demonstrates |

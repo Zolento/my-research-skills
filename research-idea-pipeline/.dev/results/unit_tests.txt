@@ -1,0 +1,244 @@
+.............................................................................................................................................................................................................................................................s....Bootstrap refused: this project is already initialized. Use `continue-research` (Legacy Research Handoff on first load).
+............................BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH1  experiments[0].preregistration.frozen_at_state_version  V21：必须 ≤ result_at_state_version（99 > 6）
+  [blocking] LH13  experiments[X1].preregistration  预测时间泄漏：frozen_at_state_version=99 晚于 result_at_state_version=6；该结果不得当作预测检验
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+...BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH1  experiments[0].preregistration.frozen_at_state_version  V21：必须 ≤ result_at_state_version（99 > 6）
+  [blocking] LH13  experiments[X1].preregistration  预测时间泄漏：frozen_at_state_version=99 晚于 result_at_state_version=6；该结果不得当作预测检验
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+...refusing to roll back: unknown files would be deleted or orphaned: hand-notes.txt
+...BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH12  index.json  已有认知索引与 canonical 重建不一致：索引内容与由 canonical state + revisions 重建的结果不一致
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+.BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH4  scheduler.json:state_version  scheduler.state_version=3 与 state.state_version=7 不一致；先由所属阶段核对产物并按 R11 同步，不得任选一份为真，更不得重建 state
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+..BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH1  claims[0].supporting_evidence[0]  V2：指向不存在的 evidence id
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+.BLOCKED — 严重兼容性错误，未写回任何内容：
+  [blocking] LH1  claims[0].supporting_evidence[0]  V2：指向不存在的 evidence id
+不得通过重建一份新 Research State 绕过这些问题；请先修好 canonical 产物，再重新接管。
+........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................s.........................................................................................................................................................................................................................................s..............................................................................................................................................................................................................................[ok] 索引与 0 个 PDF 一致
+......................../usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 429: 'err'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+/usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 403: 'err'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+..................
+----------------------------------------------------------------------
+Ran 1590 tests in 15.437s
+
+OK (skipped=3)
+built /tmp/tmpwngwuish/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpitbd2wvj/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpb2kvb19l/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpp4o16hhi/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpubqcp8dt/A/cognition/index.json (mechanisms=2, diagnostics=0)
+{
+  "schema": "research-idea-pipeline/preset-router@1",
+  "record": {
+    "_schema": "research-idea-pipeline/recovery-log@1",
+    "preset_id": "loop-health-check",
+    "at_state_version": 4,
+    "signal_fingerprint": "sha256:63a2faa14e2088a7876b67bd5d6c4e7193b6db97ecbe734a4ea8d442ef49adeb",
+    "outcome": "checked",
+    "changed_decision": false,
+    "guard_allowed": true,
+    "guard_reason": null
+  },
+  "guard": {
+    "allowed": true,
+    "reason": null,
+    "attempts": 0
+  }
+}
+{
+  "schema": "research-idea-pipeline/loop-trigger@1",
+  "snapshot": {
+    "state_version": 4,
+    "scheduler_version": null,
+    "index_version": null,
+    "index_present": false,
+    "at": null
+  },
+  "signals": {
+    "state_integrity": {
+      "ok": true,
+      "count": 0,
+      "rules": [],
+      "paths": []
+    },
+    "context_drift": {
+      "detected": true,
+      "reasons": [
+        "cognition 索引缺失（磁盘上没有可用的认知投影）"
+      ]
+    },
+    "memory_drift": {
+      "detected": false,
+      "reasons": []
+    },
+    "evidence_conflict": {
+      "detected": false,
+      "conflicts": []
+    },
+    "engineering_failure": {
+      "detected": false,
+      "kinds": {},
+      "failed_experiments": [],
+      "unhandled_experiments": []
+    },
+    "scientific_failure": {
+      "detected": false,
+      "kinds": {},
+      "note": "科学类失败只供 R9.O/R10 使用；本路由器不据此判定假设被否证"
+    },
+    "resource_blocked": {
+      "detected": false,
+      "tokens": [],
+      "text_based": true,
+      "budget": [
+        "公开数据集"
+      ]
+    },
+    "stagnation": {
+      "detected": false,
+      "reasons": [],
+      "switch_action": "CONTINUE_ATTRIBUTION",
+      "zero_streak": 0,
+      "switch": {
+        "action": "CONTINUE_ATTRIBUTION",
+        "reason": "诊断仍在产生可执行的信息，或现有判别干预已经有效。",
+        "zero_streak": 0,
+        "threshold": 2,
+        "competition_verdicts": [],
+        "independent_exploration_allowed": true,
+        "note": "普通未知、尚未验证的机制与候选存在本身都不是全局阻塞；本建议只改变归因方向的优先级，不新增预算规则，也不替代 R10/R14 的权限。"
+      }
+    },
+    "pseudo_progress": {
+      "detected": false,
+      "predicted_high_actual_zero": 0,
+      "repeated_deltas": 0,
+      "records": 0
+    },
+    "portfolio_convergence": {
+      "live": 1,
+      "share": 1.0,
+      "top": "P2",
+      "counts": {
+        "P2": 1
+      },
+      "converged": false
+    },
+    "evolution_due": {
+      "detected": false,
+      "pending_updates": 0,
+      "operators": []
+    },
+    "loop_authorization": {
+      "authorized": false,
+      "scope": null,
+      "covers": []
+    }
+  },
+  "candidates": [
+    {
+      "preset_id": "context-drift-recovery",
+      "signal": "context_drift",
+      "priority": 20,
+      "execution_scope": "recover_no_experiment",
+      "requires_confirmation": true,
+      "recommended_only": false,
+      "controlled": false,
+      "authorization": null,
+      "reason": "上下文/投影漂移：cognition 索引缺失（磁盘上没有可用的认知投影）",
+      "allowed": true,
+      "blocked_by": null,
+      "detail": null,
+      "fingerprint": "sha256:59f72b2f9682d9671bf70d29175cad02445b22f42c7b8ff5eb2f57669e88af37",
+      "attempts": 0
+    }
+  ],
+  "selected": {
+    "preset_id": "context-drift-recovery",
+    "signal": "context_drift",
+    "priority": 20,
+    "execution_scope": "recover_no_experiment",
+    "requires_confirmation": true,
+    "recommended_only": false,
+    "controlled": false,
+    "authorization": null,
+    "reason": "上下文/投影漂移：cognition 索引缺失（磁盘上没有可用的认知投影）",
+    "allowed": true,
+    "blocked_by": null,
+    "detail": null,
+    "fingerprint": "sha256:59f72b2f9682d9671bf70d29175cad02445b22f42c7b8ff5eb2f57669e88af37",
+    "attempts": 0
+  },
+  "action": "RECOVER",
+  "hold_reason": null,
+  "reason": "上下文/投影漂移：cognition 索引缺失（磁盘上没有可用的认知投影）"
+}
+{
+  "schema": "research-idea-pipeline/preset-router@1",
+  "record": {
+    "_schema": "research-idea-pipeline/recovery-log@1",
+    "preset_id": "loop-health-check",
+    "at_state_version": 4,
+    "signal_fingerprint": "sha256:63a2faa14e2088a7876b67bd5d6c4e7193b6db97ecbe734a4ea8d442ef49adeb",
+    "outcome": "",
+    "changed_decision": false,
+    "guard_allowed": true,
+    "guard_reason": null
+  },
+  "guard": {
+    "allowed": true,
+    "reason": null,
+    "attempts": 0
+  }
+}
+built /tmp/tmp8bxl2g8y/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpa34ey448/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpvxwyz1f2/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpm0vs_x37/A/cognition/index.json (mechanisms=2, diagnostics=0)
+{
+  "schema": "research-idea-pipeline/preset-router@1",
+  "action": "authorized",
+  "scheduler": "/tmp/tmpm0vs_x37/A/scheduler.json",
+  "authorization": {
+    "authorized": true,
+    "scope": "discovery_only",
+    "covers": [
+      "read_only",
+      "derived",
+      "advisory",
+      "discovery"
+    ],
+    "since_state_version": 4,
+    "note": "用户授权：可在该范围内自动触发受控 Discovery；不启动 GPU、不改锚点"
+  }
+}
+{
+  "schema": "research-idea-pipeline/preset-router@1",
+  "action": "revoked",
+  "scheduler": "/tmp/tmpm0vs_x37/A/scheduler.json",
+  "authorization": {
+    "authorized": false,
+    "scope": null,
+    "covers": []
+  }
+}
+built /tmp/tmpr8w4bl95/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpv1zw7hjj/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmpv1zw7hjj/A/cognition/index.json (mechanisms=2, diagnostics=0)
+built /tmp/tmp_zrwg2mk/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmp7veilxls/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmpaygcpwhe/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmp7_yfaewa/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmp01wxrsb_/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmpob3rflpw/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmpqt8oz2si/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmpav81891_/A/cognition/index.json (mechanisms=4, diagnostics=0)
+built /tmp/tmpyrhzra4k/A/cognition/index.json (mechanisms=4, diagnostics=0)

@@ -1,0 +1,31 @@
+{
+  "schema": "research-idea-pipeline/skill-rsi-levels@1",
+  "L1_implementation_validity": {
+    "status": "VERIFIED",
+    "evidence": [
+      "实现格式/权限/不变量单元测试",
+      "decision_trajectory / policy_evolution / source_freeze / research_replay selftest",
+      "policy candidate 越权与可执行内容拒绝测试"
+    ]
+  },
+  "L2_operational_validity": {
+    "status": "VERIFIED",
+    "evidence": [
+      "research-loop 通过现有 Strategy Decision Adapter 改变实际派遣动作（端到端测试）",
+      "决策轨迹、策略存储、replay 消融、source-freeze 均由真实 CLI/测试消费",
+      "晋升需要独立 replay 评价，且评价规则冻结后不可改动"
+    ]
+  },
+  "L3_research_improvement": {
+    "status": "NOT_VERIFIED",
+    "evidence": [],
+    "reason": "没有未见的真实科研案例 A/B：合成 fixture 与形式化单元测试不能替代，因此不宣称科研能力提升",
+    "note": "稳定策略的 L3 主张仍需独立真实评价"
+  },
+  "must_not_conflate": [
+    "策略候选已生成",
+    "策略已被应用",
+    "科研行为已改变",
+    "科研能力获得独立证据支持的改善"
+  ]
+}
