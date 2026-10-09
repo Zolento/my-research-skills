@@ -1,0 +1,244 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "AAAI",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "aaai-2025-policies-for-authors",
+      "url": "https://aaai.org/conference/aaai/aaai-25/policies-for-aaai-25-authors/",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:43d4293c727576cb6dd29148eee2b359b70c5432b4069bf431d1936440872380",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "aaai-2025-submission-instructions",
+      "url": "https://aaai.org/conference/aaai/aaai-25/submission-instructions/",
+      "source_type": "submission_requirements",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:84d3381368d2d3091a2cdac1910d066c72e143b2f3d50fcae1c7cf38316f83be",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "aaai-2025-review-process",
+      "url": "https://aaai.org/conference/aaai/aaai-25/review-process/",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:26e34d4c2d0db54c4433cd8d6522170018a503f68129c0dac24ec901ef81a657",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN: no AAAI-25 contribution taxonomy recovered",
+      "scope": "AAAI-25 contribution categories were published in the main-technical-track CFP, whose URL is aliased to the AAAI-26 page; that aliased text is not a valid AAAI-25 source, so the taxonomy stays unknown.",
+      "quote": "Papers must be formatted in AAAI two-column, camera-ready style; see the AAAI-25 author kit for details.",
+      "source_id": "aaai-2025-submission-instructions"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-contribution-fit",
+      "name": "Citation and Comparison",
+      "dimension": "contribution_fit",
+      "official_explanation": "Papers are expected to cite and compare against the most relevant refereed publications.",
+      "quote": "Papers are expected to cite those refereed publications most relevant to their content, but authors are excused for not knowing about all non-refereed work",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "Reviewers assess the degree to which reported results are reproducible, and this is weighed in decisions.",
+      "quote": "Reviewers will be asked to assess the degree to which the results reported in a paper are reproducible, and this assessment will be weighed when making final decisions about each paper.",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "RC-ethics",
+      "name": "Ethics and Professional Conduct",
+      "dimension": "other",
+      "official_explanation": "Authors and reviewers must honour the AAAI Publications Ethics and Malpractice Statement.",
+      "quote": "All AAAI authors and reviewers are required to honor the AAAI Publications Ethics and Malpractice Statement",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Blind-Review Compliance",
+      "dimension": "compliance",
+      "official_explanation": "AAAI-25 reviews are double blind; identity-revealing information may lead to summary rejection.",
+      "quote": "AAAI-25 reviews are double blind (i.e., neither reviewers nor authors should be able to identify each other).",
+      "source_id": "aaai-2025-review-process"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-in-person",
+      "topic": "other",
+      "statement": "At least one author must present the paper in person and register at the in-person rate.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "At least one author is required to present that paper in person and therefore register for the conference at the in-person rate.",
+      "source_id": "aaai-2025-policies-for-authors"
+    },
+    {
+      "id": "MP-no-remote",
+      "topic": "other",
+      "statement": "All presentations must be in person; there is no remote presentation option.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All presentations must be done in-person. There will be no remote presentation option.",
+      "source_id": "aaai-2025-policies-for-authors"
+    },
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "Technical content is limited to seven pages, with references on additional pages.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions may consist of up to 7 pages of technical content plus additional pages solely for references; acknowledgements should be omitted from papers submitted for review.",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "Submissions are anonymous and must follow the double-blind instructions.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "AAAI submissions are anonymous and must conform to the instructions (detailed below) for double-blind review.",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "MP-llm-text",
+      "topic": "ai_use_disclosure",
+      "statement": "LLM-generated text is prohibited unless it is part of the paper’s experimental analysis; LLMs cannot be authors or citable sources.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "Papers that include text generated from a large-scale language model (LLM) such as ChatGPT are prohibited unless the produced text is presented as a part of the paper",
+      "source_id": "aaai-2025-policies-for-authors",
+      "conditions": "Permitted when the generated text is presented as part of the experimental analysis."
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-repro-detail",
+      "topic": "reproducibility",
+      "statement": "Authors are encouraged to include detailed reproducibility information in the technical appendix.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Information related to reproducing experimental results described in the submission may be included in the main paper or the Code and Data Appendix, as appropriate.",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "RP-contemporaneous",
+      "topic": "other",
+      "statement": "Authors are encouraged, especially at camera-ready, to address contemporaneous work.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors are not obliged to address such papers (though, especially for the camera ready versions of accepted papers, authors are encouraged to do so)",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "RP-demo",
+      "topic": "other",
+      "statement": "Authors may express interest in giving a public demonstration of their system.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors will be able to express interest in giving a public demo of systems described in the paper.",
+      "source_id": "aaai-2025-submission-instructions"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Technical content is at most seven pages, plus references-only pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No author or affiliation information in the submission.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "CC-checklist",
+      "requirement": "Reproducibility checklist answers appear after the references.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "CC-submission-cap",
+      "requirement": "No author exceeds the 10-submission technical-track cap.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "aaai-2025-submission-instructions"
+    },
+    {
+      "id": "CC-in-person",
+      "requirement": "At least one author registers at the in-person rate and presents.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "aaai-2025-policies-for-authors"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No archival submission under parallel review elsewhere.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "aaai-2025-submission-instructions"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-vs-2024",
+      "change": "Material changes relative to AAAI-24 could not be established.",
+      "status": "UNKNOWN",
+      "source_id": null
+    },
+    {
+      "id": "CH-cfp-unavailable",
+      "change": "The AAAI-25 main-technical-track CFP is not recoverable: the -call URL serves the AAAI-26 page and the genuine main-technical-track page is logistics-only, so AAAI-25 evaluation-rubric changes cannot be confirmed.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-eval-rubric",
+      "question": "What evaluation criteria and contribution categories did the AAAI-25 main track use?",
+      "reason": "The /aaai-25/main-technical-track-call/ URL returns a page advertising AAAI-26 (byte-identical text), while the genuine /aaai-25/main-technical-track/ page is a poster/program logistics page only, so the AAAI-25 evaluation rubric cannot be quoted from a valid AAAI-25 source.",
+      "source_id": null
+    },
+    {
+      "id": "UN-ai-review",
+      "question": "Did AAAI-25 use AI-assisted peer review?",
+      "reason": "The AI-assisted review pilot is announced for AAAI-26; no captured AAAI-25 source mentions it.",
+      "source_id": null
+    },
+    {
+      "id": "UN-camera-ready",
+      "question": "What are the AAAI-25 camera-ready requirements beyond the author presentation acknowledgement?",
+      "reason": "The captured AAAI-25 policies page covers presentation and AI-use policies but not camera-ready formatting details.",
+      "source_id": null
+    }
+  ]
+}

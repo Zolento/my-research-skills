@@ -1,0 +1,274 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ICLR",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "iclr-2026-call-for-papers",
+      "url": "https://iclr.cc/Conferences/2026/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:38d089b7dffc25c5d91775e3bb45579c38182f40cd1b623c17472e94710155cf",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "iclr-2026-author-guide",
+      "url": "https://iclr.cc/Conferences/2026/AuthorGuide",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:cab3a7ba24848ee273433a88ecac7161ce4d41c4c2bf0d08e8fe30d5257e1840",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "iclr-2026-reviewer-guide",
+      "url": "https://iclr.cc/Conferences/2026/ReviewerGuide",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a43191c801ac455cd133bdb75b270d53945c15421f6f0ea24879933d98feb573",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN: no contribution-type taxonomy published for ICLR 2026",
+      "scope": "ICLR 2026 publishes subject areas but no official contribution-type categories.",
+      "quote": "We consider a broad range of subject areas including feature learning, metric learning, compositional modeling, structured prediction, reinforcement learning, uncertainty quantification and issues regarding large-scale learning and non-convex optimization, as well as applications in vision, audio, speech, language, music, robotics, games, healthcare, biology, sustainability, economics, ethical considerations in ML, and others.",
+      "source_id": "iclr-2026-call-for-papers"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-scope",
+      "name": "Problem Scope",
+      "dimension": "scope_fit",
+      "official_explanation": "What specific question or problem the paper tackles.",
+      "quote": "What is the specific question and/or problem tackled by the paper?",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "RC-motivation",
+      "name": "Motivation and Placement",
+      "dimension": "contribution_fit",
+      "official_explanation": "Whether the approach is well motivated and well placed in the literature.",
+      "quote": "Is the approach well motivated, including being well-placed in the literature?",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "RC-soundness",
+      "name": "Claims Support",
+      "dimension": "soundness",
+      "official_explanation": "Whether theoretical or empirical results supporting the claims are correct and scientifically rigorous.",
+      "quote": "Does the paper support the claims?",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "RC-significance",
+      "name": "Significance",
+      "dimension": "significance",
+      "official_explanation": "Whether the work contributes new knowledge and sufficient value to the community.",
+      "quote": "What is the significance of the work?",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "RC-originality",
+      "name": "Novel Findings",
+      "dimension": "originality",
+      "official_explanation": "Novel findings, whether theoretical, algorithmic or empirical.",
+      "quote": "Strong points: is the submission clear, technically correct, experimentally rigorous, reproducible, does it present novel findings",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "It is important that published ICLR work is reproducible; a reproducibility statement is recommended.",
+      "quote": "It is important that the work published in ICLR is reproducible.",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "RC-transparency",
+      "name": "Reproducibility Statement",
+      "dimension": "transparency",
+      "official_explanation": "Authors are strongly encouraged to reference the artifacts that support reproducibility.",
+      "quote": "Authors are strongly encouraged to include a paragraph-long Reproducibility Statement at the end of the main text (before references) to discuss the efforts that have been made to ensure reproducibility.",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Anonymity Compliance",
+      "dimension": "compliance",
+      "official_explanation": "Revealing author identity in the main text or supplementary material leads to desk rejection.",
+      "quote": "Any paper where author identity is revealed in either the main text or the supplementary material will be desk rejected.",
+      "source_id": "iclr-2026-author-guide"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "Submissions must be double blind; revealed identity in text or supplementary material causes desk rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Any paper where author identity is revealed in either the main text or the supplementary material will be desk rejected.",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "The main text must be at most nine pages at submission (ten during discussion and camera-ready).",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "At the time of submission, the main text should be 9 pages or fewer .",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "MP-llm-disclosure",
+      "topic": "ai_use_disclosure",
+      "statement": "Significant LLM use in research ideation or writing must be described in a separate LLM usage section; not disclosing it can lead to desk rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "if LLMs played a significant role in research ideation and/or writing to the extent that they could be regarded as a contributor, then authors should describe the precise role of the LLM in a separate section on LLM usage.",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "MP-reciprocal",
+      "topic": "review_process",
+      "statement": "Authors on three or more papers must review at least six papers for ICLR 2026.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All authors who are on 3 or more papers must serve as a reviewer for at least 6 papers.",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "MP-dual-submission",
+      "topic": "dual_submission",
+      "statement": "Identical or substantially similar work under prior, accepted or parallel review is not allowed.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions that are identical (or substantially similar) to versions that have been previously published, or accepted for publication, or that have been submitted in parallel to this or other conferences or journals, are not allowed and violate our dual submission policy.",
+      "source_id": "iclr-2026-author-guide"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-ethics-statement",
+      "topic": "ethics",
+      "statement": "Authors are encouraged to include an optional ethics statement of at most one page.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Recommended: Ethics statement",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "RP-reproducibility-statement",
+      "topic": "reproducibility",
+      "statement": "Authors are strongly encouraged to include a paragraph-long reproducibility statement.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Recommended: Reproducibility statement",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "RP-code",
+      "topic": "code_release",
+      "statement": "Authors are encouraged to submit source code as supplementary material.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage all authors to submit code as part of their submission.",
+      "source_id": "iclr-2026-author-guide"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Main text is at most nine pages at submission.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No author-identifying information in text or supplementary material.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "CC-llm-disclosure",
+      "requirement": "A separate LLM usage section is present when usage was significant.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "CC-ethics-statement",
+      "requirement": "An optional ethics statement is present when relevant.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No identical or substantially similar work under parallel review.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "iclr-2026-author-guide"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-llm-disclosure",
+      "change": "ICLR 2026 newly requires a separate LLM usage section when LLMs played a significant role, with desk rejection for non-disclosure.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "iclr-2026-author-guide"
+    },
+    {
+      "id": "CH-reviewer-llm",
+      "change": "ICLR 2026 newly mandates that reviewers disclose their own LLM use in reviews.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "iclr-2026-reviewer-guide"
+    },
+    {
+      "id": "CH-vs-2025",
+      "change": "Other material changes relative to ICLR 2025 could not be established.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-vs-2025",
+      "question": "What other rules changed between ICLR 2025 and ICLR 2026?",
+      "reason": "No ICLR 2025 source is cited by this profile, so only changes the 2026 sources state themselves can be confirmed.",
+      "source_id": null
+    },
+    {
+      "id": "UN-attendance",
+      "question": "Does ICLR 2026 require in-person attendance or presentation?",
+      "reason": "None of the captured 2026 sources states an attendance requirement.",
+      "source_id": null
+    },
+    {
+      "id": "UN-contrib-types",
+      "question": "Does ICLR 2026 publish official contribution types?",
+      "reason": "No contribution-type taxonomy appears in the captured 2026 sources.",
+      "source_id": null
+    }
+  ]
+}

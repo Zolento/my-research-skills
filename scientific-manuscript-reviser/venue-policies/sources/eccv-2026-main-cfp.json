@@ -1,0 +1,11 @@
+{
+  "schema": "venue-policy-source@1",
+  "id": "eccv-2026-main-cfp",
+  "venue": "ECCV",
+  "year": 2026,
+  "url": "https://eccv.ecva.net/Conferences/2026/CallForPapers",
+  "source_type": "call_for_papers",
+  "retrieved": "2026-10-10",
+  "excerpt": "ECCV 2026 uses the Springer Nature Code of Conduct for Book Authors as the basis for many of the policies. We therefore urge you to familiarize yourself with these guidelines before preparing and submitting your work to ECCV 2026.\n\n By submitting a manuscript to ECCV, the authors acknowledge that no paper substantially similar in content has been or will be submitted to another conference or workshop during the review period (March 13, 2026 – June 17, 2026). \n\n By submitting a paper to ECCV, the authors agree to the review process and understand that papers are processed by OpenReview to match each manuscript to the best possible area chairs and reviewers. Moreover, the authors agree that papers will be checked for plagiarism using iThenticate.\n\n The authors should be aware that each accepted paper is expected to be presented at ECCV in-person by an author (or an authorized delegate).\n\n All accepted papers will be made publicly available by Springer and/or the European Computer Vision Association (ECVA) no earlier than four weeks before the conference. Authors wishing to submit a patent understand that the paper’s official public disclosure is four weeks before the conference or whenever the authors make it publicly available, whichever is first. More information about ECVA is available at https://www.ecva.net/",
+  "note": "ECCV runs in even years; 2026 is the edition this document governs."
+}

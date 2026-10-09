@@ -1,0 +1,257 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ICCV",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "iccv-2025-main-cfp",
+      "url": "https://iccv.thecvf.com/Conferences/2025/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:4701155eb924dc0b8fc681fb2f90d0ab748fb13a75a7c75dda9a4fdc312f1351",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "iccv-2025-author-guidelines",
+      "url": "https://iccv.thecvf.com/Conferences/2025/AuthorGuidelines",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a661cd9c1fcfebba5f24b4dc83ada6486b44356112fb9f5980c2777b7d9d3798",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "iccv-2025-reviewer-guidelines",
+      "url": "https://iccv.thecvf.com/Conferences/2025/ReviewerGuidelines",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:0f8bceef01789e3cc6d6ccbe3d9157094ff974949a2b62cc17a60def3ab61ea5",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN",
+      "scope": "ICCV 2025 publishes no official contribution-type taxonomy in the retrieved CFP, author guidelines or reviewer guidelines.",
+      "quote": "Papers in the main technical program must describe high-quality, original research.",
+      "source_id": "iccv-2025-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-soundness",
+      "name": "Technical soundness",
+      "dimension": "soundness",
+      "official_explanation": "Accepted papers should be technically sound and contribute to the field.",
+      "quote": "Each paper that is accepted should be technically sound and make a contribution to the field.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-originality",
+      "name": "Novelty and brave concepts",
+      "dimension": "originality",
+      "official_explanation": "Reviewers are told to embrace novel concepts even without testing on many datasets.",
+      "quote": "We recommend that you embrace novel, brave concepts, even if they have not been tested on many datasets.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-significance",
+      "name": "Novelty and potential impact",
+      "dimension": "significance",
+      "official_explanation": "Novelty and impact are weighed together with reported performance.",
+      "quote": "Rather, it is important to weigh both the novelty and potential impact of the work alongside the reported performance.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-scope",
+      "name": "Fit to ICCV subject areas",
+      "dimension": "scope_fit",
+      "official_explanation": "Out-of-scope papers must be explained and redirected.",
+      "quote": "If you think the paper is out of scope for ICCV's subject areas, clearly explain why in the review.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-reproducibility",
+      "name": "Reproducibility and code",
+      "dimension": "reproducibility",
+      "official_explanation": "Code submission is encouraged and reviewers may optionally check it confidentially.",
+      "quote": "To improve reproducibility in AI research, we highly encourage authors to voluntarily submit their code as part of supplementary material, especially if they plan to release it upon acceptance.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-transparency",
+      "name": "Honest discussion of limitations",
+      "dimension": "transparency",
+      "official_explanation": "An honest limitations discussion is weighed positively and cannot be the sole rejection factor.",
+      "quote": "authors are encouraged to explicitly and honestly discuss limitations.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-ethics",
+      "name": "Personal data and human subjects",
+      "dimension": "compliance",
+      "official_explanation": "Papers using personal or human-subject data must document ethics clearance or the principles followed.",
+      "quote": "the authors must have an ethics clearance from an institutional review board (IRB, or equivalent) or clearly describe that ethical principles have been followed.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Papers are limited to eight pages including figures and tables, plus reference-only pages.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers are limited to eight pages, including figures and tables, in the ICCV style.",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "mp-format-anonymity",
+      "topic": "anonymity",
+      "statement": "Non-anonymized, non-template or over-length papers are rejected without review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers that are not properly anonymized, or do not use the template, or have more than eight pages (excluding references) will be rejected without review.",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "No publication with 20 percent or more overlap may be registered or submitted elsewhere during review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "no publication substantially similar in content (defined as having 20 percent or more overlap) has been or will be registered or submitted to this or another conference, workshop, or journal during the review period.",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "mp-llm-reviewer",
+      "topic": "ai_use_disclosure",
+      "statement": "ICCV 2025 does not allow LLMs or online chatbots in any part of the reviewing process.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "ICCV 2025 does not allow the use of Large Language Models or online chatbots such as ChatGPT in any part of the reviewing process.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "mp-review-deadline",
+      "topic": "review_process",
+      "statement": "Reviewers who miss the review deadline face desk rejection of all papers on which they are authors.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Any reviewer who fails to submit their assigned reviews by the deadline will face a desk rejection of all papers on which they are an author per the discretion of the PCs.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-code-release",
+      "topic": "code_release",
+      "statement": "Code upload as supplementary material is encouraged but not required.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage (but do not require) authors to upload their code as part of their supplementary material in order to help reviewers assess the quality of the work.",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "rp-negative-impact",
+      "topic": "ethics",
+      "statement": "Authors are encouraged to discuss potential negative societal impact; omission is not a formal violation.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors are encouraged to include a discussion on potential negative societal impact.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rp-limitations",
+      "topic": "other",
+      "statement": "An honest limitations discussion is encouraged and weighed positively.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors are encouraged to explicitly and honestly discuss limitations.",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-anonymization",
+      "requirement": "Submission, supplementary material and links preserve anonymity.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "cc-page-limit",
+      "requirement": "Main paper is at most eight pages excluding references.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "cc-template",
+      "requirement": "The official ICCV 2025 style/template is used.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "cc-dual-submission",
+      "requirement": "No paper with 20 percent or more overlap is under review elsewhere.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "iccv-2025-author-guidelines"
+    },
+    {
+      "id": "cc-review-deadline",
+      "requirement": "Assigned reviews are submitted before the review deadline.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-responsible-reviewing",
+      "change": "ICCV 2025 states a Responsible Reviewing Policy and strict enforcement of the reviewing deadline, describing an unofficial grace period at previous ICCV conferences as the condition being changed.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "iccv-2025-reviewer-guidelines"
+    },
+    {
+      "id": "ch-same-deadline",
+      "change": "ICCV 2025 uses the same deadline for paper and supplementary materials, described on the CFP menu as a change (\"The deadline for both the paper and supplementary materials is now the same.\").",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "iccv-2025-author-guidelines"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-alternating-years",
+      "question": "Why is there no ICCV profile for 2024 or 2026?",
+      "reason": "ICCV is held in odd years (the ICCV site lists only 2025 and 2027 under Select Year), so no profile is created for an even year in which the conference does not occur."
+    },
+    {
+      "id": "up-2023-baseline",
+      "question": "Which ICCV 2025 rules are new relative to ICCV 2023?",
+      "reason": "No ICCV 2023 document was retrieved, so no year-over-year delta is established and no ICCV 2023 rule is inherited."
+    },
+    {
+      "id": "up-contribution-types",
+      "question": "Does ICCV 2025 publish an official contribution-type taxonomy?",
+      "reason": "No contribution-type taxonomy appears in the retrieved ICCV 2025 documents; the profile records an explicit UNKNOWN type."
+    }
+  ]
+}

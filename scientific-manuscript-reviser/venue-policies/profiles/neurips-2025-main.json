@@ -1,0 +1,256 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "NeurIPS",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "neurips-2025-call-for-papers",
+      "url": "https://neurips.cc/Conferences/2025/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:75d021a540f0594db74950b6fb499f1c505b21d3ce827e12530d6e7f26fec6ee",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "neurips-2025-reviewer-guidelines",
+      "url": "https://neurips.cc/Conferences/2025/ReviewerGuidelines",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:82ee6563036189751feeb57155eb90c62bed9195e247a6fe171be2847b06c791",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN: no contribution-type taxonomy published for NeurIPS 2025",
+      "scope": "No official contribution-type categories were published in the captured 2025 sources; the review form is described only as a set of questions.",
+      "quote": "Below is a description of the questions you will be asked on the review form for each paper and some guidelines on what to consider when answering these questions.",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-soundness",
+      "name": "Quality",
+      "dimension": "soundness",
+      "official_explanation": "Technical soundness, support for claims, and appropriateness of methods.",
+      "quote": "Is the submission technically sound? Are claims well supported (e.g., by theoretical analysis or experimental results)?",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    },
+    {
+      "id": "RC-clarity",
+      "name": "Clarity",
+      "dimension": "transparency",
+      "official_explanation": "Clear writing and organization; enough information for an expert to reproduce results.",
+      "quote": "Is the submission clearly written? Is it well organized?",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    },
+    {
+      "id": "RC-significance",
+      "name": "Significance",
+      "dimension": "significance",
+      "official_explanation": "Impact and likely reuse of the results by the community.",
+      "quote": "Are the results impactful for the community?",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    },
+    {
+      "id": "RC-originality",
+      "name": "Originality",
+      "dimension": "originality",
+      "official_explanation": "New insights or deepened understanding; novelty of method is not required.",
+      "quote": "Does the work provide new insights, deepen understanding, or highlight important properties of existing methods?",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Submission Compliance",
+      "dimension": "compliance",
+      "official_explanation": "Style and page-limit violations may lead to rejection without further review.",
+      "quote": "Submissions that violate the NeurIPS style (e.g., by decreasing margins or font sizes) or page limits may be rejected without further review.",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "Authors are required to complete the paper checklist covering reproducibility and transparency.",
+      "quote": "authors are required to complete a paper checklist",
+      "source_id": "neurips-2025-call-for-papers"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "The main text may not exceed nine content pages, including all figures and tables.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "The main text of a submitted paper is limited to nine content pages , including all figures and tables.",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "Submissions must be anonymized and free of identifying information.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All submissions must be anonymized and may not contain any identifying information that may violate the double-blind reviewing policy.",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "MP-checklist",
+      "topic": "reproducibility",
+      "statement": "Authors must complete the NeurIPS paper checklist.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "authors are required to complete a paper checklist",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "MP-dual-submission",
+      "topic": "dual_submission",
+      "statement": "Substantially similar papers previously published or under parallel review may not be submitted.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions that are substantially similar to papers that the authors have previously published or submitted in parallel to other peer-reviewed venues with proceedings or journals may not be submitted to NeurIPS.",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "MP-openreview",
+      "topic": "other",
+      "statement": "Every author must have an up-to-date OpenReview profile by the full paper submission deadline.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Anyone who plans to submit a paper as an author or a co-author will need to create (or update) their OpenReview profile by the full paper submission deadline.",
+      "source_id": "neurips-2025-call-for-papers"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-code",
+      "topic": "code_release",
+      "statement": "Authors are encouraged to upload code as supplementary material.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage authors to upload their code specifically as part of their supplementary material in order to help reviewers assess the quality of the work.",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "RP-checklist-tool",
+      "topic": "review_process",
+      "statement": "Reviewers are invited to use the paper checklist as a tool when preparing a review.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Feel free to use the NeurIPS paper checklist included in each paper as a tool when preparing your review",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    },
+    {
+      "id": "RP-ethics-flag",
+      "topic": "ethics",
+      "statement": "Reviewers should flag questionable papers for ethics review.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Make sure to flag any questionable papers for ethics review.",
+      "source_id": "neurips-2025-reviewer-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Main text is at most nine content pages including figures and tables.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CC-template",
+      "requirement": "Submission uses the NeurIPS 2025 LaTeX style file.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No identifying information in the manuscript or supplementary material.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CC-checklist",
+      "requirement": "Paper checklist is included with the submission.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CC-funding-disclosure",
+      "requirement": "Accepted camera-ready papers include a funding disclosure.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No overlapping archival submission is under review elsewhere.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "neurips-2025-call-for-papers"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-position-track",
+      "change": "NeurIPS 2025 introduced a new Position Paper track alongside the main track.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CH-funding-disclosure",
+      "change": "NeurIPS 2025 requires all camera-ready papers to include a funding disclosure.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "neurips-2025-call-for-papers"
+    },
+    {
+      "id": "CH-vs-2024",
+      "change": "Material changes relative to NeurIPS 2024 could not be established.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-vs-2024",
+      "question": "What changed between NeurIPS 2024 and NeurIPS 2025?",
+      "reason": "No NeurIPS 2024 source is cited by this profile, and no prior-year rule may be borrowed, so the comparison cannot be confirmed.",
+      "source_id": null
+    },
+    {
+      "id": "UN-llm-policy",
+      "question": "What are the detailed NeurIPS 2025 LLM-use rules?",
+      "reason": "The 2025 CFP links a separate LLM policy page that was not captured; only the pointer is official here.",
+      "source_id": null
+    },
+    {
+      "id": "UN-contribution-types",
+      "question": "Did NeurIPS 2025 publish official contribution types?",
+      "reason": "The 2025 CFP and Reviewer Guidelines in the captured sources do not list any contribution-type categories.",
+      "source_id": null
+    }
+  ]
+}

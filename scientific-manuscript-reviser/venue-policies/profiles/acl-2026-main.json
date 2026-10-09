@@ -1,0 +1,259 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ACL",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "acl-2026-main-cfp",
+      "url": "https://2026.aclweb.org/calls/main_conference_papers/",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:c2e6859eb29b5b0b86f1397a3f45a7be57e5b9107e163325d7b16eaa8f32dd46",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "acl-2026-home",
+      "url": "https://2026.aclweb.org/",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:4fdd0622c0786510229e8ce2fcfa1fdc42a6a8b007b4c340ef6f3e9aa9dec64c",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "acl-2026-ct-papers",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Long and short research papers",
+      "scope": "Main conference, long and short papers",
+      "quote": "long and short papers featuring substantial, original, and unpublished research",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-ct-diverse",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Negative findings, surveys, resources, position papers, reproduction studies",
+      "scope": "Main conference contributions beyond traditional research results",
+      "quote": "papers may contribute negative findings, survey an area, announce the creation of a new resource, argue a position, report novel linguistic insights derived using existing computational techniques, and reproduce, or fail to reproduce, previous results",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-ct-theme",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Theme track: Explainability of NLP Models",
+      "scope": "ACL 2026 special theme track, long or short papers",
+      "quote": "The theme track submissions can be either long or short.",
+      "source_id": "acl-2026-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "acl-2026-rc-scope",
+      "name": "Scope covers all aspects of CL and NLP",
+      "dimension": "scope_fit",
+      "official_explanation": "The call states the conference scope for submitted work.",
+      "quote": "invites the submission of long and short papers featuring substantial, original, and unpublished research in all aspects of Computational Linguistics and Natural Language Processing",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rc-originality",
+      "name": "Substantial, original, unpublished research",
+      "dimension": "originality",
+      "official_explanation": "Originality and non-publication are stated conditions of a submission.",
+      "quote": "long and short papers featuring substantial, original, and unpublished research",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rc-contribution",
+      "name": "Several contribution shapes are in scope",
+      "dimension": "contribution_fit",
+      "official_explanation": "The call lists non-standard contribution shapes that are explicitly in scope.",
+      "quote": "papers may contribute negative findings, survey an area, announce the creation of a new resource, argue a position, report novel linguistic insights derived using existing computational techniques, and reproduce, or fail to reproduce, previous results",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rc-transparency",
+      "name": "Two-way anonymized, double-blind review",
+      "dimension": "transparency",
+      "official_explanation": "The review process is stated to be double-blind on the ARR side.",
+      "quote": "The reviewing process will continue to be double-blind. Reviewers will not see authors, nor will authors see reviewers, and reviews on ARR will not be made publicly visible.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rc-compliance",
+      "name": "Accepted papers must be presented",
+      "dimension": "compliance",
+      "official_explanation": "Presentation is a condition for appearing in the proceedings.",
+      "quote": "All accepted papers must be presented at the conference to appear in the proceedings.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rc-process",
+      "name": "Two-stage review: ARR review then conference decision",
+      "dimension": "other",
+      "official_explanation": "Review is delegated to ARR; acceptance decisions are made at the conference.",
+      "quote": "Authors submit articles to ARR, where submissions receive reviews and meta-reviews from ARR reviewers and area chairs;",
+      "source_id": "acl-2026-main-cfp"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "acl-2026-mp-two-stage",
+      "topic": "review_process",
+      "statement": "ACL 2026 reviews submissions through ACL Rolling Review; the conference makes the final decisions.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "ACL 2026 will use ACL Rolling Review (ARR) as a reviewing system, but final decisions will be made by the conference.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-mp-arr-requirements",
+      "topic": "page_limit",
+      "statement": "Long and short submissions must follow all ARR submission requirements, including 8-page long and 4-page short limits, two-way anonymization, the ethics checklist and a Limitations section.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Both long and short paper submissions should follow all of the ARR submission requirements , including: Long Papers (8 pages) and Short Papers (4 pages) Instructions for Two-Way Anonymized Review Authorship Citation and Comparison Multiple Submission Policy , Resubmission Policy , and Withdrawal Policy Ethics Policy including the responsible NLP research checklist Limitations Paper Submission and Templates Optional Supplementary Materials",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-mp-registration",
+      "topic": "review_process",
+      "statement": "After submission, all authors must complete the author registration form by January 7th 2026 EoD AoE.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "After submission, all authors must complete the author registration form by January 7th 2026 EoD AoE",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-mp-presentation",
+      "topic": "other",
+      "statement": "Accepted papers must be presented at the conference to appear in the proceedings.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All accepted papers must be presented at the conference to appear in the proceedings.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-mp-aoe",
+      "topic": "other",
+      "statement": "All ACL 2026 deadlines are at 11:59PM UTC-12:00, anywhere on Earth.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All deadlines are at 11:59PM UTC-12:00 (“anywhere on Earth”).",
+      "source_id": "acl-2026-main-cfp"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "acl-2026-rp-theme",
+      "topic": "other",
+      "statement": "The theme track invites empirical and theoretical work, surveys and position papers on the Explainability of NLP Models.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "The theme track invites empirical and theoretical work as well as surveys and position papers reflecting on the Explainability of NLP Models.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rp-anonymity-period",
+      "topic": "anonymity",
+      "statement": "There is no anonymity period requirement; per the ACL and ARR policies authors may post or discuss non-anonymous preprints while under review.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Following the ACL and ARR policies , there is no anonymity period requirement.",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-rp-commit-flex",
+      "topic": "review_process",
+      "statement": "Committing to ACL 2026 is optional regardless of the preferred venue declared at ARR submission.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors who selected ACL 2026 as a preferred venue when submitting to ARR may choose not to commit to ACL 2026 after receiving their reviews, and authors who selected a preferred venue other than ACL 2026 when submitting to ARR are still welcome to commit to ACL 2026.",
+      "source_id": "acl-2026-main-cfp"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "acl-2026-cc-structure",
+      "requirement": "Submission follows the ARR submission requirements, which include a Limitations section and the responsible NLP research checklist.",
+      "mechanically_checkable": true,
+      "check_kind": "structure",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-cc-page-limit",
+      "requirement": "Long paper content is at most 8 pages; short paper content is at most 4 pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-cc-anonymization",
+      "requirement": "Two-way anonymized review: no author names or affiliations.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-cc-declaration",
+      "requirement": "Ethics policy and responsible NLP research checklist submitted as required by the ARR submission requirements.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-cc-needs-review",
+      "requirement": "Confirm the submitted paper matches the current ARR submission requirements that the ACL 2026 call incorporates by reference.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "acl-2026-main-cfp"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "acl-2026-ch-theme",
+      "change": "ACL 2026 announces a new special theme track: “Explainability of NLP Models”.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "acl-2026-main-cfp"
+    },
+    {
+      "id": "acl-2026-ch-cycles",
+      "change": "The ACL 2026 call names two eligible ARR cycles (October 2025 and January 2026); whether this differs from ACL 2025 is not asserted here because the ACL 2025 document is scoped to a different profile.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "acl-2026-up-arr-rules",
+      "question": "Which ARR rules are mandatory for an ACL 2026 submission?",
+      "reason": "The ACL 2026 call incorporates the ARR submission requirements by reference instead of restating them. Those rules are recorded in the ARR 2026 profiles; no ARR rule is asserted as an ACL mandatory policy unless the ACL document itself states it applies.",
+      "source_id": null
+    },
+    {
+      "id": "acl-2026-up-findings",
+      "question": "Is there a separate ACL 2026 Findings policy?",
+      "reason": "The call states that papers not selected for the main conference will automatically be considered for Findings, but no separate Findings policy page was retrieved.",
+      "source_id": null
+    },
+    {
+      "id": "acl-2026-up-camera-ready",
+      "question": "What camera-ready formatting rules apply to accepted ACL 2026 papers?",
+      "reason": "The call gives the camera-ready deadline and an extra content page but states that accepted-paper preparation is handled by the venue; no camera-ready formatting document was retrieved.",
+      "source_id": null
+    }
+  ]
+}

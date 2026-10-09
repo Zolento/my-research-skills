@@ -1,0 +1,11 @@
+{
+  "schema": "venue-policy-source@1",
+  "id": "cvpr-2027-dates",
+  "venue": "CVPR",
+  "year": 2027,
+  "url": "https://cvpr.thecvf.com/Conferences/2027/Dates",
+  "source_type": "submission_requirements",
+  "retrieved": "2026-10-10",
+  "excerpt": "CVPR 2027 Meeting Dates \n\n Workshops and Tutorials \n \n June 20-21, 2027\n\n Main Conference Sessions \n June 22-25, 2027 \n\n Your time zone is:\n Conference local time zone \n\n Dates and Deadlines\n\n Paper Submissions\n\n Paper Registration Deadline \n Nov 10 '26 (Anywhere on Earth) \n\n Submission Deadline \n Nov 16 '26 (Anywhere on Earth) \n\n Supplementary Materials Deadline \n Nov 23 '26 (Anywhere on Earth) \n\n Reviews Released \n Jan 25 '27 (Anywhere on Earth) \n\n Final Decisions \n Feb 25 '27 (Anywhere on Earth) \n\n Workshops\n\n Workshop Proposal Deadline \n Nov 04 '26 (Anywhere on Earth) \n\n Workshop Proposal Decision",
+  "note": "Official CVPR 2027 dates/deadlines page; corroborates the CFP deadlines."
+}

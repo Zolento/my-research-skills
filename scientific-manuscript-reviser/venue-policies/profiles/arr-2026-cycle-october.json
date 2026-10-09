@@ -1,0 +1,265 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ARR",
+  "year": 2026,
+  "track": "October 2026",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "arr-2026-dates",
+      "url": "https://aclrollingreview.org/dates",
+      "source_type": "submission_requirements",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:7e66a0b50f475e38197c64a281582d8c1af1b39ed8572e87dbb60c53421c1a9c",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "arr-2026-cfp",
+      "url": "https://aclrollingreview.org/cfp",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a54aaa4d3954484bd4c479b0445c016ea9128ced8c1d6f485abe56788bd08ec6",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "arr-2026-oct-ct-resource",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Data resources",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Data resources Data analysis Model analysis & interpretability",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-ct-analysis",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Data analysis",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Data resources Data analysis Model analysis & interpretability",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-ct-experiment",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "NLP engineering experiment",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Model analysis & interpretability NLP engineering experiment Publicly available software and/or pre-trained models",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "arr-2026-oct-rc-originality",
+      "name": "Original, completed, unpublished work",
+      "dimension": "originality",
+      "official_explanation": "The standing call defines what counts as a valid submission.",
+      "quote": "All submitted papers are expected to describe original, completed and unpublished work.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rc-soundness",
+      "name": "Substantial work with concrete evaluation",
+      "dimension": "soundness",
+      "official_explanation": "Long papers must be substantial and, where appropriate, evaluated.",
+      "quote": "Long papers must describe substantial, original, completed and unpublished work. Wherever appropriate, concrete evaluation and analysis should be included.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rc-contribution",
+      "name": "Positive and negative results alike are welcome",
+      "dimension": "contribution_fit",
+      "official_explanation": "Negative results are explicitly in scope and face the same justification burden.",
+      "quote": "Both positive and negative results for experimental studies are welcome, and have the same challenge of justifying to the program committee why this particular result is interesting and important.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rc-scope",
+      "name": "Community-connected reference base",
+      "dimension": "scope_fit",
+      "official_explanation": "The call gives a rule of thumb for whether work belongs to a community.",
+      "quote": "A good rule-of-thumb to consider whether your work is connected to a given community is to consider whether your list of references has a substantial proportion of papers from that community.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rc-transparency",
+      "name": "Cite all relevant refereed publications",
+      "dimension": "transparency",
+      "official_explanation": "Authors must cite relevant refereed work, with limited excuse for unpublished work.",
+      "quote": "Authors are expected to cite all refereed publications relevant to their submission but may be excused for not knowing about all unpublished work (especially work that has been recently posted and/or is not widely cited).",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rc-authorship",
+      "name": "All and only substantial contributors as authors",
+      "dimension": "other",
+      "official_explanation": "The author list must include all and only substantial contributors.",
+      "quote": "The author list for submissions should include all (and only) individuals who made substantial contributions to the work presented.",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "arr-2026-oct-mp-service-contributor",
+      "topic": "review_process",
+      "statement": "Guaranteed review requires a qualified service contributor serving as reviewer, chair or senior role.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions will only be guaranteed review if they contribute a qualified service contributor (serving as a reviewer, chair or in senior roles).",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-mp-lottery",
+      "topic": "review_process",
+      "statement": "Submissions not selected for review via the lottery will be desk rejected.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions not selected for review via lottery will be desk rejected.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-mp-contributor-registration",
+      "topic": "other",
+      "statement": "After nomination, a service contributor must complete the registration form within 48 hours after the submission deadline.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "After nomination, they must complete a registration form within 48 hours after the submission deadline.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-mp-openreview-profiles",
+      "topic": "other",
+      "statement": "All authors must have complete OpenReview profiles within one week after the submission deadline.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "The profile registration for all authors must be finished 1 week after submission deadline at the latest.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "A paper under review elsewhere cannot be submitted to ARR, and an ARR submission cannot be submitted elsewhere during the ARR review period.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "ARR will not consider any paper that is under review in a journal or another conference at the time of submission, and submitted papers must not be submitted elsewhere during the ARR review period.",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "arr-2026-oct-rp-supplementary",
+      "topic": "supplementary",
+      "statement": "Supplementary appendices, software and data are encouraged for reproducibility.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "ARR encourages the submission of these supplementary materials to improve the reproducibility of results and to enable authors to provide additional information that does not fit in the paper.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rp-color",
+      "topic": "other",
+      "statement": "Colour-coding changed parts of a revision is allowed but not mandated.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Some authors find it useful to color-code the changed parts in the text of the submission; this is allowed, but not mandated.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-rp-revision-map",
+      "topic": "author_response",
+      "statement": "Authors are recommended to locate revisions by section and line numbers.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "It is recommended to refer to the location of revisions using section and line numbers.",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "arr-2026-oct-cc-declaration",
+      "requirement": "Responsible NLP research checklist completed as part of the submission.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-cc-limitations",
+      "requirement": "Dedicated Limitations section present.",
+      "mechanically_checkable": true,
+      "check_kind": "structure",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-cc-page-limit",
+      "requirement": "Long papers at most 8 content pages; short papers at most 4 content pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-cc-anonymization",
+      "requirement": "No author names or affiliations in the submission.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-cc-needs-review",
+      "requirement": "Confirm the paper is covered by a registered qualified service contributor within 48 hours of the submission deadline.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "arr-2026-oct-ch-sustainable",
+      "change": "Starting with the October 2026 cycle, ARR implements the ACL sustainable reviewing policy: review is capped to reviewer capacity, a qualified service contributor is required for guaranteed review, and submission caps and abuse penalties apply.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-oct-ch-noncompliance",
+      "change": "The dates page states that failure to meet reviewer registration, review and meta-review deadlines may result in desk rejection or sanctions.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "arr-2026-dates"
+    },
+    {
+      "id": "arr-2026-oct-ch-guideline-update",
+      "change": "The author and reviewer guidelines state they will be updated after the August 2026 cycle to match the sustainable reviewing policy.",
+      "status": "PENDING",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "arr-2026-oct-up-venue-map",
+      "question": "Which publication venues accept reviews from the October 2026 cycle?",
+      "reason": "The ARR dates page lists participating venues and commitment dates (EMNLP 2026, AACL 2026, EACL 2027, NAACL 2027, COLING 2027, ACL 2027) but does not map the October 2026 cycle to one conference.",
+      "source_id": null
+    },
+    {
+      "id": "arr-2026-oct-up-guideline-currency",
+      "question": "Do the reviewer and author guidelines for this cycle yet reflect the sustainable reviewing policy?",
+      "reason": "Both guideline pages state they apply until the August 2026 cycle and will be updated afterwards; as of 2026-10-10 the updated text was not confirmed.",
+      "source_id": null
+    },
+    {
+      "id": "arr-2026-oct-up-lottery",
+      "question": "How is the review lottery for submissions without a service contributor run?",
+      "reason": "The call states such submissions may be selected by lottery or desk rejected but states no timing, ordering or odds.",
+      "source_id": null
+    }
+  ]
+}

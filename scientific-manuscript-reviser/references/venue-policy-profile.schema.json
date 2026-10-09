@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "venue-policy-profile@1",
+  "description": "A single venue, year and track policy profile. Every policy claim is source-bound: it must quote an excerpt that occurs verbatim in the saved official source text. Policy scope is exact; a profile never inherits another year's mandatory rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "profile_version", "venue", "year", "track", "verification_date",
+               "sources", "contribution_types", "review_criteria", "mandatory_policy",
+               "recommended_practice", "compliance_checks", "changes_from_prior_year",
+               "unknown_policies"],
+  "properties": {
+    "schema": {"const": "venue-policy-profile@1"},
+    "profile_version": {"type": "integer", "minimum": 1},
+    "venue": {"type": "string", "enum": ["NeurIPS", "ICML", "ICLR", "CVPR", "ICCV", "ECCV",
+                                         "MICCAI", "ACL", "ARR", "AAAI"]},
+    "year": {"type": "integer", "minimum": 2024},
+    "track": {"type": "string", "minLength": 1},
+    "verification_date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "sources": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "url", "source_type", "phase", "retrieved", "digest", "status"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "pattern": "^https?://"},
+          "source_type": {"enum": ["author_guidelines", "reviewer_guidelines", "review_form",
+                                   "call_for_papers", "ethics_policy", "reproducibility_guidelines",
+                                   "submission_requirements", "code_of_conduct", "official_faq"]},
+          "phase": {"enum": ["author", "reviewer", "both"]},
+          "retrieved": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{16,64}$"},
+          "status": {"enum": ["VERIFIED", "PARTIAL", "UNREACHABLE"]},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "contribution_types": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "claim_kind", "label", "scope", "quote", "source_id"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "claim_kind": {"enum": ["MANDATORY_POLICY", "REVIEW_CRITERION", "RECOMMENDED_PRACTICE",
+                                  "EMPIRICAL_CONVENTION", "UNKNOWN"]},
+          "label": {"type": "string", "minLength": 1},
+          "scope": {"type": "string", "minLength": 1},
+          "quote": {"type": "string", "minLength": 8},
+          "source_id": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "review_criteria": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/named_claim"}
+    },
+    "mandatory_policy": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/policy_claim"}
+    },
+    "recommended_practice": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/policy_claim"}
+    },
+    "compliance_checks": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "requirement", "mechanically_checkable", "check_kind", "source_id"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "requirement": {"type": "string", "minLength": 1},
+          "mechanically_checkable": {"type": "boolean"},
+          "check_kind": {"enum": ["structure", "declaration", "template", "citation",
+                                  "anonymization", "page_limit", "needs_review", "none"]},
+          "source_id": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "changes_from_prior_year": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "change", "status"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "change": {"type": "string", "minLength": 1},
+          "status": {"enum": ["CONFIRMED_CHANGE", "PENDING", "UNKNOWN"]},
+          "source_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+        }
+      }
+    },
+    "unknown_policies": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "question", "reason"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "question": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "source_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "named_claim": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "dimension", "official_explanation", "quote", "source_id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "dimension": {"enum": ["scope_fit", "contribution_fit", "soundness", "originality",
+                               "significance", "experimental_adequacy", "theoretical_adequacy",
+                               "reproducibility", "transparency", "compliance", "ethics", "other"]},
+        "official_explanation": {"type": "string", "minLength": 1},
+        "quote": {"type": "string", "minLength": 8},
+        "source_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "policy_claim": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "topic", "statement", "claim_kind", "explicitness", "applicability",
+                   "quote", "source_id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "topic": {"enum": ["anonymity", "dual_submission", "ai_use_disclosure", "reproducibility",
+                           "ethics", "data_availability", "code_release", "page_limit",
+                           "supplementary", "review_process", "author_response", "authorship",
+                           "conflict_of_interest", "licensing", "other"]},
+        "statement": {"type": "string", "minLength": 1},
+        "claim_kind": {"enum": ["MANDATORY_POLICY", "REVIEW_CRITERION", "RECOMMENDED_PRACTICE",
+                                "EMPIRICAL_CONVENTION", "UNKNOWN"]},
+        "explicitness": {"enum": ["EXPLICIT", "INFERRED", "UNKNOWN"]},
+        "applicability": {"enum": ["REQUIRED", "CONDITIONAL", "OPTIONAL", "NOT_APPLICABLE"]},
+        "quote": {"type": "string", "minLength": 8},
+        "source_id": {"type": "string", "minLength": 1},
+        "conditions": {"type": "string"}
+      }
+    }
+  }
+}

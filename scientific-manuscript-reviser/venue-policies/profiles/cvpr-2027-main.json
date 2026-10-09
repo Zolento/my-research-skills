@@ -1,0 +1,234 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "CVPR",
+  "year": 2027,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "cvpr-2027-main-cfp",
+      "url": "https://cvpr.thecvf.com/Conferences/2027/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:57700a656dfeb8ddbc9beffd5335abdaf105fe81ae73e005dcaed163ee23e8b9",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "cvpr-2027-dates",
+      "url": "https://cvpr.thecvf.com/Conferences/2027/Dates",
+      "source_type": "submission_requirements",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a7efcae08036e17660c4b0ee7425a95121c13113f3c2f60c9fafe768ce5f2893",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN",
+      "scope": "CVPR 2027 publishes no official contribution-type taxonomy; the CFP defines the main technical program only.",
+      "quote": "Papers in the main technical program must describe high-quality, original research.",
+      "source_id": "cvpr-2027-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-scope",
+      "name": "Fit to the CVPR main technical program",
+      "dimension": "scope_fit",
+      "official_explanation": "The CFP restricts the main technical program to high-quality original research across the listed vision topics.",
+      "quote": "Papers in the main technical program must describe high-quality, original research. Topics of interest cover all aspects of computer vision and pattern recognition including, but not limited to:",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rc-reviewprocess",
+      "name": "Agreement to the OpenReview review process",
+      "dimension": "other",
+      "official_explanation": "Submitting authors agree to the review process and to automatic matching by OpenReview.",
+      "quote": "By submitting a paper, authors agree to participate in the review process and understand that OpenReview will automatically match manuscripts to appropriate reviewers and area chairs based on expertise.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rc-dualsubmission",
+      "name": "Absence of a substantially similar concurrent submission",
+      "dimension": "compliance",
+      "official_explanation": "Reviewers judge whether a paper duplicates work under review elsewhere during the stated review period.",
+      "quote": "By submitting to CVPR, authors confirm that no substantially similar paper has been or will be submitted to another conference or workshop during the review period (November 16, 2026 – February 22, 2027).",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rc-contemporaneous",
+      "name": "Treatment of contemporaneous work",
+      "dimension": "originality",
+      "official_explanation": "Work appearing online after September 15, 2026 is treated as contemporaneous and is not by itself a rejection basis.",
+      "quote": "papers that appeared online after September 15th, 2026 will generally be considered \"contemporaneous\" in the sense that the submission will not be rejected on the basis of the comparison to contemporaneous work.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rc-disclosure",
+      "name": "Publication and patent disclosure timing",
+      "dimension": "transparency",
+      "official_explanation": "Accepted papers are released by CVF two weeks before the conference, which fixes the public disclosure date.",
+      "quote": "All accepted papers will be publicly released by the Computer Vision Foundation (CVF) two weeks before the conference.",
+      "source_id": "cvpr-2027-main-cfp"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-openreview-profile",
+      "topic": "authorship",
+      "statement": "All co-authors must have an up-to-date OpenReview profile to submit.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "An up-to-date OpenReview profile for all co-authors is required to submit a paper.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "No substantially similar paper may be under review elsewhere during the CVPR 2027 review period.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "By submitting to CVPR, authors confirm that no substantially similar paper has been or will be submitted to another conference or workshop during the review period (November 16, 2026 – February 22, 2027).",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "mp-review-participation",
+      "topic": "review_process",
+      "statement": "Submitting authors agree to participate in the review process and to OpenReview matching.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "By submitting a paper, authors agree to participate in the review process and understand that OpenReview will automatically match manuscripts to appropriate reviewers and area chairs based on expertise.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "mp-reviewer-service",
+      "topic": "review_process",
+      "statement": "All authors commit to serve as reviewers, area chairs or senior area chairs when invited; exemptions must be disclosed and approved in advance.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "All authors commit to serve as reviewers, area chairs, or senior area chairs when invited by the program chairs.",
+      "source_id": "cvpr-2027-main-cfp",
+      "conditions": "Applies when the program chairs issue an invitation; exemptions require advance disclosure and program-chair approval."
+    },
+    {
+      "id": "mp-cite-contemporaneous",
+      "topic": "other",
+      "statement": "Authors must cite and discuss work that influenced their submission, including contemporaneous work.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "Any paper that influenced the submission is considered prior work and must be cited and discussed as such.",
+      "source_id": "cvpr-2027-main-cfp",
+      "conditions": "Applies to any paper that influenced the submission."
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-create-profile-early",
+      "topic": "authorship",
+      "statement": "Create OpenReview profiles early; profiles without an institutional email take up to two weeks to moderate.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "new profiles created without an institutional email will go through a moderation process which can take up to two weeks.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rp-contemporaneous-comparison",
+      "topic": "other",
+      "statement": "Authors are expected to cite contemporaneous work and to run empirical comparisons to the degree feasible.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors are still expected to cite and discuss contemporaneous work and perform empirical comparisons to the degree feasible.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "rp-patent-disclosure",
+      "topic": "licensing",
+      "statement": "Authors considering patents should treat the earlier of CVF release and self-release as the public disclosure date.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors considering patent applications should note that the paper's official public disclosure date is whichever occurs first:",
+      "source_id": "cvpr-2027-main-cfp"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-openreview-profile",
+      "requirement": "Every co-author has an up-to-date OpenReview profile before the registration deadline.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "cc-dual-submission",
+      "requirement": "No substantially similar paper is under review elsewhere during November 16, 2026 - February 22, 2027.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "cc-deadlines",
+      "requirement": "Paper registration by Nov 10, 2026 AOE, submission by Nov 16, 2026 AOE and supplementary material by Nov 23, 2026 AOE; dates are fixed with no extension.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2027-dates"
+    },
+    {
+      "id": "cc-reviewer-nomination",
+      "requirement": "At least one author is committed to serve as a reviewer/AC if invited.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2027-main-cfp"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-contemporaneous-section",
+      "change": "The CVPR 2027 CFP adds a Contemporaneous Work section treating papers appearing online after September 15, 2026 as contemporaneous; the CVPR 2025 and CVPR 2026 CFP pages do not contain such a section.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "ch-llm-section",
+      "change": "The CVPR 2027 CFP adds an LLM Usage section, but states that the exact scope, permitted uses and guidelines are still being finalized.",
+      "status": "PENDING",
+      "source_id": "cvpr-2027-main-cfp"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-llm-policy",
+      "question": "What LLM/AI-usage rules apply to CVPR 2027 authors and reviewers?",
+      "reason": "The CVPR 2027 CFP states verbatim: \"CVPR 2027 will make use of large language models (LLMs) in selected parts of the conference and reviewing process. The exact scope, permitted uses, and associated guidelines are currently being finalized. This section will be updated with further details before the submission deadline.\" No finalized rule is published, so no AI-usage mandate is recorded.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "up-page-limit",
+      "question": "What are the CVPR 2027 page limit, template and anonymization requirements?",
+      "reason": "The CVPR 2027 CFP does not state a page limit, template or anonymization rule, and the CVPR 2027 AuthorGuidelines URL returned HTTP 404 on 2026-10-10. Publishing a number from another CVPR year would inherit a superseded rule."
+    },
+    {
+      "id": "up-dual-submission-details",
+      "question": "What are the complete CVPR 2027 dual-submission and prior-work guidelines?",
+      "reason": "The CFP defers to the Author Guidelines (\"For complete dual submission guidelines and prior work policies, see the Author Guidelines on the conference website\"), which are not yet published.",
+      "source_id": "cvpr-2027-main-cfp"
+    },
+    {
+      "id": "up-contribution-types",
+      "question": "Does CVPR 2027 publish an official contribution-type taxonomy?",
+      "reason": "No contribution-type taxonomy appears in the retrieved CVPR 2027 CFP or dates page; the profile therefore records an explicit UNKNOWN contribution type rather than inventing categories."
+    }
+  ]
+}

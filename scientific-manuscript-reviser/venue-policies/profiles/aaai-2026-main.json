@@ -1,0 +1,323 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "AAAI",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "aaai-2026-main-technical-track-call",
+      "url": "https://aaai.org/conference/aaai/aaai-26/main-technical-track-call/",
+      "source_type": "call_for_papers",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:853ef624b1cb4c329f81837b8297d5427cc203e9c11f3acd4875efd2e9dbe91c",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "aaai-2026-submission-instructions",
+      "url": "https://aaai.org/conference/aaai/aaai-26/submission-instructions/",
+      "source_type": "submission_requirements",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:431a7c62351aa8073c37ce57f4467e08726a274ada388b0e7cdab82027d852c4",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "aaai-2026-review-process",
+      "url": "https://aaai.org/conference/aaai/aaai-26/review-process/",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:99193bf7fb41ed930047a205bd78e7deff6f760e58d12cf4f043f3655a915b90",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-theoretical",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "theoretical",
+      "scope": "Contribution that is theoretical in nature.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CT-methodological",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "methodological",
+      "scope": "Contribution that is methodological in nature.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CT-algorithmic",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "algorithmic",
+      "scope": "Contribution that is algorithmic in nature.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CT-empirical",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "empirical",
+      "scope": "Contribution that is empirical in nature.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CT-integrative",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "integrative",
+      "scope": "Contribution connecting ideas and methods across disparate subfields of AI.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CT-critical",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "critical",
+      "scope": "Principled analyses and arguments that draw attention to problematic goals, assumptions or approaches.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-contribution-fit",
+      "name": "Contribution Categories",
+      "dimension": "contribution_fit",
+      "official_explanation": "AAAI recognizes several kinds of contribution and reviews each accordingly.",
+      "quote": "The contributions may be theoretical, methodological, algorithmic, empirical, integrative (connecting ideas and methods across disparate subfields of AI), or critical (e.g., principled analyses and arguments that draw attention to problematic choice of goals, assumptions, or approaches).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-significance",
+      "name": "Significance and Novelty",
+      "dimension": "significance",
+      "official_explanation": "Scored for the significance and novelty of the contributions.",
+      "quote": "All submissions will be evaluated and scored for the significance and novelty of the contributions (research problems or questions addressed, methods, experiments, analyses), theoretical and/or empirical soundness of the claims, their relevance to the AAAI community, and clarity of exposition.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-soundness",
+      "name": "Soundness",
+      "dimension": "soundness",
+      "official_explanation": "Theoretical and/or empirical soundness of the claims is scored.",
+      "quote": "theoretical and/or empirical soundness of the claims",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-substance",
+      "name": "Substantiveness",
+      "dimension": "scope_fit",
+      "official_explanation": "Reviewers assess whether contributions are substantive enough to warrant AAAI publication.",
+      "quote": "All submissions will be rigorously evaluated by expert reviewers to assess whether the contributions of the paper are substantive enough to warrant publication in AAAI.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Responsible Research and Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "Responsible research practices and steps to ensure reproducibility are additional considerations.",
+      "quote": "Additional considerations include adherence to responsible research practices (e.g., with respect to human subject studies, use of sensitive data, as well as data and algorithmic bias), and of steps to ensure reproducibility of research results (e.g., by providing detailed proofs, documenting experiments, sharing data, and sharing code).",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-ethics",
+      "name": "Responsible Research Practices",
+      "dimension": "other",
+      "official_explanation": "Adherence to responsible research practices is an additional evaluation consideration.",
+      "quote": "adherence to responsible research practices",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-experimental",
+      "name": "Experimental Adequacy",
+      "dimension": "experimental_adequacy",
+      "official_explanation": "Methods, experiments and analyses are part of the scored assessment.",
+      "quote": "methods, experiments, analyses",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Format Compliance",
+      "dimension": "compliance",
+      "official_explanation": "Papers must use AAAI two-column camera-ready style and follow submission rules.",
+      "quote": "Papers must be formatted in AAAI two-column, camera-ready style",
+      "source_id": "aaai-2026-submission-instructions"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "Submissions are anonymous and must follow the double-blind instructions.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "AAAI submissions are anonymous and must conform to the instructions (detailed below) for double-blind review.",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "Technical content is limited to seven pages, with references on additional pages.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions may consist of up to 7 pages of technical content plus additional pages solely for references.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "MP-checklist",
+      "topic": "reproducibility",
+      "statement": "All authors must complete a reproducibility checklist.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All authors must complete a reproducibility checklist to facilitate replication of the reported research.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "MP-review-availability",
+      "topic": "review_process",
+      "statement": "All authors are expected to be available to review, and failing that may face sanctions including rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "All authors are expected to be available to review (light load), unless extenuating circumstances apply. Failure to meet this expectation may result in sanctions such as paper rejection.",
+      "source_id": "aaai-2026-main-technical-track-call",
+      "conditions": "Unless extenuating circumstances apply."
+    },
+    {
+      "id": "MP-llm-text",
+      "topic": "ai_use_disclosure",
+      "statement": "LLM-generated text is prohibited unless it is part of the paper’s experimental analysis; LLMs cannot be authors or citable sources.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "Papers that include text generated from a large-scale language model (LLM) such as ChatGPT are prohibited unless the produced text is presented as a part of the paper",
+      "source_id": "aaai-2026-main-technical-track-call",
+      "conditions": "Permitted when the generated text is presented as part of the experimental analysis; editing/polishing author-written text is not prohibited."
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-ai-judicious",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors may judiciously use generative AI tools in preparing manuscripts while remaining fully responsible.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors may judiciously use generative AI tools, such as large language models and image generators, in preparing their scholarly manuscripts.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RP-open-artifacts",
+      "topic": "code_release",
+      "statement": "Papers releasing open datasets, reproducible code or evaluation tools are especially encouraged.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "papers that release open datasets, reproducible code, or practical evaluation tools are especially encouraged.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "RP-best-work",
+      "topic": "review_process",
+      "statement": "Authors are strongly encouraged to submit only their very best work.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Prospective authors are therefore strongly encouraged to submit only their very best work to AAAI.",
+      "source_id": "aaai-2026-main-technical-track-call"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Technical content is at most seven pages, plus references-only pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No author or affiliation information in the submission.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "CC-template",
+      "requirement": "Submission uses AAAI two-column camera-ready style and the author kit.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "CC-checklist",
+      "requirement": "Reproducibility checklist appears after the references in the PDF.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "CC-submission-cap",
+      "requirement": "No author exceeds the 10-submission technical-track cap.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "aaai-2026-submission-instructions"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No archival submission under parallel review elsewhere.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "aaai-2026-submission-instructions"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-phase1-reviewers",
+      "change": "AAAI-26 allocates three reviewers to every paper in Phase 1, whereas AAAI-25 allocated two.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "aaai-2026-review-process"
+    },
+    {
+      "id": "CH-ai-review",
+      "change": "AAAI-26 adds an AI-generated supplementary first-stage review alongside the human reviews.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "aaai-2026-main-technical-track-call"
+    },
+    {
+      "id": "CH-checklist-page-allowance",
+      "change": "AAAI-26 explicitly allows additional pages beyond references for the reproducibility checklist.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "aaai-2026-submission-instructions"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-deadline-conflict",
+      "question": "What is the AAAI-26 full-paper submission deadline?",
+      "reason": "The main-track CFP and submission instructions say August 1, 2025, while the review-process page says August 4, 2025; the captured official pages conflict.",
+      "source_id": null
+    },
+    {
+      "id": "UN-supp-anonymity",
+      "question": "Must AAAI-26 supplementary material be anonymized?",
+      "reason": "The captured 2026 sources require anonymous submissions but do not explicitly extend the requirement to supplementary material.",
+      "source_id": null
+    },
+    {
+      "id": "UN-ai-review-detail",
+      "question": "What exactly do the AAAI-26 AI-generated reviews contain and how are they used?",
+      "reason": "The CFP describes them as supplementary and non-decisional; the FAQ PDF detailing the pilot was not captured.",
+      "source_id": null
+    }
+  ]
+}

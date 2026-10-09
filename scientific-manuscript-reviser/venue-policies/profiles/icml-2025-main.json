@@ -1,0 +1,259 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ICML",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "icml-2025-call-for-papers",
+      "url": "https://icml.cc/Conferences/2025/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:1b47cbc7d5b49964faddd660c7e16705faa71c0edef9aa046a2d86978eeb31c6",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "icml-2025-reviewer-instructions",
+      "url": "https://icml.cc/Conferences/2025/ReviewerInstructions",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:c78d3dc71baa0804240eb80fc121741479747ee3e6647887b85fe425b91a7673",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN: no contribution-type taxonomy published for the ICML 2025 main track",
+      "scope": "The main track publishes no contribution categories; position papers form a separate submission type.",
+      "quote": "Similar to last year, we also invite submissions of position papers.",
+      "source_id": "icml-2025-call-for-papers"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-claims",
+      "name": "Claims and Evidence",
+      "dimension": "soundness",
+      "official_explanation": "Are the paper’s claims supported by clear and convincing evidence, sound methods and correct proofs?",
+      "quote": "Are the claims made in the submission supported by clear and convincing evidence?",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RC-prior-work",
+      "name": "Relation to Prior Works",
+      "dimension": "contribution_fit",
+      "official_explanation": "How the key contributions relate to the broader scientific literature and whether essential related work is cited.",
+      "quote": "How are the key contributions of the paper related to the broader scientific literature?",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RC-originality",
+      "name": "Originality",
+      "dimension": "originality",
+      "official_explanation": "Originality may arise from creative combinations, removing restrictive assumptions, or real-world application.",
+      "quote": "originality may arise from creative combinations of existing ideas, removing restrictive assumptions from prior theoretical results, or application to a real-world use case",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RC-significance",
+      "name": "Significance",
+      "dimension": "significance",
+      "official_explanation": "The work must be of significant interest to the machine learning community.",
+      "quote": "Submissions should report original and rigorous research of significant interest to the machine learning community.",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "Claims must be supported by reproducible experiments or sound theoretical analysis.",
+      "quote": "All claims must be clearly stated and supported by reproducible experiments and/or sound theoretical analysis.",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "RC-ethics",
+      "name": "Ethical Issues",
+      "dimension": "other",
+      "official_explanation": "Reviewers flag papers with ethical issues for ethics review.",
+      "quote": "If you believe there are ethical issues with this paper, please flag the paper for an ethics review.",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Submission Compliance",
+      "dimension": "compliance",
+      "official_explanation": "Papers not conforming to ICML submission policies are rejected without review.",
+      "quote": "Submitted papers that do not conform to these policies will be rejected without review.",
+      "source_id": "icml-2025-call-for-papers"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-attendance",
+      "topic": "other",
+      "statement": "At least one author of an accepted paper must attend in person to present it, barring exceptional circumstances.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "CONDITIONAL",
+      "quote": "We require that, barring exceptional circumstances, at least one of the authors of accepted papers attend the conference in person to present the paper .",
+      "source_id": "icml-2025-call-for-papers",
+      "conditions": "Exceptional circumstances may excuse in-person attendance."
+    },
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "The main paper is limited to eight pages, with unlimited references, impact statement and appendices.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "8 pages for the main paper, with unlimited pages for references, the impact statement, and appendices.",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "All submissions must be anonymized and must not violate double-blind reviewing.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All submissions must be anonymized and may not contain any information with the intention or consequence of violating the double-blind reviewing policy.",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "MP-reciprocal",
+      "topic": "review_process",
+      "statement": "Qualified authors are required to review for ICML.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Qualified authors are required to review for ICML, according to the policies below.",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "MP-impact-statement",
+      "topic": "ethics",
+      "statement": "Authors must include a broader-impact statement covering ethical aspects and societal consequences.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors are required to include a statement of the potential broader impact of their work, including its ethical aspects and future societal consequences.",
+      "source_id": "icml-2025-call-for-papers"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-open-minded",
+      "topic": "review_process",
+      "statement": "Reviewers are encouraged to be open-minded about potential strengths when assessing originality.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage you to be open-minded in terms of potential strengths.",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RP-questions",
+      "topic": "review_process",
+      "statement": "Reviewers should reserve questions for cases that would change their evaluation.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Please reserve your questions for cases where the response would likely change your evaluation",
+      "source_id": "icml-2025-reviewer-instructions"
+    },
+    {
+      "id": "RP-ai-explain",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors are encouraged to explain notable ways generative-AI tools were used in their research methodology.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage authors to explain any notable ways in which these tools were used in their research methodology.",
+      "source_id": "icml-2025-call-for-papers"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Main body is at most eight pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CC-conformance",
+      "requirement": "Submission conforms to ICML author policies and style files.",
+      "mechanically_checkable": true,
+      "check_kind": "structure",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No author-identifying information anywhere.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CC-impact-statement",
+      "requirement": "A separate broader-impact section is present.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No identical or substantially similar work under parallel review.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CC-ethics",
+      "requirement": "No unaddressed ethical issues in the submission.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "icml-2025-reviewer-instructions"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-reciprocal",
+      "change": "ICML 2025 newly requires qualified authors to serve as reviewers, including a per-submission designation and a per-author requirement.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CH-lay-summary",
+      "change": "ICML 2025 newly requires accepted papers to supply a lay (plain-language) summary at camera-ready.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2025-call-for-papers"
+    },
+    {
+      "id": "CH-vs-2024",
+      "change": "Material changes relative to ICML 2024 could not be established.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-vs-2024",
+      "question": "What changed between ICML 2024 and ICML 2025?",
+      "reason": "No ICML 2024 source is cited by this profile, and no prior-year rule may be borrowed.",
+      "source_id": null
+    },
+    {
+      "id": "UN-llm-policy",
+      "question": "What were the detailed ICML 2025 rules on generative-AI use?",
+      "reason": "The 2025 CFP states only that AI is allowed, that authors are responsible for content, and that LLMs cannot be authors; no separate 2025 LLM policy page was captured.",
+      "source_id": null
+    }
+  ]
+}

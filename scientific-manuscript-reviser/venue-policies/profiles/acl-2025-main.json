@@ -1,0 +1,259 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ACL",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "acl-2025-main-cfp",
+      "url": "https://2025.aclweb.org/calls/main_conference_papers/",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:8cba6bb70557b6d1566adae72eb4bff39d43b219463014f17830adacc7b13ce0",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "acl-2025-home",
+      "url": "https://2025.aclweb.org/",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a1d107558eed7eeec77c98574038eab7393140120d77b25d0e0961d2a8165b51",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "acl-2025-ct-papers",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Long and short research papers",
+      "scope": "Main conference, long and short papers",
+      "quote": "long and short papers featuring substantial, original, and unpublished research",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-ct-diverse",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Negative findings, surveys, resources, position papers, reproduction studies",
+      "scope": "Main conference contributions beyond traditional research results",
+      "quote": "papers may contribute negative findings, survey an area, announce the creation of a new resource, argue a position, report novel linguistic insights derived using existing computational techniques, and reproduce, or fail to reproduce, previous results",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-ct-theme",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Theme track: Generalization of NLP Models",
+      "scope": "ACL 2025 special theme track, long or short papers",
+      "quote": "The theme track submissions can be either long or short.",
+      "source_id": "acl-2025-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "acl-2025-rc-scope",
+      "name": "Scope covers all aspects of CL and NLP",
+      "dimension": "scope_fit",
+      "official_explanation": "The call states the conference scope for submitted work.",
+      "quote": "invites the submission of long and short papers featuring substantial, original, and unpublished research in all aspects of Computational Linguistics and Natural Language Processing",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rc-originality",
+      "name": "Substantial, original, unpublished research",
+      "dimension": "originality",
+      "official_explanation": "Originality and non-publication are stated conditions of a submission.",
+      "quote": "long and short papers featuring substantial, original, and unpublished research",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rc-contribution",
+      "name": "Several contribution shapes are in scope",
+      "dimension": "contribution_fit",
+      "official_explanation": "The call lists non-standard contribution shapes that are explicitly in scope.",
+      "quote": "papers may contribute negative findings, survey an area, announce the creation of a new resource, argue a position, report novel linguistic insights derived using existing computational techniques, and reproduce, or fail to reproduce, previous results",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rc-transparency",
+      "name": "Two-way anonymized, double-blind review",
+      "dimension": "transparency",
+      "official_explanation": "The review process is stated to be double-blind on the ARR side.",
+      "quote": "The reviewing process will continue to be double-blind. Reviewers will not see authors, nor will authors see reviewers, and reviews on ARR will not be made publicly visible.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rc-compliance",
+      "name": "Accepted papers must be presented",
+      "dimension": "compliance",
+      "official_explanation": "Presentation is a condition for appearing in the proceedings.",
+      "quote": "All accepted papers must be presented at the conference to appear in the proceedings.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rc-process",
+      "name": "Two-stage review: ARR review then conference decision",
+      "dimension": "other",
+      "official_explanation": "Review is delegated to ARR; acceptance decisions are made at the conference.",
+      "quote": "Authors submit articles to ARR, where submissions receive reviews and meta-reviews from ARR reviewers and action editors;",
+      "source_id": "acl-2025-main-cfp"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "acl-2025-mp-two-stage",
+      "topic": "review_process",
+      "statement": "ACL 2025 reviews submissions through ACL Rolling Review; the conference makes the final decisions.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "ACL 2025 will use ACL Rolling Review (ARR) as a reviewing system, but final decisions will be made by the conference.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-mp-arr-requirements",
+      "topic": "page_limit",
+      "statement": "Long and short submissions must follow all ARR submission requirements, including 8-page long and 4-page short limits, two-way anonymization, the ethics checklist and a Limitations section.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Both long and short paper submissions should follow all of the ARR submission requirements , including: Long Papers (8 pages) and Short Papers (4 pages) Instructions for Two-Way Anonymized Review Authorship Citation and Comparison Multiple Submission Policy , Resubmission Policy , and Withdrawal Policy Ethics Policy including the responsible NLP research checklist Limitations Paper Submission and Templates Optional Supplementary Materials",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-mp-reviewing-workload",
+      "topic": "review_process",
+      "statement": "At ARR submission, authors must specify which co-authors commit to covering reviewing in the cycle.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "During the ARR submission process, authors will be required to specify which co-authors are committing to cover reviewing in this reviewing cycle.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-mp-presentation",
+      "topic": "other",
+      "statement": "Accepted papers must be presented at the conference to appear in the proceedings.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All accepted papers must be presented at the conference to appear in the proceedings.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-mp-aoe",
+      "topic": "other",
+      "statement": "All ACL 2025 deadlines are at 11:59PM UTC-12:00, anywhere on Earth.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Note: All deadlines are at 11:59PM UTC-12:00 (“anywhere on Earth”).",
+      "source_id": "acl-2025-main-cfp"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "acl-2025-rp-theme",
+      "topic": "other",
+      "statement": "The theme track invited empirical and theoretical research and position and survey papers on the Generalization of NLP Models.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "The theme track invites empirical and theoretical research and position and survey papers reflecting on the Generalization of NLP Models.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rp-anonymity-period",
+      "topic": "anonymity",
+      "statement": "There is no anonymity period requirement; per the ACL and ARR policies authors may post or discuss non-anonymous preprints while under review.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Following the ACL and ARR policies , there is no anonymity period requirement.",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-rp-commit-flex",
+      "topic": "review_process",
+      "statement": "Committing to ACL 2025 is optional regardless of the preferred venue declared at ARR submission.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors who selected ACL 2025 as a preferred venue when submitting to ARR may choose not to commit to ACL 2025 after receiving their reviews, and authors who selected a preferred venue other than ACL 2025 when submitting to ARR are still welcome to commit to ACL 2025.",
+      "source_id": "acl-2025-main-cfp"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "acl-2025-cc-structure",
+      "requirement": "Submission follows the ARR submission requirements, which include a Limitations section and the responsible NLP research checklist.",
+      "mechanically_checkable": true,
+      "check_kind": "structure",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-cc-page-limit",
+      "requirement": "Long paper content is at most 8 pages; short paper content is at most 4 pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-cc-anonymization",
+      "requirement": "Two-way anonymized review: no author names or affiliations.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-cc-declaration",
+      "requirement": "Ethics policy and responsible NLP research checklist submitted as required by the ARR submission requirements.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-cc-needs-review",
+      "requirement": "Confirm the submitted paper matches the current ARR submission requirements that the ACL 2025 call incorporates by reference.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "acl-2025-main-cfp"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "acl-2025-ch-theme",
+      "change": "ACL 2025 announces a new special theme track: “Generalization of NLP Models”.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "acl-2025-main-cfp"
+    },
+    {
+      "id": "acl-2025-ch-prior",
+      "change": "Policy differences between ACL 2024 and ACL 2025 are not asserted; no ACL 2024 document was retrieved and rules are not inherited across years.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "acl-2025-up-arr-rules",
+      "question": "Which ARR rules were mandatory for an ACL 2025 submission?",
+      "reason": "The ACL 2025 call incorporates the ARR submission requirements by reference instead of restating them; those rules belong to the ARR profiles for the cycle concerned and are not reproduced here as ACL mandatory policy.",
+      "source_id": null
+    },
+    {
+      "id": "acl-2025-up-findings",
+      "question": "Is there a separate ACL 2025 Findings policy?",
+      "reason": "The call states that papers not selected for the main conference will automatically be considered for Findings, but no separate Findings policy page was retrieved.",
+      "source_id": null
+    },
+    {
+      "id": "acl-2025-up-current",
+      "question": "Does this profile still describe current practice?",
+      "reason": "ACL 2025 is a past edition; the profile records only what the 2025 documents govern and must not be inherited by later editions.",
+      "source_id": null
+    }
+  ]
+}

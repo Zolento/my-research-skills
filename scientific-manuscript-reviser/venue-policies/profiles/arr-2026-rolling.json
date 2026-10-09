@@ -1,0 +1,297 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ARR",
+  "year": 2026,
+  "track": "rolling",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "arr-2026-cfp",
+      "url": "https://aclrollingreview.org/cfp",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a54aaa4d3954484bd4c479b0445c016ea9128ced8c1d6f485abe56788bd08ec6",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "arr-2026-authors",
+      "url": "https://aclrollingreview.org/authors",
+      "source_type": "author_guidelines",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:832899623a97b308be263069439811d98bbce1e80e479ef3e4a863c75b6512f1",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "arr-2026-reviewers",
+      "url": "https://aclrollingreview.org/reviewerguidelines",
+      "source_type": "reviewer_guidelines",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:d265ced7e9c1f388c51247c7883792199e6188843267e2ef8a74121ee7979efa",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "arr-2026-dates",
+      "url": "https://aclrollingreview.org/dates",
+      "source_type": "submission_requirements",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:7e66a0b50f475e38197c64a281582d8c1af1b39ed8572e87dbb60c53421c1a9c",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "arr-2026-ct-resource",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Data resources",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Data resources Data analysis Model analysis & interpretability",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-ct-reproduction",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Reproduction study",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Position papers Reproduction study",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-ct-software",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Publicly available software and/or pre-trained models",
+      "scope": "Contribution type selectable at ARR submission",
+      "quote": "Publicly available software and/or pre-trained models",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "arr-2026-rc-scope",
+      "name": "Substantial contribution to language processing",
+      "dimension": "scope_fit",
+      "official_explanation": "ARR papers are held to *CL main-conference standards, not generic ML standards.",
+      "quote": "the submissions are expected to make a substantial contribution to computational processing of human language",
+      "source_id": "arr-2026-authors"
+    },
+    {
+      "id": "arr-2026-rc-soundness",
+      "name": "Technically sound and appropriately scoped",
+      "dimension": "soundness",
+      "official_explanation": "Soundness and scope are stated as the minimum bar for published research.",
+      "quote": "Above all else, published research should at least be technically sound and appropriately scoped.",
+      "source_id": "arr-2026-reviewers"
+    },
+    {
+      "id": "arr-2026-rc-originality",
+      "name": "Novelty claims must be backed by references",
+      "dimension": "originality",
+      "official_explanation": "A reviewer alleging lack of novelty must supply a reference.",
+      "quote": "If the paper claims e.g. a novel method, and you think you've seen this before - you need to provide a reference",
+      "source_id": "arr-2026-reviewers"
+    },
+    {
+      "id": "arr-2026-rc-experimental",
+      "name": "Sufficient evidence for the claim made",
+      "dimension": "experimental_adequacy",
+      "official_explanation": "Extra experiments are not required beyond what the claim needs.",
+      "quote": "a paper only needs to present sufficient evidence for the claim that the authors are making",
+      "source_id": "arr-2026-reviewers"
+    },
+    {
+      "id": "arr-2026-rc-theoretical",
+      "name": "Complete assumptions and proofs",
+      "dimension": "theoretical_adequacy",
+      "official_explanation": "Formal contributions must state assumptions and carry complete proofs.",
+      "quote": "All assumptions should be clearly stated. If the paper contributes formal statements (theorems, propositions, lemmas, corollaries), they should be supported by complete and correct proofs.",
+      "source_id": "arr-2026-reviewers"
+    },
+    {
+      "id": "arr-2026-rc-reproducibility",
+      "name": "Enough detail to reproduce experiments",
+      "dimension": "reproducibility",
+      "official_explanation": "Reviewers assess whether details and code suffice for reproducibility.",
+      "quote": "Are there enough details to reproduce the experiments, including hyperparameter selection?",
+      "source_id": "arr-2026-reviewers"
+    },
+    {
+      "id": "arr-2026-rc-contribution",
+      "name": "Many kinds of contribution are in scope",
+      "dimension": "contribution_fit",
+      "official_explanation": "The reviewer guidelines reject methodology-preference heuristics.",
+      "quote": "NLP is an interdisciplinary field, relying on many kinds of contributions: models, resource, survey, data/linguistic/social analysis, position, and theory.",
+      "source_id": "arr-2026-reviewers"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "arr-2026-mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Long papers may use up to 8 content pages and short papers up to 4; exceeding the length requirements or omitting the Limitations section is desk rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Submissions that exceed the length requirements, or are missing a limitations section, will be desk rejected.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-mp-limitations",
+      "topic": "other",
+      "statement": "A dedicated Limitations section is required in both long and short papers.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors are required to discuss the limitations of their work in a dedicated section titled “Limitations”.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "ARR precludes multiple submissions; a paper under review elsewhere cannot be submitted and an ARR submission cannot go elsewhere during review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "ARR precludes multiple submissions. ARR will not consider any paper that is under review in a journal or another conference at the time of submission, and submitted papers must not be submitted elsewhere during the ARR review period.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-mp-anonymity",
+      "topic": "anonymity",
+      "statement": "Papers must not include authors’ names and affiliations.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers must not include authors’ names and affiliations.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-mp-ai-disclosure",
+      "topic": "ai_use_disclosure",
+      "statement": "Generative AI use for writing or coding, and its scope, must be disclosed in the Responsible NLP Checklist.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Their use for writing or coding, as well as its scope, must be disclosed in the Responsible NLP Checklist.",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "arr-2026-rp-supplementary",
+      "topic": "supplementary",
+      "statement": "ARR encourages supplementary appendices, software and data for reproducibility.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "ARR encourages the submission of these supplementary materials to improve the reproducibility of results and to enable authors to provide additional information that does not fit in the paper.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-rp-revision-map",
+      "topic": "author_response",
+      "statement": "Authors are recommended to locate revisions by section and line numbers.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "It is recommended to refer to the location of revisions using section and line numbers.",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-rp-review-tone",
+      "topic": "review_process",
+      "statement": "Reviews should be professional and neutral, if not kind.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Above all, a good review should be professional and neutral, if not kind.",
+      "source_id": "arr-2026-reviewers"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "arr-2026-cc-limitations",
+      "requirement": "Dedicated Limitations section present before the references in both long and short papers.",
+      "mechanically_checkable": true,
+      "check_kind": "structure",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-cc-page-limit",
+      "requirement": "Long papers at most 8 content pages; short papers at most 4 content pages, excluding limitations, ethics and references.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-cc-anonymization",
+      "requirement": "No author names or affiliations; self-references do not reveal identity; supplementary material anonymized.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-cc-declaration",
+      "requirement": "Generative AI writing/coding use disclosed in the Responsible NLP Checklist.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-cc-needs-review",
+      "requirement": "Confirm the paper is not under review elsewhere and is not an undisclosed resubmission.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "arr-2026-cfp"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "arr-2026-ch-sustainable",
+      "change": "ACL adopted a sustainable reviewing policy that applies from October 2026: review is capped to capacity, submissions need a qualified service contributor, and author and first-author submission caps apply.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "arr-2026-cfp"
+    },
+    {
+      "id": "arr-2026-ch-cycles",
+      "change": "ARR moved from 8-week to 10-week cycles beginning with the May 2025 cycle and now runs about five cycles per year.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "arr-2026-dates"
+    },
+    {
+      "id": "arr-2026-ch-guidelines-pending",
+      "change": "The ARR author and reviewer guidelines state they will be updated after the August 2026 cycle to match the sustainable reviewing policy.",
+      "status": "PENDING",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "arr-2026-up-cycle-mapping",
+      "question": "Which named ARR cycle does the standing call for papers text govern?",
+      "reason": "ARR is a rolling venue and its call for papers is a standing document that does not map its rules to one named cycle. The October 2026 cycle is recorded in a separate profile; per-cycle dates are not inferred from the standing text.",
+      "source_id": null
+    },
+    {
+      "id": "arr-2026-up-reviewer-currency",
+      "question": "Do the posted reviewer guidelines still govern the October 2026 cycle?",
+      "reason": "The reviewer guidelines page states that the current version applies until the August 2026 review cycle and will be updated afterwards to match the sustainable reviewing policy. Retrieved 2026-10-10, the page does not confirm whether the posted text is already the updated version.",
+      "source_id": null
+    },
+    {
+      "id": "arr-2026-up-guidelines-currency",
+      "question": "Do the posted author guidelines reflect the October 2026 sustainable reviewing policy?",
+      "reason": "The author guidelines page carries the same notice as the reviewer guidelines: the text will be updated after the August 2026 cycle. The CFP has already been updated, but the guidelines pages have not been confirmed as updated.",
+      "source_id": null
+    },
+    {
+      "id": "arr-2026-up-lottery",
+      "question": "How does the review lottery select submissions without a guaranteed service contributor?",
+      "reason": "The call states such submissions will be considered via a lottery and may be desk rejected, but does not state lottery timing, odds or ordering.",
+      "source_id": null
+    }
+  ]
+}

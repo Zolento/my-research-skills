@@ -1,0 +1,274 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "CVPR",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "cvpr-2026-main-cfp",
+      "url": "https://cvpr.thecvf.com/Conferences/2026/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:3be809bdb533fc5de1df1b62322a7018eaf0945844843ac968ccd61358e6d8c5",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "cvpr-2026-author-guidelines",
+      "url": "https://cvpr.thecvf.com/Conferences/2026/AuthorGuidelines",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:7eba936867b9f606c40814a785b7fd5fc0a9f2209c9cafb10ea9a27009d94396",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "cvpr-2026-reviewer-guidelines",
+      "url": "https://cvpr.thecvf.com/Conferences/2026/ReviewerGuidelines",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:78d046cf3123274b7383a1f7f9aedb7a3f0ff7422b0d3d9295fc52a2c43aa099",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN",
+      "scope": "CVPR 2026 publishes no official contribution-type taxonomy; the CFP and reviewer guidelines define no labelled categories.",
+      "quote": "Papers in the main technical program must describe high-quality, original research.",
+      "source_id": "cvpr-2026-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-soundness",
+      "name": "Technical soundness",
+      "dimension": "soundness",
+      "official_explanation": "Reviewers must judge whether the accepted paper is technically sound.",
+      "quote": "Each paper that is accepted should be technically sound and make a contribution to the field.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-originality",
+      "name": "Novelty and brave concepts",
+      "dimension": "originality",
+      "official_explanation": "Reviewers are told to embrace novel concepts even without broad benchmarking.",
+      "quote": "We recommend that you embrace novel, brave concepts, even if they have not been tested on many datasets.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-significance",
+      "name": "Potential impact alongside performance",
+      "dimension": "significance",
+      "official_explanation": "Novelty and potential impact are weighed together with reported performance, not benchmark position alone.",
+      "quote": "Rather, it is important to weigh both the novelty and potential impact of the work alongside the reported performance.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-scope",
+      "name": "Fit to CVPR subject areas",
+      "dimension": "scope_fit",
+      "official_explanation": "A paper judged out of scope must be explained and redirected to better-matched venues.",
+      "quote": "If you think the paper is out of scope for CVPR's subject areas, clearly explain why in the review.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-reproducibility",
+      "name": "Reproducibility and code",
+      "dimension": "reproducibility",
+      "official_explanation": "Code submission is encouraged; reviewers may optionally check it but must keep it confidential.",
+      "quote": "To improve reproducibility in AI research, we highly encourage authors to voluntarily submit their code as part of supplementary material, especially if they plan to release it upon acceptance.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-transparency",
+      "name": "Honest discussion of limitations",
+      "dimension": "transparency",
+      "official_explanation": "An honest limitations discussion is weighed positively and cannot be the sole rejection factor.",
+      "quote": "authors are encouraged to explicitly and honestly discuss limitations.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-ethics",
+      "name": "Personal data and human subjects",
+      "dimension": "compliance",
+      "official_explanation": "Papers using personal or human-subject data must document ethics clearance or the ethical principles followed.",
+      "quote": "the authors must have an ethics clearance from an institutional review board (IRB, or equivalent) or clearly describe that ethical principles have been followed.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Papers are limited to eight pages including figures and tables; reference-only pages are additional.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers are limited to eight pages, including figures and tables, in the CVPR style.",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "mp-format-anonymity",
+      "topic": "anonymity",
+      "statement": "Papers must be anonymized, use the official template and stay within eight pages or they are rejected without review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers that are not properly anonymized, or do not use the template, or have more than eight pages (excluding references) will be rejected without review.",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "mp-double-blind",
+      "topic": "anonymity",
+      "statement": "CVPR 2026 reviewing is double blind; authors must not be inferable from the submission or additional material.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "CVPR reviewing is double blind, in that authors do not know the names of the area chairs or reviewers for their papers, and the area chairs/reviewers cannot, beyond a reasonable doubt, infer the names of the authors from the submission and the additional material.",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "No publication with 20 percent or more overlap may be registered or submitted elsewhere during the review period.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "no publication substantially similar in content (defined as having 20 percent or more overlap) has been or will be registered or submitted to this or another conference, workshop, or journal during the review period.",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "mp-llm-author-responsibility",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors may use any tools but are fully responsible for misrepresentation, factual inaccuracy or plagiarism.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors may use any tools they find productive in preparing a paper, but must be aware that they are responsible for any misrepresentation, factual inaccuracy, or plagiarism in their paper.",
+      "source_id": "cvpr-2026-author-guidelines"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-code-release",
+      "topic": "code_release",
+      "statement": "Uploading code as supplementary material is encouraged but not required to help reviewers assess quality.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage (but do not require) authors to upload their code as part of their supplementary material in order to help reviewers assess the quality of the work.",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "rp-negative-impact",
+      "topic": "ethics",
+      "statement": "Authors are encouraged to discuss potential negative societal impact; omission is not a formal violation.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors are encouraged to include a discussion on potential negative societal impact.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rp-limitations",
+      "topic": "other",
+      "statement": "An explicit and honest limitations discussion is encouraged and weighed positively.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "authors are encouraged to explicitly and honestly discuss limitations.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rp-existing-data-consent",
+      "topic": "data_availability",
+      "statement": "For existing public datasets, checking collection and consent is encouraged but not required.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "If the authors use an existing, published dataset, we encourage (but do not require) them to check how data was collected and whether consent was obtained.",
+      "source_id": "cvpr-2026-author-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-anonymization",
+      "requirement": "Submission is anonymized, including acknowledgments, supplementary material and links.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "cc-page-limit",
+      "requirement": "Main paper is at most eight pages excluding reference-only pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "cc-template",
+      "requirement": "The official CVPR 2026 template is used without margin or spacing manipulation.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "cc-dual-submission",
+      "requirement": "No paper with 20 percent or more overlap is registered or submitted elsewhere during review.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2026-author-guidelines"
+    },
+    {
+      "id": "cc-llm-citations",
+      "requirement": "No fabricated citations or obvious factual inaccuracies; reviewers check and may desk-reject.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2026-author-guidelines"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-responsible-reviewing",
+      "change": "CVPR 2026 reviewer guidelines add a Responsible Reviewing Policy defining highly irresponsible reviewing and an oversight process.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "ch-review-deadline",
+      "change": "CVPR 2026 strictly enforces the reviewing deadline, with desk rejection of an author-reviewer's papers for late reviews; the CVPR 2025 reviewer guidelines contain no such policy.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    },
+    {
+      "id": "ch-prompt-injection",
+      "change": "CVPR 2026 author guidelines and reviewer guidelines explicitly prohibit hidden prompt-injection text in submissions.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "cvpr-2026-author-guidelines"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-contribution-types",
+      "question": "Does CVPR 2026 publish an official contribution-type taxonomy?",
+      "reason": "Neither the CFP nor the author or reviewer guidelines retrieved for CVPR 2026 define labelled contribution types; the profile records an explicit UNKNOWN type."
+    },
+    {
+      "id": "up-reproducibility-checklist",
+      "question": "Is a mandatory reproducibility checklist required for CVPR 2026 submissions?",
+      "reason": "The author and reviewer guidelines encourage code submission and describe what reproducibility information is valuable, but no mandatory checklist is stated in the retrieved documents."
+    },
+    {
+      "id": "up-ethics-metadata",
+      "question": "Is an ethics or broader-impact statement mandatory for CVPR 2026?",
+      "reason": "Reviewer guidelines state that a negative-societal-impact discussion is encouraged without a formal policy (\"We aim to raise awareness without introducing a formal policy (yet)\"), so no mandatory ethics statement is recorded.",
+      "source_id": "cvpr-2026-reviewer-guidelines"
+    }
+  ]
+}

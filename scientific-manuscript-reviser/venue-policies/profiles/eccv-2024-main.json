@@ -1,0 +1,241 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ECCV",
+  "year": 2024,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "eccv-2024-main-cfp",
+      "url": "https://eccv.ecva.net/Conferences/2024/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:ef92bfcf0056c80b2b1aedcbad7e6b54ddbf59744592bab883239ce7a587c334",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "eccv-2024-submission-policies",
+      "url": "https://eccv.ecva.net/Conferences/2024/SubmissionPolicies",
+      "source_type": "submission_requirements",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:6e5cda35cd69d61497867d85f7547736623b39ac732083ee9db55884d5fe3e71",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "eccv-2024-reviewer-guidelines",
+      "url": "https://eccv.ecva.net/Conferences/2024/ReviewerGuide",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:509bb8028c81ea85b261d6b85907ddda74283c843466d919ab08cacedaf1ca0f",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN",
+      "scope": "ECCV 2024 publishes no official contribution-type taxonomy; the Contribution Types mechanism first appears in ECCV 2026.",
+      "quote": "Papers in the main technical program must describe high-quality, original research.",
+      "source_id": "eccv-2024-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-soundness",
+      "name": "Technical soundness",
+      "dimension": "soundness",
+      "official_explanation": "Accepted papers should be technically sound and contribute to the field.",
+      "quote": "Each paper that is accepted should be technically sound and make a contribution to the field.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    },
+    {
+      "id": "rc-originality",
+      "name": "Novelty claims must be evidenced",
+      "dimension": "originality",
+      "official_explanation": "Claims that work has been done before must be supported by specific references.",
+      "quote": "Be specific about novelty. Claims in a review that the submitted work “has been done before” MUST be backed up with specific references and an explanation of how closely they are related.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    },
+    {
+      "id": "rc-significance",
+      "name": "Novelty and potential impact",
+      "dimension": "significance",
+      "official_explanation": "Novelty and impact are weighed together with reported performance.",
+      "quote": "Rather, it is important to weigh both the novelty and potential impact of the work alongside the reported performance.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    },
+    {
+      "id": "rc-scope",
+      "name": "Fit to ECCV subject areas",
+      "dimension": "scope_fit",
+      "official_explanation": "Out-of-scope papers must be explained and redirected.",
+      "quote": "If you think the paper is out of scope for ECCV's subject areas, clearly explain why in the review.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    },
+    {
+      "id": "rc-reviewer-conduct",
+      "name": "Reviewer confidentiality and LLM conduct",
+      "dimension": "compliance",
+      "official_explanation": "Allowing an LLM to see a submission is treated as a deliberate breach of referee confidentiality.",
+      "quote": "It is a significant act of referee misconduct to allow an LLM to see a submission.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Papers are limited to 14 pages including figures and tables in the Springer LNCS style, plus reference-only pages.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers are limited to 14 pages , including figures and tables, in the LNCS style of Springer.",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "mp-format-anonymity",
+      "topic": "anonymity",
+      "statement": "Non-anonymized, non-template or over-length papers may be rejected without review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers that are not properly anonymized, do not use the template, or have more than 14 pages (excluding references) may be rejected without review.",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "No substantially similar publication may be under submission elsewhere during the ECCV 2024 review period.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "no publication substantially similar in content has been or will be submitted to another conference, workshop, or journal during the review period.",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "mp-conflict-dblp",
+      "topic": "conflict_of_interest",
+      "statement": "Each author must register institutional conflicts and their DBLP ID in CMT; undeclared or incorrect conflicts may cause summary rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "each author is required to enter their DBLP ID into their CMT profile",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "mp-llm-author-responsibility",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors are responsible for the entire content of their paper, including misrepresentation, factual inaccuracy or plagiarism.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors may use any tools they find productive in preparing a paper, but must be aware that they are responsible for the entire content of their paper including any misrepresentation, factual inaccuracy, or plagiarism.",
+      "source_id": "eccv-2024-submission-policies"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-code-release",
+      "topic": "code_release",
+      "statement": "Code upload as supplementary material is encouraged but not required.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage (but do not require) authors to upload their code as part of their supplementary material in order to help reviewers assess the quality of the work.",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "rp-rebuttal-no-new-results",
+      "topic": "author_response",
+      "statement": "Authors should avoid introducing new contributions or experimental results in the rebuttal.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors should refrain from including new contributions or experimental results in the rebuttal, especially when not specifically requested to do so by the reviewers.",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "rp-llm-polish",
+      "topic": "ai_use_disclosure",
+      "statement": "Referees may use an LLM to polish review wording only if they never show it the submission and vouch for accuracy.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Referees may use any device, including a Large Language Model (LLM), to polish their review wording, but must vouch for, and be responsible for, the accuracy of the review.",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-anonymization",
+      "requirement": "Submission and supplementary material do not identify the authors.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "cc-page-limit",
+      "requirement": "Main paper is at most 14 pages excluding references.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "cc-template",
+      "requirement": "The ECCV 2024 template is used; older templates are not accepted.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "cc-conflicts-dblp",
+      "requirement": "All authors have registered institutional conflicts and DBLP IDs in CMT before the registration deadline.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "cc-dual-submission",
+      "requirement": "No substantially similar publication is under submission elsewhere during review.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "eccv-2024-submission-policies"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-new-template",
+      "change": "ECCV 2024 uses a new template: the Submission Policies state the template has changed since ECCV 2022 and that older templates must not be used.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "eccv-2024-submission-policies"
+    },
+    {
+      "id": "ch-llm-faq",
+      "change": "ECCV 2024 reviewer guidelines address LLM use in a dedicated FAQ, distinguishing polishing wording from showing a submission to an LLM.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "eccv-2024-reviewer-guidelines"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-2022-baseline",
+      "question": "Which ECCV 2024 rules are new relative to ECCV 2022?",
+      "reason": "No ECCV 2022 document was retrieved, so the year-over-year delta beyond the explicitly stated template change is not established."
+    },
+    {
+      "id": "up-contribution-types",
+      "question": "Does ECCV 2024 publish an official contribution-type taxonomy?",
+      "reason": "The ECCV 2024 CFP, submission policies and reviewer guidelines retrieved contain no contribution-type taxonomy; ECCV 2026 is the first retrieved edition that publishes one."
+    },
+    {
+      "id": "up-journal-tracks",
+      "question": "Does ECCV 2024 run a separate journal track?",
+      "reason": "The retrieved ECCV 2024 documents describe a single main technical program and no journal track; the track is recorded as \"main\"."
+    }
+  ]
+}

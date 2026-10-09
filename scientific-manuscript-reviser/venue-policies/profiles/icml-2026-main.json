@@ -1,0 +1,288 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "ICML",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "icml-2026-call-for-papers",
+      "url": "https://icml.cc/Conferences/2026/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:89efa3f7f1db4debf0d92e390d699dd35e1b66d4a3a73b0f159620596cbfe508",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "icml-2026-author-instructions",
+      "url": "https://icml.cc/Conferences/2026/AuthorInstructions",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:c6f1e89c3122a6fe077f2031ee6ae3d6774f4e9f7005a2c934e4a567350a6481",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "icml-2026-reviewer-instructions",
+      "url": "https://icml.cc/Conferences/2026/ReviewerInstructions",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:91432b0cfa998f1003b42dbaa00f4b1cb0175d0a6f81c894773217ec8829c413",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "icml-2026-llm-policy",
+      "url": "https://icml.cc/Conferences/2026/LLM-Policy",
+      "source_type": "ethics_policy",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:4ba60387acfe9d93a0935143a8ba9bc85922f19e715a49841b1543dfabd208f5",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "CT-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN: no contribution-type taxonomy published for the ICML 2026 main track",
+      "scope": "The main track publishes no contribution categories; position papers are a separate submission type handled by a separate call.",
+      "quote": "Similar to last year, we also invite submissions of position papers.",
+      "source_id": "icml-2026-call-for-papers"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "RC-soundness",
+      "name": "Soundness",
+      "dimension": "soundness",
+      "official_explanation": "Technical soundness, support for claims, and correctness of proofs and experiments.",
+      "quote": "Is the submission technically sound? Are claims well supported (e.g., by theoretical analysis or experimental results)?",
+      "source_id": "icml-2026-reviewer-instructions"
+    },
+    {
+      "id": "RC-presentation",
+      "name": "Presentation",
+      "dimension": "transparency",
+      "official_explanation": "Clear, well-structured writing and proper positioning against prior and concurrent literature.",
+      "quote": "Is the submission clearly written and well structured?",
+      "source_id": "icml-2026-reviewer-instructions"
+    },
+    {
+      "id": "RC-significance",
+      "name": "Significance",
+      "dimension": "significance",
+      "official_explanation": "Importance and relevance of the problem and the paper’s potential influence.",
+      "quote": "Does the paper address an important or relevant problem?",
+      "source_id": "icml-2026-reviewer-instructions"
+    },
+    {
+      "id": "RC-originality",
+      "name": "Originality",
+      "dimension": "originality",
+      "official_explanation": "New insights or understanding; originality may come from novel combinations or evaluations.",
+      "quote": "Does the work provide new insights, deepen understanding, or highlight important properties of existing methods?",
+      "source_id": "icml-2026-reviewer-instructions"
+    },
+    {
+      "id": "RC-reproducibility",
+      "name": "Reproducibility",
+      "dimension": "reproducibility",
+      "official_explanation": "Claims must be supported by reproducible experiments or sound theoretical analysis.",
+      "quote": "All claims must be clearly stated and supported by reproducible experiments and/or sound theoretical analysis.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "RC-limitations",
+      "name": "Limitations and Societal Impact",
+      "dimension": "other",
+      "official_explanation": "Reviewers assess whether limitations and potential negative societal impact are discussed.",
+      "quote": "Have the authors adequately discussed the limitations and potential negative societal impact of their work?",
+      "source_id": "icml-2026-reviewer-instructions"
+    },
+    {
+      "id": "RC-compliance",
+      "name": "Submission Compliance",
+      "dimension": "compliance",
+      "official_explanation": "Papers not conforming to ICML submission policies are rejected without review.",
+      "quote": "Submitted papers that do not conform to these policies will be rejected without review.",
+      "source_id": "icml-2026-call-for-papers"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "MP-page-limit",
+      "topic": "page_limit",
+      "statement": "The main paper is limited to eight pages, with unlimited references, impact statement and appendices.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "8 pages for the main paper, with unlimited pages for references, the impact statement, and appendices.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "MP-anonymity",
+      "topic": "anonymity",
+      "statement": "All submissions must be anonymized and must not violate double-blind reviewing.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All submissions must be anonymized and may not contain any information with the intention or consequence of violating the double-blind reviewing policy.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "MP-reciprocal",
+      "topic": "review_process",
+      "statement": "Every submission must have at least one author who agrees to serve as a reviewer for ICML.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "All submissions must have at least one author who agrees to serve as a reviewer for ICML.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "MP-impact-statement",
+      "topic": "ethics",
+      "statement": "Authors must include a broader-impact statement covering ethical aspects and societal consequences.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors are required to include a statement of the potential broader impact of their work, including its ethical aspects and future societal consequences.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "MP-prompt-injection",
+      "topic": "ai_use_disclosure",
+      "statement": "Prompt injection aimed at manipulating LLM-assisted review is forbidden and results in desk rejection.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Any attempts at prompt injection are strictly forbidden and will result in desk rejection.",
+      "source_id": "icml-2026-call-for-papers"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "RP-code",
+      "topic": "code_release",
+      "statement": "Authors are encouraged to submit code to foster reproducibility, and availability of code is weighed in decisions.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors are encouraged to submit code to foster reproducibility.",
+      "source_id": "icml-2026-author-instructions"
+    },
+    {
+      "id": "RP-ai-explain",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors are encouraged to explain notable ways generative-AI tools were used in the research methodology.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage authors to explain any notable ways in which these tools were used in their research methodology.",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "RP-review-tone",
+      "topic": "review_process",
+      "statement": "Reviews should be constructive, professional and respectful because they may be made public.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Reviews should therefore be constructive, professional, and respectful.",
+      "source_id": "icml-2026-reviewer-instructions"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "CC-page-limit",
+      "requirement": "Main body is at most eight pages (nine in camera-ready).",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CC-template",
+      "requirement": "Submission uses the required ICML LaTeX style files and format.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "icml-2026-author-instructions"
+    },
+    {
+      "id": "CC-anonymization",
+      "requirement": "No author-identifying information anywhere, including supplementary material.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "icml-2026-author-instructions"
+    },
+    {
+      "id": "CC-impact-statement",
+      "requirement": "A separate broader-impact section is present before references.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CC-lay-summary",
+      "requirement": "Accepted papers supply a lay (plain-language) summary at camera-ready.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CC-dual-submission",
+      "requirement": "No identical or substantially similar work under parallel review.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "icml-2026-call-for-papers"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "CH-attendance",
+      "change": "Attendance for authors of accepted papers became optional, with proceedings-only publication permitted.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CH-original-version",
+      "change": "ICML 2026 publishes the originally submitted version and reviews alongside the camera-ready for accepted papers.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CH-llm-review-policy",
+      "change": "ICML 2026 introduced a new two-policy (A/B) framework for LLM use in reviewing.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2026-llm-policy"
+    },
+    {
+      "id": "CH-reciprocal-cap",
+      "change": "A person may be the designated reciprocal reviewer for at most two of their submissions.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2026-call-for-papers"
+    },
+    {
+      "id": "CH-coi-disclosure",
+      "change": "ICML 2026 newly asks authors to disclose financial conflicts of interest in the camera-ready version.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "icml-2026-author-instructions"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "UN-ethics-detail",
+      "question": "What are the binding details of the ICML 2026 Peer Review Ethics and Research Ethics policies?",
+      "reason": "Those pages were not captured as 2026 sources, so only the references to them are quoted.",
+      "source_id": null
+    },
+    {
+      "id": "UN-position-track",
+      "question": "Do the same reciprocal-reviewing and page rules apply to the ICML 2026 position track?",
+      "reason": "Position papers are handled by a separate call that was not captured; the main-track sources do not settle it.",
+      "source_id": null
+    }
+  ]
+}

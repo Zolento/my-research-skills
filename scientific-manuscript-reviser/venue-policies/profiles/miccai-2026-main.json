@@ -1,0 +1,278 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "MICCAI",
+  "year": 2026,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "miccai-2026-main-cfp",
+      "url": "https://conferences.miccai.org/2026/en/call-for-papers.html",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:112b842bf58b7be6647bdc986d97b7574b1d7a004f25990444e1d849b068544a",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "miccai-2026-paper-submission-guidelines",
+      "url": "https://conferences.miccai.org/2026/en/PAPER-SUBMISSION-GUIDELINES.html",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:a33957bfa4889da6640cf9376cce7ce70207f116dcc30a7f858a685af868e586",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "miccai-2026-reviewer-guidelines",
+      "url": "https://conferences.miccai.org/2026/en/REVIEWER-GUIDELINES.html",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:91807689df269a4ab938be6b0c63e24ef3d06eb2494ea7ddbfaaae662d64759d",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-methodological",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Methodological works",
+      "scope": "Innovative methods, technologies or systems with demonstrated contributions over the state of the art; validation may be a proof of concept.",
+      "quote": "Methodological works should represent innovative methods, technologies, or systems in the areas of interest to the MICCAI Society.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "ct-application",
+      "claim_kind": "REVIEW_CRITERION",
+      "label": "Application studies",
+      "scope": "Impact or clinical value of existing techniques, or adaptation to a new problem, judged on experimental design, soundness of conclusions and prior similar studies.",
+      "quote": "Application studies should demonstrate the impact or clinical value of one or more existing techniques, or adapt/adopt state-of-the-art methods for a new problem or context.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-method-innovation",
+      "name": "Methodological innovation",
+      "dimension": "originality",
+      "official_explanation": "Reviewers ask whether the proposed methods are innovative.",
+      "quote": "whether the proposed methods are innovative or",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-application-innovation",
+      "name": "Application innovation",
+      "dimension": "contribution_fit",
+      "official_explanation": "Reviewers also ask whether the application itself is innovative.",
+      "quote": "whether the application is innovative.",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-performance-measures",
+      "name": "Sufficient performance measures with uncertainty",
+      "dimension": "experimental_adequacy",
+      "official_explanation": "Reviewers check that enough performance measures are reported and that uncertainty is quantified.",
+      "quote": "Do the authors report a sufficient number and type of performance measures to accurately represent the strengths and weaknesses of the algorithms? Are performance measures reported with measures of uncertainty or confidence (e.g., error bars, standard deviations, etc.)?",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-reproducibility",
+      "name": "Algorithm, dataset and evaluation detail",
+      "dimension": "reproducibility",
+      "official_explanation": "Reviewers comment on whether models/algorithms, datasets and evaluation are described in enough detail.",
+      "quote": "Please provide comments about whether the paper provides sufficient details about the models/algorithms, datasets, and evaluation.",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-clinical-significance",
+      "name": "Clinical significance and impact",
+      "dimension": "significance",
+      "official_explanation": "High clinical impact may outweigh a lower degree of methodological innovation.",
+      "quote": "Is the paper of sufficiently high clinical impact to outweigh a lower degree of methodological innovation?",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-limitations",
+      "name": "Limitations and future directions",
+      "dimension": "transparency",
+      "official_explanation": "Reviewers check that limitations, implications and future research directions are discussed.",
+      "quote": "Do the authors discuss limitations and other implications of their methods and directions for future research?",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "rc-data-quality",
+      "name": "Data quality, diversity and labelling",
+      "dimension": "compliance",
+      "official_explanation": "Reviewers check data collection, processing, division, diversity and label quality.",
+      "quote": "Do the authors clearly explain data collection, processing, and division methods?",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-intention-to-submit",
+      "topic": "page_limit",
+      "statement": "A full manuscript cannot be submitted without registering an intention-to-submit by the stated deadline.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "You will NOT be able to submit your full manuscript without registering an intention-to-submit .",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Manuscripts may be up to 8 pages plus up to 2 pages of references, using the official MICCAI 2026 template.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Manuscripts can be up to 8 pages (text, figures, tables, conclusion and acknowledgement sections) plus up to 2 pages of references.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "mp-anonymization",
+      "topic": "anonymity",
+      "statement": "All submitted content must be anonymized for the double-blind review process.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors must therefore ensure that all submitted content is anonymized.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "mp-reviewer-signup",
+      "topic": "review_process",
+      "statement": "At least one co-author must sign up to review for MICCAI 2026 or the paper is desk-rejected.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "At least one co-author of the paper must review for MICCAI 2026.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "mp-data-declaration",
+      "topic": "data_availability",
+      "statement": "Authors must declare the origin, license and, when appropriate, ethics application number of any data used.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors must declare the origin, license, and (when appropriate) ethics application number for any public or private data used in the preparation of the paper.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-llm-writing-assistance",
+      "topic": "ai_use_disclosure",
+      "statement": "LLMs are allowed as a general-purpose writing assistance tool, with full author responsibility and no LLM authorship.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "The use of LLMs (such as but not limited to ChatGPT) is allowed as a general-purpose writing assistance tool.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "rp-reproducible-research",
+      "topic": "reproducibility",
+      "statement": "Authors are strongly encouraged to improve reproducibility through open data, open implementations and appropriate evaluation design.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "we strongly encourage authors to improve the reproducibility of their research along three directions: open data, open implementations, and appropriate evaluation design and reporting.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "rp-code-and-data",
+      "topic": "code_release",
+      "statement": "Authors are invited to make data and/or code openly available where possible.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "we invite authors to use open data or to make their data and/or code available for open access by other researchers.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-intention-to-submit",
+      "requirement": "Intention-to-submit registered by 12 February 2026, before the full manuscript can be submitted.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "cc-page-limit",
+      "requirement": "Manuscript is at most 8 pages plus at most 2 reference pages.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "cc-anonymization",
+      "requirement": "Paper, code repository links and supplementary material are anonymized.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "cc-data-declaration",
+      "requirement": "Origin, license and, where applicable, ethics application number of data are declared in the paper.",
+      "mechanically_checkable": true,
+      "check_kind": "declaration",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "cc-coauthor-reviewer",
+      "requirement": "A unique co-author is nominated and signed up as reviewer by the intention-to-submit deadline.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-page-limit-wording",
+      "change": "MICCAI 2026 states the page limit as 8 pages covering text, figures, tables, conclusion and acknowledgement sections, where MICCAI 2025 said only text, figures and tables.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "ch-withdraw-accepted",
+      "change": "MICCAI 2026 states that the Program Committee reserves the right to withdraw an accepted paper from the proceedings for failure to present in person; MICCAI 2025 used \"retract\" without the explicit withdrawal power.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "ch-llm-review-sanctions",
+      "change": "MICCAI 2026 reviewer guidelines add a dedicated LLM-use policy with explicit sanctions (revocation of reviewing/authorship privileges, reporting to ethics boards); the MICCAI 2025 text stated the same prohibition without those named sanctions.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "miccai-2026-reviewer-guidelines"
+    },
+    {
+      "id": "ch-area-chairs",
+      "change": "MICCAI 2026 states submissions are evaluated by on average three external reviewers and 1-3 Area Chairs, where MICCAI 2025 stated 2-3 Area Chairs.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-contribution-types-formal",
+      "question": "Does MICCAI 2026 publish a formal labelled contribution-type taxonomy?",
+      "reason": "The submission guidelines distinguish methodological works from application studies and describe how each is assessed, but no numbered or labelled contribution-type list is published; the profile records these two official categories with their own wording.",
+      "source_id": "miccai-2026-paper-submission-guidelines"
+    },
+    {
+      "id": "up-ethics-policy",
+      "question": "Does MICCAI 2026 have a standalone ethics policy for authors?",
+      "reason": "The retrieved MICCAI 2026 CFP and submission guidelines require a data use declaration and mention ethics application numbers, but no standalone ethics-policy document was retrieved or referenced."
+    },
+    {
+      "id": "up-camera-ready",
+      "question": "What exactly do the MICCAI 2026 camera-ready guidelines require?",
+      "reason": "The CAMERA-READY-SUBMISSION-GUIDELINES page is linked from the site navigation but was not retrieved, so camera-ready requirements are not recorded."
+    }
+  ]
+}

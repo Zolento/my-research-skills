@@ -1,0 +1,249 @@
+{
+  "schema": "venue-policy-profile@1",
+  "profile_version": 1,
+  "venue": "CVPR",
+  "year": 2025,
+  "track": "main",
+  "verification_date": "2026-10-10",
+  "sources": [
+    {
+      "id": "cvpr-2025-main-cfp",
+      "url": "https://cvpr.thecvf.com/Conferences/2025/CallForPapers",
+      "source_type": "call_for_papers",
+      "phase": "both",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:e208c60af81114d21b61126a9c61ea1eaa63d0c63817cfe6ff41720ffffc57ea",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "cvpr-2025-author-guidelines",
+      "url": "https://cvpr.thecvf.com/Conferences/2025/AuthorGuidelines",
+      "source_type": "author_guidelines",
+      "phase": "author",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:8690fc7b2225b6595fafeed827c1e191c4a535cfb24765ab040ed1802dbc8145",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "cvpr-2025-reviewer-guidelines",
+      "url": "https://cvpr.thecvf.com/Conferences/2025/ReviewerGuidelines",
+      "source_type": "reviewer_guidelines",
+      "phase": "reviewer",
+      "retrieved": "2026-10-10",
+      "digest": "sha256:9495ede9016179d8e2d68044def326a957d57905788955e03ed33f7b656cd5fc",
+      "status": "VERIFIED"
+    }
+  ],
+  "contribution_types": [
+    {
+      "id": "ct-unknown",
+      "claim_kind": "UNKNOWN",
+      "label": "UNKNOWN",
+      "scope": "CVPR 2025 publishes no official contribution-type taxonomy in the retrieved CFP, author guidelines or reviewer guidelines.",
+      "quote": "Papers in the main technical program must describe high-quality, original research.",
+      "source_id": "cvpr-2025-main-cfp"
+    }
+  ],
+  "review_criteria": [
+    {
+      "id": "rc-soundness",
+      "name": "Technical soundness",
+      "dimension": "soundness",
+      "official_explanation": "Accepted papers should be technically sound and contribute to the field.",
+      "quote": "Each paper that is accepted should be technically sound and make a contribution to the field.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-originality",
+      "name": "Novelty and brave concepts",
+      "dimension": "originality",
+      "official_explanation": "Reviewers are told to embrace novel concepts even without testing on many datasets.",
+      "quote": "We recommend that you embrace novel, brave concepts, even if they have not been tested on many datasets.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-significance",
+      "name": "Novelty and potential impact",
+      "dimension": "significance",
+      "official_explanation": "Neither novelty nor benchmark performance alone decides; both are weighed together.",
+      "quote": "Rather, it is important to weigh both the novelty and potential impact of the work alongside the reported performance.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-scope",
+      "name": "Fit to CVPR subject areas",
+      "dimension": "scope_fit",
+      "official_explanation": "Out-of-scope papers must be explained and redirected to a better-matched venue.",
+      "quote": "If you think the paper is out of scope for CVPR's subject areas, clearly explain why in the review.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-experiments",
+      "name": "Rebuttal-time experimental expectations",
+      "dimension": "experimental_adequacy",
+      "official_explanation": "Reviewers must not demand substantial extra experiments or penalize their absence.",
+      "quote": "reviewers should not request substantial additional experiments for the rebuttal, or penalize for lack of additional experiments.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rc-dataset-contribution",
+      "name": "Dataset contributions must become public",
+      "dimension": "reproducibility",
+      "official_explanation": "A dataset claimed as a contribution should be publicly available upon publication.",
+      "quote": "If a paper submission is claiming a dataset as one of its contributions, there should be a reasonable expectation that the dataset will be made publicly available upon publication.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    }
+  ],
+  "mandatory_policy": [
+    {
+      "id": "mp-dual-submission",
+      "topic": "dual_submission",
+      "statement": "Authors must acknowledge that no substantially similar paper is submitted elsewhere during the CVPR 2025 review period.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "authors acknowledge that no paper substantially similar in content has been or will be submitted to another conference or workshop during the review period (November 14, 2024 – February 26, 2025).",
+      "source_id": "cvpr-2025-main-cfp"
+    },
+    {
+      "id": "mp-page-limit",
+      "topic": "page_limit",
+      "statement": "Papers are limited to eight pages including figures and tables, plus reference-only pages.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers are limited to eight pages, including figures and tables, in the CVPR style.",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "mp-format-anonymity",
+      "topic": "anonymity",
+      "statement": "Non-anonymized, non-template or over-length papers are rejected without review.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Papers that are not properly anonymized, or do not use the template, or have more than eight pages (excluding references) will be rejected without review.",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "mp-llm-reviewer",
+      "topic": "ai_use_disclosure",
+      "statement": "Reviewers may not use an LLM to write reviews or meta-reviews at any step.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Large language models (LLMs) are NOT allowed to be used for writing the reviews nor the meta-reviews at any step.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "mp-llm-author-responsibility",
+      "topic": "ai_use_disclosure",
+      "statement": "Authors remain responsible for misrepresentation, factual inaccuracy or plagiarism regardless of tool use.",
+      "claim_kind": "MANDATORY_POLICY",
+      "explicitness": "EXPLICIT",
+      "applicability": "REQUIRED",
+      "quote": "Authors may use any tools they find productive in preparing a paper, but must be aware that they are responsible for any misrepresentation, factual inaccuracy or plagiarism in their paper.",
+      "source_id": "cvpr-2025-author-guidelines"
+    }
+  ],
+  "recommended_practice": [
+    {
+      "id": "rp-code-release",
+      "topic": "code_release",
+      "statement": "Code upload as supplementary material is encouraged but not required.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "We encourage (but do not require) authors to upload their code as part of their supplementary material in order to help reviewers assess the quality of the work.",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "rp-arxiv-acknowledge",
+      "topic": "other",
+      "statement": "Authors need not compare against recent arXiv reports but should acknowledge work that directly inspired them.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "Authors are not required to discuss and compare their work with recent arXiv reports, although they should properly acknowledge those that directly and obviously inspired them.",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    },
+    {
+      "id": "rp-share-code-anonymously",
+      "topic": "code_release",
+      "statement": "For CVPR 2025 the only links authorized in supplementary material are Anonymous GitHub links for code.",
+      "claim_kind": "RECOMMENDED_PRACTICE",
+      "explicitness": "EXPLICIT",
+      "applicability": "OPTIONAL",
+      "quote": "No. The only links authorized to appear in the supplementary material are links to Anonymous GitHub, which should only be used to submit code.",
+      "source_id": "cvpr-2025-author-guidelines"
+    }
+  ],
+  "compliance_checks": [
+    {
+      "id": "cc-anonymization",
+      "requirement": "Submission, supplementary material and links preserve anonymity.",
+      "mechanically_checkable": true,
+      "check_kind": "anonymization",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "cc-page-limit",
+      "requirement": "Main paper is at most eight pages excluding references.",
+      "mechanically_checkable": true,
+      "check_kind": "page_limit",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "cc-template",
+      "requirement": "The official CVPR 2025 style/template is used.",
+      "mechanically_checkable": true,
+      "check_kind": "template",
+      "source_id": "cvpr-2025-author-guidelines"
+    },
+    {
+      "id": "cc-dual-submission",
+      "requirement": "No substantially similar paper is under review elsewhere during the review period.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2025-main-cfp"
+    },
+    {
+      "id": "cc-llm-review",
+      "requirement": "Reviews and meta-reviews are not written with an LLM.",
+      "mechanically_checkable": false,
+      "check_kind": "needs_review",
+      "source_id": "cvpr-2025-reviewer-guidelines"
+    }
+  ],
+  "changes_from_prior_year": [
+    {
+      "id": "ch-submission-rules",
+      "change": "The CVPR 2025 CFP states that changes were introduced to the submission rules this year, but it does not enumerate them on the CFP page.",
+      "status": "CONFIRMED_CHANGE",
+      "source_id": "cvpr-2025-main-cfp"
+    },
+    {
+      "id": "ch-changes-page",
+      "change": "The CVPR 2025 \"Changes for 2025\" page was not retrieved, so the detailed delta from CVPR 2024 is not established.",
+      "status": "UNKNOWN",
+      "source_id": null
+    }
+  ],
+  "unknown_policies": [
+    {
+      "id": "up-2024-baseline",
+      "question": "Which CVPR 2025 rules are new relative to CVPR 2024?",
+      "reason": "No CVPR 2024 CFP, author guidelines or reviewer guidelines were retrieved, so the year-over-year delta is not established and no CVPR 2024 rule is inherited."
+    },
+    {
+      "id": "up-contribution-types",
+      "question": "Does CVPR 2025 publish an official contribution-type taxonomy?",
+      "reason": "No contribution-type taxonomy appears in the retrieved CVPR 2025 documents; the profile records an explicit UNKNOWN type."
+    },
+    {
+      "id": "up-review-form",
+      "question": "What rating scale and fields does the CVPR 2025 review form use?",
+      "reason": "The review form itself was not among the retrieved sources; only the reviewer guidelines are available."
+    }
+  ]
+}
