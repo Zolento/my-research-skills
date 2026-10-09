@@ -155,10 +155,21 @@ class ExecutionTests(unittest.TestCase):
     def test_receipt_expiry(self):
         r=self.issue()['receipt'];out=managed_run(self.s,self.x['id'],self.manifest,r,self.ledger,now=r['expires_at']);self.assertEqual(out['errors'],['EXPIRED_RECEIPT'])
     def test_single_use_parallel_issued_receipts(self):
-        first=self.issue()['receipt'];second=self.issue()['receipt'];self.assertEqual(self.dispatch(first)['status'],'PASS');self.assertEqual(self.dispatch(second)['errors'],['FORMAL_BUDGET_EXHAUSTED'])
+        """Budget covers one real execution: the second receipt is refused.
+
+        Rewritten after the preview fix: the old expectation relied on a *dry run* consuming the
+        formal budget. Consumption is now exercised by a real (mocked) execution, so the invariant
+        is stronger, not weaker.
+        """
+        first=self.issue()['receipt'];second=self.issue()['receipt']
+        with patch.object(ex.subprocess,'run',return_value=subprocess.CompletedProcess([],0)):
+            self.assertEqual(self.dispatch(first,execute=True)['status'],'PASS')
+        self.assertEqual(self.dispatch(second,execute=True)['errors'],['FORMAL_BUDGET_EXHAUSTED'])
     def test_pilot_budget_cannot_reset_by_seed_id(self):
         self.x['execution_protocol']['mode']='pilot';self.manifest=resources(self.s,self.root)
-        r=self.issue();self.assertEqual(r['status'],'PILOT_ONLY',r);self.assertEqual(self.dispatch(r['receipt'])['status'],'PASS')
+        r=self.issue();self.assertEqual(r['status'],'PILOT_ONLY',r)
+        with patch.object(ex.subprocess,'run',return_value=subprocess.CompletedProcess([],0)):
+            self.assertEqual(self.dispatch(r['receipt'],execute=True)['status'],'PASS')
         self.x.update(id='X200',seed=1);self.s['assurance'][0]['discriminating_test']='X200';self.assertEqual(self.issue()['errors'],['PILOT_BUDGET_EXHAUSTED'])
     def test_preflight_card_loop_finishes_at_configured_limit(self):
         self.x['execution_protocol']['risk_controls'][0]['comparison_ids']=[]
@@ -188,7 +199,8 @@ class ExecutionTests(unittest.TestCase):
         for _ in range(3): self.issue()
         p['mode']='pilot';self.manifest=resources(self.s,self.root)
         result=self.issue();self.assertEqual(result['status'],'PILOT_ONLY',result)
-        self.assertEqual(self.dispatch(result['receipt'])['status'],'PASS')
+        with patch.object(ex.subprocess,'run',return_value=subprocess.CompletedProcess([],0)):
+            self.assertEqual(self.dispatch(result['receipt'],execute=True)['status'],'PASS')
         self.assertEqual(self.issue()['status'],'HOLD')
     def test_failed_pilot_card_edits_are_also_finite(self):
         p=self.x['execution_protocol'];p['mode']='pilot';p['pilot']['goal']=''
