@@ -113,3 +113,33 @@
 - 既有 `ABLATION_ARMS` 四臂语义冻结；`evaluate()` 只新增可选 `evidence_support` 键。
 - 既有 CLI 全部保持；新增子命令为附加。
 - `main` 未被修改；未 merge / rebase / 打 Tag / 发 Release / 改版本号。
+
+## `.dev/` 生命周期分类（根 AGENTS.md §14/§20）
+
+| 路径 | 分类 | 理由 |
+|---|---|---|
+| `.dev/plan.md` | KEEP_BRANCH_ONLY | 开发计划，长期价值有限 |
+| `.dev/decisions.md` | KEEP_BRANCH_ONLY | 开发决策记录（D5 已在正式代码注释中同步说明）|
+| `.dev/audit/*.md` | KEEP_BRANCH_ONLY | Phase 1 审计报告与差距矩阵 |
+| `.dev/baseline/*.txt` | KEEP_BRANCH_ONLY | 基线测试原始输出 |
+| `.dev/results/review.md` | KEEP_BRANCH_ONLY | 开发验收记录 |
+| `.dev/results/*.txt` / `*.json` | KEEP_BRANCH_ONLY | 测试与消融原始输出（体积已压缩）|
+
+**PROMOTE 的已执行项：** Skill-RSI 的正式契约与规则已提升为
+`references/skill-rsi-policy.md`，并在 `SKILL.md` §1.11、四个 Preset 与组件 `README.md` 中
+正式引用；正式运行不依赖 `.dev/`（`release_check.py` 的 Skill-RSI 步骤机械校验这一点）。
+
+**DELETE：** 无（本分支未产生一次性调试文件）。
+
+## 最终 Git 状态
+
+| 项 | 值 |
+|---|---|
+| 分支 | `research-idea-pipeline/skill-rsi-dev` |
+| 最终 commit | `139f7b98da2d1df62f96dca2f9375e4ab9dd6a4a` |
+| 远程 | `origin/research-idea-pipeline/skill-rsi-dev`（与本地一致）|
+| main | `ea0214e30f75bb9709d0c01efe25dc5f9fc3f804`（未修改）|
+| Tag | 13 个，均未创建/移动 |
+| Merge / Rebase / Release | 无 |
+| 其他 worktree | 未清理、未改动 |
+| 版本号 | 未改动（仍为 1.0.0）|
