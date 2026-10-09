@@ -70,6 +70,7 @@
 | 1 | 1 加载 case | `python3 scripts/research_replay.py validate --dir examples/replay/adversarial` |
 | 2 | 2 回放 | `python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2` |
 | 3 | 3 消融 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --runs 2` |
+| 4 | 4 RSI 消融 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2` |
 
 > 上表由 `preset_router.py run --preset discovery-replay` 实际返回，文档与代码由 `test_preset_router` 断言一致。
 
