@@ -1,0 +1,149 @@
+{
+  "schema": "counterfactual-evaluation@1",
+  "cases": [
+    {
+      "id": "co-augmentation-01",
+      "class": "causal_overreach",
+      "domain": "medical imaging segmentation",
+      "correct": "On the held-out test set, fine-tuning with the proposed augmentation is associated with a 3.1 point increase in Dice score relative to the same model trained without augmentation.",
+      "faulty": "On the held-out test set, the proposed augmentation improves segmentation quality by 3.1 Dice points relative to the same model trained without augmentation.",
+      "faulty_defect": "improves segmentation quality",
+      "faulty_span": {
+        "start": 52,
+        "end": 81
+      },
+      "paraphrase": "Relative to the same model trained without augmentation, fine-tuning with the proposed augmentation is associated with a 3.1 point increase in Dice score on the held-out test set."
+    },
+    {
+      "id": "co-external-02",
+      "class": "conclusion_inflation",
+      "domain": "medical imaging",
+      "correct": "Both models achieve comparable Dice scores on the internal validation split; external validation was not performed.",
+      "faulty": "Both models achieve comparable Dice scores on the internal validation split, demonstrating that they generalize across clinical sites.",
+      "faulty_defect": "demonstrating that they generalize across clinical sites",
+      "faulty_span": {
+        "start": 77,
+        "end": 133
+      },
+      "paraphrase": "On the internal validation split both models achieve comparable Dice scores; no external validation was performed."
+    },
+    {
+      "id": "ic-baseline-03",
+      "class": "invalid_control",
+      "domain": "machine learning",
+      "correct": "We compare against a baseline retrained on the same data split with an identical schedule and an equal hyperparameter search budget.",
+      "faulty": "We compare against the baseline reported in the original paper, which was trained on a different data split with a larger hyperparameter search budget.",
+      "faulty_defect": "trained on a different data split with a larger hyperparameter search budget",
+      "faulty_span": {
+        "start": 74,
+        "end": 150
+      },
+      "paraphrase": "Against a baseline retrained on the same data split, with an identical schedule and an equal hyperparameter search budget, we compare."
+    },
+    {
+      "id": "mt-conditioning-04",
+      "class": "missing_theoretical_assumption",
+      "domain": "statistics",
+      "correct": "Under the assumption that the design matrix is well conditioned, the estimator's finite-sample error decreases monotonically with the sample size.",
+      "faulty": "The estimator's finite-sample error decreases monotonically with the sample size.",
+      "faulty_defect": "error decreases monotonically with the sample size",
+      "faulty_span": {
+        "start": 30,
+        "end": 80
+      },
+      "paraphrase": "The estimator's finite-sample error decreases monotonically with sample size under the assumption that the design matrix is well conditioned."
+    },
+    {
+      "id": "ue-confounded-05",
+      "class": "unidentifiable_experiment",
+      "domain": "machine learning",
+      "correct": "Because the augmentation, learning-rate schedule and batch size were changed together, the experiment cannot attribute the observed gain to the augmentation alone.",
+      "faulty": "Because the augmentation, learning-rate schedule and batch size were changed together, the observed gain is attributable to the augmentation alone.",
+      "faulty_defect": "the observed gain is attributable to the augmentation alone",
+      "faulty_span": {
+        "start": 87,
+        "end": 146
+      },
+      "paraphrase": "The observed gain cannot be attributed to the augmentation alone, because the augmentation, learning-rate schedule and batch size were changed together."
+    },
+    {
+      "id": "em-cohort-06",
+      "class": "evidence_mismatch",
+      "domain": "medical imaging",
+      "correct": "The reported sensitivity of 0.71 was measured on the screening cohort, whereas Table 2 reports sensitivity on the diagnostic cohort.",
+      "faulty": "The reported sensitivity of 0.71 was measured on the screening cohort, and Table 2 summarizes this same screening-cohort result.",
+      "faulty_defect": "summarizes this same screening-cohort result",
+      "faulty_span": {
+        "start": 83,
+        "end": 127
+      },
+      "paraphrase": "Sensitivity of 0.71 was measured on the screening cohort; Table 2 instead reports sensitivity on the diagnostic cohort."
+    },
+    {
+      "id": "xc-external-07",
+      "class": "cross_section_contradiction",
+      "domain": "medical imaging",
+      "correct": "The abstract states that the method was evaluated on internal data only, matching the limitation section, which restricts the claim to the internal split.",
+      "faulty": "The abstract states that the method was evaluated on internal data only, while the limitation section reports that the method was validated on three external sites.",
+      "faulty_defect": "the method was validated on three external sites",
+      "faulty_span": {
+        "start": 115,
+        "end": 163
+      },
+      "paraphrase": "The limitation section restricts the claim to the internal split, matching the abstract statement that the method was evaluated on internal data only."
+    },
+    {
+      "id": "rp-ci-08",
+      "class": "robustness_paraphrase",
+      "domain": "medical imaging",
+      "correct": "The model achieved an AUC of 0.86 on the held-out test set, and no confidence interval is reported.",
+      "faulty": "On the held-out test set, the model achieved an AUC of 0.86, and no confidence interval is reported.",
+      "faulty_defect": "",
+      "faulty_span": {
+        "start": 0,
+        "end": 0
+      },
+      "paraphrase": "On the held-out test set the model achieved an AUC of 0.86, and no confidence interval is reported."
+    },
+    {
+      "id": "rp-seed-09",
+      "class": "robustness_paraphrase",
+      "domain": "machine learning",
+      "correct": "The result comes from a single seed, and the manuscript does not claim statistical significance.",
+      "faulty": "The manuscript does not claim statistical significance; the result comes from a single seed.",
+      "faulty_defect": "",
+      "faulty_span": {
+        "start": 0,
+        "end": 0
+      },
+      "paraphrase": "The manuscript does not claim statistical significance, and the result comes from a single seed."
+    },
+    {
+      "id": "rdr-mechanism-10",
+      "class": "robustness_defect_rewording",
+      "domain": "medical imaging segmentation",
+      "correct": "On the held-out test set, fine-tuning with the proposed augmentation is associated with a 3.1 point increase in Dice score relative to the same model trained without augmentation.",
+      "faulty": "Relative to the same model trained without augmentation, the proposed augmentation improves segmentation quality by 3.1 Dice points on the held-out test set.",
+      "faulty_defect": "improves segmentation quality",
+      "faulty_span": {
+        "start": 83,
+        "end": 112
+      },
+      "paraphrase": "On the held-out test set, fine-tuning with the proposed augmentation is associated with a 3.1 point increase in Dice score relative to the same model trained without augmentation."
+    },
+    {
+      "id": "rdr-generalization-11",
+      "class": "robustness_defect_rewording",
+      "domain": "medical imaging",
+      "correct": "Both models achieve comparable Dice scores on the internal validation split; external validation was not performed.",
+      "faulty": "External validation was not performed, yet the comparable Dice scores on the internal validation split demonstrate that both models generalize across clinical sites.",
+      "faulty_defect": "demonstrate that both models generalize across clinical sites",
+      "faulty_span": {
+        "start": 103,
+        "end": 164
+      },
+      "paraphrase": "Both models achieve comparable Dice scores on the internal validation split; external validation was not performed."
+    }
+  ],
+  "missing_context": []
+}

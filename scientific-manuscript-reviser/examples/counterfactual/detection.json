@@ -1,0 +1,101 @@
+{
+  "schema": "counterfactual-detection@1",
+  "detector": {
+    "name": "illustrative-placeholder",
+    "kind": "hand-authored fixture",
+    "description": "Non-authoritative placeholder used only to exercise the harness reporting; it is not a detector product and is not a benchmark result."
+  },
+  "evaluation_digest": "b81af0ae7c14280baf1baf141ba30b5d516e7c662f83f6aadc13cd756ed91a00",
+  "results": [
+    {
+      "case_id": "co-augmentation-01",
+      "observed": "correct",
+      "detected_span": {
+        "start": 52,
+        "end": 81
+      },
+      "notes": "Association-to-mechanism span flagged."
+    },
+    {
+      "case_id": "co-external-02",
+      "observed": "correct",
+      "detected_span": {
+        "start": 77,
+        "end": 133
+      },
+      "notes": "Internal-to-external generalization span flagged."
+    },
+    {
+      "case_id": "ic-baseline-03",
+      "observed": "correct",
+      "detected_span": {
+        "start": 74,
+        "end": 150
+      },
+      "notes": "Mismatched control span flagged."
+    },
+    {
+      "case_id": "mt-conditioning-04",
+      "observed": "correct",
+      "detected_span": {
+        "start": 30,
+        "end": 80
+      },
+      "notes": "Unstated conditioning assumption flagged."
+    },
+    {
+      "case_id": "ue-confounded-05",
+      "observed": "correct",
+      "detected_span": {
+        "start": 87,
+        "end": 146
+      },
+      "notes": "Joint-change attribution span flagged."
+    },
+    {
+      "case_id": "em-cohort-06",
+      "observed": "correct",
+      "detected_span": {
+        "start": 0,
+        "end": 12
+      },
+      "notes": "Illustrative location failure: span does not overlap the declared defect, so this counts as a miss."
+    },
+    {
+      "case_id": "xc-external-07",
+      "observed": "miss",
+      "detected_span": null,
+      "notes": "Illustrative miss."
+    },
+    {
+      "case_id": "rdr-mechanism-10",
+      "observed": "correct",
+      "detected_span": {
+        "start": 83,
+        "end": 112
+      },
+      "notes": "Reworded causal overreach still flagged; scored as detection recall."
+    },
+    {
+      "case_id": "rdr-generalization-11",
+      "observed": "correct",
+      "detected_span": {
+        "start": 103,
+        "end": 164
+      },
+      "notes": "Reworded conclusion inflation still flagged; scored as detection recall."
+    },
+    {
+      "case_id": "rp-ci-08",
+      "observed": "miss",
+      "detected_span": null,
+      "notes": "Wording-only clean variant left unflagged; scored as a clean rejection."
+    },
+    {
+      "case_id": "rp-seed-09",
+      "observed": "miss",
+      "detected_span": null,
+      "notes": "Wording-only clean variant left unflagged; scored as a clean rejection."
+    }
+  ]
+}
