@@ -911,8 +911,11 @@ python3 scripts/preset_router.py run --preset loop-health-check --state <researc
 **自动触发的真实边界（不得含糊）：** 事件监听、派遣与后台常驻由**调用方**——既有 Scheduler、运行时
 或平台 Hook——负责。本 skill 提供的是可执行、幂等、带冷却与上限的触发/记录接口
 （`trigger` / `record` / `cognition/recovery-log.jsonl`），**不安装守护进程，也不声称无人值守自动执行**；
-环境若不调用它，只能得到推荐。用户主动预设即使被 registry
-标为事件可触发，也只产生 `recommended_only` 建议，绝不自动启动。
+环境若不调用它，只能得到推荐。用户主动预设按权限层分流：`plan`/`audit` 等**不能改科学事实**的协议可直接自动触发；
+`paradigm-escape`（受控 Discovery）只有在 `preset_router.py authorize --scope discovery_only`
+授权后才可自动触发，否则只产生 `recommended_only` 建议；授权**不覆盖** execute，
+故不会自动启动 GPU、不会改主锚点、不绕过证据门禁；`research-audit` 默认只读，
+写 `assurance[]` 必须显式经 R7 写回。
 
 **四条硬规则：** ① 只读提问不升级为执行、否定表达不触发（否定按**分句**作用，逗号后的请求不被吞掉）；
 ② 同一 `(state_version, preset, 信号指纹)` 只允许一次，冷却/上限超限即 `HOLD` 交人裁决，且**不刷新 AALG 预算**；

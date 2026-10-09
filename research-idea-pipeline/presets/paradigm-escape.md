@@ -24,7 +24,7 @@
 - 适用条件：
   - 当前表示被判定为局部最优或同构候选堆积
   - 用户明确要求换范式
-- 自动触发（`recommend`，需先过防重入守卫）：信号 `stagnation`；前提：registry trigger=manual_or_stagnation；仅推荐，不自动执行；冷却 0 轮；每指纹上限 1 次。
+- 自动触发（`recommend`，需先过防重入守卫）：信号 `stagnation`；前提：registry trigger=manual_or_stagnation；权限层 discovery（可在授权的 Autonomous Loop 内自动触发受控 Discovery）；冷却 0 轮；每指纹上限 1 次。
 - registry 声明：`manual_or_stagnation`；自然语言示例：「跳出当前思路」、「换一个完全不同的数学建模角度」、「escape local paradigm」
 - 不触发的情形：显式否定、意图歧义、只陈述问题而无执行请求（先只读诊断并要求确认）。
 
@@ -41,6 +41,8 @@
 - 禁止：
   - 把参数或模块替换当作范式改变
   - 跳过结构等价审计自证新颖
+  - 未经授权启动 GPU 或执行实验
+  - 修改研究主锚点
 - 共同硬边界见 `shared-contract.md`：canonical state 是唯一科学事实、只读请求不得触发执行、工程故障不得写成否证、AALG/PEIG/容量与公平对照优先于 Preset、不得自行授权 GPU 或发布。
 
 ## 5. 复用的阶段、脚本与检查器

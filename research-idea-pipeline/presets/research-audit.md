@@ -6,7 +6,7 @@
 |---|---|
 | preset id | `research-audit` |
 | 顶层入口 | `audit` |
-| 执行授权 | `audit`（权限层 `advisory`）|
+| 执行授权 | `audit`（权限层 `read_only`）|
 | registry trigger | `manual` |
 | 分组 / 优先级 | `user` / 100（越小越优先）|
 | 协议来源 | 提供版 `presets/research-audit.md` 正文 + 本仓库 9 节契约 |
@@ -38,10 +38,12 @@
 - 允许：
   - 报告 flaw、kill condition 与判别实验
   - 复用既有验证器给出规则号
+  - 在显式请求（--apply）时产出 assurance[] 提案，交 R7 写回
 - 禁止：
   - 执行 Discovery（R3—R6）
   - 改写证据或 claim 状态
   - 消耗实验预算
+  - 因用户只说「审查」而隐式写 canonical
 - 共同硬边界见 `shared-contract.md`：canonical state 是唯一科学事实、只读请求不得触发执行、工程故障不得写成否证、AALG/PEIG/容量与公平对照优先于 Preset、不得自行授权 GPU 或发布。
 
 ## 5. 复用的阶段、脚本与检查器
@@ -92,9 +94,9 @@
 ## 8. 状态写回
 
 - 允许写入：
-  - assurance[]（只经 R7 权限）
   - 审查报告
-- canonical `research-state.json`：不写 canonical（只落 assurance[]，经 R7 权限）。
+  - assurance[] 提案（写回由 R7 执行）
+- canonical `research-state.json`：不写 canonical（assurance[] 只在显式 R7 写回时由 R7 落盘）。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 
 ## 9. 停止、失败与恢复

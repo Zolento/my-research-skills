@@ -50,7 +50,8 @@
 |---|---|---|
 | `read_only` | `read_only` / `inspect_only` / `evaluation_only` | 只读；只落报告/派生投影，不写 canonical |
 | `derived` | `derived_only` / `recover_no_experiment` / `runtime_recovery` / `engineering_recovery` | 重建投影、修复运行；不写 canonical 科学事实 |
-| `advisory` | `audit` / `plan` / `decision_only` | 产出审计、计划、决策；`assurance[]` 只经 R7 |
+| `read_only` | `audit` | 普通审查**默认只读**；`assurance[]` 只在显式请求时由 R7 写回 |
+| `advisory` | `plan` / `decision_only` | 产出计划与决策；不改 canonical 科学状态 |
 | `discovery` | `discover_only` / `evidence_repair` | 候选经 R3—R6；证据修复只经 R10/R11 |
 | `strategy` | `strategy_update` / `portfolio` | 只写既有授权的策略记忆与遥测 |
 | `execute` | `execute` | 经既有 R 阶段与 PEIG/AALG 门禁执行实验 |
@@ -100,7 +101,8 @@
 | 触发模式 | 谁可以进入 | 行为 |
 |---|---|---|
 | `recover`（分组 B/C） | 事件类 registry trigger | 通过守卫即 `RECOVER`，`requires_confirmation` 按权限层决定 |
-| `recommend`（分组 A 中被标为事件可触发者） | 仅推荐 | 候选带 `recommended_only: true`，**永不自动选中** |
+| `recommend`（分组 A 中权限层 ≥ discovery 者，且**未授权**） | 仅推荐 | 候选带 `recommended_only: true`，**永不自动选中** |
+| `recover` + `controlled`（已授权 Loop 内的受控 Discovery） | 需要 `scheduler.autonomous_loop` 授权 | 只在授权覆盖的权限层内触发；`discovery_only` **不覆盖** execute，故不会自动启动 GPU 或执行实验 |
 
 **防死循环（三条硬规则）：**
 
@@ -109,6 +111,22 @@
 | 同快照 | 相同 `(state_version, preset_id, signal_fingerprint)` 只允许一次 → `already_attempted_at_this_snapshot` |
 | 冷却 | 距上次执行 < `cooldown_rounds` 且指纹未变 → `cooldown_active` |
 | 上限 | 同一指纹累计达 `max_attempts` → `attempt_limit_reached`，`HOLD` 交人裁决 |
+
+### 5.1 Loop 授权（`scheduler.autonomous_loop`）
+
+用户决定：**Paradigm Escape 允许在已授权的 Autonomous Research Loop 中由真实停滞信号自动触发受控
+Discovery；Scientific Replanning 允许自动生成/调整计划（只影响合法动作排序）。** 实现方式：
+
+```sh
+python3 scripts/preset_router.py authorize --state <S> --scope discovery_only   # 授权
+python3 scripts/preset_router.py authorize --state <S> --revoke                 # 撤销
+```
+
+- 授权记录写在 **scheduler 遥测**（`autonomous_loop`），不在 canonical state；`discovery_only`
+  只覆盖 `discovery` 权限层，`strategy` 覆盖 discovery+strategy，`full` 才覆盖 execute。
+- 未授权时：`paradigm-escape` 只有 `recommended_only`；`scientific-replanning`（advisory）可直接自动生成计划。
+- 无论是否授权：不得自动启动 GPU、不得改研究主锚点、不得绕过 R8/R9.O/R10/R11 与统一证据门禁；
+  审查（`research-audit`）默认只读，写 `assurance[]` 必须显式经 R7 写回流程。
 
 记录写在 `cognition/recovery-log.jsonl`（控制平面）。该文件与 `.execution/policy.json` 均不在恢复
 路径的写入范围内（有测试逐字节校验，AALG 预算永不被刷新）。

@@ -556,3 +556,30 @@ failure-never-science, the Strategy Decision Adapter, `PR1`—`PR9` checks and t
 * **L2** ✅ synthetic end-to-end through the real CLI: 53/53 provided fixtures, one-protocol load,
   trigger → guard → record, adapter with/without memory, telemetry, cross-session replay.
 * **L3** ❌ not performed (no real research A/B).
+
+
+## 11. Review fixes and the three decisions before release
+
+### Fixed (review findings)
+
+1. `trigger()` selected on `guard["allowed"]` instead of the final `candidate["allowed"]`, so a
+   `recommended_only` proposal could have been started → selection now uses the candidate verdict.
+2. `load_preset_context()` returned the contract's *path* without reading it → it now reads the
+   shared contract, checks its required sections, reports `contract_text`/`contract_sections`/
+   `problems`, and fails with `EXIT_HARD` when the contract is empty or incomplete.
+3. `_loop_step()` treated any historical `outcome_analysis` as "Revise" forever → `r10_pending()`
+   checks `repairs[].outcome_analysis_id`, so a completed R10/R11 moves the loop to Consolidate.
+4. `test_write_back_permission_per_scope` had a tautological assertion (`if False else [...]`) →
+   it now asserts the protocol states its scope's canonical-write policy *and* that non-execute
+   protocols wrote nothing.
+
+### Decisions implemented
+
+* **Paradigm Escape**: `scheduler.autonomous_loop` authorization (new `authorize` op) promotes it
+  from `recommended_only` to a controlled auto-trigger inside an authorized loop; `discovery_only`
+  never covers `execute`, so no GPU job, no anchor change, no gate bypass.
+* **Scientific Replanning**: `plan` (advisory) may auto-generate/adjust plans and only affects the
+  legal action ordering; canonical science still goes through R10/R11; the anchor needs separate
+  authorization (both recorded in `forbidden`).
+* **Research Audit**: `audit` reclassified to the `read_only` tier; a plain audit writes nothing;
+  `--apply` only produces an `assurance[]` *proposal* with `writeback_flow: R7`.

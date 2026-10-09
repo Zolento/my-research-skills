@@ -58,8 +58,13 @@ Consolidate → Loop — inside the existing stages and gates.
 caller — the existing Scheduler, the runtime, or a platform hook. This skill ships an executable,
 idempotent trigger/record interface (`trigger`, `record`, `cognition/recovery-log.jsonl`) with
 cooldown and per-fingerprint attempt caps; it does **not** install a daemon and does not claim
-unattended auto-triggering. A user preset the registry marks as event-triggerable is only ever
-*recommended* (`recommended_only`), never started by the trigger.
+unattended auto-triggering. A user preset the registry marks as event-triggerable follows its
+privilege tier: planning/diagnosis protocols (which cannot change scientific facts) may auto-start;
+`paradigm-escape` (controlled discovery) needs an explicit loop authorization
+(`preset_router.py authorize --scope discovery_only`) and is otherwise only *recommended*;
+`authorize` never covers execution, so no preset can auto-start a GPU job, change the anchor or
+bypass the evidence gates. `research-audit` is read-only by default — writing `assurance[]`
+requires the explicit R7 write-back flow.
 
 **When the loop stalls:** the trigger engine reads machine-readable state only and proposes
 `stagnation-breaker` (behaviour switch and smallest decision-changing intervention) or

@@ -96,7 +96,7 @@ SCOPE_PRIVILEGE: Dict[str, str] = {
     "recover_no_experiment": "derived",
     "runtime_recovery": "derived",
     "engineering_recovery": "derived",
-    "audit": "advisory",
+    "audit": "read_only",
     "plan": "advisory",
     "decision_only": "advisory",
     "discover_only": "discovery",
@@ -117,7 +117,7 @@ SCOPE_CANONICAL: Dict[str, str] = {
     "evaluation_only": "不写 canonical", "derived_only": "不写 canonical（只重建投影）",
     "recover_no_experiment": "不写 canonical",
     "runtime_recovery": "不写 canonical", "engineering_recovery": "不写 canonical",
-    "audit": "不写 canonical（只落 assurance[]，经 R7 权限）",
+    "audit": "不写 canonical（assurance[] 只在显式 R7 写回时由 R7 落盘）",
     "plan": "不写 canonical（只产出计划）", "decision_only": "不写 canonical（只产出决策）",
     "discover_only": "只经 R3—R6 写 hypotheses[]/claims[] 候选",
     "evidence_repair": "只经 R10/R11 写 claim/hypothesis 状态",
@@ -297,7 +297,8 @@ ENFORCEMENT: Tuple[Dict[str, Any], ...] = (
         reuses=("state_check", "structural_equivalence_check", "cognition", "strategy_memory"),
         writes=("research-state.json（hypotheses/claims 只经 R3—R6 权限）",),
         allowed=("提出新的数学对象/变量/假设/目标/约束", "用结构等价审计核验差异"),
-        forbidden=("把参数或模块替换当作范式改变", "跳过结构等价审计自证新颖"),
+        forbidden=("把参数或模块替换当作范式改变", "跳过结构等价审计自证新颖",
+                   "未经授权启动 GPU 或执行实验", "修改研究主锚点"),
         outputs=("representation_before", "representation_after", "axes_changed", "discriminating_test"),
         stops=("五个面均无法改变（记录边界并停手）", "新表示无法给出可判别预测"),
     ),
@@ -334,8 +335,10 @@ ENFORCEMENT: Tuple[Dict[str, Any], ...] = (
         applies_when=("出现否证/停滞/约束变化", "用户明确要求重规划"),
         reuses=("cognition", "strategy_memory", "prediction_compare", "evidence_outcome"),
         writes=("research-state.json（只经 R10/R11 权限）", "策略记忆"),
-        allowed=("重排实验/干预优先级", "登记新的不确定性", "通过 R10/R11 改 claim 状态"),
-        forbidden=("为了绕过门禁而重跑同一实验", "把无效执行当作否证"),
+        allowed=("重排实验/干预优先级（优先只影响当前合法动作排序）", "登记新的不确定性",
+                 "通过 R10/R11 改 claim 状态"),
+        forbidden=("为了绕过门禁而重跑同一实验", "把无效执行当作否证",
+                   "绕过 R10/R11 直接改科学状态", "变更主锚点（必须单独授权）"),
         outputs=("plan_before", "plan_after", "refutations_used", "next_action"),
         stops=("无合法改法（HOLD 并交人裁决）",),
     ),
@@ -354,9 +357,11 @@ ENFORCEMENT: Tuple[Dict[str, Any], ...] = (
         requires=("research-state.json",),
         reuses=("state_check", "structural_equivalence_check", "evidence_outcome",
                 "prediction_compare", "execution_gate", "rhetorical_realization"),
-        writes=("assurance[]（只经 R7 权限）", "审查报告"),
-        allowed=("报告 flaw、kill condition 与判别实验", "复用既有验证器给出规则号"),
-        forbidden=("执行 Discovery（R3—R6）", "改写证据或 claim 状态", "消耗实验预算"),
+        writes=("审查报告", "assurance[] 提案（写回由 R7 执行）"),
+        allowed=("报告 flaw、kill condition 与判别实验", "复用既有验证器给出规则号",
+                 "在显式请求（--apply）时产出 assurance[] 提案，交 R7 写回"),
+        forbidden=("执行 Discovery（R3—R6）", "改写证据或 claim 状态", "消耗实验预算",
+                   "因用户只说「审查」而隐式写 canonical"),
         outputs=("findings", "severity", "kill_conditions", "discriminating_tests"),
         stops=("审查完成即停（不自动转执行）",),
     ),
@@ -590,6 +595,9 @@ SHARED_CONTRACT_NAME = "shared-contract.md"
 ROUTER_FIXTURES_NAME = "router-fixtures.json"
 PROTOCOLS_DIRNAME = "presets"
 
+#: Sections the shared contract must carry for the protocols to be loadable.
+CONTRACT_SECTIONS: Tuple[str, ...] = ("## 权威与权限", "## 标准执行与回报")
+
 #: Which machine signal makes a registry-level trigger observable. Group B/C presets have an
 #: explicit signal in the enforcement table; this map covers the *recommend-only* forms the
 #: registry attaches to user presets.
@@ -623,6 +631,18 @@ def load_registry(root: Optional[Path] = None) -> Dict[str, Any]:
 
 def _is_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+#: Privileges a user preset may auto-start on its own: work that cannot change science or
+#: consume resources. Discovery/strategy/execution need an explicit loop authorization.
+AUTO_SAFE_PRIVILEGES: Tuple[str, ...] = ("read_only", "derived", "advisory")
+
+
+def may_auto_start(preset: Dict[str, Any]) -> bool:
+    """Whether a registry-level event trigger may start this preset without further consent."""
+    if preset.get("group") != "user":
+        return True
+    return scope_privilege(preset.get("execution_scope")) in AUTO_SAFE_PRIVILEGES
 
 
 def scope_privilege(scope: Any) -> str:
@@ -667,9 +687,19 @@ def _merge_registry(enforcement: Tuple[Dict[str, Any], ...]) -> Tuple[Dict[str, 
         auto = base.get("auto")
         if auto is None and entry["registry_trigger"] != "manual" and base["group"] == "user":
             signal = REGISTRY_TRIGGER_SIGNALS.get(entry["registry_trigger"], "stagnation")
-            auto = {"signals": (signal,), "requires":
-                    f"registry trigger={entry['registry_trigger']}；仅推荐，不自动执行",
-                    "mode": "recommend"}
+            # A user preset may auto-start only when it cannot change science or resources:
+            # read-only / derived / advisory work (plan, diagnose, repair the run) is safe to
+            # trigger; discovery, strategy and execution need an explicit loop authorization.
+            privilege = scope_privilege(entry["execution_scope"])
+            auto = {
+                "signals": (signal,),
+                "requires": (f"registry trigger={entry['registry_trigger']}；权限层 {privilege}"
+                             + ("（可在授权的 Autonomous Loop 内自动触发受控 Discovery）"
+                                if privilege in ("discovery", "strategy", "execute")
+                                else "（可直接自动触发；不改科学事实）")),
+                "mode": "recover" if privilege in ("read_only", "derived", "advisory")
+                else "recommend",
+            }
         entry["auto"] = ({**auto, "mode": auto.get("mode", "recover")} if auto else None)
         merged.append(entry)
     return tuple(merged)
@@ -757,10 +787,10 @@ def registry_errors(root: Optional[Path] = None) -> List[Diagnostic]:
                     "PR2", path, f"AUTO_SIGNAL_MAP 的 {primary!r} 不在预设声明的信号里"))
             if preset.get("group") == "recovery" and preset.get("auto") is None:
                 failures.append(Diagnostic("PR2", path, "recovery presets 必须声明 auto 触发条件"))
-            if preset.get("group") == "user" and preset.get("auto") is not None \
-                    and preset["auto"].get("mode") != "recommend":
+            if preset.get("auto") is not None and preset["auto"].get("mode") == "recover" \
+                    and not may_auto_start(preset):
                 failures.append(Diagnostic(
-                    "PR2", path, "user presets 不得自动执行（只允许 mode=recommend 的推荐）"))
+                    "PR2", path, "该预设的权限层不得自动执行（需 loop 授权）"))
         auto = preset.get("auto")
         if auto is not None:
             if not isinstance(auto, dict) or not isinstance(auto.get("signals"), tuple) \
@@ -775,9 +805,10 @@ def registry_errors(root: Optional[Path] = None) -> List[Diagnostic]:
                     failures.append(Diagnostic("PR2", path, "auto.requires 必须说明触发前提"))
                 if auto.get("mode") not in ("recover", "recommend"):
                     failures.append(Diagnostic("PR2", path, "auto.mode 必须是 recover 或 recommend"))
-                if auto.get("mode") == "recover" and preset.get("group") == "user":
+                if auto.get("mode") == "recover" and not may_auto_start(preset):
                     failures.append(Diagnostic(
-                        "PR2", path, "user 预设不得自动执行（只能是 recommend）"))
+                        "PR2", path,
+                        "该 user 预设的权限层不得自动执行（需 loop 授权，否则只能 recommend）"))
         cooldown = preset.get("cooldown_rounds")
         if not isinstance(cooldown, int) or isinstance(cooldown, bool) or cooldown < 0:
             failures.append(Diagnostic("PR2", path, "cooldown_rounds 必须是非负整数"))
@@ -1154,6 +1185,29 @@ def _portfolio_concentration(state: Dict[str, Any]) -> Dict[str, Any]:
             "converged": len(live) >= PORTFOLIO_MIN_CANDIDATES and share > PORTFOLIO_CONCENTRATION}
 
 
+#: Where the runtime records that the user authorized an autonomous loop. It lives in the
+#: scheduler telemetry (control plane), never in the canonical state.
+LOOP_AUTHORIZATION_KEY = "autonomous_loop"
+
+
+def loop_authorization(scheduler: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The recorded loop authorization, if any. `scope` bounds which privileges it covers."""
+    record = (scheduler or {}).get(LOOP_AUTHORIZATION_KEY)
+    if not isinstance(record, dict) or record.get("authorized") is not True:
+        return {"authorized": False, "scope": None, "covers": []}
+    scope = record.get("scope")
+    covers = ["read_only", "derived", "advisory"]
+    if scope in ("discovery_only", "discovery"):
+        covers += ["discovery"]
+    if scope in ("strategy", "full"):
+        covers += ["discovery", "strategy"]
+    if scope == "full":
+        covers += ["execute"]
+    return {"authorized": True, "scope": scope, "covers": covers,
+            "since_state_version": record.get("since_state_version"),
+            "note": record.get("note")}
+
+
 def signal_snapshot(
     state: Dict[str, Any],
     *,
@@ -1280,6 +1334,7 @@ def signal_snapshot(
         "pending_updates": len(updates),
         "operators": sorted({str(item.get("subject")) for item in updates}),
     }
+    signals["loop_authorization"] = loop_authorization(scheduler)
     signals["_snapshot"] = {
         "state_version": state_version,
         "scheduler_version": (scheduler or {}).get("state_version"),
@@ -1481,12 +1536,22 @@ def trigger(
             continue
         guard = _guard_candidate(signals, preset, records)
         recommended_only = preset["auto"].get("mode") == "recommend"
+        authorization = signals.get("loop_authorization") or {}
+        controlled = False
+        if recommended_only and authorization.get("authorized") \
+                and scope_privilege(preset["execution_scope"]) in authorization.get("covers", []):
+            # An authorized Autonomous Loop may start controlled Discovery — but never an
+            # experiment: the promotion is bounded by the preset's own scope.
+            recommended_only = False
+            controlled = True
         candidate = {
             "preset_id": preset["id"], "signal": signal_id,
             "priority": preset["priority"], "execution_scope": preset["execution_scope"],
             "requires_confirmation": preset["execution_scope"] == "execute"
             or scope_privilege(preset["execution_scope"]) != "read_only",
             "recommended_only": recommended_only,
+            "controlled": controlled,
+            "authorization": {"scope": authorization.get("scope")} if controlled else None,
             "reason": _signal_reason(signals, signal_id),
             "allowed": guard["allowed"] and not recommended_only,
             "blocked_by": ("recommended_only" if recommended_only else guard["reason"]),
@@ -1496,7 +1561,9 @@ def trigger(
         if signal_id == "evolution_due" and preset["id"] == "discovery-replay":
             candidate["note"] = "先做策略进化，回放用于验证其效果"
         payload["candidates"].append(candidate)
-        if payload["selected"] is None and guard["allowed"]:
+        # Select on the *candidate's* verdict: a `recommended_only` proposal has an allowed
+        # guard but must never be started by the trigger.
+        if payload["selected"] is None and candidate["allowed"]:
             payload["selected"] = candidate
     if payload["selected"] is None:
         blocked = [item for item in payload["candidates"] if not item["allowed"]]
@@ -1594,6 +1661,29 @@ def _recommend(ctx: Dict[str, Any], revisions: Optional[Sequence[Dict[str, Any]]
                                  list(revisions if revisions is not None else ctx["revisions"]))
 
 
+def r10_pending(state: Dict[str, Any]) -> List[str]:
+    """Experiments whose R9.O analysis has **not** yet been consumed by an R10/R11 repair.
+
+    `repairs[].outcome_analysis_id` is what `evidence_outcome.apply` writes, so it is the
+    canonical receipt that the transition happened. A project with a long history of analysed
+    experiments must not be told to "Revise" forever because those analyses exist.
+    """
+    repaired = {repair.get("outcome_analysis_id") for repair in state.get("repairs") or []
+                if isinstance(repair, dict)}
+    pending: List[str] = []
+    for experiment in state.get("experiments") or []:
+        if not isinstance(experiment, dict):
+            continue
+        record = experiment.get("outcome_analysis")
+        if not isinstance(record, dict):
+            continue
+        analysis = record.get("analysis") if isinstance(record.get("analysis"), dict) else {}
+        identifier = analysis.get("id")
+        if not identifier or identifier not in repaired:
+            pending.append(str(experiment.get("id")))
+    return sorted(pending)
+
+
 def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
     state = ctx["state"]
     contract = state.get("contract") or {}
@@ -1617,8 +1707,14 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
         return {"phase": "R9.O", "step": "Verify", "action": "分析已有结果并登记收据",
                 "blocked": False}
     if analysis:
-        return {"phase": "R10/R11", "step": "Revise",
-                "action": "按 R10 迁移 claim/hypothesis 状态并修订记忆", "blocked": False}
+        pending = r10_pending(state)
+        if pending:
+            return {"phase": "R10/R11", "step": "Revise",
+                    "action": f"为 {pending} 完成 R10/R11 迁移（其余历史结果已处理）",
+                    "blocked": False, "pending_r10": pending}
+        return {"phase": "R11+", "step": "Consolidate",
+                "action": "历史结果都已走完 R10/R11：重建认知投影并进入下一轮发现",
+                "blocked": False, "pending_r10": []}
     return {"phase": "R3", "step": "Discover", "action": "继续发现候选", "blocked": False}
 
 
@@ -1909,6 +2005,13 @@ def _handle_research_audit(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                  "detail": f"执行前识别性门禁未通过：{gate.get('errors') or gate.get('status')}"})
     severity = "high" if any(item["rule"] in ("V1", "V2", "V3", "V19", "V20") for item in findings) \
         else ("medium" if findings else "none")
+    # Decision: a plain "audit" never touches the canonical state. Persisting an attack into
+    # `assurance[]` is an explicit, separate step through R7; `--apply` only *proposes* it here
+    # (the write itself belongs to R7, so this preset stays read-only).
+    proposal = [{"target": item["path"], "kill_condition": item["detail"],
+                 "discriminating_test": "TBD", "verification_tier": "T0"}
+                for item in findings[:5]] if apply else []
+    writes: List[str] = []
     steps = [
         {"step": "1 canonical 校验", "command": f"python3 scripts/state_check.py {ctx['state_path']}"},
         {"step": "2 结构等价审计", "command": "python3 scripts/structural_equivalence_check.py check --route <route>"},
@@ -1918,11 +2021,16 @@ def _handle_research_audit(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     return _result(preset, "OK",
                    observed={"findings": findings, "counts": {"total": len(findings)},
                              "severity": severity},
-                   decision={"read_only": True,
+                   decision={"read_only": not apply,
                              "discovery_started": False,
-                             "kill_conditions": [item["detail"] for item in findings[:3]]},
-                   steps=steps, writes=[], changed_decision=None,
-                   next_action="把 findings 交给 R7 落 assurance[]（本预设不执行 Discovery）")
+                             "kill_conditions": [item["detail"] for item in findings[:3]],
+                             "assurance_proposal": proposal,
+                             "writeback_flow": "R7（仅显式请求时）" if apply else None,
+                             "note": "普通审查默认只读；写 assurance[] 必须显式经 R7 写回流程，"
+                                     "不得因用户只说「审查」而隐式改 canonical"},
+                   steps=steps, writes=writes, changed_decision=None,
+                   next_action=("把 assurance_proposal 交给 R7 写回" if proposal
+                                else "把 findings 交给 R7 落 assurance[]（本预设不执行 Discovery）"))
 
 
 def _handle_research_review(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
@@ -2410,7 +2518,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(description="Research preset library, intent router and loop recovery")
     parser.add_argument("command", nargs="?",
                         choices=["list", "resolve", "inspect", "check", "trigger", "run",
-                                 "record", "load"])
+                                 "record", "load", "authorize"])
     parser.add_argument("--state", help="path to research-state.json")
     parser.add_argument("--cognition", help="path to the cognition directory")
     parser.add_argument("--scheduler", help="path to scheduler.json")
@@ -2418,6 +2526,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--preset", help="preset id")
     parser.add_argument("--signal", help="signal fingerprint for `record`")
     parser.add_argument("--outcome", help="observed outcome for `record`")
+    parser.add_argument("--scope", help="authorize: discovery_only | strategy | full")
+    parser.add_argument("--revoke", action="store_true", help="authorize: revoke the loop")
     parser.add_argument("--changed-decision", action="store_true",
                         help="record that the recovery changed the next decision")
     parser.add_argument("--apply", action="store_true",
@@ -2499,12 +2609,26 @@ def load_preset_context(preset_id: str, root: Optional[Path] = None
     preset = presets_by_id().get(preset_id)
     if preset is None:
         return ({"error": f"unknown preset: {preset_id}", "known": list(PRESET_IDS)}, EXIT_ENV)
-    contract = root / SHARED_CONTRACT_NAME
-    protocol = root / preset["protocol"]
-    if not protocol.is_file():
+    contract_path = root / SHARED_CONTRACT_NAME
+    protocol_path = root / preset["protocol"]
+    if not contract_path.is_file():
+        return ({"error": f"shared contract not found: {SHARED_CONTRACT_NAME}",
+                 "preset_id": preset_id}, EXIT_ENV)
+    if not protocol_path.is_file():
         return ({"error": f"protocol not found: {preset['protocol']}", "preset_id": preset_id},
                 EXIT_ENV)
-    text = protocol.read_text(encoding="utf-8")
+    # The contract is *loaded*, not merely named: it is read here, checked for the sections the
+    # protocols rely on, and returned with the one selected protocol. Nothing else is read.
+    contract_text = contract_path.read_text(encoding="utf-8")
+    protocol_text = protocol_path.read_text(encoding="utf-8")
+    problems: List[str] = []
+    if not contract_text.strip():
+        problems.append("shared contract is empty")
+    missing = [section for section in CONTRACT_SECTIONS if section not in contract_text]
+    if missing:
+        problems.append(f"shared contract is missing sections: {missing}")
+    if SHARED_CONTRACT_NAME not in protocol_text:
+        problems.append("the protocol does not reference the shared contract")
     return ({
         "schema": SCHEMA_ROUTER,
         "preset_id": preset_id,
@@ -2512,12 +2636,18 @@ def load_preset_context(preset_id: str, root: Optional[Path] = None
         "execution_scope": preset["execution_scope"],
         "privilege": scope_privilege(preset["execution_scope"]),
         "registry_trigger": preset.get("registry_trigger"),
-        "load": [SHARED_CONTRACT_NAME, preset["protocol"]],
+        "loaded": [SHARED_CONTRACT_NAME, preset["protocol"]],
+        "contract_chars": len(contract_text),
+        "contract_sections": [section for section in CONTRACT_SECTIONS
+                              if section in contract_text],
+        "contract_text": contract_text,
         "loaded_references": [f"scripts/{name}.py" for name in preset["reuses"]],
         "not_loaded": [item for item in PRESET_IDS if item != preset_id],
-        "protocol_chars": len(text),
-        "protocol_text": text,
-    }, EXIT_OK)
+        "protocol_chars": len(protocol_text),
+        "protocol_text": protocol_text,
+        "problems": problems,
+        "status": "PASS" if not problems else "FAIL",
+    }, EXIT_OK if not problems else EXIT_HARD)
 
 
 def run_router_fixtures(path: Optional[Path] = None, root: Optional[Path] = None
@@ -2545,6 +2675,51 @@ def run_router_fixtures(path: Optional[Path] = None, root: Optional[Path] = None
     failed = [item for item in results if not item["ok"]]
     return {"status": "PASS" if not failed else "FAIL", "total": len(results),
             "passed": len(results) - len(failed), "failed": failed, "cases": results}
+
+
+def op_authorize(args: argparse.Namespace) -> int:
+    """Record (or revoke) the user's authorization for an autonomous loop.
+
+    Written to the scheduler telemetry — never to the canonical state — and read by the trigger
+    to decide whether a user preset may auto-start controlled Discovery. Without it, such a
+    preset is only ever recommended.
+    """
+    if not args.state:
+        print("argument error: --state is required", file=sys.stderr)
+        return EXIT_ERROR
+    state_path = Path(args.state).expanduser()
+    scheduler_path = (Path(args.scheduler).expanduser() if args.scheduler
+                      else state_path.parent / cg.SCHEDULER_NAME)
+    scheduler: Dict[str, Any] = {}
+    if scheduler_path.is_file():
+        try:
+            parsed = json.loads(scheduler_path.read_text(encoding="utf-8"))
+            scheduler = parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            scheduler = {}
+    state = cg.load_state(state_path)
+    if args.revoke:
+        scheduler.pop(LOOP_AUTHORIZATION_KEY, None)
+        action = "revoked"
+    else:
+        scope = args.scope or "discovery_only"
+        if scope not in ("discovery_only", "strategy", "full"):
+            print("argument error: --scope must be discovery_only | strategy | full",
+                  file=sys.stderr)
+            return EXIT_ERROR
+        scheduler[LOOP_AUTHORIZATION_KEY] = {
+            "authorized": True, "scope": scope,
+            "since_state_version": state.get("state_version"),
+            "note": "用户授权：可在该范围内自动触发受控 Discovery；不启动 GPU、不改锚点",
+        }
+        action = "authorized"
+    scheduler_path.write_text(json.dumps(scheduler, ensure_ascii=False, indent=2) + "\n",
+                              encoding="utf-8")
+    print(json.dumps({"schema": SCHEMA_ROUTER, "action": action,
+                      "scheduler": str(scheduler_path),
+                      "authorization": loop_authorization(scheduler)},
+                     ensure_ascii=False, indent=2))
+    return EXIT_OK
 
 
 def op_load(args: argparse.Namespace) -> int:
@@ -2658,6 +2833,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return op_record(args)
     if args.command == "load":
         return op_load(args)
+    if args.command == "authorize":
+        return op_authorize(args)
     print(f"argument error: unknown command {args.command!r}", file=sys.stderr)
     return EXIT_ERROR
 
@@ -2736,8 +2913,9 @@ def selftest() -> int:
               for preset in PRESETS for name in preset["reuses"]))
     check("one handler per preset", set(HANDLERS) == set(PRESET_IDS))
     check("every auto preset maps to a signal", set(AUTO_SIGNAL_MAP) <= set(PRESET_IDS))
-    check("user presets are never auto-*started*",
+    check("user presets auto-start only when the privilege rule allows it",
           all(preset["auto"] is None or preset["auto"].get("mode") == "recommend"
+              or may_auto_start(preset)
               for preset in PRESETS if preset["group"] == "user"))
     check("recovery presets recover, not merely recommend",
           all(preset["auto"] and preset["auto"].get("mode") == "recover"
@@ -2748,7 +2926,8 @@ def selftest() -> int:
     loaded, load_code = load_preset_context("research-review")
     check("a call loads exactly one protocol",
           load_code == EXIT_OK and len(loaded.get("not_loaded") or []) == 15
-          and loaded.get("load") == [SHARED_CONTRACT_NAME, "presets/research-review.md"])
+          and loaded.get("loaded") == [SHARED_CONTRACT_NAME, "presets/research-review.md"]
+          and loaded.get("contract_text"))
 
     # --- intent routing -------------------------------------------------------
     for preset in PRESETS:

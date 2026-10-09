@@ -178,7 +178,7 @@ class TestIntentRouting(unittest.TestCase):
         for text, expected_privilege in (("总结进展", {"read_only"}),
                                          ("汇报一下", {"read_only"}),
                                          ("现在到底取得了什么科学进展", {"read_only"}),
-                                         ("审查目前的方法和实验", {"read_only", "advisory"}),
+                                         ("审查目前的方法和实验", {"read_only"}),
                                          ("检查 Loop 是否正在原地打转", {"read_only"})):
             result = pr.resolve(text)
             privilege = pr.scope_privilege(result["execution_scope"])
@@ -274,7 +274,11 @@ class TestRegistryParity(unittest.TestCase):
         for preset in pr.PRESETS:
             if preset["group"] == "user":
                 if preset["auto"] is not None:
-                    self.assertEqual(preset["auto"]["mode"], "recommend", preset["id"])
+                    if preset["auto"]["mode"] == "recover":
+                        self.assertIn(pr.scope_privilege(preset["execution_scope"]),
+                                      pr.AUTO_SAFE_PRIVILEGES, preset["id"])
+                    else:
+                        self.assertEqual(preset["auto"]["mode"], "recommend", preset["id"])
             else:
                 self.assertIsNotNone(preset["auto"], preset["id"])
                 self.assertEqual(preset["auto"]["mode"], "recover", preset["id"])
@@ -533,9 +537,8 @@ class TestScientificBehaviour(unittest.TestCase):
             self.assertEqual(payload["entry"], "audit")
             self.assertTrue(payload["decision"]["discovery_started"] is False)
             self.assertEqual(payload["execution_scope"], "audit")
-            self.assertEqual(pr.scope_privilege(payload["execution_scope"]), "advisory")
-            self.assertNotIn(pr.scope_privilege(payload["execution_scope"]),
-                             ("discovery", "strategy", "execute"))
+            self.assertEqual(pr.scope_privilege(payload["execution_scope"]), "read_only")
+            self.assertTrue(payload["decision"]["read_only"])
             for step in payload["steps"]:
                 self.assertNotIn("experiment_execute.py run", step["command"])
 
@@ -935,7 +938,9 @@ class TestProvidedLibraryIntegration(unittest.TestCase):
     def test_only_the_selected_preset_is_loaded(self):
         payload, code = pr.load_preset_context("research-review")
         self.assertEqual(code, pr.EXIT_OK)
-        self.assertEqual(payload["load"], ["shared-contract.md", "presets/research-review.md"])
+        self.assertEqual(payload["loaded"], ["shared-contract.md", "presets/research-review.md"])
+        self.assertEqual(payload["status"], "PASS")
+        self.assertIn("## 权威与权限", payload["contract_text"])
         self.assertEqual(len(payload["not_loaded"]), 15)
         text = payload["protocol_text"]
         self.assertIn("research-review", text)
@@ -944,11 +949,19 @@ class TestProvidedLibraryIntegration(unittest.TestCase):
         self.assertLess(payload["protocol_chars"], 12000)
         self.assertEqual(pr.load_preset_context("no-such-preset")[1], pr.EXIT_ENV)
 
-    def test_a_user_preset_can_only_be_recommended_by_the_trigger(self):
-        recommend = [p for p in pr.PRESETS if p["group"] == "user" and p["auto"]]
-        self.assertTrue(recommend, "the registry marks some user presets as event-triggerable")
-        for preset in recommend:
-            self.assertEqual(preset["auto"]["mode"], "recommend")
+    def test_user_preset_auto_modes_follow_the_privilege_rule(self):
+        """Decision: planning/diagnosis may auto-run; discovery needs a loop authorization."""
+        user_auto = [p for p in pr.PRESETS if p["group"] == "user" and p["auto"]]
+        self.assertTrue(user_auto, "the registry marks some user presets as event-triggerable")
+        for preset in user_auto:
+            mode = preset["auto"]["mode"]
+            privilege = pr.scope_privilege(preset["execution_scope"])
+            if mode == "recover":
+                self.assertIn(privilege, pr.AUTO_SAFE_PRIVILEGES, preset["id"])
+            else:
+                self.assertEqual(mode, "recommend", preset["id"])
+        self.assertEqual(pr.presets_by_id()["paradigm-escape"]["auto"]["mode"], "recommend")
+        self.assertEqual(pr.presets_by_id()["scientific-replanning"]["auto"]["mode"], "recover")
         with tempfile.TemporaryDirectory() as temp:
             state_path = pr._fixture(pathlib.Path(temp) / "A")
             cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
@@ -968,7 +981,7 @@ class TestProvidedLibraryIntegration(unittest.TestCase):
             for candidate in recommended:
                 self.assertFalse(candidate["allowed"])
                 self.assertEqual(candidate["blocked_by"], "recommended_only")
-                self.assertIn(candidate["preset_id"], [p["id"] for p in recommend])
+                self.assertIn(candidate["preset_id"], [p["id"] for p in user_auto])
             if decision["selected"]:
                 self.assertFalse(decision["selected"].get("recommended_only"))
 
@@ -1000,9 +1013,15 @@ class TestProvidedLibraryIntegration(unittest.TestCase):
                     self.assertTrue(payload["canonical_untouched"], preset["id"])
                 if privilege == "read_only":
                     self.assertEqual(payload["writes"], [], preset["id"])
-                self.assertIn(pr.SCOPE_CANONICAL[preset["execution_scope"]],
-                              (ROOT / preset["protocol"]).read_text(encoding="utf-8")
-                              if False else [pr.SCOPE_CANONICAL[preset["execution_scope"]]])
+                # The protocol must state the canonical write policy of its scope, and a
+                # non-execute protocol must not have written anything.
+                protocol_text = (ROOT / preset["protocol"]).read_text(encoding="utf-8")
+                self.assertIn(pr.SCOPE_CANONICAL[preset["execution_scope"]], protocol_text,
+                              preset["id"])
+                if privilege != "execute":
+                    self.assertEqual(payload["writes"] if privilege == "read_only" else
+                                     [item for item in payload["writes"]
+                                      if "research-state.json" in item], [], preset["id"])
             self.assertEqual(state_path.read_bytes(), before)
 
     def test_cross_session_recovery_keeps_the_next_round_legal(self):
@@ -1024,6 +1043,135 @@ class TestProvidedLibraryIntegration(unittest.TestCase):
             if ledger.is_file():
                 records, _ = pr.load_ledger(ledger)
                 self.assertLessEqual(len(records), 20)
+
+
+# ---------------------------------------------------------------------------
+# Review fixes: selection, contract loading, R10 completion, audit read-only
+# ---------------------------------------------------------------------------
+
+class TestReviewFixes(unittest.TestCase):
+
+    def test_a_recommended_only_candidate_is_never_started(self):
+        """The trigger must select on the candidate verdict, not on the raw guard."""
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
+            context = pr.project_context(state_path)
+            scheduler = {"state_version": 4, "next_actions": [],
+                         "eig_calibration": {"records": [
+                             {"experiment": "X0", "predicted_information_gain": "high",
+                              "actual_information_gain": "zero", "observed_delta": {}}] * 3},
+                         "operator_stats": {"by_operator": {},
+                                            "recurring_failure_patterns": []}}
+            decision = pr.trigger(context["state"], index=context["index_on_disk"],
+                                  scheduler=scheduler, revisions=context["revisions"],
+                                  projection=context["index"])
+            recommended = [c for c in decision["candidates"] if c.get("recommended_only")]
+            self.assertTrue(recommended)
+            for candidate in recommended:
+                self.assertFalse(candidate["allowed"])
+                self.assertNotEqual((decision["selected"] or {}).get("preset_id"),
+                                    candidate["preset_id"])
+            if decision["selected"]:
+                self.assertTrue(decision["selected"]["allowed"])
+                self.assertFalse(decision["selected"].get("recommended_only"))
+
+    def test_a_loop_authorization_promotes_controlled_discovery(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
+            scheduler_path = state_path.parent / cg.SCHEDULER_NAME
+            scheduler = {"state_version": 4, "next_actions": [],
+                         "eig_calibration": {"records": [
+                             {"experiment": "X0", "predicted_information_gain": "high",
+                              "actual_information_gain": "zero", "observed_delta": {}}] * 3},
+                         "operator_stats": {"by_operator": {},
+                                            "recurring_failure_patterns": []}}
+            scheduler_path.write_text(json.dumps(scheduler), encoding="utf-8")
+            code = pr.main(["authorize", "--state", str(state_path),
+                            "--scope", "discovery_only"])
+            self.assertEqual(code, pr.EXIT_OK)
+            context = pr.project_context(state_path)
+            decision = pr.trigger(context["state"], index=context["index_on_disk"],
+                                  scheduler=context["scheduler"], revisions=context["revisions"],
+                                  projection=context["index"])
+            promoted = [c for c in decision["candidates"]
+                        if c.get("controlled") and c["preset_id"] == "paradigm-escape"]
+            self.assertTrue(promoted, "an authorized loop should allow controlled discovery")
+            self.assertTrue(promoted[0]["allowed"])
+            self.assertEqual(promoted[0]["authorization"]["scope"], "discovery_only")
+            # `discovery_only` never covers execution.
+            self.assertNotIn("execute", pr.loop_authorization(context["scheduler"])["covers"])
+            self.assertEqual(pr.main(["authorize", "--state", str(state_path), "--revoke"]),
+                             pr.EXIT_OK)
+            context = pr.project_context(state_path)
+            decision = pr.trigger(context["state"], index=context["index_on_disk"],
+                                  scheduler=context["scheduler"], revisions=context["revisions"],
+                                  projection=context["index"])
+            self.assertFalse([c for c in decision["candidates"] if c.get("controlled")])
+            again = [c for c in decision["candidates"]
+                     if c["preset_id"] == "paradigm-escape"]
+            self.assertTrue(again and again[0]["recommended_only"])
+
+    def test_load_actually_reads_the_shared_contract(self):
+        payload, code = pr.load_preset_context("strategy-evolution")
+        self.assertEqual(code, pr.EXIT_OK)
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["problems"], [])
+        self.assertIn("## 权威与权限", payload["contract_text"])
+        self.assertIn("## 标准执行与回报", payload["contract_text"])
+        self.assertEqual(payload["contract_sections"], list(pr.CONTRACT_SECTIONS))
+        self.assertGreater(payload["contract_chars"], 500)
+        self.assertIn("shared-contract.md", payload["protocol_text"])
+        self.assertEqual(payload["loaded"], ["shared-contract.md", "presets/strategy-evolution.md"])
+        # A missing contract is an environment error, not a silent pass.
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "presets").mkdir()
+            (root / "presets" / "research-review.md").write_text("x", encoding="utf-8")
+            _, missing = pr.load_preset_context("research-review", root=root)
+            self.assertEqual(missing, pr.EXIT_ENV)
+
+    def test_r10_completion_stops_the_revise_loop(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["experiments"][0].update({
+                "status": "done", "result_at_state_version": 4,
+                "outcome_analysis": {"packet": {}, "analysis": {"id": "AN1", "outcome": "POSITIVE_EVIDENCE"},
+                                     "audit": None}})
+            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(pr.r10_pending(state), ["X1"])
+            payload, _, _ = pr.run_preset("research-loop", state_path)
+            self.assertEqual(payload["observed"]["current"]["step"], "Revise")
+            state["repairs"] = [{"flaw": "f", "disposition": "REPAIR_CLAIM", "state_delta": "d",
+                                 "closure": "RESOLVED", "targets": ["C1"],
+                                 "source_review": None, "outcome_analysis_id": "AN1"}]
+            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(pr.r10_pending(state), [])
+            payload, _, _ = pr.run_preset("research-loop", state_path)
+            self.assertNotEqual(payload["observed"]["current"]["step"], "Revise")
+            self.assertEqual(payload["observed"]["current"]["step"], "Consolidate")
+
+    def test_a_plain_audit_never_writes_and_proposes_only_on_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["claims"][0]["supporting_evidence"] = ["E9"]      # a real finding to report
+            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            before = state_path.read_bytes()
+            payload, _, _ = pr.run_preset("research-audit", state_path)
+            self.assertEqual(payload["writes"], [])
+            self.assertTrue(payload["decision"]["read_only"])
+            self.assertEqual(payload["decision"]["assurance_proposal"], [])
+            self.assertIsNone(payload["decision"]["writeback_flow"])
+            self.assertEqual(state_path.read_bytes(), before)
+            proposed, _, _ = pr.run_preset("research-audit", state_path, apply=True)
+            self.assertTrue(proposed["decision"]["assurance_proposal"])
+            self.assertEqual(proposed["decision"]["writeback_flow"], "R7（仅显式请求时）")
+            self.assertEqual(proposed["writes"], [])
+            self.assertTrue(proposed["canonical_untouched"])
+            self.assertEqual(state_path.read_bytes(), before)
 
 
 if __name__ == "__main__":
