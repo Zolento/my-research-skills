@@ -56,6 +56,14 @@ Consolidate → Loop — inside the existing stages and gates.
 
 **v2.3.2 — R10/R11 loop liveness:**
 
+**Execution previews are side-effect free (v2.3.3):** `experiment_execute.py run` without
+`--execute` re-checks every gate under the ledger lock and returns
+`preview: true / consumed: false / would_execute / budget` without writing a `consume` event — so a
+preview can no longer burn GPU hours, pilot runs or the single-use receipt, and the same receipt
+still executes for real afterwards. A real `--execute` consumes atomically before the external
+command starts. Ledgers written before this fix keep their historical `dry_run: true` events
+readable and those events no longer count against the budget.
+
 **Loop completion is validator-backed:** a terminal experiment is done with R10/R11 only when its
 `outcome_analysis` transaction passes `evidence_outcome.state_errors()` — not when a `repairs[]`
 entry happens to exist (`NEGATIVE_EVIDENCE`, `INVALID_EXPERIMENT`, hypothesis-only and partial-scope

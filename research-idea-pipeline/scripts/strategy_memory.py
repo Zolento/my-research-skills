@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import cognition as cg
+import evidence_outcome as eo
 import state_check as sc
 
 Diagnostic = cg.Diagnostic
@@ -910,19 +911,84 @@ def action_affinity(action: Dict[str, Any], state: Dict[str, Any],
     return {"aligned": False, "basis": "no declared link to the advice"}
 
 
+#: Scheduler error codes that invalidate the whole selection, not one action. An error with no
+#: experiment id is treated as global too: authorization is never decided by the shape of an
+#: English message.
+SCHEDULER_GLOBAL_ERRORS: Tuple[str, ...] = ("STALE_SCHEDULER", "STATE_INVALID")
+
+
+def scheduler_verdict(state: Dict[str, Any],
+                      scheduler: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The scheduler's overall verdict plus a structural per-action legality check.
+
+    Fail-closed: when the scheduler as a whole is not PASS, no action is legal. Local errors are
+    re-derived from canonical state (plan gate, status, execution hold, PEIG) instead of being
+    read out of an error string, so a message-format change cannot silently authorize dispatch.
+    """
+    import execution_gate as eg
+    import state_check as sc
+    report = eg.scheduler_check(state, scheduler or {})
+    errors = [str(item) for item in report.get("errors") or []]
+    # Authorization never depends on the shape of an English error message: the scheduler must be
+    # PASS as a whole. The attribution below is *reporting only* (which ids are implicated), so a
+    # message-format change cannot widen the dispatch set.
+    passed = report.get("status") == "PASS"
+    global_errors = [item for item in errors
+                     if item in SCHEDULER_GLOBAL_ERRORS or ": " not in item]
+    local = {item.split(": ", 1)[1]: item for item in errors if ": " in item}
+    actions = [action for action in (scheduler or {}).get("next_actions") or []
+               if isinstance(action, dict)]
+    legal: List[Dict[str, Any]] = []
+    blocked: List[str] = []
+    state_ok = None
+    for action in actions:
+        identifier = str(action.get("action"))
+        if not passed:
+            blocked.append(identifier)
+            continue
+        if identifier in local:
+            blocked.append(identifier)
+            continue
+        experiment = None
+        for item in state.get("experiments") or []:
+            if isinstance(item, dict) and str(item.get("id")) == identifier:
+                experiment = item
+                break
+        if experiment is None:
+            # A non-experiment action (H<n>/P<n>/R<n>/…) has no execution to authorize.
+            legal.append(action)
+            continue
+        if state_ok is None:
+            state_ok = sc.check_state(state).ok
+        reason = None
+        if not state_ok:
+            reason = "STATE_INVALID"
+        elif experiment.get("status") != "planned":
+            reason = f"{identifier}: experiment is not planned"
+        elif eo._check_plan(state, identifier)["status"] != "PASS":
+            reason = f"{identifier}: stop-rule-blocked plan"
+        elif experiment.get("execution_blocked_by"):
+            reason = f"{identifier}: explicit execution hold"
+        elif experiment.get("execution_protocol") and \
+                eg.peig(state, identifier)["status"] == "HOLD":
+            reason = f"{identifier}: PEIG HOLD"
+        if reason:
+            local.setdefault(identifier, reason)
+            blocked.append(identifier)
+        else:
+            legal.append(action)
+    return {"status": report.get("status"), "passed": passed, "errors": errors,
+            "global_errors": global_errors, "local_errors": local,
+            "blocked_actions": sorted(set(blocked)), "legal_actions": legal}
+
+
 def _legal_actions(
     state: Dict[str, Any],
     scheduler: Optional[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """The action set that already passes the hard gates, plus the blocked ids."""
-    import execution_gate as eg
-    actions = [action for action in (scheduler or {}).get("next_actions") or []
-               if isinstance(action, dict)]
-    report = eg.scheduler_check(state, scheduler or {})
-    errors = list(report.get("errors") or [])
-    blocked = sorted({error.split(": ", 1)[1] for error in errors if ": " in error})
-    legal = [action for action in actions if str(action.get("action")) not in blocked]
-    return legal, blocked
+) -> Tuple[List[Dict[str, Any]], List[str], Dict[str, Any]]:
+    """The legal action set, the blocked ids, and the full scheduler verdict."""
+    verdict = scheduler_verdict(state, scheduler)
+    return verdict["legal_actions"], verdict["blocked_actions"], verdict
 
 
 def _order_actions(
@@ -963,7 +1029,7 @@ def strategy_decision(
     """
     import prediction_compare as pc
     advice = recommend_strategy(state, index, scheduler, revisions)
-    legal, blocked = _legal_actions(state, scheduler)
+    legal, blocked, verdict = _legal_actions(state, scheduler)
     without = _order_actions(state, legal, None)
     with_memory = _order_actions(state, legal, advice)
     before_first = without[0] if without else None
@@ -972,7 +1038,9 @@ def strategy_decision(
                          if before_first and item["tier_rank"] == before_first["tier_rank"]])
     adopted = bool(before_first and after_first
                    and before_first.get("action") != after_first.get("action"))
-    if not legal:
+    if not verdict["passed"]:
+        reason = "scheduler_check_failed"
+    elif not legal:
         reason = "no_legal_action"
     elif not adopted and top_tier_size <= 1:
         reason = "single_candidate_in_tier"
@@ -991,7 +1059,9 @@ def strategy_decision(
                    "island": advice.get("island"), "shift": advice.get("shift"),
                    "basis": advice.get("basis"), "reason": advice.get("reason")},
         "discovery_operator": advice.get("operator"),
-        "hard_gates": {"scheduler_check": "PASS" if not blocked else "FAIL",
+        "hard_gates": {"scheduler_check": "PASS" if verdict["passed"] else "FAIL",
+                       "scheduler_status": verdict["status"],
+                       "global_errors": verdict["global_errors"],
                        "blocked_actions": blocked,
                        "switch_action": switch.get("action")},
         "candidates_before": [{key: item.get(key) for key in
@@ -1064,6 +1134,40 @@ def latest_strategy_decision(scheduler: Optional[Dict[str, Any]]) -> Optional[Di
 # Validation of recorded strategy updates
 # ---------------------------------------------------------------------------
 
+#: Longest `note` written into a strategy revision payload.
+STRATEGY_NOTE_LIMIT = 400
+
+
+def revision_payload(update: Dict[str, Any]) -> Dict[str, Any]:
+    """Project a rich strategy update into the canonical `strategy_update` revision payload.
+
+    `cognition.PAYLOAD_KEYS['strategy_update']` accepts only
+    `note / priors / operator / action / evidence / observations`. `strategy_updates()` carries
+    structured `scope`, `reactivation_conditions` and `telemetry` as well; writing those keys
+    verbatim made every committed strategy revision fail `CM1`. The structure is preserved under
+    `priors` (free-form by contract) and mirrored in a human-readable `note`, so nothing is lost
+    and no validator is weakened.
+    """
+    after = update.get("after") if isinstance(update.get("after"), dict) else {}
+    refs = update.get("refs") if isinstance(update.get("refs"), dict) else {}
+    note_parts = [str(update.get("summary") or "")]
+    if after.get("scope"):
+        note_parts.append("scope: " + str(after["scope"]))
+    conditions = after.get("reactivation_conditions")
+    if conditions:
+        note_parts.append("reactivation: " + "; ".join(str(item) for item in conditions))
+    carried = {key: copy.deepcopy(after[key])
+               for key in ("scope", "reactivation_conditions", "telemetry") if key in after}
+    payload: Dict[str, Any] = {
+        "note": " | ".join(part for part in note_parts if part)[:STRATEGY_NOTE_LIMIT],
+        "operator": after.get("operator"), "action": after.get("action"),
+        "priors": carried or None,
+        "evidence": list(refs.get("evidence") or []),
+        "observations": list(refs.get("hypotheses") or []) + list(refs.get("failures") or []),
+    }
+    return {key: value for key, value in payload.items() if value not in (None, [], {})}
+
+
 def validate_strategy_revisions(
     state: Dict[str, Any],
     revisions: Sequence[Dict[str, Any]],
@@ -1088,7 +1192,7 @@ def validate_strategy_revisions(
         if operator is not None and operator not in sc.OPERATORS:
             diagnostics.append(Diagnostic(
                 "SV5", path, f"未知算子 {operator!r}；不得自创探索算子"))
-        if record.get("actor") not in ("R3", "R4", "R5", "R6", "R11", "CIE"):
+        if record.get("actor") not in cg.STRATEGY_REVISION_ACTORS:
             diagnostics.append(Diagnostic(
                 "SV6", path, "strategy_update 只能由 Discovery 或 Meta-Controller 追加；"
                              "R12 / R13 / R14 不写认知层"))

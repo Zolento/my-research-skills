@@ -1781,13 +1781,156 @@ def _r10_covered(state: Dict[str, Any], experiment_id: str,
     return bool(item) and item["status"] == R10_COMMITTED
 
 
-def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    """Choose the next loop step from **per-experiment** todo state.
+#: Where a post-update Assurance artifact lives, next to the route's state. It is a *derived*
+#: control-plane artifact: the canonical state stays the only scientific authority, and R7 owns
+#: the review. `evidence_outcome.decision --assurance <file>` accepts exactly this document.
+OUTCOME_ASSURANCE_SUBDIR: Tuple[str, ...] = ("assurance", "outcome")
+SCHEMA_OUTCOME_ASSURANCE = "evidence-outcome-assurance@1"
 
-    A global "has any analysis" test cannot express this: it hid unanalysed experiments behind
-    historical ones and turned repair-less (but legally committed) transactions into an endless
-    `Revise`. Ordering: contract → candidates → damaged receipts (hold) → missing analyses →
-    planned/running work → consolidate a stale projection → the Scheduler's next legal action.
+#: Assurance lifecycle states. `PENDING`/`STALE` keep the gate at `NEEDS_REVIEW`; `FAILED`
+#: blocks; `CONSUMED` means the real `decision_gate` accepted it.
+ASSURANCE_PENDING = "PENDING"
+ASSURANCE_VERIFIED = "VERIFIED"
+ASSURANCE_FAILED = "FAILED"
+ASSURANCE_STALE = "STALE"
+
+#: A superseded analysis (a later result already reassessed its targets) needs no review of its
+#: own: `decision_gate` says so itself, and treating it as pending would block the loop forever.
+ASSURANCE_SUPERSEDED = "SUPERSEDED"
+
+
+def outcome_assurance_path(route_dir: Optional[Path], analysis_id: Any) -> Optional[Path]:
+    """The conventional location of the Assurance for one committed analysis."""
+    if route_dir is None or not analysis_id:
+        return None
+    return Path(route_dir).joinpath(*OUTCOME_ASSURANCE_SUBDIR, f"{analysis_id}.json")
+
+
+def load_outcome_assurance(route_dir: Optional[Path],
+                           analysis_id: Any) -> Dict[str, Any]:
+    """Read the Assurance artifact for an analysis, if one is on disk.
+
+    Only the document shape is checked here; the authoritative verification (state/analysis
+    digests and every check verdict) stays inside `evidence_outcome.decision_gate`, so this can
+    never upgrade a review into a pass.
+    """
+    path = outcome_assurance_path(route_dir, analysis_id)
+    if path is None or not path.is_file():
+        return {"found": False, "path": None, "assurance": None}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return {"found": True, "path": str(path), "assurance": None,
+                "problem": "unreadable assurance artifact"}
+    if not isinstance(payload, dict) or payload.get("schema") != SCHEMA_OUTCOME_ASSURANCE:
+        return {"found": True, "path": str(path), "assurance": None,
+                "problem": "unexpected assurance schema"}
+    return {"found": True, "path": str(path), "assurance": payload}
+
+
+def assurance_status(state: Dict[str, Any],
+                     route_dir: Optional[Path]) -> Dict[str, Dict[str, Any]]:
+    """Per-experiment post-update Assurance state, checked with the real `decision_gate`.
+
+    A missing artifact stays `PENDING` (NEEDS_REVIEW), a failing check is `FAILED`, and an
+    artifact whose binding digests no longer match the state is `STALE`: it must be re-reviewed,
+    not reused and not treated as a failure of the science.
+    """
+    status: Dict[str, Dict[str, Any]] = {}
+    for experiment in state.get("experiments") or []:
+        if not isinstance(experiment, dict):
+            continue
+        receipt = experiment.get("outcome_analysis")
+        if not isinstance(receipt, dict):
+            continue
+        analysis = receipt.get("analysis") if isinstance(receipt.get("analysis"), dict) else {}
+        # Ask the real gate even without an artifact: it reports whether a *later* result already
+        # reassessed this analysis's targets. Such an analysis needs no review of its own and must
+        # not keep the loop parked on a review nobody owes.
+        baseline = eo.decision_gate(state, str(experiment.get("id")))
+        baseline_reason = "; ".join(str(item.get("reason", item))
+                                   for item in baseline.get("decisions") or [])
+        if baseline.get("status") != "PASS" and "superseded" in baseline_reason.lower():
+            status[str(experiment.get("id"))] = {
+                "status": ASSURANCE_SUPERSEDED, "gate": baseline.get("status"),
+                "source": "superseded", "analysis_id": analysis.get("id"), "path": None,
+                "reason": baseline_reason}
+            continue
+        loaded = load_outcome_assurance(route_dir, analysis.get("id"))
+        if not loaded["found"]:
+            status[str(experiment.get("id"))] = {
+                "status": ASSURANCE_PENDING, "gate": "NEEDS_REVIEW", "source": "missing",
+                "analysis_id": analysis.get("id"), "path": None,
+                "reason": "no post-update Assurance artifact found"}
+            continue
+        if loaded["assurance"] is None:
+            status[str(experiment.get("id"))] = {
+                "status": ASSURANCE_PENDING, "gate": "NEEDS_REVIEW", "source": "invalid",
+                "analysis_id": analysis.get("id"), "path": loaded["path"],
+                "reason": loaded.get("problem", "invalid assurance artifact")}
+            continue
+        gate = eo.decision_gate(state, str(experiment.get("id")), loaded["assurance"])
+        verdict = gate.get("status")
+        if verdict == "PASS":
+            lifecycle, reason = ASSURANCE_VERIFIED, None
+        elif verdict == "FAIL":
+            failures = "; ".join(str(item) for item in gate.get("errors") or [])
+            if "stale" in failures.lower() or "invalid" in failures.lower():
+                lifecycle, reason = ASSURANCE_STALE, failures
+            else:
+                lifecycle, reason = ASSURANCE_FAILED, failures
+        else:
+            reasons = "; ".join(str(item.get("reason", item))
+                                for item in gate.get("decisions") or []) or str(verdict)
+            if "superseded" in reasons.lower():
+                lifecycle, reason = ASSURANCE_SUPERSEDED, reasons
+            else:
+                lifecycle, reason = ASSURANCE_PENDING, reasons
+        status[str(experiment.get("id"))] = {
+            "status": lifecycle, "gate": verdict, "source": "artifact",
+            "analysis_id": analysis.get("id"), "path": loaded["path"], "reason": reason}
+    return status
+
+
+def _assurance_dependencies(state: Dict[str, Any], pending: Sequence[str]) -> List[str]:
+    """Planned experiments whose targets overlap an experiment still awaiting Assurance.
+
+    An independent new action is not blocked by an unrelated review; an action that depends on a
+    target whose outcome is not yet assured must wait.
+    """
+    pending_set = set(pending)
+    touched: Dict[str, set] = {}
+    for experiment in state.get("experiments") or []:
+        if not isinstance(experiment, dict) or str(experiment.get("id")) not in pending_set:
+            continue
+        receipt = experiment.get("outcome_analysis") or {}
+        analysis = receipt.get("analysis") if isinstance(receipt.get("analysis"), dict) else {}
+        targets = {str(item.get("id")) for item in
+                   (analysis.get("claim_updates") or []) + (analysis.get("hypothesis_updates") or [])
+                   if isinstance(item, dict)}
+        touched[str(experiment.get("id"))] = targets
+    dependent: List[str] = []
+    for experiment in state.get("experiments") or []:
+        if not isinstance(experiment, dict) or experiment.get("status") not in ("planned", "running"):
+            continue
+        xid = str(experiment.get("id"))
+        own = {str(item) for item in
+               (experiment.get("claim_targeted") or []) + (experiment.get("hypothesis_targeted") or [])}
+        dep_chain = {str(item) for item in experiment.get("depends_on") or []}
+        if any(own & targets or xid in {str(i) for i in targets} for targets in touched.values()) \
+                or (dep_chain & pending_set):
+            dependent.append(xid)
+    return sorted(dependent)
+
+
+def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose the next loop step from **per-experiment** todo and Assurance state.
+
+    Ordering: contract → candidates → damaged receipts (hold) → missing analyses (R9.O) →
+    failed Assurance (hold) → dependent planned work (hold) → independent planned work →
+    consolidate a stale projection → pending Assurance → the Scheduler's next legal action.
+    A completed outcome transaction never authorizes new dependent work by itself, and a review
+    that is merely missing is a todo, not a failure.
     """
     state = ctx["state"]
     contract = state.get("contract") or {}
@@ -1813,42 +1956,63 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
         return {"phase": "R9.O", "step": "Verify",
                 "action": f"为 {needs} 提交 Outcome Analysis（R9.O，工程故障不得当作否证）",
                 "blocked": False, "hold": False, "pending_r10": needs}
+    # Post-update Assurance: discovered from the route's artifacts, verified by the real gate.
+    assurance = assurance_status(state, ctx.get("route_dir"))
+    failed = {xid: item for xid, item in sorted(assurance.items())
+              if item["status"] == ASSURANCE_FAILED}
+    if failed:
+        return {"phase": "Assurance", "step": "HOLD",
+                "action": "post-update Assurance 未通过，不得继续：" + "；".join(
+                    f"{xid}（{item['reason']}）" for xid, item in failed.items()),
+                "blocked": True, "hold": True, "hold_reason": "assurance_failed",
+                "assurance_failed": {xid: item["reason"] for xid, item in failed.items()}}
+    pending = sorted(xid for xid, item in assurance.items()
+                     if item["status"] in (ASSURANCE_PENDING, ASSURANCE_STALE))
+    guarantee = {xid: {"lifecycle": item["status"], "gate": item["gate"],
+                       "path": item["path"], "reason": item["reason"]}
+                 for xid, item in sorted(assurance.items())}
     planned = [item for item in experiments if item.get("status") in ("planned", "running")]
+    dependent = _assurance_dependencies(state, pending)
+    if dependent:
+        return {"phase": "Assurance", "step": "HOLD",
+                "action": ("以下实验依赖尚未完成 post-update Assurance 的结果，必须先审核："
+                           + "、".join(dependent) + f"（待审核：{', '.join(pending)}）"),
+                "blocked": False, "hold": True, "hold_reason": "assurance_pending_dependency",
+                "assurance_pending": pending, "assurance_dependent": dependent,
+                "assurance": guarantee, "pending_r10": []}
     if planned:
         return {"phase": "R8/R9", "step": "Intervene",
                 "action": f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行",
-                "blocked": False, "hold": False, "pending_r10": []}
-    # Every terminal experiment carries a valid receipt. Consolidate a stale projection once,
-    # then let the existing decision path pick the next legal scientific action.
+                "blocked": False, "hold": False, "pending_r10": [],
+                "assurance_pending": pending, "assurance": guarantee}
     if ctx.get("index_missing") or (ctx.get("index") or {}).get("state_version") != \
             state.get("state_version"):
         return {"phase": "R11+", "step": "Consolidate",
                 "action": "所有结果凭证有效：重建认知投影后进入下一轮",
-                "blocked": False, "hold": False, "pending_r10": []}
-    review = []
-    for xid, item in sorted(status.items()):
-        if item["status"] != R10_COMMITTED:
-            continue
-        gate = eo.decision_gate(state, xid)
-        if gate.get("status") != "PASS":
-            review.append(f"{xid}（{gate.get('status')}）")
-    if review:
+                "blocked": False, "hold": False, "pending_r10": [],
+                "assurance_pending": pending, "assurance": guarantee}
+    if pending:
+        paths = [item["path"] for xid, item in sorted(assurance.items()) if item["path"]]
         return {"phase": "Assurance / Decision Gate", "step": "Assurance",
-                "action": ("已完成分析但决策门禁未通过，先走 Assurance/Decision Gate："
-                           + "、".join(review)),
-                "blocked": False, "hold": False, "pending_r10": [], "decision_gate": review}
+                "action": ("已完成分析但 post-update Assurance 尚未通过："
+                           + "、".join(f"{xid}（{assurance[xid]['gate']}）" for xid in pending)
+                           + "；审核产物应放在 "
+                           + str(outcome_assurance_path(ctx.get("route_dir"), "<analysis_id>"))),
+                "blocked": False, "hold": False, "pending_r10": [],
+                "assurance_pending": pending, "assurance_paths": paths,
+                "assurance": guarantee}
     actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
                if isinstance(item, dict) and item.get("action")]
     if actions:
         return {"phase": "R3—R6/R8", "step": "Discover",
                 "action": f"按 Scheduler 选择下一项合法动作：{actions[0].get('action')}",
                 "blocked": False, "hold": False, "pending_r10": [],
+                "assurance": guarantee, "assurance_pending": pending,
                 "next_actions": [item.get("action") for item in actions[:5]]}
     return {"phase": "HOLD", "step": "HOLD",
             "action": "无新状态、无待分析结果、无合法下一动作：停下交人裁决",
             "blocked": False, "hold": True, "hold_reason": "no_legal_action",
-            "pending_r10": []}
-
+            "assurance": guarantee, "pending_r10": []}
 
 def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     preset = presets_by_id()["research-loop"]
@@ -1896,13 +2060,18 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                        f"（算子 {guidance.get('discovery_operator')}）")
     return _result(preset, status, observed={"loop": loop, "current": step,
                                              "switch_action": switch.get("action"),
-                                             "strategy_guidance": guidance},
+                                             "strategy_guidance": guidance,
+                                             "assurance": step.get("assurance"),
+                                             "assurance_pending": step.get("assurance_pending")},
                    decision={"next_action": next_action,
                              "consumes_previous_decision": bool(guidance and not guidance["stale"]),
                              "step": step["step"],
                              "pending_r10": step.get("pending_r10"),
                              "blocked_experiments": step.get("blocked_experiments"),
                              "decision_gate": step.get("decision_gate"),
+                             "assurance_pending": step.get("assurance_pending"),
+                             "assurance_dependent": step.get("assurance_dependent"),
+                             "assurance_paths": step.get("assurance_paths"),
                              "stop_reason": step.get("hold_reason")
                              or (None if not step["blocked"] else "contract missing")},
                    steps=steps, writes=["cognition/ 投影（经 cognition build）"],
@@ -2077,8 +2246,9 @@ def _handle_scientific_replanning(ctx: Dict[str, Any], apply: bool) -> Dict[str,
     changed = _rec_key(before) != _rec_key(after)
     writes: List[str] = []
     if apply and updates:
-        _append_strategy_revisions(ctx, updates)
-        writes.append("cognition/model-revisions.jsonl")
+        appended = _append_strategy_revisions(ctx, updates)
+        if appended["written"]:
+            writes.append("cognition/model-revisions.jsonl")
     status = "OK" if (refuted or sci or changed) else "HOLD"
     steps = [
         {"step": "1 汇总否证", "command": "python3 scripts/state_check.py <state> --quiet"},
@@ -2098,29 +2268,62 @@ def _handle_scientific_replanning(ctx: Dict[str, Any], apply: bool) -> Dict[str,
                    hold_reason=None if status == "OK" else "no_intent_matched")
 
 
-def _append_strategy_revisions(ctx: Dict[str, Any], updates: Sequence[Dict[str, Any]]) -> int:
-    """Append already-authorised strategy revisions to the append-only log."""
-    if not updates:
-        return 0
-    path = ctx["cognition_dir"] / cg.REVISIONS_NAME
+def _revision_identity(record: Dict[str, Any]) -> str:
+    """Event identity of a strategy revision: kind + subject + state version + payload digest."""
+    return cg.digest_of({"kind": record.get("kind"), "subject": record.get("subject"),
+                         "at_state_version": record.get("at_state_version"),
+                         "after": record.get("after")})
+
+
+def _strategy_revision_records(ctx: Dict[str, Any],
+                               updates: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The exact records that would be appended (no I/O, so they can be validated first)."""
     existing = list(ctx["revisions"])
     next_seq = max([item.get("seq", 0) for item in existing] + [0]) + 1
-    lines: List[str] = []
+    records: List[Dict[str, Any]] = []
     for offset, update in enumerate(updates):
-        record = {
+        records.append({
             "_schema": cg.SCHEMA_REVISION, "id": f"REV{next_seq + offset}",
             "seq": next_seq + offset, "kind": update.get("kind", "strategy_update"),
-            "subject": update.get("subject"), "actor": "R14",
+            "subject": update.get("subject"),
+            # `SV6`: the Meta-Controller commits; R14 only proposes. Recording "R14" here made
+            # every written strategy update fail its own validator.
+            "actor": cg.STRATEGY_UPDATE_ACTOR,
             "at_state_version": ctx["state"].get("state_version"),
-            "summary": update.get("summary"), "trigger": {"kind": "strategy_update",
-                                                          "ref": update.get("subject")},
-            "refs": update.get("refs") or cg.EMPTY_REFS, "after": update.get("after") or {},
-        }
-        lines.append(json.dumps(record, ensure_ascii=False))
+            "summary": update.get("summary"),
+            "trigger": {"kind": "strategy_update", "ref": update.get("subject")},
+            # `CM1` only accepts the canonical payload keys; the projection keeps the structured
+            # scope/reactivation/telemetry under `priors` instead of writing unknown fields.
+            "refs": update.get("refs") or cg.EMPTY_REFS,
+            "after": sm.revision_payload(update),
+        })
+    return records
+
+
+def _append_strategy_revisions(ctx: Dict[str, Any],
+                               updates: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Validate the whole set, then append it atomically. Nothing is written when any record is
+    invalid, so a rejected revision can never pollute the append-only strategy memory."""
+    if not updates:
+        return {"written": 0, "diagnostics": [], "records": []}
+    records = _strategy_revision_records(ctx, updates)
+    diagnostics = sm.validate_strategy_revisions(ctx["state"], records)
+    if diagnostics:
+        return {"written": 0, "diagnostics": [item.render() for item in diagnostics],
+                "records": [], "skipped": 0}
+    # Idempotency by event identity: re-running the same preset on the same state version must not
+    # append a duplicate record for an event the log already holds.
+    seen = {_revision_identity(record) for record in ctx["revisions"]}
+    fresh = [record for record in records if _revision_identity(record) not in seen]
+    skipped = len(records) - len(fresh)
+    if not fresh:
+        return {"written": 0, "diagnostics": [], "records": [], "skipped": skipped}
+    path = ctx["cognition_dir"] / cg.REVISIONS_NAME
+    payload = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in fresh)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write("\n".join(lines) + "\n")
-    return len(lines)
+        handle.write(payload)
+    return {"written": len(fresh), "diagnostics": [], "records": fresh, "skipped": skipped}
 
 
 def _handle_research_audit(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
@@ -2461,9 +2664,14 @@ def _handle_strategy_evolution(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
     updates = [item for item in updates or [] if isinstance(item, dict)]
     writes: List[str] = []
     applied_revisions = 0
+    revision_diagnostics: List[str] = []
+    revisions_skipped = 0
     if apply:
         if updates:
-            applied_revisions = _append_strategy_revisions(ctx, updates)
+            appended = _append_strategy_revisions(ctx, updates)
+            applied_revisions = appended["written"]
+            revision_diagnostics = appended["diagnostics"]
+            revisions_skipped = appended.get("skipped", 0)
             writes.append("cognition/model-revisions.jsonl")
         if ctx["scheduler"]:
             recorded = decision
@@ -2492,6 +2700,8 @@ def _handle_strategy_evolution(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
     return _result(preset, status,
                    observed={"pending_updates": len(updates),
                              "applied_revisions": applied_revisions,
+                             "revision_diagnostics": revision_diagnostics,
+                             "revisions_skipped": revisions_skipped,
                              "advice": decision.get("advice"),
                              "candidates_before": decision.get("candidates_before"),
                              "candidates_after": decision.get("candidates_after"),
@@ -2523,8 +2733,9 @@ def _handle_hypothesis_rebalance(ctx: Dict[str, Any], apply: bool) -> Dict[str, 
     changed = bool(decision.get("decision_changed"))
     writes: List[str] = []
     if apply and updates and changed:
-        _append_strategy_revisions(ctx, updates)
-        writes.append("cognition/model-revisions.jsonl")
+        appended = _append_strategy_revisions(ctx, updates)
+        if appended["written"]:
+            writes.append("cognition/model-revisions.jsonl")
     status = "OK" if (before["converged"] or changed) else "NO_CHANGE"
     return _result(preset, status,
                    observed={"concentration_before": before,

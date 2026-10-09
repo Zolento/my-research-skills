@@ -109,6 +109,15 @@ REVISION_ACTORS: Tuple[str, ...] = (
     "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R9.O", "R10", "R11", "R14", "CIE",
 )
 
+#: Writers permitted to append a `strategy_update` (rule `SV6`). R14 owns the strategy *route*
+#: and proposes; it must not write the cognitive layer. The Meta-Controller is the writer, and
+#: this tuple is the single source both the writer and the validator consult so the two can
+#: never disagree again.
+STRATEGY_REVISION_ACTORS: Tuple[str, ...] = ("R3", "R4", "R5", "R6", "R11", "CIE")
+
+#: The actor recorded by the Meta-Controller channel when it commits strategy updates.
+STRATEGY_UPDATE_ACTOR: str = "CIE"
+
 #: Derived support ladder, weakest first. This replaces the free-text notion of
 #: "how much do we believe this mechanism" with a function of canonical evidence.
 SUPPORT_LEVELS: Tuple[str, ...] = (

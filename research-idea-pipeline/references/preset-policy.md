@@ -163,6 +163,36 @@ Decision Gate）→ Scheduler 的下一项合法动作（Discover）→ 无合�
 **工程故障信号同理**：`engineering_failure` 只统计既无 R10 处置、也无 `COMMITTED` 凭证的失败实验，
 避免已合法提交的 `INVALID_EXPERIMENT` 被反复重新触发。
 
+## 5.3 Scheduler 整体判定、策略写者权限与 post-update Assurance（2.3.3 修复）
+
+**Scheduler 必须整体 PASS 才可派遣。** `strategy_memory.scheduler_verdict()` 以
+`execution_gate.scheduler_check()` 的**整体状态**为准（`STALE_SCHEDULER`、`STATE_INVALID`、schema
+错误、`MISSING_EIG` 等任一 FAIL → 无可派遣动作），授权判断**不再解析英文错误文本**；错误归因只用于
+报告。`hard_gates.scheduler_check` 只有在整体 PASS 时才是 `PASS`，且每个动作还要通过结构化复检
+（`status == planned`、plan gate PASS、无 `execution_blocked_by`、PEIG 非 HOLD）。
+
+**策略写者与校验者统一。** `cognition.STRATEGY_REVISION_ACTORS = (R3,R4,R5,R6,R11,CIE)` 是唯一权威：
+Meta-Controller（`CIE`）负责写入，R14 只提出建议（`SV6`）。写入前**先整组校验**（`SV1`/`SV3`/`SV5`/
+`SV6`/`SV8`），任何一条不合法则整组不落盘；`after` 载荷投影为 `CM1` 允许的键
+（`note`/`priors`/`operator`/`action`/`evidence`/`observations`，结构化 `scope`/`reactivation_conditions`/
+`telemetry` 保存在 `priors` 与 `note` 中）。同一 `(kind, subject, at_state_version, after)` 事件幂等，
+重复提交不产生重复记录。
+
+**post-update Assurance 生命周期。** 正式审核产物放在
+`<route>/assurance/outcome/<analysis_id>.json`（派生产物，canonical 仍是唯一科学权威，R7 拥有审核）：
+
+| 状态 | 判据 | Loop 行为 |
+|---|---|---|
+| `PENDING` | 无产物 / 产物非法 / `decision_gate` 仍 `NEEDS_REVIEW`（含 `UNKNOWN`） | 报为待办；依赖它的 planned 实验必须等 |
+| `VERIFIED` | 真实 `decision_gate()` 返回 `PASS` | 消费并推进到下一项合法动作 |
+| `FAILED` | 有检查项 FAIL | `HOLD`（`assurance_failed`），不得继续 |
+| `STALE` | state/analysis 摘要与当前状态不再匹配 | 视为需重新审核（待办），**不得复用** |
+| `SUPERSEDED` | `decision_gate` 判定已有更晚结果重评其目标 | 无需自身审核，不阻塞后续动作 |
+
+阶段顺序：凭证受损 → 缺失分析(R9.O) → Assurance FAIL → **依赖未完成审核的 planned 实验（HOLD）** →
+独立 planned 实验（可推进并附带 `assurance_pending`）→ Consolidate（投影过期时一次）→ 待办审核 →
+Scheduler 合法动作 → HOLD。**Loop 永不自行生成 Assurance**；缺审核时只能是待办或 HOLD。
+
 ## 6. Strategy Decision Adapter：让建议进入真实动作选择
 
 审计结论：`recommend_strategy()` 产出菜单/算子/结构轴，但**没有任何消费者**；

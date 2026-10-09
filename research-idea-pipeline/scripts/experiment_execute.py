@@ -206,7 +206,11 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
         value = dict(receipt); seal = value.pop('seal', '')
         if not isinstance(seal, str) or not hmac.compare_digest(seal, ledger.seal(value)): return {'status':'HOLD','errors':['FORGED_RECEIPT']}
         registered = any(e.get('kind') == 'issue' and e['receipt'] == receipt for e in ledger.events)
-        consumed = any(e.get('kind') == 'consume' and e['receipt_id'] == receipt['id'] for e in ledger.events)
+        # A preview never consumes; historical ledgers may still carry `dry_run: true` consume
+        # events from before the preview semantics were fixed, and those must not block the one
+        # legitimate execution either (the ledger itself is never rewritten or reset).
+        consumed = any(e.get('kind') == 'consume' and e['receipt_id'] == receipt['id']
+                       and e.get('dry_run') is not True for e in ledger.events)
         if not registered or consumed: return {'status':'HOLD','errors':['UNKNOWN_OR_USED_RECEIPT']}
         if now < receipt['issued_at'] or now >= receipt['expires_at']: return {'status':'HOLD','errors':['EXPIRED_RECEIPT']}
         if eo.digest(scheduler) != receipt['scheduler_digest'] or eg.scheduler_check(state,scheduler or {})['status'] != 'PASS': return {'status':'HOLD','errors':['SCHEDULER_RECEIPT_MISMATCH']}
@@ -223,7 +227,9 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
         gate = eg.peig(state, experiment_id)
         if not sc.check_state(state).ok or x['status'] != 'planned' or gate['status'] != receipt['permission']: return {'status':'HOLD','errors':['GATE_CHANGED']}
         # Recheck reservations under the same lock: issued receipts do not reserve yet.
-        spent = [e for e in ledger.events if e.get('kind') == 'consume' and e.get('family') == receipt['family'] and e['permission'] == receipt['permission']]
+        spent = [e for e in ledger.events if e.get('kind') == 'consume'
+                 and e.get('dry_run') is not True
+                 and e.get('family') == receipt['family'] and e['permission'] == receipt['permission']]
         p = x['execution_protocol']; hours = receipt['requested_hours']
         if receipt['permission'] == 'PILOT_ONLY':
             if len(spent) >= min(p['pilot']['max_runs'],ledger.policy['max_pilot_runs']) or sum(e['hours'] for e in spent) + hours > min(p['pilot']['max_hours'],ledger.policy['max_pilot_hours']): return {'status':'HOLD','errors':['PILOT_BUDGET_EXHAUSTED']}
@@ -231,10 +237,22 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
             caps = [e['budget_hours'] for e in ledger.events if e.get('kind') == 'issue' and e.get('family') == receipt['family'] and e['receipt']['permission'] == 'PASS']
             if any(e['experiment_id'] == experiment_id for e in spent) or sum(e['hours'] for e in spent) + hours > min(caps): return {'status':'HOLD','errors':['FORMAL_BUDGET_EXHAUSTED']}
         if receipt['human_exception'] and now >= receipt['human_exception']['expires_at']: return {'status':'HOLD','errors':['EXPIRED_HUMAN_EXCEPTION']}
+        if not execute:
+            # Preview: every gate above has been re-checked under the lock, and nothing is
+            # consumed. The receipt stays valid for exactly one real execution, so a preview can
+            # never burn GPU hours, pilot runs or the single-use receipt.
+            return {'status':'PASS','errors':[],'dry_run':True,'preview':True,'consumed':False,
+                    'command_started':False,'receipt_id':receipt['id'],
+                    'execution_record':{'receipt':receipt,'launch_seal':None,'dry_run':True},
+                    'would_execute':{'argv':list(manifest['argv']),'cwd':manifest['cwd'],
+                                     'gpu_devices':list(manifest['gpu_devices']),
+                                     'requested_hours':hours,'permission':receipt['permission'],
+                                     'family':receipt['family']},
+                    'budget':{'spent_runs':len(spent),'spent_hours':sum(e['hours'] for e in spent)}}
+        # Real execution consumes atomically before the external command can start (no double launch).
         consumption = ledger.append({'kind':'consume','family':receipt['family'],'receipt_id':receipt['id'], 'experiment_id':experiment_id,
-                       'permission':receipt['permission'],'hours':hours,'dry_run':not execute,'timestamp':now})
-    execution_record = {'receipt':receipt, 'launch_seal':consumption['seal'], 'dry_run':not execute}
-    if not execute: return {'status':'PASS','errors':[], 'dry_run':True,'command_started':False,'receipt_id':receipt['id'], 'execution_record':execution_record}
+                       'permission':receipt['permission'],'hours':hours,'dry_run':False,'timestamp':now})
+    execution_record = {'receipt':receipt, 'launch_seal':consumption['seal'], 'dry_run':False}
     # Invoke only after atomic consumption. No retries or implicit detached jobs.
     try:
         log_path = ledger.directory / ('run-' + receipt['id'] + '.log')
