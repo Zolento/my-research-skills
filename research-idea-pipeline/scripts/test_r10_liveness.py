@@ -20,6 +20,7 @@ Acceptance: legal work is never repeated, missing work is never masked, damaged 
 from __future__ import annotations
 
 import copy
+import json
 import pathlib
 import sys
 import tempfile
@@ -194,12 +195,24 @@ class TestR10Classification(unittest.TestCase):
         self.assertEqual(pr.r10_pending(state), [])
 
 
+def assurance_payload(state, experiment_id="X1"):
+    """A source-bound post-update Assurance for the committed analysis of one experiment."""
+    receipt = [item for item in state["experiments"]
+               if item["id"] == experiment_id][0]["outcome_analysis"]
+    return {"schema": "evidence-outcome-assurance@1", "state_digest": eo.digest(state),
+            "analysis_digest": eo.digest(receipt["analysis"]),
+            "checks": {name: {"status": "PASS", "reason": "source-bound review"}
+                       for name in ("integrity", "claim_calibration", "reproducibility",
+                                    "stop_rule_compliance")}}
+
+
 class TestLoopStepLiveness(unittest.TestCase):
     """Phase 3: the phase is chosen from per-experiment todo state, and the loop advances."""
 
-    def _ctx(self, state, *, index=None, index_missing=False, scheduler=None, revisions=()):
+    def _ctx(self, state, *, index=None, index_missing=False, scheduler=None, revisions=(),
+             route_dir=None):
         return {"state": state, "index": index or {}, "index_missing": index_missing,
-                "scheduler": scheduler, "revisions": list(revisions)}
+                "scheduler": scheduler, "revisions": list(revisions), "route_dir": route_dir}
 
     def test_case_c_repair_less_commit_does_not_repeat_revise(self):
         for scenario in ("negative", "invalid"):
@@ -235,34 +248,35 @@ class TestLoopStepLiveness(unittest.TestCase):
         step = pr._loop_step(self._ctx(state, index=fresh_index))
         self.assertTrue(step["hold"] or step["step"] in ("Assurance", "Discover", "Intervene"))
 
-    def test_case_e_a_pending_decision_gate_is_surfaced_not_skipped(self):
-        """A committed transaction is not a licence to continue: the gate still applies."""
+    def test_case_e_a_pending_review_is_surfaced_not_skipped(self):
+        """A committed transaction is not a licence to continue: the review still applies."""
         state = committed_state("positive")
         step = pr._loop_step(self._ctx(state, index={"state_version": state["state_version"]}))
         self.assertEqual(step["step"], "Assurance")
-        self.assertIn("X1", "、".join(step["decision_gate"]))
+        self.assertEqual(step["assurance_pending"], ["X1"])
         self.assertFalse(step["hold"])
         self.assertIn("Decision Gate", step["phase"])
 
-    def test_a_scheduler_action_is_consumed_once_the_gate_passes(self):
+    @staticmethod
+    def _write_assurance(route, state, experiment_id="X1"):
+        """A source-bound review written where the loop looks for it (never fabricated by the loop)."""
+        receipt = [item for item in state["experiments"]
+                   if item["id"] == experiment_id][0]["outcome_analysis"]
+        payload = {**assurance_payload(state, experiment_id)}
+        directory = pathlib.Path(route).joinpath(*pr.OUTCOME_ASSURANCE_SUBDIR)
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{receipt['analysis']['id']}.json").write_text(
+            json.dumps(payload), encoding="utf-8")
+
+    def test_a_scheduler_action_is_consumed_once_the_review_passes(self):
         state = committed_state("positive")
-        receipt = state["experiments"][-1]["outcome_analysis"]
-        assurance = {"schema": "evidence-outcome-assurance@1", "state_digest": eo.digest(state),
-                     "analysis_digest": eo.digest(receipt["analysis"]),
-                     "checks": {name: {"status": "PASS", "reason": "Source-bound mock Assurance"}
-                                for name in ("integrity", "claim_calibration", "reproducibility",
-                                             "stop_rule_compliance")}}
-        self.assertEqual(eo.decision_gate(state, "X1", assurance)["status"], "PASS")
         scheduler = {"state_version": state["state_version"], "next_actions": [
             {"action": "X2", "type": "discriminating_experiment", "target": "C1",
              "eig": "high", "cost": "low"}]}
-        previous = pr.eo.decision_gate
-        try:
-            pr.eo.decision_gate = lambda *a, **k: {"status": "PASS", "decisions": []}
+        with tempfile.TemporaryDirectory() as route:
+            self._write_assurance(route, state)
             step = pr._loop_step(self._ctx(state, index={"state_version": state["state_version"]},
-                                          scheduler=scheduler))
-        finally:
-            pr.eo.decision_gate = previous
+                                           scheduler=scheduler, route_dir=route))
         self.assertIn(step["step"], ("Discover", "Intervene"))
         self.assertIn("X2", step["action"])
 
@@ -293,18 +307,17 @@ class TestLoopStepLiveness(unittest.TestCase):
         third = pr._loop_step(self._ctx(state, index={"state_version": state["state_version"] - 1},
                                         scheduler=scheduler))
         self.assertEqual(third["step"], "Consolidate")
-        # Round 4 — fresh projection: the decision gate is surfaced, not skipped.
+        # Round 4 — fresh projection: the pending review is surfaced, not skipped.
         fourth = pr._loop_step(self._ctx(state, index={"state_version": state["state_version"]},
                                          scheduler=scheduler))
         self.assertEqual(fourth["step"], "Assurance")
-        # Round 5 — gate satisfied: the Scheduler's next legal action is consumed.
-        previous = pr.eo.decision_gate
-        try:
-            pr.eo.decision_gate = lambda *a, **k: {"status": "PASS", "decisions": []}
+        # X2's result superseded X1's target assessment, so only X2 still needs a review.
+        self.assertEqual(fourth["assurance_pending"], ["X2"])
+        # Round 5 — the review is satisfied: the Scheduler's next legal action is consumed.
+        with tempfile.TemporaryDirectory() as route:
+            self._write_assurance(route, state, "X2")
             fifth = pr._loop_step(self._ctx(state, index={"state_version": state["state_version"]},
-                                            scheduler=scheduler))
-        finally:
-            pr.eo.decision_gate = previous
+                                            scheduler=scheduler, route_dir=route))
         self.assertEqual(fifth["step"], "Discover")
         self.assertIn("X3", fifth["action"])
         # No round repeats a completed stage, and no round fakes progress.

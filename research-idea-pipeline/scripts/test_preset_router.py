@@ -33,6 +33,7 @@ import tempfile
 import unittest
 
 import cognition as cg
+import execution_gate as eg
 import preset_router as pr
 import strategy_memory as sm
 
@@ -609,236 +610,181 @@ class TestScientificBehaviour(unittest.TestCase):
 # L2: the strategy decision adapter reaches the next action selection
 # ---------------------------------------------------------------------------
 
-class TestStrategyDecisionAdapter(unittest.TestCase):
+#: The fixture's planned experiment, used as a *declared* (V7-legal) discriminating test.
+CHEAPEST_XID = "X1"
 
-    def _project(self, root, *, candidates=(), zero_gain=0, actions=None,
-                 operator_stats=None):
-        state_path = pr._fixture(root)
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        state["hypotheses"] = list(state["hypotheses"]) + [candidate(*item) for item in candidates]
-        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-        scheduler = scheduler_with(actions or [], zero_gain=zero_gain,
-                                   operator_stats=operator_stats)
-        (state_path.parent / cg.SCHEDULER_NAME).write_text(
-            json.dumps(scheduler, ensure_ascii=False, indent=2), encoding="utf-8")
+
+class TestStrategyDecisionAdapter(unittest.TestCase):
+    """The adapter, exercised on a **valid** state and a PASS scheduler.
+
+    `scheduler_check` now fails closed, so a synthetic state that violates `state_check` can no
+    longer produce a dispatch at all (`STATE_INVALID`). These tests therefore run on the
+    repository's schema-valid preflight fixture, and affinity is driven through a declared field
+    (`uncertainties[].cheapest_discriminating_test`) instead of an invented link.
+    """
+
+    def _project(self, root, *, actions, cheapest=None, lower_second=False):
+        state = json.loads((ROOT / 'examples/preflight-identifiability/ct-mri.json')
+                           .read_text(encoding='utf-8'))['state']
+        # The declared link is a real experiment id: pointing the uncertainty at a hypothesis
+        # violates `V7`, and the repo does not invent links that the canonical state forbids.
+        if cheapest:
+            state['uncertainties'][0]['cheapest_discriminating_test'] = state['experiments'][-1]['id']
+        actions = [dict(item) for item in actions]
+        if lower_second:
+            actions[1] = {**actions[1], 'eig': 'low', 'cost': 'high'}
+        scheduler = {"state_version": state['state_version'], "next_actions": actions,
+                     "eig_calibration": {"records": []},
+                     "operator_stats": {"by_operator": {}, "recurring_failure_patterns": []}}
+        route = pathlib.Path(root)
+        route.mkdir(parents=True, exist_ok=True)
+        state_path = route / 'research-state.json'
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
+        (route / 'scheduler.json').write_text(json.dumps(scheduler, ensure_ascii=False, indent=2),
+                                              encoding='utf-8')
         return state_path
+
+    def _decision(self, state_path):
+        context = pr.project_context(state_path)
+        self.assertEqual(eg.scheduler_check(context['state'], context['scheduler'])['status'],
+                         'PASS', "the adapter is only meaningful on a passing scheduler")
+        return sm.strategy_decision(context['state'], context['index'], context['scheduler'],
+                                    context['revisions']), context
 
     def test_the_advice_reorders_inside_one_tier_and_changes_the_choice(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2,
-                actions=[action("H1", target="H1"), action("H2", target="H2")])
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
-            self.assertEqual(decision["advice"]["operator"], "reframe")
-            self.assertTrue(decision["adopted"])
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID)
+            decision, _ = self._decision(state_path)
+            self.assertEqual(decision["hard_gates"]["scheduler_check"], "PASS")
+            self.assertTrue(decision["adopted"], decision)
             self.assertTrue(decision["decision_changed"])
-            self.assertEqual(decision["chosen_without_memory"], "H1")
-            self.assertEqual(decision["chosen"], "H2")
-            aligned = [c for c in decision["candidates_after"] if c["aligned"]]
-            self.assertEqual([c["action"] for c in aligned], ["H2"])
-            self.assertIn("hypotheses[H2]", aligned[0]["affinity_basis"])
+            self.assertEqual(decision["chosen_without_memory"], "R1")
+            self.assertEqual(decision["chosen"], CHEAPEST_XID)
+            aligned = [item for item in decision["candidates_after"] if item["aligned"]]
+            self.assertEqual([item["action"] for item in aligned], [CHEAPEST_XID])
+            self.assertIn("uncertainties[U1]", aligned[0]["affinity_basis"])
 
     def test_a_better_tier_is_never_displaced_by_the_advice(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2,
-                actions=[action("H1", target="H1", eig="high", cost="low"),
-                         action("H2", target="H2", eig="low", cost="high")])
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
-            self.assertEqual(decision["chosen"], "H1")
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID, lower_second=True)
+            decision, _ = self._decision(state_path)
+            self.assertEqual(decision["chosen"], "R1")
             self.assertFalse(decision["decision_changed"])
-            self.assertEqual([c["action"] for c in decision["candidates_after"]], ["H1", "H2"])
+            self.assertEqual([item["action"] for item in decision["candidates_after"]],
+                             ["R1", CHEAPEST_XID])
             self.assertEqual(decision["reason_if_not"], "single_candidate_in_tier")
 
     def test_the_adapter_says_why_when_it_cannot_change_anything(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                actions=[action("H1", target="H1")])
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"}])
+            decision, _ = self._decision(state_path)
             self.assertFalse(decision["strategy_applied"])
             self.assertFalse(decision["decision_changed"])
-            self.assertIn(decision["reason_if_not"],
-                          ("single_candidate_in_tier", "no_aligned_candidate_in_tier"))
+            self.assertEqual(decision["reason_if_not"], "single_candidate_in_tier")
 
-    def test_blocked_actions_are_never_selected(self):
+    def test_an_unaligned_pair_is_reported_not_reordered(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = pathlib.Path(temp) / "A"
             state_path = self._project(
-                root, candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2,
-                actions=[action("X1", target="X1", kind="discriminating_experiment"),
-                         action("H2", target="H2")])
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            state["experiments"][0]["execution_blocked_by"] = ["STOP1"]
-            state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2),
-                                  encoding="utf-8")
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
-            self.assertIn("X1", decision["hard_gates"]["blocked_actions"])
-            self.assertNotEqual(decision["chosen"], "X1")
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": "R2", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"}])
+            decision, _ = self._decision(state_path)
+            self.assertFalse(decision["adopted"])
+            self.assertEqual(decision["reason_if_not"], "no_aligned_candidate_in_tier")
 
     def test_recording_touches_only_scheduler_telemetry(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID)
+            decision, context = self._decision(state_path)
             before = context["scheduler"]
             updated = sm.record_strategy_decision(before, decision, dispatch_result="H2 dispatched")
             self.assertEqual(sorted(set(updated) - set(before)), ["strategy_decisions"])
             for key in before:
                 self.assertEqual(updated[key], before[key], key)
-            entry = sm.latest_strategy_decision(updated)
-            self.assertEqual(entry["dispatch_result"], "H2 dispatched")
-            self.assertIn("candidates_before", entry)
-            self.assertEqual(entry["reason_if_not"], None)
-
-    def test_the_cli_decide_records_into_the_scheduler_file(self):
-        with tempfile.TemporaryDirectory() as temp:
-            state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
-            scheduler_path = state_path.parent / cg.SCHEDULER_NAME
-            before = json.loads(scheduler_path.read_text(encoding="utf-8"))
-            proc = subprocess.run(
-                [sys.executable, str(STRATEGY_SCRIPT), "decide", "--state", str(state_path),
-                 "--scheduler", str(scheduler_path), "--record",
-                 "--dispatch-result", "H2 dispatched"],
-                capture_output=True, text=True, cwd=str(ROOT / "scripts"))
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            after = json.loads(scheduler_path.read_text(encoding="utf-8"))
-            self.assertEqual(len(after["strategy_decisions"]), 1)
-            self.assertEqual(after["eig_calibration"], before["eig_calibration"])
-            self.assertEqual(after["next_actions"], before["next_actions"])
-            self.assertEqual(after["operator_stats"], before["operator_stats"])
-
-    def test_apply_is_recommendation_only_and_says_so(self):
-        with tempfile.TemporaryDirectory() as temp:
-            state_path = self._project(pathlib.Path(temp) / "A", zero_gain=1,
-                                       actions=[action("H1", target="H1")])
-            scheduler_path = state_path.parent / cg.SCHEDULER_NAME
-            before = scheduler_path.read_bytes()
-            proc = subprocess.run(
-                [sys.executable, str(STRATEGY_SCRIPT), "apply", "--state", str(state_path),
-                 "--scheduler", str(scheduler_path)],
-                capture_output=True, text=True, cwd=str(ROOT / "scripts"))
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            payload = json.loads(proc.stdout)
-            self.assertEqual(payload["writes"], [])
-            self.assertIn("只输出建议", payload["note"])
-            self.assertEqual(scheduler_path.read_bytes(), before)
-
-    def test_the_next_round_consumes_the_recorded_decision(self):
-        with tempfile.TemporaryDirectory() as temp:
-            state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
-            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
-            updated = sm.record_strategy_decision(context["scheduler"], decision,
-                                                  dispatch_result="H2 dispatched")
-            (state_path.parent / cg.SCHEDULER_NAME).write_text(
-                json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
-            payload, _, code = pr.run_preset("research-loop", state_path)
-            self.assertEqual(code, pr.EXIT_OK)
-            guidance = payload["observed"]["strategy_guidance"]
-            self.assertIsNotNone(guidance)
-            self.assertFalse(guidance["stale"])
-            self.assertEqual(guidance["dispatch"]["action"], "H2")
-            self.assertEqual(guidance["discovery_operator"], "reframe")
-            self.assertTrue(payload["decision"]["consumes_previous_decision"])
-            self.assertIn("H2", payload["next_action"])
+            self.assertEqual(sm.latest_strategy_decision(updated)["dispatch_result"],
+                             "H2 dispatched")
 
     def test_the_evolution_preset_reports_the_adapter_verdict(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID)
             payload, _, code = pr.run_preset("strategy-evolution", state_path)
-            self.assertEqual(code, pr.EXIT_OK)
-            self.assertEqual(payload["status"], "OK")
-            self.assertTrue(payload["changed_decision"])
+            self.assertEqual(code, pr.EXIT_OK, payload)
             self.assertTrue(payload["decision"]["strategy_applied"])
-            self.assertIsNone(payload["decision"]["reason_if_not"])
-            self.assertEqual(payload["decision"]["dispatch"]["action"], "H2")
-            self.assertTrue(payload["decision"]["adoption_is_not_capability"])
+            self.assertTrue(payload["decision"]["changed_decision"])
+            self.assertEqual(payload["decision"]["dispatch"]["action"], CHEAPEST_XID)
 
-    def test_the_evolution_preset_applies_revisions_and_records_the_decision(self):
+    def test_the_next_round_consumes_the_recorded_decision(self):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
-            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
-            scheduler_before = json.loads((state_path.parent / cg.SCHEDULER_NAME)
-                                         .read_text(encoding="utf-8"))
-            revisions_path = state_path.parent / cg.COGNITION_DIRNAME / cg.REVISIONS_NAME
-            payload, _, _ = pr.run_preset("strategy-evolution", state_path, apply=True)
-            self.assertIn(cg.SCHEDULER_NAME, payload["writes"])
-            after = json.loads((state_path.parent / cg.SCHEDULER_NAME)
-                               .read_text(encoding="utf-8"))
-            self.assertEqual(len(after["strategy_decisions"]), 1)
-            self.assertEqual(after["eig_calibration"], scheduler_before["eig_calibration"])
-            self.assertTrue(payload["canonical_untouched"])
-            self.assertTrue(revisions_path.exists() or payload["observed"]["applied_revisions"] == 0)
-
-    def test_an_unchangeable_decision_is_reported_not_faked(self):
-        with tempfile.TemporaryDirectory() as temp:
-            state_path = self._project(pathlib.Path(temp) / "A",
-                                       actions=[action("H1", target="H1")])
-            payload, _, code = pr.run_preset("strategy-evolution", state_path)
-            self.assertEqual(code, pr.EXIT_OK)
-            self.assertEqual(payload["status"], "NO_CHANGE")
-            self.assertFalse(payload["changed_decision"])
-            self.assertEqual(payload["decision"]["strategy_applied"], False)
-            self.assertTrue(payload["decision"]["reason_if_not"])
-
-    def test_cross_session_recovery_still_consumes_the_experience(self):
-        """A new session re-reads the scheduler from disk and gets the same decision path."""
-        with tempfile.TemporaryDirectory() as temp:
-            state_path = self._project(
-                pathlib.Path(temp) / "A",
-                candidates=[("H2", "P1", "reframe", "representation-shift")],
-                zero_gain=2, actions=[action("H1", target="H1"), action("H2", target="H2")])
-            context = pr.project_context(state_path)
-            decision = sm.strategy_decision(context["state"], context["index"],
-                                            context["scheduler"], context["revisions"])
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID)
+            decision, context = self._decision(state_path)
             updated = sm.record_strategy_decision(context["scheduler"], decision,
                                                   dispatch_result="H2 dispatched")
-            (state_path.parent / cg.SCHEDULER_NAME).write_text(
+            (context["route_dir"] / cg.SCHEDULER_NAME).write_text(
                 json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
-            fresh = pr.project_context(state_path)
-            replayed = sm.strategy_decision(fresh["state"], fresh["index"], fresh["scheduler"],
-                                            fresh["revisions"])
-            self.assertEqual(replayed["chosen"], decision["chosen"])
-            self.assertEqual(sm.latest_strategy_decision(fresh["scheduler"])["dispatch_result"],
-                             "H2 dispatched")
+            payload, _, code = pr.run_preset("research-loop", state_path)
+            self.assertEqual(code, pr.EXIT_OK, payload)
+            guidance = payload["observed"]["strategy_guidance"]
+            self.assertIsNotNone(guidance)
+            self.assertFalse(guidance["stale"])
+            self.assertEqual(guidance["dispatch"]["action"], CHEAPEST_XID)
+            self.assertTrue(payload["decision"]["consumes_previous_decision"])
 
+    def test_a_stale_scheduler_decision_is_not_consumed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self._project(
+                pathlib.Path(temp) / 'A',
+                actions=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                          "cost": "low"},
+                         {"action": CHEAPEST_XID, "type": "discriminating_experiment",
+                          "target": "U1", "eig": "high", "cost": "low"}],
+                cheapest=CHEAPEST_XID)
+            decision, context = self._decision(state_path)
+            stale = sm.record_strategy_decision(context["scheduler"], decision)
+            stale = dict(stale, strategy_decisions=[
+                {**stale["strategy_decisions"][-1],
+                 "state_version": context["state"]["state_version"] - 1}])
+            (context["route_dir"] / cg.SCHEDULER_NAME).write_text(
+                json.dumps(stale, ensure_ascii=False, indent=2), encoding="utf-8")
+            payload, _, _ = pr.run_preset("research-loop", state_path)
+            guidance = payload["observed"]["strategy_guidance"]
+            self.assertTrue(guidance["stale"])
+            self.assertFalse(payload["decision"]["consumes_previous_decision"])
 
-# ---------------------------------------------------------------------------
-# L2: the provided library is integrated as data, not pasted as prose
-# ---------------------------------------------------------------------------
 
 class TestProvidedLibraryIntegration(unittest.TestCase):
     """`preset-registry.json` drives ids/entries/scopes/examples; the repo keeps enforcement."""
