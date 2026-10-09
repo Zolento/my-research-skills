@@ -1798,6 +1798,11 @@ ASSURANCE_STALE = "STALE"
 #: own: `decision_gate` says so itself, and treating it as pending would block the loop forever.
 ASSURANCE_SUPERSEDED = "SUPERSEDED"
 
+#: A review exists but a check came back UNKNOWN (or otherwise still NEEDS_REVIEW). The reviewer
+#: has been asked and answered "not yet": the loop waits with the recorded blocker and the stated
+#: re-review conditions instead of sending the same question back every round.
+ASSURANCE_UNKNOWN = "UNKNOWN"
+
 
 def outcome_assurance_path(route_dir: Optional[Path], analysis_id: Any) -> Optional[Path]:
     """The conventional location of the Assurance for one committed analysis."""
@@ -1885,10 +1890,19 @@ def assurance_status(state: Dict[str, Any],
             if "superseded" in reasons.lower():
                 lifecycle, reason = ASSURANCE_SUPERSEDED, reasons
             else:
-                lifecycle, reason = ASSURANCE_PENDING, reasons
+                # The artifact exists and was actually reviewed: this is a recorded blocker,
+                # not an outstanding task.
+                lifecycle, reason = ASSURANCE_UNKNOWN, reasons
+        conditions = loaded["assurance"].get("re_review_conditions")
         status[str(experiment.get("id"))] = {
             "status": lifecycle, "gate": verdict, "source": "artifact",
-            "analysis_id": analysis.get("id"), "path": loaded["path"], "reason": reason}
+            "analysis_id": analysis.get("id"), "path": loaded["path"], "reason": reason,
+            "reviewer": loaded["assurance"].get("reviewer"),
+            "verification_tier": loaded["assurance"].get("verification_tier"),
+            "re_review_conditions": list(conditions) if isinstance(conditions, list) else [],
+            "checks": {name: item.get("status") for name, item in
+                       (loaded["assurance"].get("checks") or {}).items()
+                       if isinstance(item, dict)}}
     return status
 
 
@@ -1968,8 +1982,12 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 "assurance_failed": {xid: item["reason"] for xid, item in failed.items()}}
     pending = sorted(xid for xid, item in assurance.items()
                      if item["status"] in (ASSURANCE_PENDING, ASSURANCE_STALE))
+    unknown = sorted(xid for xid, item in assurance.items()
+                     if item["status"] == ASSURANCE_UNKNOWN)
     guarantee = {xid: {"lifecycle": item["status"], "gate": item["gate"],
-                       "path": item["path"], "reason": item["reason"]}
+                       "path": item["path"], "reason": item["reason"],
+                       "reviewer": item.get("reviewer"),
+                       "re_review_conditions": item.get("re_review_conditions")}
                  for xid, item in sorted(assurance.items())}
     planned = [item for item in experiments if item.get("status") in ("planned", "running")]
     dependent = _assurance_dependencies(state, pending)
@@ -1993,14 +2011,34 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 "assurance_pending": pending, "assurance": guarantee}
     if pending:
         paths = [item["path"] for xid, item in sorted(assurance.items()) if item["path"]]
-        return {"phase": "Assurance / Decision Gate", "step": "Assurance",
-                "action": ("已完成分析但 post-update Assurance 尚未通过："
-                           + "、".join(f"{xid}（{assurance[xid]['gate']}）" for xid in pending)
-                           + "；审核产物应放在 "
-                           + str(outcome_assurance_path(ctx.get("route_dir"), "<analysis_id>"))),
+        states = {xid: assurance[xid]["status"] for xid in pending}
+        return {"phase": "R7 / Assurance", "step": "Assurance",
+                "action": ("R7 审查任务：为 " + "、".join(
+                    f"{xid}（{states[xid]}，analysis {assurance[xid]['analysis_id']}）"
+                    for xid in pending)
+                    + " 完成四项检查并提交："
+                    + "python3 scripts/evidence_outcome.py assurance-store --state <state> "
+                      "--experiment <" + pending[0] + "> --reviewer R7 --check "
+                      "integrity=PASS:理由 --check claim_calibration=PASS:理由 --check "
+                      "reproducibility=PASS:理由 --check stop_rule_compliance=PASS:理由；"
+                      "步骤见 references/loop-assurance-review.md；产物路径 "
+                    + str(outcome_assurance_path(ctx.get("route_dir"), "<analysis_id>"))),
                 "blocked": False, "hold": False, "pending_r10": [],
-                "assurance_pending": pending, "assurance_paths": paths,
+                "assurance_pending": pending, "assurance_task": True,
+                "assurance_states": states, "assurance_paths": paths,
                 "assurance": guarantee}
+    if unknown:
+        details = {xid: {"reason": assurance[xid]["reason"],
+                         "re_review_conditions": assurance[xid].get("re_review_conditions") or []}
+                   for xid in unknown}
+        return {"phase": "R7 / Assurance", "step": "HOLD",
+                "action": ("R7 已审查但结论为 UNKNOWN/未决，等待新信息，不重复送审："
+                           + "、".join(f"{xid}（{assurance[xid]['reason']}）" for xid in unknown)
+                           + "；重新审查条件：" + "；".join(
+                               f"{xid}: {' / '.join(details[xid]['re_review_conditions'])}"
+                               for xid in unknown)),
+                "blocked": False, "hold": True, "hold_reason": "assurance_unknown",
+                "assurance_unknown": details, "assurance": guarantee, "pending_r10": []}
     actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
                if isinstance(item, dict) and item.get("action")]
     if actions:

@@ -478,11 +478,12 @@ class TestAssuranceLifecycle(unittest.TestCase):
                                      "reproducibility": {"status": "PASS", "reason": "ok"},
                                      "stop_rule_compliance": {"status": "PASS", "reason": "ok"}})
         status = pr.assurance_status(self.state, self.route)
-        self.assertEqual(status['X1']['status'], pr.ASSURANCE_PENDING)
+        self.assertEqual(status['X1']['status'], pr.ASSURANCE_UNKNOWN)
         self.assertEqual(status['X1']['gate'], 'NEEDS_REVIEW')
         step = pr._loop_step(self.ctx())
-        self.assertEqual(step['step'], 'Assurance')
-        self.assertFalse(step['hold'])
+        self.assertEqual(step['step'], 'HOLD')
+        self.assertEqual(step['hold_reason'], 'assurance_unknown')
+        self.assertTrue(step['hold'])
 
     def test_a_stale_state_digest_invalidates_the_assurance(self):
         self.write_assurance(state_digest='sha256:' + '0' * 64)
@@ -552,6 +553,219 @@ class TestAssuranceLifecycle(unittest.TestCase):
         pr._loop_step(self.ctx())
         directory = self.route.joinpath(*pr.OUTCOME_ASSURANCE_SUBDIR)
         self.assertFalse(directory.exists(), "the loop must never write an Assurance itself")
+
+
+# ---------------------------------------------------------------------------
+# R7 authoring: the reviewer tool, its refusal rules, and review liveness
+# ---------------------------------------------------------------------------
+
+class TestAssuranceStore(unittest.TestCase):
+    """`evidence_outcome.py assurance-store` authors a real R7 review — never a pass."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.route = pathlib.Path(self.tmp.name)
+        self.state = eo.apply(*teo.fixture('positive'), timestamp=TIMESTAMP)['state']
+        self.state_path = self.route / 'research-state.json'
+        self.state_path.write_text(json.dumps(self.state, ensure_ascii=False), encoding='utf-8')
+        self.analysis_id = self.state['experiments'][-1]['outcome_analysis']['analysis']['id']
+        self.path = self.route.joinpath(*pr.OUTCOME_ASSURANCE_SUBDIR) / f'{self.analysis_id}.json'
+
+    def run_cli(self, *checks, reviewer='R7', experiment='X1', output=None, force=False,
+                state=None, review_conditions=()):
+        command = [sys.executable, str(ROOT / 'scripts' / 'evidence_outcome.py'), 'assurance-store',
+                   '--state', str(state or self.state_path), '--experiment', experiment,
+                   '--reviewer', reviewer]
+        for item in checks:
+            command += ['--check', item]
+        for item in review_conditions:
+            command += ['--re-review-condition', item]
+        if output is not None:
+            command += ['--output', str(output)]
+        if force:
+            command += ['--force']
+        proc = subprocess.run(command, capture_output=True, text=True,
+                              cwd=str(ROOT / 'scripts'))
+        return proc, (json.loads(proc.stdout) if proc.stdout.strip() else {})
+
+    @staticmethod
+    def check(name, status='PASS', reason=None):
+        return f"{name}={status}:{reason or (name + ' 已按来源核验，范围与冻结范围一致')}"
+
+    def all_checks(self, status='PASS'):
+        return [self.check(name, status) for name in eo.ASSURANCE_CHECKS]
+
+    def test_four_passes_store_and_release_the_real_gate(self):
+        proc, payload = self.run_cli(*self.all_checks())
+        self.assertEqual(proc.returncode, 0, payload)
+        self.assertTrue(payload['stored'])
+        self.assertEqual(payload['decision_gate']['status'], 'PASS')
+        self.assertEqual(payload['verification_tier'], 'T0')
+        stored = json.loads(self.path.read_text(encoding='utf-8'))
+        self.assertEqual(stored['reviewer'], 'R7')
+        self.assertEqual(stored['experiment_id'], 'X1')
+        self.assertEqual(stored['analysis_id'], self.analysis_id)
+        self.assertEqual(stored['state_digest'], eo.digest(self.state))
+        self.assertEqual(stored['analysis_digest'],
+                         eo.digest(self.state['experiments'][-1]['outcome_analysis']['analysis']))
+        self.assertIn('does not start a run', stored['note'])
+        self.assertEqual(pr.assurance_status(self.state, self.route)['X1']['status'],
+                         pr.ASSURANCE_VERIFIED)
+
+    def test_a_failing_check_blocks_and_is_kept_as_the_review(self):
+        proc, payload = self.run_cli(self.check('integrity', 'FAIL', '来源与冻结配置不一致，无法确认完整性'),
+                                     *[self.check(n) for n in eo.ASSURANCE_CHECKS
+                                       if n != 'integrity'])
+        self.assertEqual(proc.returncode, 3, payload)
+        self.assertTrue(payload['stored'])
+        self.assertEqual(payload['decision_gate']['status'], 'FAIL')
+        self.assertEqual(pr.assurance_status(self.state, self.route)['X1']['status'],
+                         pr.ASSURANCE_FAILED)
+
+    def test_an_unknown_check_returns_needs_review_and_parks_the_loop(self):
+        proc, payload = self.run_cli(self.check('claim_calibration', 'UNKNOWN',
+                                                '缺少独立的校准证据，当前无法判定'),
+                                     *[self.check(n) for n in eo.ASSURANCE_CHECKS
+                                       if n != 'claim_calibration'])
+        self.assertEqual(proc.returncode, 4, payload)
+        self.assertEqual(pr.assurance_status(self.state, self.route)['X1']['status'],
+                         pr.ASSURANCE_UNKNOWN)
+        scheduler = {"state_version": self.state['state_version'],
+                     "next_actions": [{"action": 'H1', "type": 'repair', "target": 'C1',
+                                       "eig": 'high', "cost": 'low'}]}
+        first = pr._loop_step(self.ctx(scheduler=scheduler))
+        self.assertEqual(first['step'], 'HOLD')
+        self.assertEqual(first['hold_reason'], 'assurance_unknown')
+        self.assertFalse(first.get('assurance_task'))
+        self.assertTrue(first['assurance_unknown']['X1']['re_review_conditions'])
+        self.assertEqual(pr._loop_step(self.ctx(scheduler=scheduler)), first,
+                         "an UNKNOWN review must not be re-asked every round")
+
+    def test_missing_check_empty_and_placeholder_reasons_are_refused(self):
+        cases = {
+            'missing': [self.check(name) for name in eo.ASSURANCE_CHECKS[:3]],
+            'empty': [*[self.check(name) for name in eo.ASSURANCE_CHECKS[:3]],
+                      'stop_rule_compliance=PASS:'],
+            'placeholder': [*[self.check(name) for name in eo.ASSURANCE_CHECKS[:3]],
+                            'stop_rule_compliance=PASS:TBD'],
+            'short': [*[self.check(name) for name in eo.ASSURANCE_CHECKS[:3]],
+                      'stop_rule_compliance=PASS:ok了'],
+            'bad_status': [*[self.check(name) for name in eo.ASSURANCE_CHECKS[:3]],
+                           'stop_rule_compliance=PROBABLY:理由足够长但状态非法'],
+            'bad_name': [self.check('integrity'), self.check('claim_calibration'),
+                         self.check('reproducibility'), self.check('vibes')],
+            'no_reviewer': self.all_checks(),
+        }
+        for name, checks in cases.items():
+            with self.subTest(name=name):
+                proc, payload = self.run_cli(*checks,
+                                             **({'reviewer': ''} if name == 'no_reviewer' else {}))
+                self.assertNotEqual(proc.returncode, 0, payload)
+                self.assertFalse(payload.get('stored'), payload)
+                self.assertFalse(self.path.exists(), name)
+
+    def test_a_wrong_binding_is_refused(self):
+        other = copy.deepcopy(self.state)
+        other['experiments'][-1]['outcome_analysis']['analysis']['experiment_id'] = 'X9'
+        bad = self.route / 'bad-state.json'
+        bad.write_text(json.dumps(other, ensure_ascii=False), encoding='utf-8')
+        proc, payload = self.run_cli(*self.all_checks(), state=bad)
+        self.assertNotEqual(proc.returncode, 0, payload)
+        self.assertFalse(payload.get('stored'))
+        self.assertFalse(self.path.exists())
+        proc, payload = self.run_cli(*self.all_checks(), experiment='X-does-not-exist')
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload.get('stored'))
+
+    def test_an_arbitrary_output_path_is_refused(self):
+        target = pathlib.Path(self.tmp.name) / 'research-state.json'
+        proc, payload = self.run_cli(*self.all_checks(), output=target)
+        self.assertNotEqual(proc.returncode, 0, payload)
+        self.assertIn('output must be', payload['errors'][0])
+        self.assertTrue(self.state_path.exists())
+
+    def test_duplicate_and_concurrent_submissions_do_not_corrupt_the_review(self):
+        self.run_cli(*self.all_checks())
+        before = self.path.read_bytes()
+        proc, payload = self.run_cli(*self.all_checks())
+        self.assertEqual(proc.returncode, 0, payload)
+        self.assertEqual(payload['outcome'], 'already_stored')
+        self.assertEqual(self.path.read_bytes(), before, "an identical re-submission must not rewrite")
+        changed = [self.check('integrity', 'FAIL', '来源与冻结配置不一致，无法确认完整性'),
+                   *[self.check(n) for n in eo.ASSURANCE_CHECKS if n != 'integrity']]
+        proc, payload = self.run_cli(*changed)
+        self.assertNotEqual(proc.returncode, 0, payload)
+        self.assertEqual(self.path.read_bytes(), before,
+                         "a different verdict without --force must not overwrite history")
+        proc, payload = self.run_cli(*changed, force=True)
+        self.assertEqual(proc.returncode, 3, payload)
+        self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['checks']['integrity'][
+                             'status'], 'FAIL')
+
+    def test_the_stored_review_survives_a_session_restart(self):
+        self.run_cli(*self.all_checks())
+        reloaded = cg.load_state(self.state_path)
+        context = {"state": reloaded, "index": {"state_version": reloaded['state_version']},
+                   "index_missing": False, "scheduler": None, "revisions": [],
+                   "route_dir": self.route, "state_path": self.state_path}
+        self.assertEqual(pr.assurance_status(reloaded, self.route)['X1']['status'],
+                         pr.ASSURANCE_VERIFIED)
+        step = pr._loop_step(context)
+        self.assertNotEqual(step['step'], 'Assurance')
+
+    def test_a_state_change_invalidates_the_stored_review(self):
+        self.run_cli(*self.all_checks())
+        moved = copy.deepcopy(self.state)
+        moved['state_version'] += 1
+        moved_path = self.route / 'moved.json'
+        moved_path.write_text(json.dumps(moved, ensure_ascii=False), encoding='utf-8')
+        status = pr.assurance_status(moved, self.route)['X1']
+        self.assertEqual(status['status'], pr.ASSURANCE_STALE)
+        step = pr._loop_step({"state": moved, "index": {"state_version": moved['state_version']},
+                              "index_missing": False, "scheduler": None, "revisions": [],
+                              "route_dir": self.route, "state_path": moved_path})
+        self.assertEqual(step['step'], 'Assurance')
+        self.assertTrue(step.get('assurance_task'))
+
+    def test_a_superseded_analysis_needs_no_review(self):
+        second = eo.apply(*teo.fixture('positive', state=self.state, xid='X2'), timestamp=TIMESTAMP)
+        self.assertEqual(second['status'], 'PASS', second)
+        state = second['state']
+        state_path = self.route / 'after-x2.json'
+        state_path.write_text(json.dumps(state, ensure_ascii=False), encoding='utf-8')
+        proc, payload = self.run_cli(*self.all_checks(), experiment='X2', state=state_path)
+        self.assertEqual(proc.returncode, 0, payload)
+        status = pr.assurance_status(state, self.route)
+        self.assertEqual(status['X1']['status'], pr.ASSURANCE_SUPERSEDED)
+        self.assertEqual(status['X2']['status'], pr.ASSURANCE_VERIFIED)
+        self.assertEqual(pr._loop_step({"state": state,
+                                        "index": {"state_version": state['state_version']},
+                                        "index_missing": False, "scheduler": None, "revisions": [],
+                                        "route_dir": self.route,
+                                        "state_path": state_path})['step'], 'HOLD')
+
+    def test_a_review_never_starts_a_run_or_raises_support(self):
+        before = copy.deepcopy(self.state)
+        proc, payload = self.run_cli(*self.all_checks())
+        self.assertEqual(proc.returncode, 0, payload)
+        after = json.loads(self.state_path.read_text(encoding='utf-8'))
+        self.assertEqual(after, before, "the review must not touch canonical state")
+        stored = json.loads(self.path.read_text(encoding='utf-8'))
+        self.assertEqual(stored['verification_tier'], 'T0')
+        self.assertEqual(payload['decision_gate']['note'],
+                         'R8 preregistration, planning constraints and existing execution '
+                         'authorization still apply.')
+        self.assertEqual([item['status'] for item in after['experiments']],
+                         [item['status'] for item in before['experiments']],
+                         "the review must not start, finish or re-plan any experiment")
+
+    def ctx(self, **kw):
+        context = {"state": self.state, "index": {"state_version": self.state['state_version']},
+                   "index_missing": False, "scheduler": None, "revisions": [],
+                   "route_dir": self.route, "state_path": self.state_path}
+        context.update(kw)
+        return context
 
 
 # ---------------------------------------------------------------------------

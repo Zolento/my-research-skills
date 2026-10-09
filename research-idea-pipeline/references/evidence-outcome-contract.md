@@ -209,6 +209,7 @@ python3 scripts/state_check.py --check next-state.json
 python3 scripts/evidence_outcome.py constraints --state next-state.json
 python3 scripts/evidence_outcome.py check-plan --state next-state.json --experiment X-next
 python3 scripts/evidence_outcome.py decision --state next-state.json --experiment X-result --assurance assurance.json
+python3 scripts/evidence_outcome.py assurance-store --state next-state.json --experiment X-result --reviewer R7 --check integrity=PASS:理由 ...   # R7 提交审查（见 loop-assurance-review.md）
 ```
 
 Exit codes are 0 PASS, 3 FAIL, 4 NEEDS_REVIEW/environment input error. apply never
