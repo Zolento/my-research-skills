@@ -131,6 +131,38 @@ python3 scripts/preset_router.py authorize --state <S> --revoke                 
 记录写在 `cognition/recovery-log.jsonl`（控制平面）。该文件与 `.execution/policy.json` 均不在恢复
 路径的写入范围内（有测试逐字节校验，AALG 预算永不被刷新）。
 
+## 5.2 R9.O → R10/R11 完成判定与 Loop 活性
+
+**完成凭证是事务，不是 Repair。** `evidence_outcome.apply()` 合法提交后写入的正式凭证是五键
+`outcome_analysis = {packet, analysis, audit, validation_context, audit_trail}`，其权威是
+`evidence_outcome.state_errors()`：它校验 analysis 键集、packet/analysis/audit 摘要、audit 全部检查、
+冻结策略、对 `validation_context` 的历史复验、"既有分析结果未被删除或改写"、
+以及 `audit_trail`（`state_version == result_at_state_version`、`previous_state.version == state_version - 1`、
+decision 一致、`state_delta` 非空、timestamp）与 `result`/`status` 一致性。
+
+`repairs[]` **不是**完成条件：`NEGATIVE_EVIDENCE`、`INVALID_EXPERIMENT`、hypothesis-only 与
+partial-scope 事务都合法提交却**不产生 Repair**（只有"把证据挂到 claim/hypothesis 上"的分支才写
+Repair）。把 Repair 当收据会让这些实验永远像"待 Revise"。
+
+| 状态 | 含义 | Loop 行为 |
+|---|---|---|
+| `NEEDS_ANALYSIS` | 终态实验尚无合法事务凭证 | 进入 R9.O（列出**具体**实验 ID） |
+| `COMMITTED` | 正式事务凭证通过校验 | 不再重复 R10/R11；**不等于**科学结论成立，也不等于可以继续 GPU |
+| `BLOCKED` | 凭证不完整、损坏、版本冲突或与状态矛盾 | `HOLD` 并报告实验 ID 与原因，不重试、不默认完成 |
+| `PENDING_EXECUTION` | 尚未终态 | 不属于 R10/R11 待办 |
+
+**判定按实验逐一进行**，不使用"项目已有任意历史分析"作为其他实验的完成凭证。同一快照下重复调用
+结果稳定；跨会话重载后判定不变。`r10_pending()` 仅返回 `NEEDS_ANALYSIS`（保持向后兼容），
+`BLOCKED` 由 `r10_blocked()` 单独报告。
+
+**Loop 步骤顺序**（`_loop_step`）：契约 → 候选 → 凭证受损（HOLD）→ 缺失分析（R9.O Verify）→
+planned/running（R8/R9 Intervene）→ 投影过期（Consolidate 一次）→ 决策门禁未过（Assurance /
+Decision Gate）→ Scheduler 的下一项合法动作（Discover）→ 无合法动作（HOLD，不伪造进展）。
+`COMMITTED` 之后仍必须先过 Assurance/Decision Gate，**不得**把"分析完成"当作"可以无条件继续执行"。
+
+**工程故障信号同理**：`engineering_failure` 只统计既无 R10 处置、也无 `COMMITTED` 凭证的失败实验，
+避免已合法提交的 `INVALID_EXPERIMENT` 被反复重新触发。
+
 ## 6. Strategy Decision Adapter：让建议进入真实动作选择
 
 审计结论：`recommend_strategy()` 产出菜单/算子/结构轴，但**没有任何消费者**；

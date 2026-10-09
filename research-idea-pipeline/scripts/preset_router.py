@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import cognition as cg
+import evidence_outcome as eo
 import prediction_compare as pc
 import state_check as sc
 import strategy_memory as sm
@@ -1239,6 +1240,11 @@ def signal_snapshot(
         "paths": [item.path for item in violations[:8]],
     }
 
+    # Outcome-transaction errors, computed once: the same validator verdict backs both the
+    # R10/R11 classification and the engineering-failure signal.
+    outcome_errors = eo.state_errors(state)
+    r10_report = r10_status(state, state_errors=outcome_errors)
+
     drift: List[str] = []
     if index is None or index_missing:
         drift.append("cognition 索引缺失（磁盘上没有可用的认知投影）")
@@ -1269,8 +1275,13 @@ def signal_snapshot(
 
     classification = failure_classification(state)
     failed_experiments = terminal_failed_experiments(state)
+    # A failed experiment is "unhandled" only while it has neither an R10 disposition nor a
+    # committed outcome receipt. Deriving this from repairs alone re-signalled every legally
+    # committed INVALID_EXPERIMENT forever.
     unhandled = [item.get("id") for item in failed_experiments
-                 if not _repair_covers(state, str(item.get("id")))]
+                 if not _repair_covers(state, str(item.get("id")))
+                 and (r10_report.get(str(item.get("id"))) or {}).get("status")
+                 != R10_COMMITTED]
     signals["engineering_failure"] = {
         "detected": bool(classification["engineering"]) or bool(unhandled),
         "kinds": classification["engineering"],
@@ -1661,61 +1672,182 @@ def _recommend(ctx: Dict[str, Any], revisions: Optional[Sequence[Dict[str, Any]]
                                  list(revisions if revisions is not None else ctx["revisions"]))
 
 
-def r10_pending(state: Dict[str, Any]) -> List[str]:
-    """Experiments whose R9.O analysis has **not** yet been consumed by an R10/R11 repair.
+#: R9.O → R10/R11 completion states, per experiment.
+#:
+#: * `COMMITTED` — a formal outcome transaction is on record and passes its own validator.
+#: * `NEEDS_ANALYSIS` — the experiment is terminal but has no legal outcome analysis yet.
+#: * `BLOCKED` — a receipt exists but is incomplete, damaged, or contradicts the state.
+#: * `PENDING_EXECUTION` — not terminal, so R10/R11 does not apply yet.
+R10_COMMITTED = "COMMITTED"
+R10_NEEDS_ANALYSIS = "NEEDS_ANALYSIS"
+R10_BLOCKED = "BLOCKED"
+R10_PENDING_EXECUTION = "PENDING_EXECUTION"
 
-    `repairs[].outcome_analysis_id` is what `evidence_outcome.apply` writes, so it is the
-    canonical receipt that the transition happened. A project with a long history of analysed
-    experiments must not be told to "Revise" forever because those analyses exist.
+#: The exact receipt keys `evidence_outcome._apply` writes; a partial block is not a receipt.
+R10_RECEIPT_KEYS = ("packet", "analysis", "audit", "validation_context", "audit_trail")
+
+
+def r10_status(state: Dict[str, Any], *,
+               state_errors: Optional[Sequence[str]] = None) -> Dict[str, Dict[str, Any]]:
+    """Per-experiment R10/R11 completion, derived from the transaction receipt.
+
+    The authority is `evidence_outcome.state_errors()` — it re-validates the analysis key set, the
+    packet/analysis/audit digests, every audit check, the frozen policy, the historical
+    re-validation against `validation_context`, the "previously analysed result was not removed or
+    rewritten" invariant, the `audit_trail` (`state_version == result_at_state_version`,
+    `previous_state.version == state_version - 1`, decision match, non-empty `state_delta`,
+    timestamp) and the `result`/`status` consistency.
+
+    A repair is **not** part of this judgement: `NEGATIVE_EVIDENCE`, `INVALID_EXPERIMENT`,
+    hypothesis-only and partial-scope transactions commit legally without ever writing one, and
+    requiring a repair made them look permanently unfinished.
+
+    Reporting `COMMITTED` means "the transaction was legally committed", never "the scientific
+    claim is supported" and never "the next GPU run is authorized".
     """
-    repaired = {repair.get("outcome_analysis_id") for repair in state.get("repairs") or []
-                if isinstance(repair, dict)}
-    pending: List[str] = []
-    for experiment in state.get("experiments") or []:
-        if not isinstance(experiment, dict):
+    if state_errors is None:
+        state_errors = eo.state_errors(state)
+    errors = [str(item) for item in state_errors]
+    experiments = [item for item in state.get("experiments") or [] if isinstance(item, dict)]
+    known_ids = {str(item.get("id")) for item in experiments}
+    global_errors = [item for item in errors
+                     if not any(item.startswith(f"{xid}: ") for xid in known_ids)]
+    report: Dict[str, Dict[str, Any]] = {}
+    for experiment in experiments:
+        xid = str(experiment.get("id"))
+        if experiment.get("status") not in ("done", "failed"):
+            report[xid] = {"status": R10_PENDING_EXECUTION,
+                           "reason": f"实验状态为 {experiment.get('status')!r}，尚未进入 R10/R11"}
             continue
-        record = experiment.get("outcome_analysis")
-        if not isinstance(record, dict):
+        receipt = experiment.get("outcome_analysis")
+        if not isinstance(receipt, dict):
+            report[xid] = {"status": R10_NEEDS_ANALYSIS,
+                           "reason": "终态实验尚无 outcome_analysis 事务"}
             continue
-        analysis = record.get("analysis") if isinstance(record.get("analysis"), dict) else {}
-        identifier = analysis.get("id")
-        if not identifier or identifier not in repaired:
-            pending.append(str(experiment.get("id")))
-    return sorted(pending)
+        missing = [key for key in R10_RECEIPT_KEYS if key not in receipt]
+        if missing:
+            report[xid] = {"status": R10_BLOCKED,
+                           "reason": "凭证不完整，缺少：" + ", ".join(missing)}
+            continue
+        trail = receipt.get("audit_trail") if isinstance(receipt.get("audit_trail"), dict) else {}
+        version = experiment.get("result_at_state_version")
+        if not isinstance(version, int) or trail.get("state_version") != version:
+            report[xid] = {"status": R10_BLOCKED,
+                           "reason": ("audit_trail.state_version 与 result_at_state_version 不一致"
+                                      f"（{trail.get('state_version')!r} vs {version!r}）")}
+            continue
+        if version > state.get("state_version", version):
+            report[xid] = {"status": R10_BLOCKED,
+                           "reason": "凭证版本晚于当前 state_version（版本冲突）"}
+            continue
+        own = [item for item in errors if item.startswith(f"{xid}: ")]
+        if own:
+            report[xid] = {"status": R10_BLOCKED, "reason": "; ".join(own[:2])}
+            continue
+        if global_errors:
+            report[xid] = {"status": R10_BLOCKED, "reason": "; ".join(global_errors[:2])}
+            continue
+        analysis = receipt.get("analysis") if isinstance(receipt.get("analysis"), dict) else {}
+        report[xid] = {"status": R10_COMMITTED,
+                       "reason": "正式事务凭证通过校验（analysis/audit/audit_trail 一致）",
+                       "analysis_id": analysis.get("id"),
+                       "committed_at_state_version": version}
+    return report
+
+
+def r10_pending(state: Dict[str, Any], *,
+                state_errors: Optional[Sequence[str]] = None) -> List[str]:
+    """Terminal experiments that still need their R9.O analysis (compatibility wrapper).
+
+    `BLOCKED` receipts are deliberately *not* listed here: they are a hold condition to be
+    reported, not work to be repeated.
+    """
+    return sorted(xid for xid, item in r10_status(state, state_errors=state_errors).items()
+                  if item["status"] == R10_NEEDS_ANALYSIS)
+
+
+def r10_blocked(state: Dict[str, Any], *,
+                state_errors: Optional[Sequence[str]] = None) -> Dict[str, str]:
+    """Terminal experiments whose receipt is incomplete, damaged or in conflict."""
+    return {xid: item["reason"] for xid, item in
+            sorted(r10_status(state, state_errors=state_errors).items())
+            if item["status"] == R10_BLOCKED}
+
+
+def _r10_covered(state: Dict[str, Any], experiment_id: str,
+                 state_errors: Optional[Sequence[str]] = None) -> bool:
+    """Whether the experiment's outcome transaction is on record (used by the signals)."""
+    item = r10_status(state, state_errors=state_errors).get(str(experiment_id))
+    return bool(item) and item["status"] == R10_COMMITTED
 
 
 def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose the next loop step from **per-experiment** todo state.
+
+    A global "has any analysis" test cannot express this: it hid unanalysed experiments behind
+    historical ones and turned repair-less (but legally committed) transactions into an endless
+    `Revise`. Ordering: contract → candidates → damaged receipts (hold) → missing analyses →
+    planned/running work → consolidate a stale projection → the Scheduler's next legal action.
+    """
     state = ctx["state"]
     contract = state.get("contract") or {}
-    experiments = state.get("experiments") or []
-    planned = [item for item in experiments if item.get("status") in ("planned", "running")]
-    failed = terminal_failed_experiments(state)
-    analysis = [item for item in experiments if item.get("outcome_analysis")]
-    done = [item for item in experiments if item.get("status") == "done"]
+    experiments = [item for item in state.get("experiments") or [] if isinstance(item, dict)]
     if not contract:
         return {"phase": "R0", "step": "Understand", "action": "先建立 research contract",
-                "blocked": True}
+                "blocked": True, "hold": False}
     if not (state.get("hypotheses") or []):
-        return {"phase": "R3—R6", "step": "Discover", "action": "生成并筛选候选", "blocked": False}
-    if planned:
-        return {"phase": "R8/R9", "step": "Intervene", "action":
-                f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行", "blocked": False}
-    if failed and not analysis:
+        return {"phase": "R3—R6", "step": "Discover", "action": "生成并筛选候选",
+                "blocked": False, "hold": False}
+    status = r10_status(state)
+    blocked = {xid: item["reason"] for xid, item in sorted(status.items())
+               if item["status"] == R10_BLOCKED}
+    if blocked:
+        return {"phase": "R10/R11", "step": "HOLD",
+                "action": "凭证损坏或冲突，需人工处理：" + "；".join(
+                    f"{xid}（{reason}）" for xid, reason in blocked.items()),
+                "blocked": True, "hold": True, "hold_reason": "outcome_receipt_blocked",
+                "blocked_experiments": blocked}
+    needs = sorted(xid for xid, item in status.items()
+                   if item["status"] == R10_NEEDS_ANALYSIS)
+    if needs:
         return {"phase": "R9.O", "step": "Verify",
-                "action": "先按 R9.O 分析失败实验（工程故障不得当作否证）", "blocked": False}
-    if done and not analysis:
-        return {"phase": "R9.O", "step": "Verify", "action": "分析已有结果并登记收据",
-                "blocked": False}
-    if analysis:
-        pending = r10_pending(state)
-        if pending:
-            return {"phase": "R10/R11", "step": "Revise",
-                    "action": f"为 {pending} 完成 R10/R11 迁移（其余历史结果已处理）",
-                    "blocked": False, "pending_r10": pending}
+                "action": f"为 {needs} 提交 Outcome Analysis（R9.O，工程故障不得当作否证）",
+                "blocked": False, "hold": False, "pending_r10": needs}
+    planned = [item for item in experiments if item.get("status") in ("planned", "running")]
+    if planned:
+        return {"phase": "R8/R9", "step": "Intervene",
+                "action": f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行",
+                "blocked": False, "hold": False, "pending_r10": []}
+    # Every terminal experiment carries a valid receipt. Consolidate a stale projection once,
+    # then let the existing decision path pick the next legal scientific action.
+    if ctx.get("index_missing") or (ctx.get("index") or {}).get("state_version") != \
+            state.get("state_version"):
         return {"phase": "R11+", "step": "Consolidate",
-                "action": "历史结果都已走完 R10/R11：重建认知投影并进入下一轮发现",
-                "blocked": False, "pending_r10": []}
-    return {"phase": "R3", "step": "Discover", "action": "继续发现候选", "blocked": False}
+                "action": "所有结果凭证有效：重建认知投影后进入下一轮",
+                "blocked": False, "hold": False, "pending_r10": []}
+    review = []
+    for xid, item in sorted(status.items()):
+        if item["status"] != R10_COMMITTED:
+            continue
+        gate = eo.decision_gate(state, xid)
+        if gate.get("status") != "PASS":
+            review.append(f"{xid}（{gate.get('status')}）")
+    if review:
+        return {"phase": "Assurance / Decision Gate", "step": "Assurance",
+                "action": ("已完成分析但决策门禁未通过，先走 Assurance/Decision Gate："
+                           + "、".join(review)),
+                "blocked": False, "hold": False, "pending_r10": [], "decision_gate": review}
+    actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
+               if isinstance(item, dict) and item.get("action")]
+    if actions:
+        return {"phase": "R3—R6/R8", "step": "Discover",
+                "action": f"按 Scheduler 选择下一项合法动作：{actions[0].get('action')}",
+                "blocked": False, "hold": False, "pending_r10": [],
+                "next_actions": [item.get("action") for item in actions[:5]]}
+    return {"phase": "HOLD", "step": "HOLD",
+            "action": "无新状态、无待分析结果、无合法下一动作：停下交人裁决",
+            "blocked": False, "hold": True, "hold_reason": "no_legal_action",
+            "pending_r10": []}
 
 
 def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
@@ -1751,7 +1883,12 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
         {"step": "Consolidate", "command": "python3 scripts/cognition.py build --state <state>"},
         {"step": "Loop", "command": "python3 scripts/preset_router.py trigger --state <state>"},
     ]
-    status = "BLOCKED" if step["blocked"] else "OK"
+    if step.get("hold"):
+        status = "HOLD"
+    elif step.get("blocked"):
+        status = "BLOCKED"
+    else:
+        status = "OK"
     next_action = step["action"]
     if guidance and not guidance["stale"] and guidance["dispatch"].get("action"):
         next_action = (f"{step['action']}；上一轮策略决策："
@@ -1762,10 +1899,16 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                              "strategy_guidance": guidance},
                    decision={"next_action": next_action,
                              "consumes_previous_decision": bool(guidance and not guidance["stale"]),
-                             "stop_reason": None if not step["blocked"] else "contract missing"},
+                             "step": step["step"],
+                             "pending_r10": step.get("pending_r10"),
+                             "blocked_experiments": step.get("blocked_experiments"),
+                             "decision_gate": step.get("decision_gate"),
+                             "stop_reason": step.get("hold_reason")
+                             or (None if not step["blocked"] else "contract missing")},
                    steps=steps, writes=["cognition/ 投影（经 cognition build）"],
                    changed_decision=switch.get("action") != "CONTINUE_ATTRIBUTION",
-                   next_action=next_action)
+                   next_action=next_action,
+                   hold_reason=step.get("hold_reason"))
 
 
 REPRESENTATION_AXES: Tuple[str, ...] = ("object", "variable", "assumption", "objective",
