@@ -60,14 +60,57 @@ EXIT_HARD = cg.EXIT_HARD
 EXIT_ENV = cg.EXIT_ENV
 
 #: Ablation arms, weakest first. Each arm adds exactly one capability.
+#: These four are frozen: the shipped ablation report and its consumers read them.
 ABLATION_ARMS: Tuple[str, ...] = ("baseline", "memory_only", "memory_prediction", "full_cie")
+
+#: Skill-RSI arms. They extend the ladder instead of replacing it, so the original four
+#: arms keep their exact meaning and the historical reports stay comparable.
+RSI_ARMS: Tuple[str, ...] = (
+    "rsi_full",
+    "rsi_shadow",
+    "rsi_without_trajectory",
+    "rsi_without_replay",
+    "rsi_without_scope",
+    "rsi_without_promotion",
+)
 
 ARM_CAPABILITIES: Dict[str, Tuple[str, ...]] = {
     "baseline": (),
     "memory_only": ("cognitive_memory",),
     "memory_prediction": ("cognitive_memory", "prediction_comparator"),
     "full_cie": ("cognitive_memory", "prediction_comparator", "strategy_memory"),
+    # Skill-RSI: a scoped, replay-evaluated policy candidate may change which already-legal
+    # action is chosen. Every RSI arm keeps CIE + strategy memory; they differ only in
+    # which guard is present, so a difference is attributable to that guard alone.
+    "rsi_full": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                 "scoped_policy", "trajectory_evidence", "replay_evaluation", "promotion_gate"),
+    "rsi_shadow": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                   "scoped_policy", "trajectory_evidence", "replay_evaluation",
+                   "promotion_gate", "shadow_only"),
+    "rsi_without_trajectory": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                               "scoped_policy", "replay_evaluation", "promotion_gate"),
+    "rsi_without_replay": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                           "scoped_policy", "trajectory_evidence", "promotion_gate"),
+    "rsi_without_scope": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                          "trajectory_evidence", "replay_evaluation", "promotion_gate"),
+    "rsi_without_promotion": ("cognitive_memory", "prediction_comparator", "strategy_memory",
+                              "scoped_policy", "trajectory_evidence", "replay_evaluation"),
 }
+
+#: Counterfactual evidence classes (Skill-RSI §5.2). A historical branch that was never
+#: executed cannot be scored, and it is never rounded up to an observed result.
+EVIDENCE_SUPPORT_CLASSES: Tuple[str, ...] = ("OBSERVED", "REPLAY_SUPPORTED", "NO_SUPPORT")
+
+#: Policy candidate statuses that are allowed to influence a decision during evaluation.
+#: A merely PROPOSED candidate may not act; that is the promotion gate.
+ACTIONABLE_POLICY_STATUSES: Tuple[str, ...] = ("ACTIVE",)
+
+#: Any of these makes an arm a Skill-RSI arm, so the policy step runs and each *missing*
+#: guard is reported as a bypass instead of the whole step being skipped.
+RSI_POLICY_CAPABILITIES: Tuple[str, ...] = ("scoped_policy", "trajectory_evidence",
+                                            "replay_evaluation", "promotion_gate",
+                                            "shadow_only")
+
 
 #: Evaluation dimensions. Each is scored independently; nothing is averaged into a total.
 METRIC_DIMENSIONS: Tuple[str, ...] = (
@@ -96,6 +139,11 @@ FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
     "repeat_stopped_protocol",
     "report_unqualified_result_as_held",
     "certify_insight_from_unqualified_evidence",
+    # Skill-RSI additions: a policy change that skipped a guard.
+    "apply_unpromoted_policy",
+    "use_unobserved_branch",
+    "apply_unscoped_policy",
+    "apply_unsupported_policy",
 )
 
 #: A novelty label must come from outside the agent.
@@ -187,6 +235,15 @@ def visible_view(case: Dict[str, Any]) -> Dict[str, Any]:
         "known_conditions": list(visible.get("known_conditions") or []),
         "insight_cards": [card for card in visible.get("insight_cards") or []
                           if isinstance(card, dict)],
+        # Skill-RSI visible surface: policy candidates and the counterfactual support map are
+        # inputs to the decision, so they are visible by design. The hidden answer stays out.
+        "policy_candidates": [dict(item) for item in visible.get("policy_candidates") or []
+                              if isinstance(item, dict)],
+        "evidence_support": dict(visible.get("evidence_support") or {}),
+        "legal_actions": [dict(item) for item in visible.get("legal_actions") or []
+                          if isinstance(item, dict)],
+        "decision_time": visible.get("decision_time"),
+        "cognition": visible.get("cognition"),
     }
 
 
@@ -336,6 +393,9 @@ def cie_offline_runner(visible: Dict[str, Any], arm: str) -> Dict[str, Any]:
         decision["intervention_quality_signals"] = assessment["decision_value"][
             "changes_experiment_design"]["assessment"]
         decision["objections"] = assessment["objections"]
+
+    if any(capability in capabilities for capability in RSI_POLICY_CAPABILITIES):
+        _apply_policy_candidate(visible, capabilities, decision, state, scheduler)
     return decision
 
 
@@ -542,6 +602,9 @@ def evaluate(case: Dict[str, Any], decision: Dict[str, Any],
         "metrics": metrics,
         "violations": violations,
         "passed": not violations,
+        # Skill-RSI: the counterfactual evidence class of this decision. It is a tag, not a
+        # dimension and not a score — no capability claim may rest on a NO_SUPPORT decision.
+        "evidence_support": classify_evidence_support(case, decision),
         "note": ("每个维度独立评分，不做加权总分；null 表示该维度在本 case 不可评，"
                  "不得当作 0 或 1"),
     }
@@ -582,7 +645,376 @@ def _behaviour_present(behaviour: str, decision: Dict[str, Any], case: Dict[str,
         return (not decision.get("evidence_eligible")
                 and "evidence_supported_insight"
                 in set((decision.get("insight_classes") or {}).values()))
+    # --- Skill-RSI policy guards -------------------------------------------------
+    if behaviour == "apply_unpromoted_policy":
+        return decision.get("policy_gate_bypassed") is True
+    if behaviour == "use_unobserved_branch":
+        return decision.get("policy_used_unobserved_branch") is True
+    if behaviour == "apply_unscoped_policy":
+        return decision.get("policy_scope_bypassed") is True
+    if behaviour == "apply_unsupported_policy":
+        return decision.get("policy_support_bypassed") is True
     return False
+
+
+# ---------------------------------------------------------------------------
+# Skill-RSI: counterfactual evidence classes, leak audit, history ingestion
+# ---------------------------------------------------------------------------
+
+def _visible_actions(visible: Dict[str, Any], state: Dict[str, Any],
+                     scheduler: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The action set the decision was allowed to choose from, with its scheduler tier."""
+    actions: List[Dict[str, Any]] = []
+    for item in visible.get("legal_actions") or []:
+        if isinstance(item, dict) and item.get("action"):
+            actions.append(dict(item))
+    if actions:
+        return actions
+    for action in (scheduler or {}).get("next_actions") or []:
+        if isinstance(action, dict) and action.get("action"):
+            actions.append(dict(action))
+    for experiment in state.get("experiments") or []:
+        if isinstance(experiment, dict) and experiment.get("id"):
+            actions.append({"action": experiment.get("id"),
+                            "type": "discriminating_experiment",
+                            "target": experiment.get("claim_targeted") or experiment.get("parent"),
+                            "eig": "high", "cost": "medium"})
+    return actions
+
+
+def support_sets(visible: Dict[str, Any]) -> Tuple[set, set]:
+    """`(observed, replay_supported)` actions for this case.
+
+    `observed` is the set of actions whose result was actually seen. `replay_supported` is
+    the wider set of branches that exist in the recorded history and therefore can be
+    compared. Anything outside both is unobservable and must return `NO_SUPPORT`.
+    """
+    declared = visible.get("evidence_support")
+    if isinstance(declared, dict):
+        # A declared map is authoritative, including when it is empty: "no observed branch"
+        # is information, not a missing value.
+        return ({str(item) for item in declared.get("observed_actions") or []},
+                {str(item) for item in declared.get("replay_supported_actions") or []})
+    state = visible.get("state") or {}
+    replayable = {str(item.get("id")) for item in state.get("experiments") or []
+                  if isinstance(item, dict) and item.get("id")}
+    replayable |= {str(item.get("action"))
+                   for item in (visible.get("scheduler") or {}).get("next_actions") or []
+                   if isinstance(item, dict) and item.get("action")}
+    replayable |= {str(item.get("action")) for item in visible.get("legal_actions") or []
+                   if isinstance(item, dict) and item.get("action")}
+    return set(), replayable
+
+
+def classify_evidence_support(case: Dict[str, Any], decision: Dict[str, Any],
+                              support: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Tag a decision with its counterfactual evidence class (Skill-RSI §5.2).
+
+    * `OBSERVED` — the action and its result were both seen.
+    * `REPLAY_SUPPORTED` — the branch exists in recorded history with real observations,
+      so policies can be compared inside that coverage.
+    * `NO_SUPPORT` — the candidate policy selects an action that was never executed; its
+      result cannot be manufactured and no capability claim may rest on it.
+    """
+    visible = case.get("visible") or {}
+    if support is not None:
+        observed = {str(item) for item in support.get("observed_actions") or []}
+        replayable = {str(item) for item in support.get("replay_supported_actions") or []}
+    else:
+        declared = visible.get("evidence_support")
+        if isinstance(declared, dict):
+            observed = {str(item) for item in declared.get("observed_actions") or []}
+            replayable = {str(item) for item in declared.get("replay_supported_actions") or []}
+        else:
+            observed, replayable = support_sets(visible)
+        observed |= {str(item) for item in decision.get("observed_actions") or []}
+        replayable |= {str(item) for item in decision.get("replay_supported_actions") or []}
+    intended = decision.get("candidate_choice") or decision.get("chosen_intervention")
+    if intended in observed:
+        support_class = "OBSERVED"
+        reason = f"行动 {intended!r} 及其结果均已真实观测"
+    elif intended in replayable:
+        support_class = "REPLAY_SUPPORTED"
+        reason = f"行动 {intended!r} 属于历史已执行分支，可在覆盖范围内比较"
+    elif intended:
+        support_class = "NO_SUPPORT"
+        reason = (f"行动 {intended!r} 在历史中没有被执行过：结果不可观测，"
+                  "不得用模型预测替代真实实验")
+    else:
+        support_class = "OBSERVED"
+        reason = "本决策没有提出历史之外的新行动分支"
+    return {
+        "class": support_class,
+        "reason": reason,
+        "intended_action": intended,
+        "observed_actions": sorted(observed),
+        "replay_supported_actions": sorted(replayable),
+        "observed_count": len(observed),
+        "replay_supported_count": len(replayable),
+    }
+
+
+def _apply_policy_candidate(visible: Dict[str, Any], capabilities: Sequence[str],
+                            decision: Dict[str, Any], state: Dict[str, Any],
+                            scheduler: Optional[Dict[str, Any]]) -> None:
+    """Let a *scoped and evaluated* policy candidate pick a different already-legal action.
+
+    Every guard the arm is missing is reported as a bypass so the ablation can measure the
+    guard instead of assuming it helps. Without a promotion gate a merely PROPOSED policy
+    acts; without scoped memory an unscoped policy acts; without replay evaluation an
+    unevaluated policy acts; without trajectory evidence an unobserved branch is attempted.
+    """
+    candidates = [item for item in visible.get("policy_candidates") or []
+                  if isinstance(item, dict)]
+    if not candidates:
+        return
+    observed, replayable = support_sets(visible)
+    decision["observed_actions"] = sorted(observed)
+    decision["replay_supported_actions"] = sorted(replayable)
+    legal = _visible_actions(visible, state, scheduler)
+    legal_ids = {str(item.get("action")) for item in legal}
+    tiers = {str(item.get("action")): sm.action_tier(item)["rank"] for item in legal}
+    current = decision.get("chosen_intervention")
+    current_tier = tiers.get(str(current))
+    reason = "no_candidate_with_action_preference"
+    for candidate in candidates:
+        preferred = None
+        for change in candidate.get("strategy_changes") or []:
+            if isinstance(change, dict) and change.get("prefer_action"):
+                preferred = str(change["prefer_action"])
+                break
+        if preferred is None:
+            continue
+        status = str(candidate.get("status") or "UNKNOWN")
+        if "promotion_gate" in capabilities:
+            if status not in ACTIONABLE_POLICY_STATUSES:
+                reason = f"candidate_not_promoted:{status}"
+                continue
+        else:
+            decision["policy_gate_bypassed"] = True
+        if "scoped_policy" in capabilities:
+            scope = candidate.get("scope")
+            if not isinstance(scope, dict) or not scope:
+                reason = "candidate_without_scope"
+                continue
+        else:
+            decision["policy_scope_bypassed"] = True
+        if "trajectory_evidence" in capabilities:
+            if not candidate.get("supporting_trajectory_ids"):
+                reason = "candidate_without_trajectory_support"
+                continue
+        if "replay_evaluation" in capabilities:
+            refs = candidate.get("evaluation_refs") or []
+            if not any(isinstance(item, dict) and item.get("independent") for item in refs):
+                reason = "candidate_without_independent_replay"
+                continue
+        else:
+            decision["policy_support_bypassed"] = True
+        if preferred not in legal_ids:
+            reason = f"preferred_action_not_legal:{preferred}"
+            continue
+        if "trajectory_evidence" in capabilities and preferred not in replayable:
+            decision["policy_used_unobserved_branch"] = True
+            reason = f"preferred_action_not_in_history:{preferred}"
+            continue
+        if current_tier is not None and tiers.get(preferred) != current_tier:
+            reason = f"preferred_action_in_another_tier:{preferred}"
+            continue
+        decision["candidate_choice"] = preferred
+        decision["policy_id"] = candidate.get("policy_id")
+        if "shadow_only" in capabilities:
+            # Shadow: the candidate states what it would do; it changes nothing.
+            decision["policy_shadow_choice"] = preferred
+            decision["policy_intent_changed"] = preferred != current
+            decision["policy_applied"] = False
+            return
+        decision["policy_applied"] = True
+        decision["chosen_intervention"] = preferred
+        decision["decision_changed"] = True
+        return
+    decision["policy_reason_if_not"] = reason
+
+
+def leak_audit(case: Dict[str, Any], visible: Dict[str, Any], *,
+               case_dir: Optional[Path] = None,
+               route_dir: Optional[Path] = None) -> List[str]:
+    """Beyond-substring isolation checks (Skill-RSI §5.3).
+
+    The existing `RP2` scan is necessary but not sufficient. This adds:
+    * `RP2` — the original substring scan over the visible payload;
+    * `RP6` — a temporal boundary: visible literature must not postdate the decision;
+    * `RP7` — the filesystem: no readable file under the case directory (or symlink
+      pointing out of it) may contain a hidden answer;
+    * `RP8` — cognitive memory: a recalled projection must not carry later observations.
+    The evaluation refuses a case whose isolation cannot be established.
+    """
+    findings: List[str] = []
+    findings.extend(f"RP2: {text}" for text in leak_scan(case, visible))
+
+    decision_time = _year(visible.get("decision_time"))
+    if decision_time is not None:
+        for reference in visible.get("available_literature") or []:
+            year = _year(reference)
+            if year is not None and year > decision_time:
+                findings.append(
+                    f"RP6: 文献 {reference!r} 晚于决策时间 {visible.get('decision_time')!r}"
+                    "（越过历史时间边界）")
+
+    hidden_strings = forbidden_strings(case)
+    memory = visible.get("cognition")
+    if memory is not None:
+        blob = json.dumps(memory, ensure_ascii=False)
+        findings.extend(f"RP8: 认知记忆包含未来信息 {text}" for text in hidden_strings
+                        if text in blob)
+
+    if case_dir is not None:
+        root = Path(case_dir).resolve()
+        for path in sorted(root.rglob("*")):
+            try:
+                resolved = path.resolve()
+            except OSError:
+                findings.append(f"RP7: 无法解析路径 {path}")
+                continue
+            if root != resolved and root not in resolved.parents:
+                findings.append(f"RP7: {path.name} 是指向评测目录之外的符号链接")
+                continue
+            if not resolved.is_file():
+                continue
+            if resolved.suffix in (".pyc",):
+                continue
+            try:
+                text = resolved.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for marker in hidden_strings:
+                if marker in text:
+                    findings.append(f"RP7: 可见目录中的 {path.name} 含隐藏答案文本")
+    if route_dir is not None:
+        root = Path(route_dir)
+        for name in ("context-brief.md", "index.json"):
+            candidate = root / "cognition" / name
+            if not candidate.is_file():
+                continue
+            try:
+                text = candidate.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for marker in hidden_strings:
+                if marker in text:
+                    findings.append(f"RP7: 项目认知投影 {name} 含隐藏答案文本")
+    return sorted(set(findings))
+
+
+def _year(value: Any) -> Optional[int]:
+    """The first 4-digit year in a string, if any. Used only for time-boundary checks."""
+    if isinstance(value, int) and 1000 <= value <= 9999:
+        return value
+    if not isinstance(value, str):
+        return None
+    digits = ""
+    for character in value:
+        if character.isdigit():
+            digits += character
+            if len(digits) == 4:
+                year = int(digits)
+                return year if 1900 <= year <= 2999 else None
+        else:
+            digits = ""
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Real-history ingestion (never invents a hidden answer)
+# ---------------------------------------------------------------------------
+
+def support_map_from_trajectory(path: Path) -> Dict[str, Any]:
+    """Turn a real decision trajectory into an evidence-support map for replay.
+
+    `observed_actions` are actions with a recorded real outcome; `replay_supported_actions`
+    additionally include chosen actions whose result has not landed yet. Nothing here
+    fabricates a result: a decision without an outcome stays `NO_SUPPORT` for evaluation.
+    """
+    import decision_trajectory as dt
+    records, diagnostics = dt.load_records(Path(path), tolerant=True)
+    views = dt.rebuild_trajectories(records)
+    observed: List[str] = []
+    replayable: List[str] = []
+    pending: List[str] = []
+    for ident, view in sorted(views.items()):
+        decision = view.get("decision") or {}
+        chosen = ((decision.get("decision") or {}).get("chosen"))
+        if chosen:
+            replayable.append(str(chosen))
+        if view.get("outcome") is not None:
+            if chosen:
+                observed.append(str(chosen))
+        elif chosen:
+            pending.append(str(chosen))
+    return {
+        "source": str(path),
+        "observed_actions": sorted(set(observed)),
+        "replay_supported_actions": sorted(set(replayable)),
+        "pending_actions": sorted(set(pending)),
+        "trajectories": len(views),
+        "unobservable_until_real_result": sorted(set(pending)),
+        "diagnostics": [item.render() for item in diagnostics],
+    }
+
+
+def coverage_report(path: Path) -> Dict[str, Any]:
+    """Honest coverage statement: how much of the history replay may actually evaluate."""
+    support = support_map_from_trajectory(path)
+    total = support["trajectories"]
+    evaluable = len(support["observed_actions"])
+    return {
+        "schema": "research-idea-pipeline/replay-coverage@1",
+        "source": support["source"],
+        "trajectories": total,
+        "observed_actions": support["observed_actions"],
+        "replay_supported_actions": support["replay_supported_actions"],
+        "unobservable_until_real_result": support["unobservable_until_real_result"],
+        "evaluable_fraction": round(evaluable / total, 4) if total else None,
+        "note": ("历史回放只在已执行分支的覆盖范围内有效；未执行分支保持 NO_SUPPORT，"
+                 "不得用模型预测补造结果"),
+    }
+
+
+def cases_from_trajectory(path: Path, *, state: Dict[str, Any],
+                          hidden_answers: Dict[str, Any],
+                          evaluation_only: Optional[Dict[str, Any]] = None
+                          ) -> List[Dict[str, Any]]:
+    """Build replay cases from a real trajectory plus externally supplied hidden answers.
+
+    The hidden answers must come from outside the runner. A trajectory without an
+    external answer yields **no** case and is reported instead of being scored.
+    """
+    import decision_trajectory as dt
+    records, _ = dt.load_records(Path(path), tolerant=True)
+    views = dt.rebuild_trajectories(records)
+    cases: List[Dict[str, Any]] = []
+    for ident, view in sorted(views.items()):
+        answer = hidden_answers.get(ident)
+        if not isinstance(answer, dict):
+            continue
+        decision = view.get("decision") or {}
+        chosen = (decision.get("decision") or {}).get("chosen")
+        cases.append({
+            "_schema": SCHEMA_CASE,
+            "id": ident,
+            "question": (decision.get("context") or {}).get("scientific_question") or ident,
+            "visible": {"state": state, "revisions": [], "scheduler": None,
+                        "available_literature": [],
+                        "known_conditions": [],
+                        "decision_time": (decision.get("context") or {}).get("decided_at"),
+                        "evidence_support": {
+                            "observed_actions": [str(chosen)] if view.get("outcome") else [],
+                            "replay_supported_actions": [str(chosen)] if chosen else [],
+                        }},
+            "hidden": {"later_results": [], "answer": answer},
+            "evaluation_only": evaluation_only or {},
+        })
+    return cases
+
 
 
 # ---------------------------------------------------------------------------
@@ -593,6 +1025,10 @@ def run_case(
     case: Dict[str, Any],
     arm: str = "full_cie",
     runner: Optional[Callable[[Dict[str, Any], str], Dict[str, Any]]] = None,
+    *,
+    case_dir: Optional[Path] = None,
+    route_dir: Optional[Path] = None,
+    require_isolation: bool = False,
 ) -> Dict[str, Any]:
     """Run one case under one arm. The runner never receives the hidden section."""
     runner = runner or cie_offline_runner
@@ -602,6 +1038,11 @@ def run_case(
         raise cg.CognitionError(
             "future-information leak: hidden strings are reachable from the visible payload: "
             + "; ".join(leaks))
+    audit = leak_audit(case, visible, case_dir=case_dir, route_dir=route_dir)
+    if require_isolation and audit:
+        raise cg.CognitionError(
+            "case isolation cannot be established, refusing independent evaluation: "
+            + "; ".join(audit))
     decision = runner(visible, arm)
     diagnostics = decision_errors(decision)
     baseline = None
@@ -614,6 +1055,8 @@ def run_case(
         "evaluation": evaluate(case, decision, baseline),
         "diagnostics": [d.as_dict() for d in diagnostics],
         "leak_checked": True,
+        "leak_audit": audit,
+        "isolation_verified": not audit,
     }
 
 
@@ -667,6 +1110,10 @@ def run_suite(
                 results.append(run_case(case, arm, runner))
         violations = [violation for result in results
                       for violation in result["evaluation"]["violations"]]
+        support_counts = {name: 0 for name in EVIDENCE_SUPPORT_CLASSES}
+        for result in results:
+            support_counts[result["evaluation"]["evidence_support"]["class"]] = \
+                support_counts.get(result["evaluation"]["evidence_support"]["class"], 0) + 1
         per_arm[arm] = {
             "capabilities": list(ARM_CAPABILITIES.get(arm, ())),
             "runs": max(1, runs),
@@ -674,6 +1121,8 @@ def run_suite(
             "observations": len(results),
             "dimensions": _dimension_means(results),
             "violations": sorted(set(violations)),
+            "evidence_support": support_counts,
+            "isolation_verified": all(result.get("isolation_verified", True) for result in results),
             "pass_rate": round(
                 sum(1 for result in results if result["evaluation"]["passed"]) / len(results), 4)
             if results else None,
@@ -702,6 +1151,8 @@ def run_suite(
 
     sample_size = len(cases) * max(1, runs)
     sufficient = sample_size >= 2 and len(cases) >= 3
+    unobservable = sum(block["evidence_support"].get("NO_SUPPORT", 0)
+                       for block in per_arm.values())
     return {
         "schema": "research-idea-pipeline/replay-ablation@1",
         "cases": len(cases),
@@ -711,6 +1162,7 @@ def run_suite(
         "sufficient_sample": sufficient,
         "per_arm": per_arm,
         "delta_vs_baseline": comparison,
+        "unobservable_decisions": unobservable,
         "claim": (
             "样本不足：只报告实测值与不确定性，不得宣称提升"
             if not sufficient else
@@ -723,6 +1175,9 @@ def run_suite(
             "未使用真实模型或真实文献库",
             "novelty 只在 case 携带独立标签或近邻时可评",
         ] + ([
+            f"有 {unobservable} 个决策落在 NO_SUPPORT：历史未执行分支不可评价，"
+            "不得据此晋升策略",
+        ] if unobservable else []) + ([
             "以下 arm 在这些维度上完全无法区分：" +
             "；".join("/".join(group) for group in undifferentiated) +
             "——不得据此宣称额外能力带来了提升",
@@ -1331,6 +1786,73 @@ def selftest() -> int:
           tiny["sufficient_sample"] is False and "不得宣称提升" in tiny["claim"])
     check("every ablation declares its limitations", bool(ablation["limitations"]))
 
+    # --- Skill-RSI: counterfactual evidence classes and guard ablation ----------
+    def policy_case(base, *, status="ACTIVE", prefer="X9", scope=True, trajectory=True,
+                    replay_ref=True, support=True):
+        case = json.loads(json.dumps(base))
+        candidate = {
+            "policy_id": "P-RSI-SELFTEST",
+            "status": status,
+            "strategy_changes": [{"kind": "same_tier_preference", "prefer_action": prefer}],
+            "supporting_trajectory_ids": ["DT-selftest"] if trajectory else [],
+            "evaluation_refs": ([{"independent": True, "verdict": "SUPPORTED"}]
+                                if replay_ref else []),
+            "scope": {"problem_structure": "fixture"} if scope else {},
+        }
+        case["visible"]["policy_candidates"] = [candidate]
+        case["visible"]["legal_actions"] = [
+            {"action": prefer, "type": "repair", "target": "C1", "eig": "high", "cost": "low"},
+            {"action": "X1", "type": "discriminating_experiment", "target": "C1",
+             "eig": "high", "cost": "low"}]
+        case["visible"]["evidence_support"] = {
+            "observed_actions": [],
+            "replay_supported_actions": [prefer, "X1"] if support else [],
+        }
+        return case
+
+    base = cases[0]
+    promoted = run_case(policy_case(base), "rsi_full")
+    check("an evaluated scoped policy is applied by rsi_full",
+          promoted["decision"].get("policy_applied") is True)
+    shadow = run_case(policy_case(base), "rsi_shadow")
+    check("the shadow arm changes no action",
+          shadow["decision"].get("policy_applied") in (False, None)
+          and shadow["decision"].get("policy_shadow_choice") == "X9")
+    unpromoted = run_case(policy_case(base, status="PROPOSED"), "rsi_full")
+    check("the promotion gate refuses a PROPOSED policy",
+          unpromoted["decision"].get("policy_applied") in (False, None))
+    bypassed = run_case(policy_case(base, status="PROPOSED"), "rsi_without_promotion")
+    check("without the gate a PROPOSED policy acts and is flagged",
+          bypassed["decision"].get("policy_gate_bypassed") is True)
+    unobserved = run_case(policy_case(base, support=False), "rsi_full")
+    check("a branch outside history is refused",
+          unobserved["decision"].get("policy_used_unobserved_branch") is True)
+    check("an unobserved branch is NO_SUPPORT",
+          classify_evidence_support(policy_case(base, support=False),
+                                    {"chosen_intervention": "X9"})["class"] == "NO_SUPPORT")
+    observed = classify_evidence_support({}, {"chosen_intervention": "X9"},
+                                         {"observed_actions": ["X9"],
+                                          "replay_supported_actions": ["X9"]})
+    check("an observed action is OBSERVED", observed["class"] == "OBSERVED")
+    replay_supported = classify_evidence_support({}, {"chosen_intervention": "X9"},
+                                                 {"observed_actions": ["X1"],
+                                                  "replay_supported_actions": ["X1", "X9"]})
+    check("a replayed branch is REPLAY_SUPPORTED",
+          replay_supported["class"] == "REPLAY_SUPPORTED")
+
+    rsi_report = run_suite([policy_case(base)], RSI_ARMS, 1)
+    check("the RSI ablation keeps the four frozen arms intact",
+          set(ABLATION_ARMS).isdisjoint(set(RSI_ARMS)))
+    check("the RSI ablation reports evidence classes",
+          all("evidence_support" in block for block in rsi_report["per_arm"].values()))
+
+    temporal = json.loads(json.dumps(base))
+    temporal["visible"]["decision_time"] = "2020"
+    temporal["visible"]["available_literature"] = ["[Journal 2026] later work"]
+    check("a literature time-boundary violation is detected",
+          any(item.startswith("RP6") for item in leak_audit(temporal, visible_view(temporal))))
+    check("a first-session case has no memory leak", leak_audit(base, visible_view(base)) == [])
+
     with tempfile.TemporaryDirectory() as temp:
         report = smoke(Path(temp))
         check("the smoke test passes", report["passed"])
@@ -1358,10 +1880,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(description="Historical research replay, metrics and ablation")
     parser.add_argument("command", nargs="?",
                         choices=["validate", "show", "run", "suite", "ablate",
-                                 "adversarial", "smoke"])
+                                 "adversarial", "smoke", "support", "coverage"])
     parser.add_argument("--case", help="path to one replay case")
     parser.add_argument("--dir", help="directory of replay cases")
-    parser.add_argument("--arm", default="full_cie", choices=ABLATION_ARMS)
+    parser.add_argument("--arm", default="full_cie", choices=ABLATION_ARMS + RSI_ARMS)
+    parser.add_argument("--rsi", action="store_true",
+                        help="ablate/suite: include the Skill-RSI arms")
+    parser.add_argument("--trajectory", help="path to decision-trajectory.jsonl")
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--runner", help="`module:function` pluggable runner")
     parser.add_argument("--write", help="output directory for generated cases")
@@ -1398,8 +1923,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return EXIT_OK if report["passed"] else EXIT_HARD
         if args.command == "validate":
+            if args.dir:
+                # `validate --dir` is advertised by presets/discovery-replay.md; it validates
+                # every case and reports per-case diagnostics without running anything.
+                cases = load_cases(Path(args.dir).expanduser())
+                failures = [{"id": case.get("id"),
+                             "errors": [d.render() for d in case_errors(case)]}
+                            for case in cases]
+                failures = [item for item in failures if item["errors"]]
+                print(json.dumps({"cases": len(cases), "invalid": failures,
+                                  "valid": not failures}, ensure_ascii=False))
+                return EXIT_OK if not failures else EXIT_HARD
             if not args.case:
-                print("argument error: --case is required", file=sys.stderr)
+                print("argument error: --case or --dir is required", file=sys.stderr)
                 return EXIT_ERROR
             case = load_case(Path(args.case).expanduser())
             diagnostics = case_errors(case)
@@ -1423,12 +1959,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = run_case(case, args.arm, runner)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return EXIT_OK if result["evaluation"]["passed"] else EXIT_HARD
+        if args.command == "support":
+            if not args.trajectory:
+                print("argument error: --trajectory is required", file=sys.stderr)
+                return EXIT_ERROR
+            print(json.dumps(support_map_from_trajectory(Path(args.trajectory).expanduser()),
+                             ensure_ascii=False, indent=2))
+            return EXIT_OK
+        if args.command == "coverage":
+            if not args.trajectory:
+                print("argument error: --trajectory is required", file=sys.stderr)
+                return EXIT_ERROR
+            print(json.dumps(coverage_report(Path(args.trajectory).expanduser()),
+                             ensure_ascii=False, indent=2))
+            return EXIT_OK
         if args.command in ("suite", "ablate"):
             if not args.dir:
                 print("argument error: --dir is required", file=sys.stderr)
                 return EXIT_ERROR
             cases = load_cases(Path(args.dir).expanduser())
-            report = run_suite(cases, ABLATION_ARMS, max(1, args.runs), runner)
+            arms = ABLATION_ARMS + RSI_ARMS if args.rsi else ABLATION_ARMS
+            report = run_suite(cases, arms, max(1, args.runs), runner)
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return EXIT_OK
     except cg.CognitionError as exc:
