@@ -853,6 +853,16 @@ def step_release_metadata() -> Tuple[bool, str]:
     registry = json.loads((root / 'preset-registry.json').read_text(encoding='utf-8'))
     if registry.get('schema_version') != '0.1':
         return False, 'the preset registry schema version must not track the release'
+    # Once the tag exists it must point *exactly* at this commit (never merely an ancestor).
+    tag = f'research-idea-pipeline/v{version}'
+    tagged = sub.run(['git', 'rev-parse', f'{tag}^{{}}'], capture_output=True, text=True,
+                     cwd=str(root.parent))
+    if tagged.returncode == 0:
+        head = sub.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True,
+                       cwd=str(root.parent)).stdout.strip()
+        if tagged.stdout.strip() != head:
+            return False, (f'{tag} points at {tagged.stdout.strip()[:8]}, not at the release '
+                           f'commit {head[:8]}')
     proc = sub.run([sys.executable, str(root / 'scripts' / 'test_release_metadata.py')],
                    capture_output=True, text=True, cwd=str(root))
     if proc.returncode != 0:

@@ -65,20 +65,30 @@ class TestReleaseMetadata(unittest.TestCase):
         outcome = (ROOT / 'references' / 'evidence-outcome-contract.md').read_text(encoding='utf-8')
         self.assertIn('evidence-outcome-assurance@1', outcome)
 
-    def test_a_released_version_is_tagged_at_or_before_head(self):
-        """Before tagging this is vacuous by design; after tagging it must point at or behind HEAD."""
+    def test_the_release_tag_points_exactly_at_the_verified_release_commit(self):
+        """A released tag must point **at** the verified commit, not merely at an ancestor.
+
+        `--is-ancestor` would also accept a tag left on some earlier commit of the same branch,
+        which is precisely the "tag behind main" drift this check exists to prevent. Before the
+        tag is created the check is reported as skipped; it activates by itself once the tag
+        exists, so no test ever creates a tag.
+        """
         version = declared_version()
         tag = f'research-idea-pipeline/v{version}'
-        proc = subprocess.run(['git', 'tag', '-l', tag], cwd=str(REPO), capture_output=True,
-                              text=True)
-        if not proc.stdout.strip():
+        if not subprocess.run(['git', 'tag', '-l', tag], cwd=str(REPO), capture_output=True,
+                              text=True).stdout.strip():
             self.skipTest(f'{tag} does not exist yet (release not tagged)')
         tagged = subprocess.run(['git', 'rev-parse', f'{tag}^{{}}'], cwd=str(REPO),
                                 capture_output=True, text=True).stdout.strip()
-        head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=str(REPO), capture_output=True,
-                              text=True).stdout.strip()
-        ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', tagged, head], cwd=str(REPO))
-        self.assertEqual(ancestor.returncode, 0, f'{tag} must not point past HEAD')
+        head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=str(REPO),
+                              capture_output=True, text=True).stdout.strip()
+        main = subprocess.run(['git', 'rev-parse', 'refs/heads/main'], cwd=str(REPO),
+                              capture_output=True, text=True).stdout.strip()
+        self.assertEqual(tagged, head,
+                         f'{tag} must point at the verified release commit {head[:8]}, '
+                         f'not {tagged[:8]}')
+        if main:
+            self.assertEqual(tagged, main, f'{tag} must be the main release commit')
 
 
 if __name__ == '__main__':
