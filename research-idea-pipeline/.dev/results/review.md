@@ -136,7 +136,7 @@
 | 项 | 值 |
 |---|---|
 | 分支 | `research-idea-pipeline/skill-rsi-dev` |
-| 最终 commit | `139f7b98da2d1df62f96dca2f9375e4ab9dd6a4a` |
+| 最终 commit | 见本文件所在的 HEAD（对抗式复核修复见 `2506405`）|
 | 远程 | `origin/research-idea-pipeline/skill-rsi-dev`（与本地一致）|
 | main | `ea0214e30f75bb9709d0c01efe25dc5f9fc3f804`（未修改）|
 | Tag | 13 个，均未创建/移动 |
