@@ -13,7 +13,10 @@ class PackageTests(unittest.TestCase):
     def test_short_entrypoint_and_name(self):
         skill = (ROOT / 'SKILL.md').read_text()
         self.assertIn('name: ' + ROOT.name, skill)
-        self.assertLess(len(skill.splitlines()), 120)
+        # The entry point stays a routing document, not a manuscript. The ceiling was 120
+        # for v0.1.0-v0.2.0; v0.3.0 adds the venue intelligence routing section, so the
+        # ceiling is raised to keep the check meaningful rather than removed.
+        self.assertLess(len(skill.splitlines()), 180)
 
     def test_no_cross_skill_code_dependency(self):
         for path in (ROOT / 'scripts').glob('*.py'):

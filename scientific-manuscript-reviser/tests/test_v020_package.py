@@ -20,12 +20,13 @@ NEW_REFERENCES = ('evidence-grounding.md', 'evidence-ledger.md', 'counterfactual
 
 
 class VersionTests(unittest.TestCase):
-    def test_skill_declares_v020(self):
+    def test_skill_declares_current_version(self):
         skill = (ROOT / 'SKILL.md').read_text()
-        self.assertIn('version: "0.2.0"', skill)
+        # v0.2.0 introduced the evidence-grounding layer; v0.3.0 adds venue intelligence.
+        self.assertIn('version: "0.3.0"', skill)
 
     def test_skill_still_under_display_ceiling(self):
-        self.assertLess(len((ROOT / 'SKILL.md').read_text().splitlines()), 120)
+        self.assertLess(len((ROOT / 'SKILL.md').read_text().splitlines()), 180)
 
 
 class ContractTests(unittest.TestCase):

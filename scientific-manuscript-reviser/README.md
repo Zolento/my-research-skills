@@ -72,6 +72,18 @@ python3 scripts/revision_impact.py manuscript.md --before before.md \
   --original-facts before-facts.json --revised-facts after-facts.json --plan plan.json
 python3 scripts/revision_loop.py loop.json
 python3 scripts/evidence_core.py --self-check
+python3 scripts/venue_registry.py venue-policies
+python3 scripts/venue_registry.py venue-policies --venue CVPR --year 2027 --track main
+python3 scripts/contribution_positioning.py --positioning p.json --ledger ledger.json \
+  --registry venue-policies
+python3 scripts/venue_audit.py --audit audit.json --positioning p.json --coherence report.json \
+  --venue CVPR --year 2027 --track main --registry venue-policies
+python3 scripts/venue_strategy.py --strategy s.json --blueprint b.json --positioning p.json \
+  --material-numbers numbers.json --venue CVPR --year 2027 --track main --registry venue-policies
+python3 scripts/venue_revision_impact.py --impact i.json --before p.json --after q.json
+python3 scripts/submission_compliance.py --manifest m.json --venue CVPR --year 2027 \
+  --track main --registry venue-policies
+python3 scripts/venue_intelligence_core.py --self-check
 python3 scripts/release_check.py
 ```
 
@@ -114,6 +126,40 @@ coherence audit or the semantic trust boundary.
 These layers bound the verification a change requires and surface what a human must decide.
 They never certify a claim, promote an UNKNOWN to supported, or convert a disagreement into
 a conclusion. Nothing here replaces scientific judgment with extra schemas.
+
+## Venue intelligence
+
+Version 0.3.0 adds a venue-aware layer over the same science. The governing rule is that
+**scientific validity is venue-independent, while contribution positioning and submission
+requirements are venue-dependent.** Changing the target venue may change framing, ordering
+and which stated requirements apply. It may never change a support status, a scientific
+finding or a critical gap. Contract: [venue-intelligence.md](references/venue-intelligence.md).
+
+The venue layer is optional. With no venue, year and track the skill runs a venue-neutral
+science audit, applies no mandatory rule, and never guesses the target from a manuscript's
+topics.
+
+- **Venue Policy Registry** (`venue-policies/`) is offline-first and source-bound. Each
+  profile covers exactly one venue, year and track, and every rule quotes a saved official
+  source verbatim, so a summary cannot masquerade as a published requirement. Rules are typed
+  MANDATORY_POLICY, REVIEW_CRITERION, RECOMMENDED_PRACTICE, EMPIRICAL_CONVENTION or UNKNOWN.
+  A rule is only in force for the year it was published for: a superseded policy is never
+  inherited, and an unpublished policy stays UNKNOWN or PENDING. CVPR 2027 is the worked
+  example, where its LLM policy is recorded as PENDING because the CFP says the guidelines
+  are still being finalized.
+- **Contribution Positioning** maps the skill's internal classes to a venue's official
+  categories, which are never invented. Support status comes only from ledger evidence, and
+  a novelty or priority claim requires an inspected prior-work record.
+- **Venue-Aware Audit** evaluates eight criteria after the science audit and types every
+  issue as SCIENTIFIC_DEFECT, CONTRIBUTION_GAP, VENUE_FIT_RISK, PRESENTATION_ISSUE or
+  COMPLIANCE_ISSUE. Critical and major scientific findings must survive unchanged.
+- **Venue Strategy** changes framing, ordering and emphasis. A framing needs a different
+  scientific anchor, and an experiment needs a named logic gap, not a venue preference.
+- **Submission Compliance** verifies only checkable requirements and reports hard policy
+  separately from scientific quality. Page limits are judged on a compiled PDF; without one
+  the count is UNKNOWN. AI-use disclosure is checked only against supplied records.
+- **Venue Readiness** aggregates upstream verdicts with priorities and human decisions. It
+  produces no acceptance probability and no weighted overall score.
 
 ## Examples
 

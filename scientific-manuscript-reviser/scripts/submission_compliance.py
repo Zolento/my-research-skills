@@ -71,9 +71,15 @@ def _check(manifest, profile, profiles_present):
     if manifest['schema'] != 'submission-manifest@1':
         errors.append('invalid manifest schema')
     scope = vic.profile_scope(profile)
-    for key in ('venue', 'year', 'track'):
-        if manifest[key] != scope[key]:
-            errors.append('manifest ' + key + ' does not match the cited profile scope')
+    mismatched = [key for key in ('venue', 'year', 'track') if manifest[key] != scope[key]]
+    if mismatched:
+        # Short-circuit: a profile that is out of scope must not have its requirements
+        # applied to this submission at all, not merely reported as a mismatch.
+        return {'status': 'FAIL', 'checks': [], 'page_count': None, 'venue_neutral': False,
+                'schema': vic.SCHEMAS['compliance'],
+                'errors': ['manifest ' + key + ' does not match the cited profile scope' for key in mismatched]
+                          + ['no requirement from an out-of-scope profile was applied'],
+                'unresolved': [], 'note': NOTE}
     source = Path(manifest['source_path'])
     if not source.is_file():
         errors.append('source_path does not resolve to a file')

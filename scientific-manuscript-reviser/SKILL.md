@@ -6,7 +6,7 @@ description: >-
   Use for 论文大纲, detailed paper blueprints, scientific coherence, manuscript audits,
   去 AI 味, or section revisions. Default to suggestions, not full rewriting.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Scientific Manuscript Reviser
@@ -90,6 +90,36 @@ the scientific audit, and each one bounds verification rather than certifying a 
 - **Bounded Revision Loop** ties each round to a problem, target change and completion
   criteria, never re-proposes a resolved problem without new evidence, and stops on a met
   condition, no progress or unresolvable disagreement.
+
+## Venue intelligence
+
+Read [venue-intelligence.md](references/venue-intelligence.md) when the user names a target
+venue, year or track. The governing rule is that **scientific validity is venue-independent,
+while contribution positioning and submission requirements are venue-dependent.** Never
+simulate a reviewer, predict acceptance or optimize a score.
+
+Order is enforced. Run the venue-independent Scientific Coherence Audit first, then the
+venue layer. A venue profile is optional; without one the skill runs a venue-neutral science
+audit and applies no mandatory rule. Never guess the target venue from clues.
+
+- **Venue Policy Registry** is offline-first. Each profile binds one venue, year and track,
+  and every rule quotes a saved official source verbatim. Rules are typed MANDATORY_POLICY,
+  REVIEW_CRITERION, RECOMMENDED_PRACTICE, EMPIRICAL_CONVENTION or UNKNOWN. A rule applies
+  only to its own year: a superseded policy is never inherited, and an unpublished policy
+  stays UNKNOWN or PENDING rather than filled from last year.
+- **Contribution Positioning** maps internal classes to a venue's official categories.
+  Support status comes only from evidence, a novelty claim needs inspected prior work, and
+  an official category label is never invented.
+- **Venue-Aware Audit** adds scope fit, contribution fit, soundness, originality,
+  significance, adequacy, reproducibility and compliance. Issues are typed SCIENTIFIC_DEFECT,
+  CONTRIBUTION_GAP, VENUE_FIT_RISK, PRESENTATION_ISSUE or COMPLIANCE_ISSUE, and every
+  critical or major scientific finding survives into the report unchanged.
+- **Venue Strategy** changes framing, ordering and emphasis only. A framing needs a different
+  scientific anchor, an experiment needs a named logic gap rather than a venue preference,
+  and a contribution is never foregrounded beyond its evidence.
+- **Venue Readiness** aggregates upstream verdicts and never restates them more favourably.
+  It reports priorities, blockers and human decisions, with no acceptance probability and no
+  weighted overall score.
 
 ## Output contract
 

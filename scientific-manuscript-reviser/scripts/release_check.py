@@ -121,6 +121,45 @@ def evidence_examples():
     return errors
 
 
+def venue_checks():
+    """Validate the policy registry and the venue-intelligence contract.
+
+    Deterministic only: quote fidelity, exact year/track scope, and the rule that a
+    venue switch cannot change a support status or drop a scientific finding. No
+    acceptance probability, no reviewer simulation, no scientific judgement.
+    """
+    errors = []
+    from venue_intelligence_core import self_check as vic_self_check
+    from venue_intelligence_core import venue_dependent_change_ok
+    if vic_self_check() != 0:
+        errors.append('venue_intelligence_core contract self-check failed')
+    registry = ROOT / 'venue-policies'
+    if not registry.is_dir():
+        return ['venue policy registry is missing']
+    result = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'venue_registry.py'), str(registry)],
+                            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.stderr.strip():
+        errors.append('venue_registry.py wrote to stderr')
+    try:
+        output = json.loads(result.stdout)
+    except ValueError:
+        return errors + ['venue registry produced no JSON verdict']
+    if output.get('status') != 'PASS':
+        errors.extend(output.get('errors', [])[:5] or ['venue policy registry did not pass'])
+    if not output.get('coverage'):
+        errors.append('venue policy registry has no profiles')
+    # A venue switch must not move a support status or lose a scientific defect.
+    base = {'contributions': [{'id': 'C1', 'support_status': 'PARTIALLY_SUPPORTED'}],
+            'issues': [{'id': 'D1', 'issue_type': 'SCIENTIFIC_DEFECT'}]}
+    swapped = {'contributions': [{'id': 'C1', 'support_status': 'SUPPORTED'}],
+               'issues': [{'id': 'D1', 'issue_type': 'SCIENTIFIC_DEFECT'}]}
+    if not venue_dependent_change_ok(base, swapped):
+        errors.append('venue_dependent_change_ok failed to detect a venue-driven support change')
+    if venue_dependent_change_ok(base, base):
+        errors.append('venue_dependent_change_ok rejected an unchanged pair')
+    return errors
+
+
 def main():
     checks = []
     proc = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'],
@@ -132,7 +171,8 @@ def main():
     try:
         for name, function in (('Self-contained reference links', links),
                                ('Real section and Architect examples', examples),
-                               ('Evidence grounding examples and contract', evidence_examples)):
+                               ('Evidence grounding examples and contract', evidence_examples),
+                               ('Venue policy registry and venue layer', venue_checks)):
             errors = function()
             checks.append((name, not errors, str(errors) if errors else 'ok'))
     except (OSError, ValueError, KeyError, TypeError) as exc:
