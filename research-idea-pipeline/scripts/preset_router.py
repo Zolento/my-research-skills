@@ -2072,16 +2072,25 @@ def scoped_policy_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     Read-only: it never proposes, promotes or writes a policy. The policy log lives in the
     route control plane, so its absence simply means "no scoped policy".
+
+    A broken hash chain is NOT tolerate-and-continue: a tampered policy log is exactly the
+    threat the chain exists for, so the state is reported as tampered and no policy is
+    loaded from it.
     """
     import policy_evolution as pe
     path = pe.candidates_path(ctx["state_path"])
     if not path.is_file():
-        return {"candidate": None, "advice": None, "records": []}
-    records, _ = pe.load_records(ctx["state_path"], tolerant=True)
+        return {"candidate": None, "advice": None, "records": [], "tampered": False,
+                "diagnostics": []}
+    records, diagnostics = pe.load_records(ctx["state_path"], tolerant=True)
+    if diagnostics:
+        return {"candidate": None, "advice": None, "records": records, "tampered": True,
+                "diagnostics": [item.render() for item in diagnostics]}
     candidate = pe.active_policy(records)
     advice = pe.advice_from_active_policy(records, ctx["state"], ctx["index"]) \
         if candidate else None
-    return {"candidate": candidate, "advice": advice, "records": records}
+    return {"candidate": candidate, "advice": advice, "records": records, "tampered": False,
+            "diagnostics": []}
 
 
 def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -2089,7 +2098,8 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     Precedence: an ACTIVE scoped policy evaluated right now on this state → the recorded
     scheduler decision while it is still fresh → the scheduler's own first action. A scoped
-    policy whose applicability conditions do not hold is reported as such and ignored.
+    policy whose applicability conditions do not hold is reported as such and ignored. A
+    tampered policy store stops policy consumption entirely.
     """
     import policy_evolution as pe
     policy = scoped_policy_state(ctx)
@@ -2099,6 +2109,12 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     conditions_ok = None
     unmet: List[str] = []
     reason = None
+    if policy["tampered"]:
+        return {"policy_id": None, "advice": None, "decision": None, "conditions_ok": False,
+                "unmet": [], "applied": False, "action": None, "level": None,
+                "source": "policy_store_tampered", "reason": "policy_store_tampered",
+                "recorded": None, "tampered": True,
+                "diagnostics": policy["diagnostics"]}
     if candidate and policy["advice"]:
         conditions_ok, unmet = pe.scope_conditions_hold(candidate, ctx["state"])
         transfer = pe.cross_project_transfer_allowed(
@@ -2130,7 +2146,7 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
                         "recorded": recorded}
     return {"policy_id": (candidate or {}).get("policy_id"), "advice": policy.get("advice"),
             "decision": decision, "conditions_ok": conditions_ok, "unmet": unmet,
-            "applied": applied,
+            "applied": applied, "tampered": False, "diagnostics": [],
             "action": (decision or {}).get("chosen") if applied else None,
             "level": "L2" if applied else None,
             "source": "active_scoped_policy" if applied else "scheduler",
@@ -2177,6 +2193,11 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
         status = "BLOCKED"
     else:
         status = "OK"
+    write_failure = None
+    if dispatch.get("tampered"):
+        # A tampered policy store stops policy consumption; it is not a "no policy" state.
+        status = "HOLD"
+        write_failure = "policy_store_tampered"
     next_action = step["action"]
     if guidance and not guidance["stale"] and guidance["dispatch"].get("action"):
         next_action = (f"{step['action']}；上一轮策略决策："
@@ -2185,45 +2206,58 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
 
     writes = ["cognition/ 投影（经 cognition build）"]
     strategy_changed_dispatch = bool(step.get("strategy_overrode_scheduler"))
-    policy_delta: Dict[str, Any] = {"status": "none", "level": None, "policy_id": None}
-    if dispatch["applied"] and strategy_changed_dispatch:
+    # A policy delta exists only when a policy actually changed the dispatched action. Reporting
+    # "an L2 policy was consumed" while nothing was dispatched (or while the decision came from
+    # strategy memory rather than a scoped policy) is a false Delta.
+    policy_delta: Dict[str, Any] = {"status": "none", "level": None, "policy_id": None,
+                                    "scope": None}
+    if dispatch["applied"] and strategy_changed_dispatch and step.get("dispatched_action"):
         policy_delta = {"status": "applied", "level": dispatch.get("level") or "L2",
                         "policy_id": dispatch.get("policy_id"),
                         "scope": (dispatch.get("advice") or {}).get("scope")}
-    if dispatch["applied"] and dispatch.get("policy_id") is None \
-            and not strategy_changed_dispatch:
-        policy_delta = {"status": "consumed", "level": "L2", "policy_id": None,
-                        "scope": None}
     if apply and dispatch["applied"] and step.get("dispatched_action"):
         import decision_trajectory as dt
         state = ctx["state"]
         trajectory = ctx["route_dir"] / dt.TRAJECTORY_NAME
-        context = dt.record_context(state, state_path=ctx["state_path"],
-                                    scheduler=ctx["scheduler"])
-        record = dt.build_decision_record(
-            state, route=cg.route_of(ctx["state_path"]), project=ctx["route_dir"].name,
-            context=context,
-            candidates=[{"action": item.get("action"), "type": item.get("type"),
-                         "target": item.get("target"), "eig": item.get("eig"),
-                         "cost": item.get("cost")}
-                        for item in (ctx["scheduler"] or {}).get("next_actions") or []
-                        if isinstance(item, dict)],
-            chosen=step["dispatched_action"],
-            scheduler_priority={"level": 4, "label": "high_information_gain_test"},
-            policy_version=dispatch.get("policy_id") or "strategy-memory",
-            policy_changed_order=strategy_changed_dispatch,
-            dispatch_status="dispatched")
-        outcome = dt.append_record(trajectory, record, state=state,
-                                   route=cg.route_of(ctx["state_path"]))
-        if outcome["status"] in ("APPENDED", "DUPLICATE"):
-            writes.append(dt.TRAJECTORY_NAME)
-        if ctx["scheduler"] and dispatch.get("decision"):
-            updated = sm.record_strategy_decision(
-                ctx["scheduler"], dispatch["decision"],
-                dispatch_result=f"dispatched {step['dispatched_action']}")
-            (ctx["route_dir"] / cg.SCHEDULER_NAME).write_text(
-                json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            writes.append(cg.SCHEDULER_NAME)
+        try:
+            context = dt.record_context(state, state_path=ctx["state_path"],
+                                        scheduler=ctx["scheduler"])
+            record = dt.build_decision_record(
+                state, route=cg.route_of(ctx["state_path"]), project=ctx["route_dir"].name,
+                context=context,
+                candidates=[{"action": item.get("action"), "type": item.get("type"),
+                             "target": item.get("target"), "eig": item.get("eig"),
+                             "cost": item.get("cost")}
+                            for item in (ctx["scheduler"] or {}).get("next_actions") or []
+                            if isinstance(item, dict)],
+                chosen=step["dispatched_action"],
+                scheduler_priority={"level": 4, "label": "high_information_gain_test"},
+                policy_version=dispatch.get("policy_id") or "strategy-memory",
+                policy_changed_order=strategy_changed_dispatch,
+                dispatch_status="dispatched")
+            outcome = dt.append_record(trajectory, record, state=state,
+                                       route=cg.route_of(ctx["state_path"]))
+            if outcome["status"] in ("APPENDED", "DUPLICATE"):
+                writes.append(dt.TRAJECTORY_NAME)
+            else:
+                # An INVALID trajectory write is a real failure, not a silent no-op.
+                write_failure = "decision_trajectory_rejected"
+        except (dt.TrajectoryError, OSError) as exc:
+            # A damaged trajectory store must produce a diagnosable HOLD, not a traceback.
+            write_failure = f"decision_trajectory_unreadable: {type(exc).__name__}"
+        if write_failure is None and ctx["scheduler"] and dispatch.get("decision"):
+            try:
+                updated = sm.record_strategy_decision(
+                    ctx["scheduler"], dispatch["decision"],
+                    dispatch_result=f"dispatched {step['dispatched_action']}")
+                (ctx["route_dir"] / cg.SCHEDULER_NAME).write_text(
+                    json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                writes.append(cg.SCHEDULER_NAME)
+            except OSError as exc:
+                write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
+    if write_failure:
+        status = "HOLD"
+        policy_delta = {"status": "none", "level": None, "policy_id": None, "scope": None}
 
     return _result(preset, status, observed={"loop": loop, "current": step,
                                              "switch_action": switch.get("action"),
@@ -2234,6 +2268,9 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                                  "conditions_ok": dispatch.get("conditions_ok"),
                                                  "unmet_conditions": dispatch.get("unmet"),
                                                  "source": dispatch.get("source"),
+                                                 "tampered": dispatch.get("tampered"),
+                                                 "diagnostics": dispatch.get("diagnostics"),
+                                                 "write_failure": write_failure,
                                                  "dispatched_action": step.get("dispatched_action"),
                                                  "strategy_overrode_scheduler":
                                                      strategy_changed_dispatch},
@@ -2255,13 +2292,13 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                              "assurance_pending": step.get("assurance_pending"),
                              "assurance_dependent": step.get("assurance_dependent"),
                              "assurance_paths": step.get("assurance_paths"),
-                             "stop_reason": step.get("hold_reason")
+                             "stop_reason": write_failure or step.get("hold_reason")
                              or (None if not step["blocked"] else "contract missing")},
                    steps=steps, writes=writes,
                    changed_decision=switch.get("action") != "CONTINUE_ATTRIBUTION"
                    or strategy_changed_dispatch,
                    next_action=next_action,
-                   hold_reason=step.get("hold_reason"))
+                   hold_reason=write_failure or step.get("hold_reason"))
 
 
 REPRESENTATION_AXES: Tuple[str, ...] = ("object", "variable", "assumption", "objective",

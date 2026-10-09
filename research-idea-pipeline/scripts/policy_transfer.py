@@ -219,26 +219,32 @@ def _scientific_layer(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _experience_layer(trajectory_path: Optional[Path]) -> Dict[str, Any]:
+def _experience_layer(trajectory_path: Optional[Path]
+                      ) -> Tuple[Dict[str, Any], List[cg.Diagnostic]]:
     if trajectory_path is None:
         return {"layer": "decision_experience", "source": "decision_trajectory",
                 "trajectory_path": None, "count": 0, "trajectories": [],
-                "supported": [], "pending": []}
+                "supported": [], "pending": [], "chain_ok": True,
+                "chain_diagnostics": []}, []
     path = Path(trajectory_path)
     try:
-        records, _ = dt.load_records(path, tolerant=True)
-    except dt.TrajectoryError:
-        records = []
-    views = dt.rebuild_trajectories(records)
+        links, chain_diagnostics = dt.load_records(path, tolerant=True)
+    except dt.TrajectoryError as exc:  # tolerant=True 正常不抛；保险地 fail-closed
+        links, chain_diagnostics = [], [_diag("DT0", str(path), str(exc))]
+    views = dt.rebuild_trajectories(links)
     return {
         "layer": "decision_experience",
         "source": "decision_trajectory",
         "trajectory_path": str(path),
         "count": len(views),
         "trajectories": sorted(views),
-        "supported": dt.support_ids(records),
-        "pending": dt.pending_outcomes(records),
-    }
+        "supported": dt.support_ids(links),
+        "pending": dt.pending_outcomes(links),
+        # 容错读取会把断裂的哈希链/seq 降级为诊断；这里必须把它暴露出来，
+        # 否则任意 JSONL 都会被当成“已验证的决策经验”（provenance fail-open）。
+        "chain_ok": not chain_diagnostics,
+        "chain_diagnostics": [item.as_dict() for item in chain_diagnostics],
+    }, chain_diagnostics
 
 
 def _policy_layer(policy_records: Sequence[Any]) -> Dict[str, Any]:
@@ -317,8 +323,16 @@ def memory_layers(state: Dict[str, Any], *, trajectory_path: Optional[Path] = No
         diagnostics.extend(_policy_mixing_diagnostics(record, f"policy[{index}]"))
 
     scientific = _scientific_layer(state)
-    experience = _experience_layer(trajectory_path)
+    experience, chain_diagnostics = _experience_layer(trajectory_path)
     policies = _policy_layer(policy_records or ())
+
+    # 决策经验链断裂时，经验层不可信：把链诊断升格为 separation 诊断。
+    diagnostics.extend(chain_diagnostics)
+    if chain_diagnostics:
+        diagnostics.append(_diag(
+            "PT1", "decision_experience",
+            f"决策经验哈希链/序列校验失败（{len(chain_diagnostics)} 条诊断）；"
+            "该 JSONL 不能作为已验证的决策经验来源"))
 
     diagnostics = _dedupe(diagnostics)
     return {
@@ -568,9 +582,24 @@ def structure_similarity(source_state: Dict[str, Any], target_state: Dict[str, A
 
 NEGATED_CLAIM_STATUSES: Tuple[str, ...] = ("killed", "contradicted", "refuted")
 
+#: 假设生命周期中代表“已停止追求/已被否证”的合法状态（state_check.HYPOTHESIS_STATUSES
+#: 是 ("active","elite","archived","killed")；refuted/contradicted 用于兼容显式声明的投影）。
+NEGATED_HYPOTHESIS_STATUSES: Tuple[str, ...] = (
+    "killed", "archived", "refuted", "contradicted",
+)
 
-def negated_mechanisms(state: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """已被否证的机制：状态为 killed/contradicted/refuted 的主张，加 negative_knowledge。"""
+#: 索引（cognition/index.json）里机制生命周期中代表已否证的状态（cognition.MECHANISM_STATUSES）。
+NEGATED_MECHANISM_STATUSES: Tuple[str, ...] = ("refuted",)
+
+
+def negated_mechanisms(state: Dict[str, Any],
+                       index: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """已被否证的机制：killed/contradicted/refuted 的主张、killed/archived 的假设、
+    negative_knowledge，以及（当提供索引时）status == "refuted" 的索引机制。
+
+    对 negative_knowledge 条目同时保留 `finding`（解释）与 `statement`（= ruled_out，
+    即真正被排除的命题）；PT8 以 ruled_out 为主匹配、finding 为次级上下文。
+    """
     state = state if isinstance(state, dict) else {}
     out: List[Dict[str, Any]] = []
     for claim in _as_list(state.get("claims")):
@@ -582,25 +611,68 @@ def negated_mechanisms(state: Dict[str, Any]) -> List[Dict[str, Any]]:
         out.append({
             "id": claim.get("id"),
             "statement": claim.get("statement", ""),
+            "finding": "",
             "kind": "claim",
+            "status": status,
+        })
+    for hypothesis in _as_list(state.get("hypotheses")):
+        if not isinstance(hypothesis, dict):
+            continue
+        status = hypothesis.get("status")
+        if status not in NEGATED_HYPOTHESIS_STATUSES:
+            continue
+        out.append({
+            "id": hypothesis.get("id"),
+            "statement": hypothesis.get("statement", ""),
+            "finding": "",
+            "kind": "hypothesis",
             "status": status,
         })
     for failure in _as_list(state.get("failures")):
         if not isinstance(failure, dict):
             continue
         failure_id = failure.get("id")
-        for index, memory in enumerate(_as_list(failure.get("negative_knowledge"))):
+        for index_in_failure, memory in enumerate(_as_list(failure.get("negative_knowledge"))):
             if not isinstance(memory, dict):
                 continue
             target = memory.get("target_id")
-            ident = target if isinstance(target, str) and target else f"{failure_id}#nk{index + 1}"
-            statement = memory.get("finding") or memory.get("ruled_out") or failure.get("what") or ""
+            ident = (target if isinstance(target, str) and target
+                     else f"{failure_id}#nk{index_in_failure + 1}")
+            finding = memory.get("finding")
+            ruled_out = memory.get("ruled_out")
+            # ruled_out 是被排除的命题；finding 只是解释。没有 ruled_out 时退回 finding /
+            # failure.what，保证旧数据仍被覆盖。
+            statement = ruled_out or finding or failure.get("what") or ""
             out.append({
                 "id": ident,
                 "statement": statement,
+                "finding": finding if isinstance(finding, str) else "",
                 "kind": "failure",
                 "status": failure.get("kind") or "negated",
             })
+    if isinstance(index, dict):
+        for mechanism in _as_list(index.get("mechanisms")):
+            if not isinstance(mechanism, dict):
+                continue
+            status = mechanism.get("status")
+            if status not in NEGATED_MECHANISM_STATUSES:
+                continue
+            statement = mechanism.get("statement", "")
+            identifiers: List[Any] = [mechanism.get("id")]
+            refs = mechanism.get("canonical_refs")
+            if isinstance(refs, dict):
+                for key in ("claims", "hypotheses"):
+                    identifiers.extend(_as_list(refs.get(key)))
+            for ident in identifiers:
+                if not isinstance(ident, str) or not ident:
+                    continue
+                out.append({
+                    "id": ident,
+                    "statement": statement,
+                    "finding": "",
+                    "kind": "mechanism",
+                    "status": status,
+                })
     out.sort(key=lambda item: (str(item.get("kind")), str(item.get("id"))))
     return out
 
@@ -664,14 +736,21 @@ def _normalize_condition(condition: Any, index: int) -> Optional[Dict[str, Any]]
     return cond
 
 
-def _collect_conditions(policy: Dict[str, Any], scope: Optional[Dict[str, Any]]) -> List[Any]:
+def _collect_conditions(policy: Dict[str, Any], scope: Optional[Dict[str, Any]]
+                        ) -> Tuple[List[Any], List[cg.Diagnostic]]:
+    """收集条件；对“存在但不是 list/dict”的声明fail-closed 诊断（PT5）。
+
+    只处理**显式存在**的键：键缺失表示未声明，是合法的默认；显式 null/字符串/数字则
+    无法机械求值，必须阻塞而不是被静默忽略。
+    """
     conditions: List[Any] = []
-    for source in (policy.get("applicable_conditions"), policy.get("conditions"),
-                   (scope or {}).get("applicable_conditions"),
-                   (scope or {}).get("conditions")):
+    diagnostics: List[cg.Diagnostic] = []
+
+    def absorb(source: Any, path: str) -> None:
         if isinstance(source, list):
             conditions.extend(source)
-        elif isinstance(source, dict):
+            return
+        if isinstance(source, dict):
             for key, value in source.items():
                 if isinstance(value, dict):
                     item = dict(value)
@@ -679,17 +758,35 @@ def _collect_conditions(policy: Dict[str, Any], scope: Optional[Dict[str, Any]])
                     conditions.append(item)
                 else:
                     conditions.append({"field": key, "op": "eq", "value": value})
-    return conditions
+            return
+        diagnostics.append(_diag(
+            "PT5", path,
+            f"applicable_conditions 声明为 {type(source).__name__}（{source!r}），"
+            "既不是列表也不是对象；无法证明其条件成立（fail-closed 阻塞）"))
+
+    containers: List[Tuple[Dict[str, Any], str]] = [(policy, "policy")]
+    if isinstance(scope, dict):
+        containers.append((scope, "policy.scope"))
+    for container, prefix in containers:
+        for key in ("applicable_conditions", "conditions"):
+            if key in container:
+                absorb(container[key], f"{prefix}.{key}")
+    return conditions, diagnostics
 
 
-def _condition_satisfied(condition: Any, target_state: Dict[str, Any]) -> Tuple[bool, str]:
+def _condition_eval(condition: Any, target_state: Dict[str, Any]) -> Tuple[bool, bool, str]:
+    """求值一个条件，返回 (是否满足, 是否可机械判定, 说明)。
+
+    `可机械判定=False` 表示条件畸形/不可解析（缺 field、未知算子、缺 value、正则被拒），
+    调用方必须 fail-closed。`可机械判定=True` 但 `满足=False` 才是“确实不适用”。
+    """
     if not isinstance(condition, dict):
-        return False, "条件不是对象；无法机械求值（fail-closed 阻塞）"
+        return False, False, "条件不是对象；无法机械求值（fail-closed 阻塞）"
     cond = _normalize_condition(condition, 0)
     assert cond is not None
     field = cond.get("field") or cond.get("path")
     if not isinstance(field, str) or not field.strip():
-        return False, "条件缺少 field，无法对声明字段求值（fail-closed 阻塞）"
+        return False, False, "条件缺少 field，无法对声明字段求值（fail-closed 阻塞）"
     field = field.strip()
     op = cond.get("op") or cond.get("compare") or cond.get("relation")
     value = cond.get("value", _MISSING)
@@ -706,16 +803,16 @@ def _condition_satisfied(condition: Any, target_state: Dict[str, Any]) -> Tuple[
 
     resolved, actual = _resolve_path(field, target_state)
     if not resolved:
-        return False, f"条件字段 {field!r} 不存在于目标声明字段（fail-closed 阻塞）"
+        return False, False, f"条件字段 {field!r} 不存在于目标声明字段（fail-closed 阻塞）"
 
     if op in ("exists", "present"):
         present = actual is not None and actual != "" and actual != []
-        return present, ("" if present else f"条件字段 {field!r} 为空")
+        return present, True, ("" if present else f"条件字段 {field!r} 为空")
     if op in ("absent", "missing"):
         missing = actual is None or actual == "" or actual == []
-        return missing, ("" if missing else f"条件字段 {field!r} 存在")
+        return missing, True, ("" if missing else f"条件字段 {field!r} 存在")
     if value is _MISSING:
-        return False, f"条件 {field!r} 的算子 {op!r} 缺少 value（fail-closed 阻塞）"
+        return False, False, f"条件 {field!r} 的算子 {op!r} 缺少 value（fail-closed 阻塞）"
 
     if op in ("eq", "=="):
         ok = actual == value
@@ -741,18 +838,25 @@ def _condition_satisfied(condition: Any, target_state: Dict[str, Any]) -> Tuple[
         try:
             left, right = float(actual), float(value)
         except (TypeError, ValueError):
-            return False, f"条件 {field!r} 的算子 {op!r} 需要数值"
+            return False, False, f"条件 {field!r} 的算子 {op!r} 需要数值"
         ok = {"gt": left > right, "gte": left >= right,
               "lt": left < right, "lte": left <= right}[op]
     elif op in ("matches", "regex"):
-        try:
-            ok = isinstance(actual, str) and re.fullmatch(str(value), actual) is not None
-        except re.error:
-            return False, f"条件 {field!r} 的正则非法（fail-closed 阻塞）"
+        # 安全决策：策略/反例条件完全由调用方（可能不可信）提供。`re` 没有超时，攻击者可用
+        # `(a+)+$` 这类模式让闸门灾难性回溯（ReDoS），因此这里直接拒绝用户提供的正则算子
+        # （fail-closed 不可判定），而不是执行无界匹配。规则只允许结构化比较算子。
+        return False, False, (
+            f"条件 {field!r} 使用被拒绝的正则算子 {op!r}；"
+            "为避免无界回溯（ReDoS），闸门不接受用户提供的正则（fail-closed 阻塞）")
     else:
-        return False, f"未知条件算子 {op!r}（fail-closed 阻塞）"
+        return False, False, f"未知条件算子 {op!r}（fail-closed 阻塞）"
     detail = "" if ok else f"条件不满足：{field} {op} {value!r}（实际 {actual!r}）"
-    return bool(ok), detail
+    return bool(ok), True, detail
+
+
+def _condition_satisfied(condition: Any, target_state: Dict[str, Any]) -> Tuple[bool, str]:
+    ok, _resolved, detail = _condition_eval(condition, target_state)
+    return ok, detail
 
 
 # ---------------------------------------------------------------------------
@@ -770,18 +874,35 @@ def _tool_name(item: Any) -> str:
     return ""
 
 
-def _required_tools(policy: Dict[str, Any], scope: Optional[Dict[str, Any]]) -> List[str]:
+def _absorb_tool_names(value: Any, path: str, names: List[str],
+                       diagnostics: List[cg.Diagnostic]) -> None:
+    """收集工具名；存在但不是 list/tuple 时给出 PT6 诊断（fail-closed）。"""
+    if isinstance(value, (list, tuple)):
+        names.extend(_tool_name(item) for item in value)
+        return
+    diagnostics.append(_diag(
+        "PT6", path,
+        f"required_tools/resources 声明为 {type(value).__name__}（{value!r}），"
+        "不是列表；无法证明目标具备这些工具/资源（fail-closed 阻塞）"))
+
+
+def _required_tools(policy: Dict[str, Any], scope: Optional[Dict[str, Any]]
+                    ) -> Tuple[List[str], List[cg.Diagnostic]]:
     names: List[str] = []
+    diagnostics: List[cg.Diagnostic] = []
     for key in ("required_tools", "required_resources", "tools", "resources"):
-        names.extend(_tool_name(item) for item in _as_list(policy.get(key)))
+        if key in policy:
+            _absorb_tool_names(policy[key], f"policy.{key}", names, diagnostics)
     requires = policy.get("requires")
     if isinstance(requires, dict):
         for key in ("tools", "resources", "required_tools", "required_resources"):
-            names.extend(_tool_name(item) for item in _as_list(requires.get(key)))
+            if key in requires:
+                _absorb_tool_names(requires[key], f"policy.requires.{key}", names, diagnostics)
     if isinstance(scope, dict):
         for key in ("required_tools", "required_resources", "tools", "resources"):
-            names.extend(_tool_name(item) for item in _as_list(scope.get(key)))
-    return sorted({name for name in names if name})
+            if key in scope:
+                _absorb_tool_names(scope[key], f"policy.scope.{key}", names, diagnostics)
+    return sorted({name for name in names if name}), diagnostics
 
 
 def _declared_resources(state: Dict[str, Any]) -> Set[str]:
@@ -948,12 +1069,18 @@ def _counterexample_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
                 tokens.discard(token)
                 tokens.update(prefixed)
         if conditions:
-            satisfied = []
-            for condition in conditions:
-                ok, _ = _condition_satisfied(condition, target_state)
-                satisfied.append(ok)
-            if not any(satisfied):
-                continue  # 反例条件不成立，不适用于目标
+            evaluations = [_condition_eval(condition, target_state) for condition in conditions]
+            unresolved = [detail for _ok, resolved, detail in evaluations if not resolved]
+            if unresolved:
+                # 无法机械判定条件是否适用时不得当作“不适用”：否则加一个畸形条件即可
+                # 中和反例覆盖检查（fail-open）。这里 fail-closed。
+                diagnostics.append(_diag(
+                    "PT10", path,
+                    "反例条件无法机械求值，无法排除其覆盖目标（fail-closed 阻塞）："
+                    + "；".join(unresolved)))
+                continue
+            if not any(ok for ok, _resolved, _detail in evaluations):
+                continue  # 反例条件确实不成立，不适用于目标
         if tokens:
             union = tokens | target_tokens
             shared = tokens & target_tokens
@@ -1018,30 +1145,43 @@ def _transfer_similarity(policy: Dict[str, Any], target_state: Dict[str, Any],
                          source_state: Optional[Dict[str, Any]],
                          source_index: Optional[Dict[str, Any]],
                          target_index: Optional[Dict[str, Any]],
-                         threshold: float) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+                         threshold: float, *, attested: bool = False
+                         ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     if not isinstance(target_state, dict):
         return None, None
     target = structural_signature(target_state, target_index)
     if isinstance(source_state, dict):
         source = structural_signature(source_state, source_index)
+        self_attested = False
     else:
         source = _policy_declared_signature(policy, scope)
+        self_attested = True
     if source is None:
         return None, target
-    return _similarity_from_signatures(source, target, threshold), target
+    similarity = _similarity_from_signatures(source, target, threshold)
+    if self_attested:
+        # 自证结构：策略自己声明源签名并给自己打分。没有 attested source_state
+        # （或调用方显式提供 source_trajectories 作为来源）时不得据此判定结构匹配，
+        # 否则任何策略只要自带一个 signatur 就能得到 1.0 并迁移（fail-open）。
+        similarity["self_attested"] = True
+        if not attested:
+            similarity["basis"] = list(similarity["basis"]) + [
+                "缺少 attested source_state/source_trajectories：策略自证的结构签名"
+                "不足以判定可迁移（fail-closed 阻塞）"]
+        similarity["structural_match"] = bool(similarity["structural_match"] and attested)
+    return similarity, target
 
 
 def _tool_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
                  scope: Optional[Dict[str, Any]], target_tools: Sequence[Any]
                  ) -> List[cg.Diagnostic]:
-    required = _required_tools(policy, scope)
+    required, diagnostics = _required_tools(policy, scope)
     if not required:
-        return []
+        return diagnostics
     available = {_tool_name(item) for item in target_tools}
     available.discard("")
     if isinstance(target_state, dict):
         available |= _declared_resources(target_state)
-    diagnostics: List[cg.Diagnostic] = []
     for tool in required:
         if tool not in available:
             diagnostics.append(_diag(
@@ -1078,36 +1218,45 @@ def _protocol_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
 
 
 def _negated_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
-                    source_state: Optional[Dict[str, Any]]) -> List[cg.Diagnostic]:
+                    source_state: Optional[Dict[str, Any]],
+                    target_index: Optional[Dict[str, Any]] = None,
+                    source_index: Optional[Dict[str, Any]] = None) -> List[cg.Diagnostic]:
     negated: List[Dict[str, Any]] = []
     if isinstance(target_state, dict):
-        negated += negated_mechanisms(target_state)
+        negated += negated_mechanisms(target_state, target_index)
     if isinstance(source_state, dict):
-        negated += negated_mechanisms(source_state)
+        negated += negated_mechanisms(source_state, source_index)
     if not negated:
         return []
     diagnostics: List[cg.Diagnostic] = []
     for proposed in _proposed_mechanisms(policy):
         for item in negated:
             ident = str(item.get("id") or "")
-            negated_statement = _norm_statement(item.get("statement"))
+            # 主匹配对象是被排除的命题 ruled_out（statement），finding 仅作次级上下文。
+            negated_statements = [_norm_statement(item.get("statement")),
+                                  _norm_statement(item.get("finding"))]
+            negated_statements = [text for text in negated_statements if text]
             if proposed.get("id") and proposed["id"] == ident:
                 diagnostics.append(_diag(
                     "PT8", "policy.mechanism",
                     f"策略重新提出已被否证的机制 {ident!r}（{item.get('kind')}）"))
                 continue
             statement = _norm_statement(proposed.get("statement"))
-            if not statement or not negated_statement:
+            if not statement or not negated_statements:
                 continue
-            if statement == negated_statement:
+            context = ""
+            finding = _norm_statement(item.get("finding"))
+            if finding and finding != negated_statements[0]:
+                context = f"；否证理由：{item.get('finding')!r}"
+            if statement in negated_statements:
                 diagnostics.append(_diag(
                     "PT8", "policy.mechanism",
-                    f"策略重新提出已被否证的机制陈述（{ident!r}）"))
-            elif len(negated_statement) >= 12 and (
-                    negated_statement in statement or statement in negated_statement):
+                    f"策略重新提出已被否证的机制陈述（{ident!r}）{context}"))
+            elif any(len(text) >= 12 and (text in statement or statement in text)
+                     for text in negated_statements):
                 diagnostics.append(_diag(
                     "PT8", "policy.mechanism",
-                    f"策略机制陈述与已否证机制 {ident!r} 实质相同"))
+                    f"策略机制陈述与已否证机制 {ident!r} 实质相同{context}"))
     return diagnostics
 
 
@@ -1239,25 +1388,35 @@ def transfer_errors(policy: Dict[str, Any], target_state: Dict[str, Any], *,
         diagnostics.append(_diag("PT4", "policy", "目标 state 不是对象，无法建立结构签名"))
 
     similarity, _target_sig = _transfer_similarity(
-        policy_dict, target, scope, source_state, source_index, target_index, threshold)
+        policy_dict, target, scope, source_state, source_index, target_index, threshold,
+        attested=bool(isinstance(source_state, dict) or source_trajectories))
     if similarity is None:
         diagnostics.append(_diag(
             "PT4", "policy.structure",
             "无法建立源结构签名；领域关键词相似不足以判定可迁移"))
     elif not similarity["structural_match"]:
-        diagnostics.append(_diag(
-            "PT4", "policy.structure",
-            f"结构不匹配（score={similarity['score']} < {similarity['threshold']} 或未共享声明结构 token）；"
-            "领域关键词相似不足以判定可迁移"))
+        if similarity.get("self_attested"):
+            diagnostics.append(_diag(
+                "PT4", "policy.structure",
+                "策略自证结构签名，但没有 attested source_state/source_trajectories；"
+                "自证来源不能判定可迁移（fail-closed 阻塞）"))
+        else:
+            diagnostics.append(_diag(
+                "PT4", "policy.structure",
+                f"结构不匹配（score={similarity['score']} < {similarity['threshold']} "
+                "或未共享声明结构 token）；领域关键词相似不足以判定可迁移"))
 
-    for index, condition in enumerate(_collect_conditions(policy_dict, scope)):
+    conditions, condition_shape_errors = _collect_conditions(policy_dict, scope)
+    diagnostics.extend(condition_shape_errors)
+    for index, condition in enumerate(conditions):
         ok, detail = _condition_satisfied(condition, target)
         if not ok:
             diagnostics.append(_diag("PT5", f"policy.applicable_conditions[{index}]", detail))
 
     diagnostics.extend(_tool_errors(policy_dict, target, scope, target_tools))
     diagnostics.extend(_protocol_errors(policy_dict, target, source_state))
-    diagnostics.extend(_negated_errors(policy_dict, target, source_state))
+    diagnostics.extend(_negated_errors(policy_dict, target, source_state,
+                                       target_index, source_index))
     diagnostics.extend(_evidence_level_errors(
         policy_dict, scope, source_trajectories, records, source_project))
     diagnostics.extend(_counterexample_errors(policy_dict, target, threshold))
@@ -1273,7 +1432,9 @@ def transfer_decision(policy: Dict[str, Any], target_state: Dict[str, Any],
     similarity, _ = _transfer_similarity(
         policy if isinstance(policy, dict) else {}, target_state, scope,
         kwargs.get("source_state"), kwargs.get("source_index"),
-        kwargs.get("target_index"), threshold)
+        kwargs.get("target_index"), threshold,
+        attested=bool(isinstance(kwargs.get("source_state"), dict)
+                      or kwargs.get("source_trajectories")))
     if similarity is None:
         similarity = {"score": 0.0, "basis": ["无源结构签名，无法匹配"],
                       "shared_operators": [], "shared_islands": [],
@@ -1291,7 +1452,9 @@ def transfer_decision(policy: Dict[str, Any], target_state: Dict[str, Any],
         boundaries.append(f"scope:{scope.get('kind')}")
     if isinstance(source_project, str) and isinstance(target_project, str):
         boundaries.append(f"project:{source_project}->{target_project}")
-    for item in negated_mechanisms(target_state if isinstance(target_state, dict) else {}):
+    for item in negated_mechanisms(
+            target_state if isinstance(target_state, dict) else {},
+            kwargs.get("target_index")):
         boundaries.append(f"negated:{item.get('kind')}:{item.get('id')}")
     for index, counterexample in enumerate(_counterexample_list(
             policy if isinstance(policy, dict) else {})):
@@ -1317,13 +1480,46 @@ def transfer_decision(policy: Dict[str, Any], target_state: Dict[str, Any],
 # 过期经验
 # ---------------------------------------------------------------------------
 
-def expired_trajectories(records: Sequence[Any], state: Dict[str, Any], *,
-                         max_state_version_gap: int = 50,
-                         invalidated_subjects: Sequence[Any] = ()) -> List[str]:
-    """过期轨迹：绑定 state_version 落后过多，或引用了已失效主体。"""
-    current = state.get("state_version") if isinstance(state, dict) else None
-    if not isinstance(current, int) or isinstance(current, bool):
-        current = 0
+def expired_trajectories_report(records: Sequence[Any], state: Dict[str, Any], *,
+                                max_state_version_gap: int = 50,
+                                invalidated_subjects: Sequence[Any] = ()
+                                ) -> Dict[str, Any]:
+    """过期轨迹 + 诊断（`expired_trajectories` 的 fail-closed 报告版）。
+
+    - 缺失/非整数的 `state_version`：无法证明轨迹新鲜 → 全部视为过期，并给出诊断。
+    - 缺失/非整数/负数的 `max_state_version_gap`：不抛 TypeError，按 0 处理（任何正差都
+      过期）并给出诊断。
+    - 引用已失效主体的轨迹始终过期。
+    """
+    diagnostics: List[cg.Diagnostic] = []
+    current: Optional[int] = None
+    if isinstance(state, dict):
+        raw_version = state.get("state_version")
+        if isinstance(raw_version, int) and not isinstance(raw_version, bool):
+            current = raw_version
+        else:
+            diagnostics.append(_diag(
+                "PT11", "state.state_version",
+                f"state_version={raw_version!r} 缺失或非整数；无法证明轨迹未过期，"
+                "按 fail-closed 全部视为过期"))
+    else:
+        diagnostics.append(_diag(
+            "PT11", "state", "state 不是对象；无法读取 state_version，按 fail-closed 全部视为过期"))
+
+    if isinstance(max_state_version_gap, int) and not isinstance(max_state_version_gap, bool):
+        gap = max_state_version_gap
+        if gap < 0:
+            diagnostics.append(_diag(
+                "PT11", "max_state_version_gap",
+                f"max_state_version_gap={gap!r} 为负数；按 0 处理（fail-closed）"))
+            gap = 0
+    else:
+        diagnostics.append(_diag(
+            "PT11", "max_state_version_gap",
+            f"max_state_version_gap={max_state_version_gap!r} 非整数；"
+            "按 0 处理（任何正版本差都视为过期，fail-closed）"))
+        gap = 0
+
     invalid = {str(item) for item in invalidated_subjects}
     views = dt.rebuild_trajectories(records)
     expired: Set[str] = set()
@@ -1342,6 +1538,11 @@ def expired_trajectories(records: Sequence[Any], state: Dict[str, Any], *,
             expired.add(ident)
             continue
 
+        # 状态版本不可用时，轨迹的新鲜度不可证明：fail-closed。
+        if current is None:
+            expired.add(ident)
+            continue
+
         versions: List[int] = []
         bound = context.get("state_version")
         if isinstance(bound, int) and not isinstance(bound, bool):
@@ -1352,9 +1553,24 @@ def expired_trajectories(records: Sequence[Any], state: Dict[str, Any], *,
         if not versions:
             expired.add(ident)
             continue
-        if current - min(versions) > max_state_version_gap:
+        if current - min(versions) > gap:
             expired.add(ident)
-    return sorted(expired)
+    return {
+        "expired": sorted(expired),
+        "diagnostics": [item.as_dict() for item in _dedupe(diagnostics)],
+    }
+
+
+def expired_trajectories(records: Sequence[Any], state: Dict[str, Any], *,
+                         max_state_version_gap: int = 50,
+                         invalidated_subjects: Sequence[Any] = ()) -> List[str]:
+    """过期轨迹：绑定 state_version 落后过多，或引用了已失效主体。
+
+    接口保持 `List[str]`；需要诊断时使用 `expired_trajectories_report`。
+    """
+    return expired_trajectories_report(
+        records, state, max_state_version_gap=max_state_version_gap,
+        invalidated_subjects=invalidated_subjects)["expired"]
 
 
 # ---------------------------------------------------------------------------
@@ -1372,15 +1588,30 @@ def _compression_item(entry: Any) -> Tuple[str, str]:
 def compression_report(identifier_kinds: Iterable[Any], budget: int, *,
                        protected: Sequence[Any] = ()) -> Dict[str, Any]:
     """模拟把记忆压缩到 budget 条；证据/终止规则/科学事实与 protected 永不可丢。"""
-    items: List[Tuple[str, str]] = []
-    seen: Set[str] = set()
+    # 先按 id 归并**所有**声明，再做保护判定：同一个 id 以不同 kind 重复出现时，
+    # 只要任一声明是不可丢弃/未知种类/protected，该 id 就被强制保留。
+    order: List[str] = []
+    kinds_by_id: Dict[str, List[str]] = {}
     for entry in identifier_kinds:
         ident, kind = _compression_item(entry)
-        if ident in seen:
-            continue
-        seen.add(ident)
-        items.append((ident, kind))
+        if ident not in kinds_by_id:
+            order.append(ident)
+            kinds_by_id[ident] = []
+        if kind not in kinds_by_id[ident]:
+            kinds_by_id[ident].append(kind)
     protected_set = {str(item) for item in protected}
+
+    def effective_kind(ident: str) -> str:
+        kinds = kinds_by_id[ident]
+        for kind in kinds:
+            if kind in NON_DROPPABLE_KINDS:
+                return kind
+        for kind in kinds:
+            if kind not in ALL_KINDS:
+                return kind
+        return kinds[0]
+
+    items: List[Tuple[str, str]] = [(ident, effective_kind(ident)) for ident in order]
 
     if not isinstance(budget, int) or isinstance(budget, bool) or budget < 0:
         return {"status": "REFUSED", "kept": [ident for ident, _ in items], "dropped": [],
@@ -1400,7 +1631,7 @@ def compression_report(identifier_kinds: Iterable[Any], budget: int, *,
 
     if budget >= len(items):
         return {"status": "OK", "kept": [ident for ident, _ in items], "dropped": [],
-                "reasons": []}
+                "reasons": reasons}
 
     if budget < len(forced):
         reasons.insert(0, (
@@ -1465,17 +1696,29 @@ def _emit(payload: Any, code: int = EXIT_OK) -> int:
 
 def _read_json(value: str) -> Any:
     path = Path(value)
-    if path.is_file():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return json.loads(value)
+    try:
+        text = path.read_text(encoding="utf-8") if path.is_file() else value
+    except OSError as exc:
+        raise cg.CognitionError(f"无法读取 {value!r}：{exc}") from exc
+    try:
+        return json.loads(text)
+    except (TypeError, ValueError) as exc:
+        raise cg.CognitionError(f"无法把 {value!r} 解析为 JSON：{exc}") from exc
 
 
 def _load_trajectory_records(path_value: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[Path]]:
     if not path_value:
         return [], None
     path = Path(path_value)
-    records, _ = dt.load_records(path, tolerant=True)
+    try:
+        records, _ = dt.load_records(path, tolerant=True)
+    except (OSError, dt.TrajectoryError) as exc:
+        raise cg.CognitionError(f"无法读取轨迹 {path_value!r}：{exc}") from exc
     return records, path
+
+
+def _invalid(errors: Sequence[str]) -> int:
+    return _emit({"status": "INVALID", "errors": [str(item) for item in errors]}, EXIT_ERROR)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -1486,8 +1729,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.command == "layers":
         if not args.state:
-            return _emit({"status": "INVALID", "errors": ["需要 --state"]}, EXIT_ERROR)
-        state = cg.load_state(Path(args.state))
+            return _invalid(["需要 --state"])
+        try:
+            state = cg.load_state(Path(args.state))
+        except Exception as exc:
+            return _invalid([f"无法加载 state {args.state!r}：{type(exc).__name__}: {exc}"])
         payload = memory_layers(state, trajectory_path=Path(args.trajectory)
                                 if args.trajectory else None)
         return _emit({"status": "OK" if payload["separation_ok"] else "FAIL", **payload},
@@ -1495,18 +1741,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.command == "signature":
         if not args.state:
-            return _emit({"status": "INVALID", "errors": ["需要 --state"]}, EXIT_ERROR)
-        state = cg.load_state(Path(args.state))
+            return _invalid(["需要 --state"])
+        try:
+            state = cg.load_state(Path(args.state))
+        except Exception as exc:
+            return _invalid([f"无法加载 state {args.state!r}：{type(exc).__name__}: {exc}"])
         return _emit({"status": "OK", "signature": structural_signature(state)})
 
     if args.command == "transfer":
         if not args.policy or not args.target_state:
-            return _emit({"status": "INVALID", "errors": ["需要 --policy 与 --target-state"]},
-                         EXIT_ERROR)
-        policy = _read_json(args.policy)
-        target_state = cg.load_state(Path(args.target_state))
-        source_state = cg.load_state(Path(args.source_state)) if args.source_state else None
-        records, _ = _load_trajectory_records(args.source_trajectory)
+            return _invalid(["需要 --policy 与 --target-state"])
+        try:
+            policy = _read_json(args.policy)
+            target_state = cg.load_state(Path(args.target_state))
+            source_state = cg.load_state(Path(args.source_state)) if args.source_state else None
+            records, _ = _load_trajectory_records(args.source_trajectory)
+        except Exception as exc:
+            return _invalid([f"无法读取输入：{type(exc).__name__}: {exc}"])
+        if not isinstance(policy, dict):
+            return _invalid(["策略候选必须是 JSON 对象（非对象无法证明其属于策略层）"])
+        if not isinstance(target_state, dict):
+            return _invalid(["target-state 必须是 JSON 对象"])
         result = transfer_decision(
             policy, target_state, source_state=source_state, records=records,
             source_project=args.source_project, target_project=args.target_project)
@@ -1514,19 +1769,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.command == "expired":
         if not args.state or not args.trajectory:
-            return _emit({"status": "INVALID", "errors": ["需要 --state 与 --trajectory"]},
-                         EXIT_ERROR)
-        state = cg.load_state(Path(args.state))
-        records, _ = _load_trajectory_records(args.trajectory)
-        return _emit({"status": "OK",
-                      "expired": expired_trajectories(records, state)})
+            return _invalid(["需要 --state 与 --trajectory"])
+        try:
+            state = cg.load_state(Path(args.state))
+            records, _ = _load_trajectory_records(args.trajectory)
+        except Exception as exc:
+            return _invalid([f"无法读取输入：{type(exc).__name__}: {exc}"])
+        report = expired_trajectories_report(records, state)
+        return _emit({"status": "OK" if not report["diagnostics"] else "DEGRADED",
+                      "expired": report["expired"], "diagnostics": report["diagnostics"]},
+                     EXIT_OK if not report["diagnostics"] else EXIT_HARD)
 
     if args.command == "compress":
         if args.items is None or args.budget is None:
-            return _emit({"status": "INVALID", "errors": ["需要 --items 与 --budget"]},
-                         EXIT_ERROR)
-        items = _read_json(args.items)
-        return _emit(compression_report(items, args.budget))
+            return _invalid(["需要 --items 与 --budget"])
+        try:
+            items = _read_json(args.items)
+        except Exception as exc:
+            return _invalid([f"无法读取 --items：{type(exc).__name__}: {exc}"])
+        report = compression_report(items, args.budget)
+        # REFUSED 正是本命令要检测的失败；必须以非零退出码暴露给 CI/自动化。
+        return _emit(report, EXIT_OK if report.get("status") == "OK" else EXIT_HARD)
 
     parser.print_help()
     return EXIT_ERROR

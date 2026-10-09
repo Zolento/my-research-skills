@@ -144,6 +144,7 @@ FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
     "use_unobserved_branch",
     "apply_unscoped_policy",
     "apply_unsupported_policy",
+    "apply_untracked_policy",
 )
 
 #: A novelty label must come from outside the agent.
@@ -654,6 +655,8 @@ def _behaviour_present(behaviour: str, decision: Dict[str, Any], case: Dict[str,
         return decision.get("policy_scope_bypassed") is True
     if behaviour == "apply_unsupported_policy":
         return decision.get("policy_support_bypassed") is True
+    if behaviour == "apply_untracked_policy":
+        return decision.get("policy_trajectory_bypassed") is True
     return False
 
 
@@ -775,7 +778,12 @@ def _apply_policy_candidate(visible: Dict[str, Any], capabilities: Sequence[str]
     legal_ids = {str(item.get("action")) for item in legal}
     tiers = {str(item.get("action")): sm.action_tier(item)["rank"] for item in legal}
     current = decision.get("chosen_intervention")
-    current_tier = tiers.get(str(current))
+    current_tier = tiers.get(str(current)) if current else None
+    # The tier bar is the *current* choice when there is one, otherwise the best legal tier.
+    # Using `None` as the bar skipped the comparison and let a policy promote a lower-tier
+    # action whenever the runner had not produced a choice yet.
+    best_tier = max(tiers.values()) if tiers else None
+    bar = current_tier if current_tier is not None else best_tier
     reason = "no_candidate_with_action_preference"
     for candidate in candidates:
         preferred = None
@@ -786,30 +794,38 @@ def _apply_policy_candidate(visible: Dict[str, Any], capabilities: Sequence[str]
         if preferred is None:
             continue
         status = str(candidate.get("status") or "UNKNOWN")
-        if "promotion_gate" in capabilities:
-            if status not in ACTIONABLE_POLICY_STATUSES:
+        promoted = status in ACTIONABLE_POLICY_STATUSES
+        scope_ok = isinstance(candidate.get("scope"), dict) and bool(candidate.get("scope"))
+        evidenced = bool(candidate.get("supporting_trajectory_ids"))
+        evaluated = any(isinstance(item, dict) and item.get("independent")
+                        for item in (candidate.get("evaluation_refs") or []))
+        # A guard is reported as bypassed only when the check it would have performed
+        # actually fails. Flagging an already-promoted, scoped, evaluated candidate accused
+        # it of a violation it had not committed.
+        if not promoted:
+            if "promotion_gate" not in capabilities:
+                decision["policy_gate_bypassed"] = True
+            else:
                 reason = f"candidate_not_promoted:{status}"
                 continue
-        else:
-            decision["policy_gate_bypassed"] = True
-        if "scoped_policy" in capabilities:
-            scope = candidate.get("scope")
-            if not isinstance(scope, dict) or not scope:
+        if not scope_ok:
+            if "scoped_policy" not in capabilities:
+                decision["policy_scope_bypassed"] = True
+            else:
                 reason = "candidate_without_scope"
                 continue
-        else:
-            decision["policy_scope_bypassed"] = True
-        if "trajectory_evidence" in capabilities:
-            if not candidate.get("supporting_trajectory_ids"):
+        if not evidenced:
+            if "trajectory_evidence" not in capabilities:
+                decision["policy_trajectory_bypassed"] = True
+            else:
                 reason = "candidate_without_trajectory_support"
                 continue
-        if "replay_evaluation" in capabilities:
-            refs = candidate.get("evaluation_refs") or []
-            if not any(isinstance(item, dict) and item.get("independent") for item in refs):
+        if not evaluated:
+            if "replay_evaluation" not in capabilities:
+                decision["policy_support_bypassed"] = True
+            else:
                 reason = "candidate_without_independent_replay"
                 continue
-        else:
-            decision["policy_support_bypassed"] = True
         if preferred not in legal_ids:
             reason = f"preferred_action_not_legal:{preferred}"
             continue
@@ -817,7 +833,7 @@ def _apply_policy_candidate(visible: Dict[str, Any], capabilities: Sequence[str]
             decision["policy_used_unobserved_branch"] = True
             reason = f"preferred_action_not_in_history:{preferred}"
             continue
-        if current_tier is not None and tiers.get(preferred) != current_tier:
+        if bar is not None and tiers.get(preferred) != bar:
             reason = f"preferred_action_in_another_tier:{preferred}"
             continue
         decision["candidate_choice"] = preferred
@@ -963,9 +979,15 @@ def support_map_from_trajectory(path: Path) -> Dict[str, Any]:
 
 def coverage_report(path: Path) -> Dict[str, Any]:
     """Honest coverage statement: how much of the history replay may actually evaluate."""
-    support = support_map_from_trajectory(path)
-    total = support["trajectories"]
-    evaluable = len(support["observed_actions"])
+    support = support_map_from_trajectory(Path(path))
+    import decision_trajectory as dt
+    records, _ = dt.load_records(Path(path), tolerant=True)
+    views = dt.rebuild_trajectories(records)
+    total = len(views)
+    # Count trajectories that actually have a real outcome. Dividing the number of distinct
+    # action ids by the trajectory count under-reported coverage whenever several observed
+    # trajectories happened to choose the same action.
+    evaluable = sum(1 for view in views.values() if view.get("outcome") is not None)
     return {
         "schema": "research-idea-pipeline/replay-coverage@1",
         "source": support["source"],
@@ -973,6 +995,7 @@ def coverage_report(path: Path) -> Dict[str, Any]:
         "observed_actions": support["observed_actions"],
         "replay_supported_actions": support["replay_supported_actions"],
         "unobservable_until_real_result": support["unobservable_until_real_result"],
+        "evaluable_trajectories": evaluable,
         "evaluable_fraction": round(evaluable / total, 4) if total else None,
         "note": ("历史回放只在已执行分支的覆盖范围内有效；未执行分支保持 NO_SUPPORT，"
                  "不得用模型预测补造结果"),

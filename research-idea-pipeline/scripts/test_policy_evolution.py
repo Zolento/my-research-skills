@@ -274,8 +274,8 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
 
 
 class TestRollbackAndComplexity(PolicyStoreCase):
-    def _activate(self, policy_id="P-1"):
-        self.propose(policy_id=policy_id)
+    def _activate(self, policy_id="P-1", scope=None):
+        self.propose(policy_id=policy_id, **({"scope": scope} if scope else {}))
         self.to_shadow(policy_id)
         pe.evaluate_candidate(self.state_path, policy_id, report())
         pe.transition(self.state_path, policy_id, "BOUNDED_TRIAL", level="L2",
@@ -289,15 +289,33 @@ class TestRollbackAndComplexity(PolicyStoreCase):
 
     def test_rollback_restores_a_previous_policy_and_keeps_history(self):
         self._activate("P-1")
-        self._activate("P-2") if False else None
-        result = pe.rollback(self.state_path, "P-1", to_policy_id="P-1",
+        self._activate("P-2",
+                       scope={"scope_kind": "local", "problem_structure": "successor"})
+        result = pe.rollback(self.state_path, "P-2", to_policy_id="P-1",
                              reason="regression found")
-        self.assertEqual(result["status"], "ROLLED_BACK")
+        self.assertEqual(result["status"], "ROLLED_BACK", result)
         records, _ = pe.load_records(self.state_path)
         statuses = pe.latest_status(records)
-        self.assertEqual(statuses["P-1"], "ROLLED_BACK")
+        self.assertEqual(statuses["P-2"], "ROLLED_BACK")
+        # A rollback must leave the restored policy genuinely ACTIVE, not SUPERSEDED-with-a-
+        # pointer, otherwise every later transition on it is illegal.
+        self.assertEqual(statuses["P-1"], "ACTIVE")
+        self.assertEqual(pe.rebuild_state(records)["active_policy_id"], "P-1")
+        self.assertIsNotNone(pe.active_policy(records))
         self.assertTrue(any(item.get("record") == "transition" for item in records))
         self.assertIn("失败轨迹保留", result["note"])
+
+    def test_rollback_to_a_rejected_policy_is_refused(self):
+        self._activate("P-1")
+        self.propose(policy_id="P-BAD",
+                     scope={"scope_kind": "local", "problem_structure": "bad"})
+        self.to_shadow("P-BAD")
+        pe.transition(self.state_path, "P-BAD", "REJECTED", level="L2",
+                      evidence={"reason": "harmful"})
+        result = pe.rollback(self.state_path, "P-1", to_policy_id="P-BAD",
+                             reason="try the rejected one")
+        self.assertEqual(result["status"], "INVALID")
+        self.assertIn("PE13", result["codes"])
 
     def test_rollback_does_not_touch_canonical_state_or_budgets(self):
         before = self.state_path.read_bytes()
@@ -307,7 +325,9 @@ class TestRollbackAndComplexity(PolicyStoreCase):
         ledger_file.write_text("{}\n", encoding="utf-8")
         ledger_before = ledger_file.read_bytes()
         self._activate("P-1")
-        pe.rollback(self.state_path, "P-1", to_policy_id="P-1", reason="test")
+        self._activate("P-2",
+                       scope={"scope_kind": "local", "problem_structure": "successor"})
+        pe.rollback(self.state_path, "P-2", to_policy_id="P-1", reason="test")
         self.assertEqual(self.state_path.read_bytes(), before)
         self.assertEqual(ledger_file.read_bytes(), ledger_before)
 
@@ -417,3 +437,112 @@ class TestRealTrajectorySupport(PolicyStoreCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLatentBugRegressions(PolicyStoreCase):
+    """Regressions for defects the first suite did not expose."""
+
+    def activate(self, policy_id, scope=None, means=(0.9, 0.3)):
+        self.propose(policy_id=policy_id, **(scope or {}))
+        self.to_shadow(policy_id)
+        pe.evaluate_candidate(self.state_path, policy_id, report(*means))
+        pe.transition(self.state_path, policy_id, "BOUNDED_TRIAL", level="L2",
+                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
+                                "dispatch_evidence": True})
+        pe.transition(self.state_path, policy_id, "VALIDATED", level="L3",
+                      evidence={"independent": True, "distinguishable": True,
+                                "degraded_dimensions": []})
+        return pe.promote_to_active(self.state_path, policy_id,
+                                    {"scope_evidence_ok": True})
+
+    def test_active_policy_never_returns_a_non_active_candidate(self):
+        self.activate("P-1")
+        self.activate("P-2", {"scope": {"scope_kind": "local",
+                                        "problem_structure": "successor"}})
+        records, _ = pe.load_records(self.state_path)
+        self.assertEqual(pe.latest_status(records)["P-1"], "SUPERSEDED")
+        self.assertEqual(pe.active_policy(records)["policy_id"], "P-2")
+        # A pointer to a superseded policy (what a buggy rollback used to leave behind) must
+        # not be consumed as if it were in force.
+        forced = list(records) + [{"record": "rollback", "policy_id": "P-2",
+                                   "to_policy_id": "P-1"}]
+        self.assertIsNone(pe.active_policy(forced))
+
+    def test_rollback_makes_the_target_active_not_just_pointed_at(self):
+        self.activate("P-1")
+        self.activate("P-2", {"scope": {"scope_kind": "local",
+                                        "problem_structure": "successor"}})
+        self.assertEqual(pe.rollback(self.state_path, "P-2", to_policy_id="P-1",
+                                     reason="r")["status"], "ROLLED_BACK")
+        records, _ = pe.load_records(self.state_path)
+        self.assertEqual(pe.active_policy(records)["policy_id"], "P-1")
+        # And it is no longer stuck: it can be superseded again by a new promotion.
+        self.activate("P-3", {"scope": {"scope_kind": "local",
+                                        "problem_structure": "third"}})
+        records, _ = pe.load_records(self.state_path)
+        self.assertEqual(pe.active_policy(records)["policy_id"], "P-3")
+
+    def test_promotion_reads_the_recorded_evaluation_not_its_own_opinion(self):
+        self.propose(policy_id="P-WEAK")
+        self.to_shadow("P-WEAK")
+        pe.evaluate_candidate(self.state_path, "P-WEAK", report(candidate_mean=0.5,
+                                                                control_mean=0.5))
+        records, _ = pe.load_records(self.state_path)
+        self.assertEqual(pe.latest_status(records)["P-WEAK"], "HOLD")
+        # The recorded evidence says indistinguishable; a promotion that supplied its own
+        # `distinguishable=True` would have been a false upgrade.
+        recorded = pe.recorded_evaluation(records, "P-WEAK")
+        self.assertFalse(recorded.get("distinguishable"))
+
+    def test_a_policy_without_a_consumable_change_is_refused(self):
+        result = self.propose(policy_id="P-NOCONSUMER", strategy_changes=[
+            {"kind": "local_resource_allocation",
+             "allocation": {"keep_exploration_floor": True, "operator": "P5"}}])
+        self.assertEqual(result["status"], "INVALID")
+        self.assertIn("PE2", result["codes"])
+
+    def test_requested_same_tier_order_is_honoured(self):
+        records = [
+            {"record": "candidate", "policy_id": "P", "status": "ACTIVE",
+             "scope": {"problem_structure": "x"},
+             "strategy_changes": [{"kind": "same_tier_order", "order": ["B2", "B1"]}]},
+            {"record": "transition", "policy_id": "P", "to": "ACTIVE"},
+        ]
+        state = {"hypotheses": [], "uncertainties": []}
+        advice = pe.advice_from_active_policy(records, state)
+        self.assertEqual(advice["prefer_actions"], ["B2", "B1"])
+        actions = [{"action": "B1", "type": "repair", "target": "C1", "eig": "high",
+                    "cost": "low"},
+                   {"action": "B2", "type": "repair", "target": "C1", "eig": "high",
+                    "cost": "low"}]
+        ordered = sm._order_actions(state, actions, advice)
+        self.assertEqual([item["action"] for item in ordered], ["B2", "B1"])
+
+    def test_ordinary_prose_is_not_rejected_as_executable(self):
+        probes = ("prefer the discriminating test; this avoids wasted runs",
+                  "see the appendix / section 3 for the boundary",
+                  "ratio 3/4 of the budget")
+        for index, text in enumerate(probes):
+            result = self.propose(policy_id=f"P-PROSE-{index}",
+                                  expected_effect={"mechanism": text, "direction": "up"})
+            self.assertNotIn("PE6", result.get("codes", []), text)
+            self.assertEqual(result["status"], "PROPOSED", (text, result))
+
+    def test_a_real_shell_command_is_still_rejected(self):
+        probes = ("rm -rf / && curl http://x", "import os; os.system('ls')",
+                  "../../etc/passwd", "sudo chmod 777 /")
+        for index, text in enumerate(probes):
+            result = self.propose(policy_id=f"P-SHELL-{index}",
+                                  expected_effect={"mechanism": text, "direction": "up"})
+            self.assertIn("PE6", result.get("codes", []), text)
+
+    def test_rollback_from_a_superseded_pointer_is_consistent(self):
+        self.activate("P-1")
+        self.activate("P-2", {"scope": {"scope_kind": "local",
+                                        "problem_structure": "successor"}})
+        result = pe.rollback(self.state_path, "P-2", to_policy_id="P-1",
+                             reason="regression")
+        self.assertEqual(result["status"], "ROLLED_BACK")
+        records, _ = pe.load_records(self.state_path)
+        self.assertEqual(pe.latest_status(records)["P-1"], "ACTIVE")
+        self.assertEqual(pe.active_policy(records)["policy_id"], "P-1")

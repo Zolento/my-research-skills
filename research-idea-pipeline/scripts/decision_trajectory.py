@@ -150,9 +150,12 @@ def load_chained(path: Path, *, tolerant: bool = False
                                      "哈希链断裂：历史行被改写或被删除"))
             if not tolerant:
                 raise TrajectoryError(diagnostics[-1].render())
-        if record.get("seq") != index + 1:
+        if record.get("seq") != len(records) + 1:
+            # Count the records parsed so far, not raw lines: a blank line is not a record and
+            # must not make a healthy log look tampered with.
             diagnostics.append(_diag("DT0", f"{name}:{index + 1}",
-                                     f"seq 不连续：期望 {index + 1}，实际 {record.get('seq')!r}"))
+                                     f"seq 不连续：期望 {len(records) + 1}，"
+                                     f"实际 {record.get('seq')!r}"))
             if not tolerant:
                 raise TrajectoryError(diagnostics[-1].render())
         records.append(record)
@@ -173,15 +176,46 @@ def load_chained(path: Path, *, tolerant: bool = False
     return records, diagnostics
 
 
-def append_chained(path: Path, record: Dict[str, Any]) -> Dict[str, Any]:
-    """Durably append one record to a chained store, returning the stored record."""
+def store_lock(path: Path) -> Path:
+    """Per-store lock file, so two different stores in one route never share a lock."""
+    return Path(path).parent / ("." + Path(path).name + ".lock")
+
+
+def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
+    """Atomically validate-and-append one record to a chained store.
+
+    The read that computes `seq`/`previous`, the validation and the append all happen under
+    one exclusive lock. Reading outside the lock was a time-of-check/time-of-use bug: two
+    concurrent appends both saw `n` records, both wrote `seq = n + 1`, and the store was
+    corrupted (duplicate sequence numbers and a broken hash chain).
+
+    `validate(records)` may return a refusal dict; the append is then skipped and that dict is
+    returned unchanged, so a caller can reject a duplicate without racing another writer.
+    """
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    records, _ = load_chained(path)
-    stored = copy.deepcopy(record)
-    stored["seq"] = len(records) + 1
-    stored["previous"] = _digest(records[-1]) if records else None
-    _append_line(path, stored)
-    return stored
+    with store_lock(path).open("a", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        records, _ = load_chained(path)
+        if validate is not None:
+            refusal = validate(records)
+            if refusal is not None:
+                return refusal
+        stored = copy.deepcopy(record)
+        stored["seq"] = len(records) + 1
+        stored["previous"] = _digest(records[-1]) if records else None
+        with path.open("a", encoding="utf-8") as out:
+            out.write(json.dumps(stored, ensure_ascii=False, sort_keys=True,
+                                 allow_nan=False) + "\n")
+            out.flush()
+            os.fsync(out.fileno())
+        pending = head_path(path).with_name(head_path(path).name + ".pending")
+        with pending.open("w", encoding="ascii") as out:
+            out.write(_digest(stored))
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(pending, head_path(path))
+        return stored
 
 
 def _digest(value: Any) -> str:
@@ -209,28 +243,26 @@ def load_records(path: Path, *, tolerant: bool = False) -> Tuple[List[Dict[str, 
     return load_chained(path, tolerant=tolerant)
 
 
-def _append_line(path: Path, record: Dict[str, Any]) -> None:
-    """Durably append one line while holding an exclusive lock on the store."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = path.parent / TRAJECTORY_LOCK
-    with lock_path.open("a", encoding="utf-8") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        with path.open("a", encoding="utf-8") as out:
-            out.write(json.dumps(record, ensure_ascii=False, sort_keys=True,
-                                 allow_nan=False) + "\n")
-            out.flush()
-            os.fsync(out.fileno())
-        pending = head_path(path).with_name(head_path(path).name + ".pending")
-        with pending.open("w", encoding="ascii") as out:
-            out.write(_digest(record))
-            out.flush()
-            os.fsync(out.fileno())
-        os.replace(pending, head_path(path))
+    append_chained(path, record)
 
 
 # ---------------------------------------------------------------------------
 # Record construction
 # ---------------------------------------------------------------------------
+
+def decision_identity(context: Dict[str, Any], chosen: Any) -> str:
+    """Stable identity of a decision, independent of the wall clock.
+
+    `decided_at` and the telemetry digests are deliberately excluded: including the timestamp
+    meant two dispatch records for the *same* decision a second apart received different ids
+    and were both accepted, so "prevent a duplicate dispatch" was only accidentally enforced
+    when both writes landed in the same second.
+    """
+    visible = {key: context.get(key) for key in
+               ("state_version", "state_digest", "scientific_question",
+                "active_hypotheses", "key_uncertainties", "visible_evidence", "stop_rules")}
+    return _digest({"context": visible, "chosen": chosen})
+
 
 def trajectory_id(project: str, route: str, state_version: Any, chosen: Any,
                   context_digest: str) -> str:
@@ -278,7 +310,7 @@ def build_decision_record(state: Dict[str, Any], *, route: str, project: str,
                           recorded_at: Optional[str] = None) -> Dict[str, Any]:
     """Build an unsigned `decision` record (validation happens in `append_record`)."""
     ident = trajectory_id(project, route, context.get("state_version"), chosen,
-                          context_digest(context))
+                          decision_identity(context, chosen))
     record: Dict[str, Any] = {
         "_schema": SCHEMA_TRAJECTORY,
         "record": "decision",
@@ -363,10 +395,28 @@ def _prior(records: Sequence[Dict[str, Any]], ident: str, kind: str) -> List[Dic
             if item.get("trajectory_id") == ident and item.get("record") == kind]
 
 
+#: Fields that differ between two submissions of the *same* record and must not turn an
+#: idempotent re-submission into a "different content" conflict.
+VOLATILE_FIELDS: Tuple[str, ...] = ("seq", "previous", "recorded_at", "decided_at",
+                                    "observed_at", "scheduler_digest", "cognition_digest")
+
+
 def _payload_digest(record: Dict[str, Any]) -> str:
-    stripped = {key: value for key, value in record.items()
-                if key not in ("seq", "previous")}
-    return _digest(stripped)
+    """Digest of a record's meaning, ignoring volatile timing and telemetry fields.
+
+    Re-submitting the identical decision one second later must be a `DUPLICATE`, not a
+    `DT2` conflict; a genuine rewrite (a different choice, a different result) still differs.
+    """
+    def strip(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: strip(item) for key, item in value.items()
+                    if key not in VOLATILE_FIELDS}
+        if isinstance(value, list):
+            return [strip(item) for item in value]
+        return value
+
+    return _digest(strip({key: value for key, value in record.items()
+                          if key not in VOLATILE_FIELDS}))
 
 
 def leak_strings(records: Sequence[Dict[str, Any]], ident: str) -> List[str]:
@@ -462,9 +512,36 @@ def _decision_errors(record: Dict[str, Any], *, state: Optional[Dict[str, Any]],
         if key in context or key in decision:
             diagnostics.append(_diag("DT6", path, f"决策记录不得包含事后结果字段 {key!r}"))
 
+    # DT7: a trajectory is never evidence. Its own record must not name the trajectory store
+    # (or the policy store) as the source of a scientific evidence reference.
+    for item in decision.get("candidates") or []:
+        if not isinstance(item, dict):
+            continue
+        for value in item.values():
+            if isinstance(value, str) and _names_non_evidence_source(value):
+                diagnostics.append(_diag("DT7", path,
+                                         f"决策记录不得把轨迹/策略存储当作证据来源：{value[:60]!r}"))
+
     if isinstance(route, str) and route and record.get("route") and record["route"] != route:
         diagnostics.append(_diag("DT10", path,
                                  f"route 绑定不一致：记录 {record['route']!r} ≠ 当前 {route!r}"))
+
+    # DT8: the same decision is not dispatched twice under a renamed traffic id.
+    if decision.get("dispatch_status") == "dispatched" and isinstance(chosen, str):
+        for previous in records:
+            if previous.get("record") != "decision" or previous.get("trajectory_id") == ident:
+                continue
+            prior_decision = previous.get("decision") or {}
+            prior_context = previous.get("context") or {}
+            if prior_decision.get("dispatch_status") != "dispatched":
+                continue
+            if str(prior_decision.get("chosen")) == chosen and \
+                    prior_context.get("state_version") == context.get("state_version") and \
+                    previous.get("route") == record.get("route"):
+                diagnostics.append(_diag(
+                    "DT8", path,
+                    f"同一 state_version 下行动 {chosen!r} 已被派遣过"
+                    f"（{previous.get('trajectory_id')}）：不得重复派遣"))
 
     if state is not None:
         if context.get("state_version") != state.get("state_version"):
@@ -551,10 +628,20 @@ def _outcome_errors(record: Dict[str, Any], *, state: Optional[Dict[str, Any]],
     refs = record.get("evidence_refs")
     if not isinstance(refs, list):
         diagnostics.append(_diag("DT1", path, "evidence_refs 必须是数组"))
-    elif state is not None:
-        diagnostics += _ref_errors(state, path, {"evidence": [item.get("evidence")
-                                                              for item in refs
-                                                              if isinstance(item, dict)]})
+    else:
+        # DT7: the trajectory/policy control plane is not a scientific evidence source.
+        for item in refs:
+            if not isinstance(item, dict):
+                continue
+            for value in item.values():
+                if isinstance(value, str) and _names_non_evidence_source(value):
+                    diagnostics.append(_diag(
+                        "DT7", path,
+                        f"轨迹不是科学证据，不得写入 evidence 引用：{value[:60]!r}"))
+        if state is not None:
+            diagnostics += _ref_errors(state, path, {"evidence": [item.get("evidence")
+                                                                  for item in refs
+                                                                  if isinstance(item, dict)]})
 
     # Leakage: an outcome summary must not already be present in the frozen decision.
     if decisions:
@@ -604,39 +691,42 @@ def _ref_errors(state: Dict[str, Any], path: str,
 # ---------------------------------------------------------------------------
 
 def append_record(path: Path, record: Dict[str, Any], *, state: Optional[Dict[str, Any]] = None,
-                  route: Optional[str] = None,
-                  allow_replay: bool = False) -> Dict[str, Any]:
-    """Validate then durably append one record.
+                  route: Optional[str] = None) -> Dict[str, Any]:
+    """Validate then durably append one record, atomically.
 
     Returns `{"status": "APPENDED"|"DUPLICATE"|"INVALID"|"HOLD", ...}`. Re-submitting an
     identical record is a `DUPLICATE` and writes nothing; re-submitting a *different*
     record for the same trajectory is `INVALID` (DT2).
+
+    The whole validate-then-append sequence runs under the store lock, so two concurrent
+    callers cannot both observe `n` records and both write `seq = n + 1`.
     """
-    if not allow_replay:
-        pass
-    records, _ = load_records(path)
+    path = Path(path)
     if route is None and state is not None:
-        route = cg.route_of(Path(path).parent / cg.STATE_NAME) \
-            if (Path(path).parent / cg.STATE_NAME).exists() else Path(path).parent.name
-    diagnostics = record_errors(record, state=state, records=records, route=route)
-    if diagnostics:
-        return {"status": "INVALID", "written": False, "path": str(path),
-                "diagnostics": [item.render() for item in diagnostics],
-                "codes": sorted({item.rule for item in diagnostics})}
-    ident = record["trajectory_id"]
-    same_kind = _prior(records, ident, record["record"])
-    if same_kind and record["record"] in ("decision", "outcome", "learning", "prediction"):
-        if _payload_digest(same_kind[-1]) == _payload_digest(record):
-            return {"status": "DUPLICATE", "written": False, "path": str(path),
-                    "trajectory_id": ident, "record": record["record"],
-                    "diagnostics": []}
-        return {"status": "INVALID", "written": False, "path": str(path),
-                "diagnostics": [f"DT2 同一 {record['record']} 记录已存在且内容不同"],
-                "codes": ["DT2"]}
-    stored = copy.deepcopy(record)
-    stored["seq"] = len(records) + 1
-    stored["previous"] = _digest(records[-1]) if records else None
-    _append_line(Path(path), stored)
+        route = cg.route_of(path.parent / cg.STATE_NAME) \
+            if (path.parent / cg.STATE_NAME).exists() else path.parent.name
+    ident = record.get("trajectory_id")
+
+    def validate(records: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        diagnostics = record_errors(record, state=state, records=records, route=route)
+        if diagnostics:
+            return {"status": "INVALID", "written": False, "path": str(path),
+                    "diagnostics": [item.render() for item in diagnostics],
+                    "codes": sorted({item.rule for item in diagnostics})}
+        same_kind = _prior(records, ident, record["record"])
+        if same_kind and record["record"] in ("decision", "outcome", "learning", "prediction"):
+            if _payload_digest(same_kind[-1]) == _payload_digest(record):
+                return {"status": "DUPLICATE", "written": False, "path": str(path),
+                        "trajectory_id": ident, "record": record["record"],
+                        "diagnostics": []}
+            return {"status": "INVALID", "written": False, "path": str(path),
+                    "diagnostics": [f"DT2 同一 {record['record']} 记录已存在且内容不同"],
+                    "codes": ["DT2"]}
+        return None
+
+    stored = append_chained(path, record, validate=validate)
+    if isinstance(stored, dict) and "status" in stored and "written" in stored:
+        return stored
     return {"status": "APPENDED", "written": True, "path": str(path),
             "trajectory_id": ident, "record": record["record"], "seq": stored["seq"],
             "digest": _digest(stored), "diagnostics": []}
@@ -708,6 +798,17 @@ def support_ids(records: Sequence[Dict[str, Any]], *, require_outcome: bool = Tr
 # ---------------------------------------------------------------------------
 # Small time helpers (ISO-8601 Z strings compare lexicographically)
 # ---------------------------------------------------------------------------
+
+def _names_non_evidence_source(value: str) -> bool:
+    """Whether a string names the trajectory/policy control plane as an evidence source.
+
+    A trajectory is decision experience, never a scientific observation, so a record that
+    tries to cite it as evidence is refused (`DT7`).
+    """
+    lowered = value.lower()
+    return "decision-trajectory" in lowered or "trajectory.jsonl" in lowered \
+        or "policy/candidates" in lowered or "source-integrity" in lowered
+
 
 def _text_lt(left: Any, right: Any) -> bool:
     return isinstance(left, str) and isinstance(right, str) and left < right

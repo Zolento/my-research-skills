@@ -143,3 +143,43 @@
 | Merge / Rebase / Release | 无 |
 | 其他 worktree | 未清理、未改动 |
 | 版本号 | 未改动（仍为 1.0.0）|
+
+
+---
+
+## 附：对抗式复核（第二轮）与修复
+
+在 `139f7b9` 之上做了一轮全面对抗复核，共定位 **12 条 HIGH / 16 条 MEDIUM / 12 条 LOW** 的
+**未暴露缺陷**（多为 fail-open：应 BLOCK 却 ALLOW）。完整清单、复现命令与逐条状态见
+[`.dev/audit/G-latent-bugs.md`](../audit/G-latent-bugs.md)，原始审计报告见
+[`E-source-freeze-bugs.md`](../audit/E-source-freeze-bugs.md) 与
+[`F-policy-transfer-bugs.md`](../audit/F-policy-transfer-bugs.md)。
+
+已修复的关键缺陷（每条都有回归测试）：
+
+- 决策/策略存储的 **read-then-lock TOCTOU**（并发 append 产生重复 seq 与断链）；
+- 轨迹身份含挂钟时间导致**重复派遣**只在一秒内偶然被拦；
+- 文档声称的 `DT7`/`DT8` **根本不存在**，现已实现（轨迹不得作为证据、禁止改名重复派遣）；
+- 离线回放允许策略**越层**（低 EIG/高成本可压过高 EIG/低成本）；
+- 对合规候选**误报绕过 guard**；
+- 回滚可以把 **REJECTED** 策略重新变成 active，且回滚后目标停在 SUPERSEDED 成为**死路**；
+- `promote_to_active` **自带证据**（硬编码 `distinguishable/sample_adequate=True`）；
+- 7 种授权策略面中 **3 种没有消费者**，且无消费者的策略仍可晋升；
+- 被篡改的策略日志**照常被消费**；损坏的轨迹存储**穿透为未捕获异常**；
+- 未派遣时输出**虚假 Policy Delta（L2）**；
+- `source_freeze`：写入白名单在默认参数下 **fail-open**、**硬链接绕过**、
+  审计链**可伪造/截断且从不校验**、相对 `allowed_roots` 等于开放整个 Skill 根；
+- `policy_transfer`：PT8 **看不到被 killed 的假设**、匹配错字段、PT10 被畸形条件**绕过**、
+  非列表条件/工具被忽略、迁移门**整体消失**、版本号缺失即**关闭过期判定**、
+  策略自带正则造成 **ReDoS**。
+
+复核过程中**新引入并已修掉**一条更严重的回归：E-8 的修法把解释器生成的 `__pycache__`
+纳入冻结清单，导致「冷字节码缓存的第一次运行」被误判为源码改动并 `HOLD`；
+现已在任意深度排除 `__pycache__`（`.dev` / `examples` 仍只在顶层排除）。
+
+复核后的验证：**1661 tests OK (skipped=3)**、`release_check.py` PASS（18 步）、
+5 个模块 selftest 全绿、冷缓存端到端 `source_integrity: PASS`。
+
+仍**未修**并已记录：`verify()` 只比内容不绑根（E-5）、受保护目录下的符号链接目录不入清单（E-9）、
+`guard_errors` 是死代码（E-10）、`allow_canonical` 未绑定 route（E-11）、
+enter/exit 之间「改了又改回」检测不到（E-16）、PT9 跨项目证据可自述（F-12）。

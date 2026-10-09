@@ -901,7 +901,10 @@ def action_affinity(action: Dict[str, Any], state: Dict[str, Any],
     preferred = advice.get("prefer_actions") or []
     identifier = action.get("action")
     if isinstance(identifier, str) and identifier and identifier in preferred:
-        return {"aligned": True, "basis": f"policy_prefers[{identifier}]"}
+        # The position in the requested list is the rank, so `same_tier_order` honours the
+        # order it asked for instead of only its membership.
+        return {"aligned": True, "basis": f"policy_prefers[{identifier}]",
+                "prefer_rank": preferred.index(identifier)}
     target = _action_target_kind(action, state)
     if target["kind"] == "hypothesis":
         if target.get("operator") and target["operator"] == advice.get("operator"):
@@ -1009,12 +1012,18 @@ def _order_actions(
             {"aligned": False, "basis": "no advice"}
         annotated.append({**action, "tier": tier["label"], "tier_rank": tier["rank"],
                           "aligned": affinity["aligned"], "affinity_basis": affinity["basis"],
+                          "prefer_rank": affinity.get("prefer_rank"),
                           "declared_order": index,
                           "legal": True})
     best = max((item["tier_rank"] for item in annotated), default=0)
     top = [item for item in annotated if item["tier_rank"] == best]
     rest = [item for item in annotated if item["tier_rank"] != best]
-    top.sort(key=lambda item: (0 if item["aligned"] else 1, item["declared_order"]))
+    # Aligned first; among aligned candidates an explicit requested rank wins over declaration
+    # order, so a policy that asked for A-before-B actually gets A-before-B.
+    top.sort(key=lambda item: (0 if item["aligned"] else 1,
+                               item["prefer_rank"] if item["prefer_rank"] is not None
+                               else item["declared_order"],
+                               item["declared_order"]))
     return top + rest
 
 

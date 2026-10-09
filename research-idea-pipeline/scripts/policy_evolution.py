@@ -83,10 +83,12 @@ ALLOWED_TRANSITIONS: Dict[str, Tuple[str, ...]] = {
     "BOUNDED_TRIAL": ("VALIDATED", "REJECTED", "HOLD"),
     "VALIDATED": ("ACTIVE", "REJECTED", "HOLD"),
     "ACTIVE": ("ROLLED_BACK", "SUPERSEDED"),
+    # A superseded policy may come back only through an explicit restore, which is what
+    # `rollback()` writes; that keeps `active_policy_id` and the lifecycle status consistent.
+    "SUPERSEDED": ("ACTIVE", "ROLLED_BACK"),
     "HOLD": ("SHADOW", "REPLAY_EVALUATED", "REJECTED", "ROLLED_BACK"),
     "REJECTED": (),
     "ROLLED_BACK": (),
-    "SUPERSEDED": (),
 }
 
 #: Evidence an independent evaluation must supply before a candidate may advance.
@@ -108,6 +110,8 @@ TRANSITION_REQUIREMENTS: Dict[Tuple[str, str], Dict[str, Any]] = {
                                               "degraded_dimensions")},
     ("VALIDATED", "ACTIVE"): {"level": "L3",
                               "keys": ("rules_digest_unchanged", "scope_evidence_ok")},
+    # A restore re-activates an already-promoted policy; it still requires a recorded reason.
+    ("SUPERSEDED", "ACTIVE"): {"level": "L2", "keys": ("reason",)},
 }
 
 #: The authorised strategy surface. A change outside it is `PE2`.
@@ -121,6 +125,14 @@ CHANGE_KINDS: Dict[str, Dict[str, Any]] = {
     "local_resource_allocation": {"required": ("allocation",), "keep_exploration_floor": True},
 }
 
+#: Change kinds the Strategy Decision Adapter can actually consume. A policy made only of
+#: advisory kinds (resource allocation) is accepted data but can never change a decision, so
+#: it must not be promotable on its own — otherwise "the policy is ACTIVE" would be a lie.
+CONSUMABLE_CHANGE_KINDS: Tuple[str, ...] = (
+    "exploration_operator_preference", "menu_choice", "same_tier_preference",
+    "same_tier_order", "probe_order", "applicability",
+)
+
 #: Targets a policy may never touch, whatever shape the attempt takes.
 FORBIDDEN_TARGETS: Tuple[str, ...] = (
     "scheduler_priority", "next_action_policy", "priority", "eig_rule", "eig_cost",
@@ -132,11 +144,15 @@ FORBIDDEN_TARGETS: Tuple[str, ...] = (
 )
 
 #: A policy is structured data. These patterns mean someone is trying to ship code.
+#: The traversal pattern is `\.\./` (a literal dot-dot), not `../`: the unescaped form was a
+#: wildcard that matched any two characters followed by a slash, so ordinary prose such as
+#: "ratio 3/4" or "see appendix / section 3" was rejected as a path-traversal attempt.
 EXECUTABLE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     (r"`", "反引号（命令替换）"),
     (r"\$\(", "shell 命令替换"),
     (r"&&|\|\|", "shell 连接符"),
-    (r";\s*\w", "shell 语句分隔"),
+    (r";\s*(?:\w+\s+){0,3}(?:rm|curl|wget|chmod|chown|python|bash|sh|sudo)\b",
+     "shell 语句分隔后接命令"),
     (r"\bimport\s+\w", "Python import"),
     (r"\b__import__\b", "Python 动态导入"),
     (r"\bexec\s*\(", "exec"),
@@ -144,7 +160,7 @@ EXECUTABLE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     (r"\bos\.system\b", "os.system"),
     (r"\bsubprocess\b", "subprocess"),
     (r"\bshutil\.rmtree\b", "shutil.rmtree"),
-    (r"../", "路径穿越"),
+    (r"\.\./", "路径穿越"),
     (r"^\s*/", "绝对路径"),
     (r"\bcurl\b|\bwget\b", "网络下载"),
     (r"\bchmod\b|\bchown\b", "权限修改"),
@@ -380,6 +396,18 @@ def candidate_errors(candidate: Any, *, records: Sequence[Dict[str, Any]] = (),
                                                  f"未知菜单 {change.get('menu')!r}"))
                 except Exception:  # pragma: no cover - strategy memory always importable
                     pass
+            if kind == "same_tier_order":
+                order = change.get("order")
+                if not isinstance(order, list) or not all(isinstance(item, str) and item
+                                                          for item in order):
+                    diagnostics.append(_diag("PE1", cpath,
+                                             "same_tier_order.order 必须是非空字符串数组"))
+            if kind == "probe_order":
+                order = change.get("order")
+                if not isinstance(order, list) or not all(isinstance(item, str) and item
+                                                          for item in order):
+                    diagnostics.append(_diag("PE1", cpath,
+                                             "probe_order.order 必须是非空字符串数组"))
             if kind == "exploration_operator_preference":
                 try:
                     import state_check as sc
@@ -389,6 +417,17 @@ def candidate_errors(candidate: Any, *, records: Sequence[Dict[str, Any]] = (),
                 except Exception:  # pragma: no cover
                     pass
     diagnostics += _forbidden_target_errors(candidate, path)
+
+    # A policy must be able to change a decision. Advisory-only changes (resource allocation)
+    # may accompany a consumable one but may not be the whole policy, otherwise a promoted
+    # policy could never have a real consumer.
+    if isinstance(changes, list) and changes and \
+            not any(isinstance(item, dict) and item.get("kind") in CONSUMABLE_CHANGE_KINDS
+                    for item in changes):
+        diagnostics.append(_diag(
+            "PE2", path,
+            "策略至少需要一个可被 Strategy Decision Adapter 消费的变更类型"
+            f"（{sorted(CONSUMABLE_CHANGE_KINDS)}）；只有建议性变更的策略没有消费者"))
 
     # --- operational boundary -------------------------------------------------
     scope = candidate.get("scope")
@@ -515,6 +554,9 @@ def propose(state_path: Path, candidate: Dict[str, Any], *,
                    "recorded_at": _now(), "signature": candidate_signature(candidate),
                    "evaluation_rules_digest": rules_digest,
                    "schema_version": POLICY_SCHEMA_VERSION})
+    # Stamp the origin so a later cross-project application is verifiable instead of
+    # unprovable; the transfer gate blocks a candidate whose provenance is missing.
+    record.setdefault("source_route", cg.route_of(Path(state_path)))
     stored = _append(state_path, record)
     return {"status": "PROPOSED", "written": True, "policy_id": ident,
             "signature": stored["signature"], "seq": stored["seq"],
@@ -564,9 +606,17 @@ def rebuild_state(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def active_policy(records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The policy currently in force, or None.
+
+    The pointer and the lifecycle status are both required to say `ACTIVE`: a pointer to a
+    `SUPERSEDED`, `REJECTED` or `ROLLED_BACK` candidate must never be consumed as if it were
+    in force.
+    """
     snapshot = rebuild_state(records)
     ident = snapshot.get("active_policy_id")
     if not ident:
+        return None
+    if latest_status(records).get(ident) != "ACTIVE":
         return None
     for record in records:
         if record.get("record") == "candidate" and record.get("policy_id") == ident:
@@ -700,22 +750,30 @@ def transition(state_path: Path, policy_id: str, target: str, *,
 
 
 def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str) -> Dict[str, Any]:
-    """Restore an earlier valid policy; keep the failure trail; touch nothing else."""
+    """Restore an earlier valid policy; keep the failure trail; touch nothing else.
+
+    The target must currently be a *restorable* policy (`SUPERSEDED` or still `ACTIVE`).
+    A `REJECTED` or already `ROLLED_BACK` policy is terminal and must not be restored —
+    otherwise "防止同一失败策略重复晋升" would be violated by the rollback path itself.
+    The restore is written as an explicit `→ ACTIVE` transition so the pointer and the
+    lifecycle status can never disagree.
+    """
     records, _ = load_records(state_path)
     statuses = latest_status(records)
     diagnostics: List[cg.Diagnostic] = []
     if statuses.get(policy_id) != "ACTIVE":
         diagnostics.append(_diag("PE13", f"policy[{policy_id}]", "只有 ACTIVE 策略可以回滚"))
     target_record = policy_record(records, to_policy_id)
+    target_status = statuses.get(to_policy_id)
     if target_record is None:
         diagnostics.append(_diag("PE13", f"policy[{to_policy_id}]", "回滚目标不存在"))
-    else:
-        target_history = [item.get("to") for item in records
-                          if item.get("record") == "transition"
-                          and item.get("policy_id") == to_policy_id]
-        if not {"VALIDATED", "ACTIVE"} & set(target_history):
-            diagnostics.append(_diag("PE13", f"policy[{to_policy_id}]",
-                                     "回滚目标必须是先前已验证或生效过的策略"))
+    elif target_status not in ("SUPERSEDED", "ACTIVE"):
+        diagnostics.append(_diag(
+            "PE13", f"policy[{to_policy_id}]",
+            f"回滚目标当前状态是 {target_status}：REJECTED / ROLLED_BACK 是终态，不得恢复"))
+    if to_policy_id and to_policy_id == policy_id:
+        diagnostics.append(_diag("PE13", f"policy[{policy_id}]",
+                                 "回滚目标不能是策略自身"))
     if not reason:
         diagnostics.append(_diag("PE10", f"policy[{policy_id}]", "回滚必须写明原因"))
     if diagnostics:
@@ -731,6 +789,14 @@ def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str
                          "at": _now(), "level": "L2",
                          "evidence": {"reason": reason}, "reason": reason,
                          "signature": record["signature"]})
+    if target_status == "SUPERSEDED":
+        restore = transition(state_path, to_policy_id, "ACTIVE", level="L2",
+                             evidence={"reason": f"restored by rollback from {policy_id}",
+                                       "restored": True})
+        if not restore.get("written"):
+            return {"status": "INVALID", "written": False,
+                    "diagnostics": restore.get("diagnostics") or [],
+                    "codes": restore.get("codes") or ["PE13"]}
     return {"status": "ROLLED_BACK", "written": True, "policy_id": policy_id,
             "restored": to_policy_id, "seq": stored["seq"], "reason": reason,
             "note": ("回滚不修改既有实验结果、不重置 AALG/其他预算、"
@@ -844,17 +910,47 @@ def evaluate_candidate(state_path: Path, policy_id: str, report: Dict[str, Any],
                       reason=evidence["reason"])
 
 
-def promote_to_active(state_path: Path, policy_id: str, evaluation: Dict[str, Any]) -> Dict[str, Any]:
-    """ACTIVE promotion with the frozen-rule and scope checks applied."""
+def recorded_evaluation(records: Sequence[Dict[str, Any]], policy_id: str) -> Dict[str, Any]:
+    """The most recent evaluation evidence actually written for this policy.
+
+    Promotion must read this, never restate it: a function that supplies its own
+    `sample_adequate=True` would silently upgrade a policy whose recorded replay said the
+    sample was too small or the arms were indistinguishable.
+    """
+    merged: Dict[str, Any] = {}
+    for record in records:
+        if record.get("record") != "transition" or record.get("policy_id") != policy_id:
+            continue
+        if record.get("to") not in ("REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED"):
+            continue
+        # Later transitions override, but a key recorded earlier (e.g. `sample_adequate` from
+        # the replay evaluation) is not lost just because a later step did not repeat it.
+        merged.update({key: value for key, value in (record.get("evidence") or {}).items()})
+    return merged
+
+
+def promote_to_active(state_path: Path, policy_id: str,
+                      evaluation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """ACTIVE promotion, using the *recorded* evaluation evidence plus the frozen-rule check."""
+    evaluation = dict(evaluation or {})
     current_digest = evaluation_rules_digest(state_path)
     records, _ = load_records(state_path)
     candidate = policy_record(records, policy_id) or {}
+    recorded = recorded_evaluation(records, policy_id)
     evidence = {
-        "rules_digest_unchanged": candidate.get("evaluation_rules_digest") == current_digest,
+        "rules_digest_unchanged": bool(
+            candidate.get("evaluation_rules_digest") == current_digest
+            and evaluation.get("rules_digest_unchanged", True)),
         "scope_evidence_ok": bool(evaluation.get("scope_evidence_ok", True)),
-        "independent": True, "leakage_checked": True, "reproducible": True,
-        "sample_adequate": True, "distinguishable": True, "degraded_dimensions": [],
-        "reason": evaluation.get("reason") or "independent replay evaluation",
+        # Fail closed: absent recorded evidence is not evidence.
+        "independent": bool(recorded.get("independent")),
+        "leakage_checked": bool(recorded.get("leakage_checked", True)),
+        "reproducible": bool(recorded.get("reproducible", True)),
+        "sample_adequate": bool(recorded.get("sample_adequate")),
+        "distinguishable": bool(recorded.get("distinguishable")),
+        "degraded_dimensions": list(recorded.get("degraded_dimensions") or []),
+        "reason": evaluation.get("reason") or recorded.get("reason")
+        or "independent replay evaluation (recorded)",
     }
     return transition(state_path, policy_id, "ACTIVE", level="L3", evidence=evidence,
                       reason=evidence["reason"])
@@ -881,16 +977,31 @@ def advice_from_active_policy(records: Sequence[Dict[str, Any]], state: Dict[str
                               "reason": "active scoped policy",
                               "policy_id": candidate.get("policy_id"),
                               "scope": copy.deepcopy(candidate.get("scope"))}
+    try:
+        import strategy_memory as sm
+        menus = sm.MENU_BY_NAME
+    except Exception:  # pragma: no cover - strategy memory is always importable
+        menus = {}
     for change in changes:
         kind = change.get("kind")
         if kind == "exploration_operator_preference":
             advice["operator"] = change.get("operator")
         elif kind == "menu_choice":
+            # A menu only changes behaviour through the operator/island it declares, so map it;
+            # recording the menu name alone made `menu_choice` a change with no consumer.
             advice["menu"] = change.get("menu")
-        elif kind in ("same_tier_preference", "same_tier_order"):
+            entry = menus.get(change.get("menu")) or {}
+            advice["operator"] = advice.get("operator") or entry.get("operator")
+            advice["island"] = advice.get("island") or entry.get("island")
+            advice["shift"] = advice.get("shift") or entry.get("shift")
+        elif kind == "same_tier_preference":
             advice.setdefault("prefer_actions", [])
             if change.get("prefer_action"):
                 advice["prefer_actions"].append(change["prefer_action"])
+        elif kind in ("same_tier_order", "probe_order"):
+            # The requested order is preserved, not just the membership: the adapter uses the
+            # position in this list as the re-ordering rank.
+            advice.setdefault("prefer_actions", [])
             advice["prefer_actions"].extend(change.get("order") or [])
         elif kind == "applicability":
             advice["island"] = advice.get("island") or change.get("problem_structure")
@@ -948,17 +1059,45 @@ def scope_conditions_hold(candidate: Dict[str, Any], state: Dict[str, Any]) -> T
 
 def cross_project_transfer_allowed(candidate: Dict[str, Any], target_state: Dict[str, Any], *,
                                    current_route: Optional[str] = None,
+                                   require_transfer: bool = False,
                                    **transfer_kwargs: Any) -> Dict[str, Any]:
     """Whether a policy that originated in another route may act on this one.
 
     Same-route policies are not gated. A policy that declares a different
     `scope.source_route` / `scope.source_project` must pass the structural transfer gate
     (`policy_transfer.PT*`); domain-keyword resemblance is never enough.
+
+    Fail-closed provenance: `propose()` does not stamp `source_route`/`source_project`, so a
+    candidate with no declared source is *unverifiable*, not "same route". When the caller
+    supplies a `current_route` (or passes `require_transfer=True`), the gate must not silently
+    return `NOT_REQUIRED`: an absent source, or an absent `current_route` when a source *is*
+    declared, is a BLOCK. `require_transfer=True` forces the transfer gate even without a
+    declared source, leaving the PT* rules to decide.
     """
-    scope = candidate.get("scope") if isinstance(candidate.get("scope"), dict) else {}
-    source = scope.get("source_route") or scope.get("source_project")
-    if not source or not current_route or str(source) == str(current_route):
+    def blocked(reason: str) -> Dict[str, Any]:
+        return {"required": True, "status": "BLOCK", "reasons": [reason], "similarity": None}
+
+    if not isinstance(candidate, dict):
+        return blocked("策略候选不是对象；无法判定跨项目迁移边界（fail-closed 阻塞）")
+    raw_scope = candidate.get("scope")
+    scope = raw_scope if isinstance(raw_scope, dict) else {}
+    source = (scope.get("source_route") or scope.get("source_project")
+              or candidate.get("source_route") or candidate.get("source_project"))
+    source_declared = bool(source)
+    if source_declared and current_route and str(source) == str(current_route):
         return {"required": False, "status": "NOT_REQUIRED", "reasons": [], "similarity": None}
+    if not require_transfer:
+        if not source_declared:
+            if current_route:
+                return blocked(
+                    "策略未声明 scope.source_route/source_project；在已知当前路由 "
+                    f"{current_route!r} 时无法证明同路由（fail-closed 阻塞）")
+            return {"required": False, "status": "NOT_REQUIRED", "reasons": [],
+                    "similarity": None}
+        if not current_route:
+            return blocked(
+                f"当前路由未知（current_route 为空）；无法证明与来源 {source!r} 同路由"
+                "（fail-closed 阻塞）")
     import policy_transfer as pt
     try:
         decision = pt.transfer_decision(candidate, target_state,
@@ -1265,23 +1404,60 @@ def selftest() -> int:
         check("applicability conditions are checked against declared fields", hold, )
 
         # --- rollback and anti-evasion ---------------------------------------
-        rollback_result = rollback(state_path, "P-1", to_policy_id="P-1",
+        # Promote a second policy so the first becomes SUPERSEDED, which is the only state a
+        # rollback may restore (a REJECTED / ROLLED_BACK policy is terminal).
+        successor = _valid_candidate(policy_id="P-2",
+                                     scope={"scope_kind": "local",
+                                            "problem_structure": "successor-loop"})
+        successor["evaluation_rules_digest"] = evaluation_rules_digest(state_path)
+        check("successor proposes", propose(state_path, successor,
+                                            trajectory_support={"DT-1"})["status"] == "PROPOSED")
+        transition(state_path, "P-2", "SHADOW", level="L1",
+                   evidence={"format_ok": True, "invariants_ok": True, "permissions_ok": True})
+        evaluate_candidate(state_path, "P-2", _report())
+        transition(state_path, "P-2", "BOUNDED_TRIAL", level="L2",
+                   evidence={"budget_expanded": False, "hard_gates_unchanged": True,
+                             "dispatch_evidence": True})
+        transition(state_path, "P-2", "VALIDATED", level="L3",
+                   evidence={"independent": True, "distinguishable": True,
+                             "degraded_dimensions": []})
+        check("successor becomes ACTIVE",
+              promote_to_active(state_path, "P-2", {"scope_evidence_ok": True})["status"]
+              == "ACTIVE")
+        rollback_result = rollback(state_path, "P-2", to_policy_id="P-1",
                                    reason="rehearsal rollback")
         check("rollback keeps the failure trail",
-              rollback_result["status"] == "ROLLED_BACK")
+              rollback_result["status"] == "ROLLED_BACK", )
         snapshot = rebuild_state(load_records(state_path)[0])
         check("the snapshot records the rollback",
-              "ROLLED_BACK" in snapshot["status"].values())
-
-        first = _valid_candidate(policy_id="P-EVADE-0")
-        first["evaluation_rules_digest"] = evaluation_rules_digest(state_path)
-        proposed = propose(state_path, first)
-        check("a same-signature retry is allowed once under the cap",
-              proposed["status"] == "PROPOSED")
-        transition(state_path, "P-EVADE-0", "SHADOW", level="L1",
+              snapshot["status"].get("P-2") == "ROLLED_BACK")
+        check("a rollback restores the target to ACTIVE",
+              snapshot["status"].get("P-1") == "ACTIVE"
+              and snapshot["active_policy_id"] == "P-1")
+        rejected = _valid_candidate(policy_id="P-REJECTED",
+                                    scope={"scope_kind": "local",
+                                           "problem_structure": "rejected-loop"})
+        rejected["evaluation_rules_digest"] = evaluation_rules_digest(state_path)
+        propose(state_path, rejected, trajectory_support={"DT-1"})
+        transition(state_path, "P-REJECTED", "SHADOW", level="L1",
                    evidence={"format_ok": True, "invariants_ok": True, "permissions_ok": True})
-        transition(state_path, "P-EVADE-0", "REJECTED", level="L2",
-                   evidence={"reason": "fails"})
+        transition(state_path, "P-REJECTED", "REJECTED", level="L2",
+                   evidence={"reason": "harmful"})
+        check("rollback to a REJECTED policy is refused",
+              rollback(state_path, "P-1", to_policy_id="P-REJECTED",
+                       reason="try again")["status"] == "INVALID")
+
+        for index in (0, 1):
+            retry = _valid_candidate(policy_id=f"P-EVADE-{index}")
+            retry["evaluation_rules_digest"] = evaluation_rules_digest(state_path)
+            proposed = propose(state_path, retry)
+            check(f"a same-signature retry #{index} is allowed under the cap",
+                  proposed["status"] == "PROPOSED")
+            transition(state_path, f"P-EVADE-{index}", "SHADOW", level="L1",
+                       evidence={"format_ok": True, "invariants_ok": True,
+                                 "permissions_ok": True})
+            transition(state_path, f"P-EVADE-{index}", "REJECTED", level="L2",
+                       evidence={"reason": "fails"})
         blocked = _valid_candidate(policy_id="P-EVADE-NEW-NAME")
         blocked["evaluation_rules_digest"] = evaluation_rules_digest(state_path)
         outcome = propose(state_path, blocked)

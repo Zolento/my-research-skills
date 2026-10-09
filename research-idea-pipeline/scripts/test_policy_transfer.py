@@ -18,10 +18,12 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 import cognition as cg
 import decision_trajectory as dt
+import policy_evolution as pe
 import policy_transfer as pt
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -555,6 +557,331 @@ class TestCli(unittest.TestCase):
                  "--budget", "1"], capture_output=True, text=True)
             self.assertEqual(compressed.returncode, 0, compressed.stderr)
             self.assertEqual(json.loads(compressed.stdout)["status"], "OK")
+
+
+# ---------------------------------------------------------------------------
+# 8. 对抗审计回归（F1—F15）
+# ---------------------------------------------------------------------------
+
+class TestNegatedMechanismCoverage(unittest.TestCase):
+    """F1：killed/refuted 的假设与索引机制也必须进入负向知识集合。"""
+
+    def test_negated_mechanisms_includes_killed_and_archived_hypotheses(self):
+        for status in ("killed", "archived"):
+            state = fixture_state()
+            state["hypotheses"][0]["status"] = status
+            identifiers = {item["id"] for item in pt.negated_mechanisms(state)}
+            self.assertIn("H1", identifiers, status)
+
+    def test_reproposing_a_killed_hypothesis_blocks_PT8(self):
+        state = fixture_state()
+        state["hypotheses"][0]["status"] = "killed"
+        result = transfer(allow_policy(mechanism={"id": "H1"}), state, state)
+        self.assertEqual(result["status"], "BLOCK", result["reasons"])
+        self.assertIn("PT8", result["codes"])
+
+    def test_index_refuted_mechanism_is_negated_and_its_canonical_id_blocks_PT8(self):
+        index = {"mechanisms": [{
+            "id": "MECH-1", "status": "refuted", "statement": "机制 X 已被否证",
+            "canonical_refs": {"claims": ["C9"], "hypotheses": ["H9"]}}]}
+        identifiers = {item["id"] for item in pt.negated_mechanisms({}, index)}
+        self.assertLessEqual({"MECH-1", "C9", "H9"}, identifiers)
+        result = transfer(allow_policy(mechanism={"id": "H9"}), fixture_state(),
+                          fixture_state(), target_index=index)
+        self.assertEqual(result["status"], "BLOCK", result["reasons"])
+        self.assertIn("PT8", result["codes"])
+
+
+class TestNegativeKnowledgeProposition(unittest.TestCase):
+    """F2：PT8 必须以 ruled_out（被排除的命题）为主匹配，finding 仅作上下文。"""
+
+    def test_negative_knowledge_keeps_both_ruled_out_and_finding(self):
+        entries = [item for item in pt.negated_mechanisms(fixture_state())
+                   if item["kind"] == "failure"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["statement"], "协议 P 有效")
+        self.assertEqual(entries[0]["finding"], "协议 P 在该 regime 下无效")
+
+    def test_reproposing_the_ruled_out_proposition_blocks_PT8(self):
+        state = fixture_state()
+        result = transfer(allow_policy(mechanism={"id": "", "statement": "协议 P 有效"}),
+                          state, state)
+        self.assertEqual(result["status"], "BLOCK", result["reasons"])
+        self.assertIn("PT8", result["codes"])
+
+    def test_finding_is_still_a_secondary_match(self):
+        result = transfer(allow_policy(
+            mechanism={"id": "", "statement": "协议 P 在该 regime 下无效（换个说法）"}),
+            fixture_state(), fixture_state())
+        self.assertEqual(result["status"], "BLOCK", result["reasons"])
+        self.assertIn("PT8", result["codes"])
+
+
+class TestCounterexampleConditionFailClosed(unittest.TestCase):
+    """F3：畸形/不可判定的反例条件不得中和 PT10 覆盖检查。"""
+
+    def _counterexample(self, condition):
+        return allow_policy(counterexamples=[{
+            "id": "CE1", "operators": ["reframe"], "islands": ["P1"],
+            "conditions": [condition]}])
+
+    def test_unresolvable_condition_fails_closed_PT10(self):
+        for condition in ({"field": "contract.does_not_exist", "op": "eq", "value": "x"},
+                          {"field": "hypotheses[].operator", "op": "no_such_op"},
+                          {"field": "contract.primary_anchor", "op": "eq"}):
+            result = transfer(self._counterexample(condition), fixture_state(), fixture_state())
+            self.assertEqual(result["status"], "BLOCK", condition)
+            self.assertIn("PT10", result["codes"])
+            self.assertNotIn("PT5", result["codes"])
+
+    def test_regex_condition_in_a_counterexample_fails_closed_PT10(self):
+        result = transfer(self._counterexample(
+            {"field": "contract.primary_anchor", "op": "regex", "value": "(a+)+$"}),
+            fixture_state(), fixture_state())
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT10", result["codes"])
+
+
+class TestConditionAndToolShape(unittest.TestCase):
+    """F4：present-but-not-list 的 applicable_conditions / required_tools 必须阻塞。"""
+
+    def test_non_list_applicable_conditions_fails_closed_PT5(self):
+        for shape in ("always applies", None, 42, True):
+            policy = allow_policy(applicable_conditions=shape)
+            result = transfer(policy, fixture_state(), fixture_state())
+            self.assertEqual(result["status"], "BLOCK", shape)
+            self.assertIn("PT5", result["codes"], shape)
+
+    def test_empty_list_applicable_conditions_is_allowed(self):
+        result = transfer(allow_policy(applicable_conditions=[]),
+                          fixture_state(), fixture_state())
+        self.assertEqual(result["status"], "ALLOW", result["reasons"])
+
+    def test_non_list_required_tools_fails_closed_PT6(self):
+        for shape in ("gpu-cluster", None, 42):
+            policy = allow_policy(required_tools=shape)
+            result = transfer(policy, fixture_state(), fixture_state())
+            self.assertEqual(result["status"], "BLOCK", shape)
+            self.assertIn("PT6", result["codes"], shape)
+
+
+class TestCrossProjectGateProvenance(unittest.TestCase):
+    """F5：未声明/不可验证的来源必须让 `cross_project_transfer_allowed` fail-closed。"""
+
+    def test_missing_source_with_known_route_blocks(self):
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project", "problem_structure": "x"}},
+            fixture_state(), current_route="A")
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
+        self.assertTrue(gate["reasons"])
+
+    def test_declared_source_with_empty_current_route_blocks(self):
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project",
+                                  "source_route": "B", "source_project": "B"}},
+            fixture_state(), current_route="")
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
+
+    def test_non_dict_candidate_blocks_instead_of_raising(self):
+        gate = pe.cross_project_transfer_allowed([], fixture_state(), current_route="A")
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
+
+    def test_same_declared_route_still_needs_no_gate(self):
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project", "source_route": "A"}},
+            fixture_state(), current_route="A")
+        self.assertFalse(gate["required"])
+        self.assertEqual(gate["status"], "NOT_REQUIRED")
+
+    def test_candidate_level_source_route_is_honoured(self):
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project"}, "source_route": "A"},
+            fixture_state(), current_route="A")
+        self.assertFalse(gate["required"])
+        self.assertEqual(gate["status"], "NOT_REQUIRED")
+
+    def test_require_transfer_forces_the_gate_without_a_source(self):
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project", "problem_structure": "x"}},
+            fixture_state(), current_route="A", require_transfer=True)
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
+
+
+class TestExpiredVersionFailClosed(unittest.TestCase):
+    """F6：缺失/非整数 state_version 与非法 gap 必须 fail-closed，而不是当 0。"""
+
+    def setUp(self):
+        self.state = fixture_state(version=3)
+        self.record = decision_record(self.state, version=3)
+        self.ident = self.record["trajectory_id"]
+
+    def test_missing_state_version_expires_everything(self):
+        without = {key: value for key, value in self.state.items() if key != "state_version"}
+        self.assertEqual(pt.expired_trajectories([self.record], without), [self.ident])
+
+    def test_string_state_version_expires_everything(self):
+        self.assertEqual(pt.expired_trajectories([self.record], {"state_version": "200"}),
+                         [self.ident])
+
+    def test_non_dict_state_expires_everything(self):
+        self.assertEqual(pt.expired_trajectories([self.record], None), [self.ident])
+
+    def test_invalid_gap_diagnoses_instead_of_raising(self):
+        for gap in (None, "50", 3.5, True):
+            report = pt.expired_trajectories_report(
+                [self.record], fixture_state(version=4), max_state_version_gap=gap)
+            self.assertEqual(report["expired"], [self.ident], gap)
+            self.assertTrue(report["diagnostics"], gap)
+
+    def test_missing_version_is_reported_and_expired(self):
+        report = pt.expired_trajectories_report([self.record], {"state_version": "3"})
+        self.assertEqual(report["expired"], [self.ident])
+        self.assertTrue(any("state_version" in item["path"]
+                            for item in report["diagnostics"]))
+
+    def test_valid_version_still_uses_the_gap(self):
+        self.assertEqual(pt.expired_trajectories([self.record], fixture_state(version=10)), [])
+        self.assertEqual(pt.expired_trajectories([self.record], fixture_state(version=200)),
+                         [self.ident])
+
+
+class TestExperienceChainDiagnostics(unittest.TestCase):
+    """F7：容错读取断裂的决策链必须把诊断暴露出来并使 separation_ok=False。"""
+
+    def test_broken_trajectory_chain_breaks_separation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "x.jsonl"
+            path.write_text(
+                json.dumps({"trajectory_id": "DT-evil", "record": "decision",
+                            "decision": {"context": {"state_version": 3}}}) + "\nnot json\n",
+                encoding="utf-8")
+            layers = pt.memory_layers(fixture_state(), trajectory_path=path)
+        self.assertFalse(layers["separation_ok"])
+        self.assertFalse(layers["decision_experience"]["chain_ok"])
+        self.assertTrue(layers["decision_experience"]["chain_diagnostics"])
+        self.assertIn("DT0", {item["rule"] for item in layers["diagnostics"]})
+
+
+class TestSelfAttestedStructure(unittest.TestCase):
+    """F8：缺少 attested source_state 时，策略自证的结构签名不得产生结构匹配。"""
+
+    def test_self_attested_signature_blocks_PT4(self):
+        signature = fixture_state()["hypotheses"][0]["structural_signature"]
+        policy = {
+            "id": "EVIL", "scope": {"kind": "structure"},
+            "structural_signature": {"operators": ["reframe"], "islands": ["P1"],
+                                     "structural_signature": clone(signature)},
+            "evidence_level": "independent", "independent_evaluation_refs": ["X"],
+            "counterexamples": [],
+        }
+        result = pt.transfer_decision(policy, fixture_state())
+        self.assertEqual(result["status"], "BLOCK", result["reasons"])
+        self.assertIn("PT4", result["codes"])
+        self.assertTrue(result["similarity"]["self_attested"])
+        self.assertFalse(result["similarity"]["structural_match"])
+
+    def test_explicit_source_state_is_attested_and_still_matches(self):
+        source = fixture_state()
+        policy = allow_policy()
+        result = transfer(policy, source, source)
+        self.assertEqual(result["status"], "ALLOW", result["reasons"])
+        self.assertFalse(result["similarity"].get("self_attested", False))
+
+
+class TestCompressionDuplicateOrder(unittest.TestCase):
+    """F9：同一 id 的冲突 kind 不得因输入顺序而丢弃不可丢成员。"""
+
+    def test_protected_kind_wins_regardless_of_order(self):
+        for items in ([("X1", "policy"), ("X1", "evidence")],
+                      [("X1", "evidence"), ("X1", "policy")]):
+            report = pt.compression_report(items, 0)
+            self.assertEqual(report["status"], "REFUSED", items)
+            self.assertEqual(report["dropped"], [], items)
+
+    def test_unknown_kind_wins_regardless_of_order(self):
+        for items in ([("X1", "policy"), ("X1", "mystery")],
+                      [("X1", "mystery"), ("X1", "policy")]):
+            report = pt.compression_report(items, 0)
+            self.assertEqual(report["status"], "REFUSED", items)
+
+    def test_protected_argument_and_kind_conflict_is_order_independent(self):
+        first = pt.compression_report([("X1", "policy"), ("X1", "evidence")], 0)
+        second = pt.compression_report([("X1", "evidence"), ("X1", "policy")], 0)
+        self.assertEqual((first["status"], first["kept"], first["dropped"]),
+                         (second["status"], second["kept"], second["dropped"]))
+
+
+class TestRegexReDoSFailClosed(unittest.TestCase):
+    """F10：用户提供的正则算子必须被拒绝，闸门不得被灾难性回溯拖住。"""
+
+    def test_catastrophic_regex_is_refused_quickly(self):
+        state = fixture_state()
+        state["contract"]["goal"] = "a" * 40 + "b"
+        policy = allow_policy(applicable_conditions=[
+            {"field": "contract.goal", "op": "regex", "value": "(a+)+$"}])
+        started = time.monotonic()
+        result = transfer(policy, state, state)
+        elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 1.0, f"regex 求值耗时 {elapsed:.2f}s（ReDoS）")
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT5", result["codes"])
+
+    def test_matches_operator_is_refused_too(self):
+        policy = allow_policy(applicable_conditions=[
+            {"field": "contract.primary_anchor", "op": "matches", "value": ".*"}])
+        result = transfer(policy, fixture_state(), fixture_state())
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT5", result["codes"])
+
+
+class TestAuditCliContract(unittest.TestCase):
+    """F11/F15：REFUSED 的退出码与不可解析输入的 INVALID 负载。"""
+
+    def test_compress_cli_exits_nonzero_on_refused(self):
+        out = subprocess.run(
+            [sys.executable, str(SCRIPT), "compress",
+             "--items", json.dumps([["E1", "evidence"], ["P1", "policy"]]),
+             "--budget", "0"],
+            capture_output=True, text=True)
+        self.assertEqual(out.returncode, pt.EXIT_HARD, out.stderr)
+        self.assertEqual(json.loads(out.stdout)["status"], "REFUSED")
+
+    def test_transfer_cli_unparseable_policy_is_invalid(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pathlib.Path(temp) / cg.STATE_NAME
+            state_path.write_text(json.dumps(fixture_state(), ensure_ascii=False),
+                                  encoding="utf-8")
+            out = subprocess.run(
+                [sys.executable, str(SCRIPT), "transfer",
+                 "--policy", "not-a-json-file", "--target-state", str(state_path)],
+                capture_output=True, text=True)
+        self.assertNotEqual(out.returncode, 0)
+        self.assertNotIn("Traceback", out.stderr)
+        self.assertEqual(json.loads(out.stdout)["status"], "INVALID")
+
+    def test_transfer_cli_non_dict_policy_is_invalid(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pathlib.Path(temp) / cg.STATE_NAME
+            state_path.write_text(json.dumps(fixture_state(), ensure_ascii=False),
+                                  encoding="utf-8")
+            out = subprocess.run(
+                [sys.executable, str(SCRIPT), "transfer",
+                 "--policy", "[]", "--target-state", str(state_path)],
+                capture_output=True, text=True)
+        self.assertEqual(out.returncode, pt.EXIT_ERROR)
+        self.assertEqual(json.loads(out.stdout)["status"], "INVALID")
+
+    def test_layers_cli_missing_state_is_invalid_not_a_traceback(self):
+        out = subprocess.run(
+            [sys.executable, str(SCRIPT), "layers", "--state", "/tmp/does-not-exist.json"],
+            capture_output=True, text=True)
+        self.assertEqual(out.returncode, pt.EXIT_ERROR)
+        self.assertNotIn("Traceback", out.stderr)
+        self.assertEqual(json.loads(out.stdout)["status"], "INVALID")
 
 
 if __name__ == "__main__":

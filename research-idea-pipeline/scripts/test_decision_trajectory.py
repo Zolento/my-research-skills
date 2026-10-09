@@ -52,7 +52,8 @@ def fixture_state(version=3):
     }
 
 
-def decision_record(state, chosen="H1", at="2026-01-01T00:00:00Z"):
+def decision_record(state, chosen="H1", at="2026-01-01T00:00:00Z",
+                    dispatch_status="not_dispatched"):
     context = dt.build_context(state, scientific_question="q", active_hypotheses=["H1"],
                                key_uncertainties=["U1"], visible_evidence=["E1"],
                                decided_at=at, scheduler={"next_actions": [{"action": "H1"}]})
@@ -63,7 +64,7 @@ def decision_record(state, chosen="H1", at="2026-01-01T00:00:00Z"):
                     {"action": "H2", "type": "discriminating_experiment", "target": "U1",
                      "eig": "high", "cost": "low"}],
         chosen=chosen, scheduler_priority={"level": 4, "label": "high_information_gain_test"},
-        dispatch_status="not_dispatched", recorded_at=at)
+        dispatch_status=dispatch_status, recorded_at=at)
 
 
 class TestTrajectoryArtefacts(unittest.TestCase):
@@ -341,3 +342,93 @@ class TestRealAdapterConsumer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLatentBugRegressions(unittest.TestCase):
+    """Regressions for defects that the first acceptance suite did not expose."""
+
+    def test_concurrent_appends_keep_the_chain_contiguous(self):
+        """The read that computed `seq` used to happen outside the lock: 8 writers produced
+        duplicate sequence numbers and a broken hash chain."""
+        import threading
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            state = fixture_state()
+            errors = []
+
+            def worker(index):
+                record = decision_record(state, chosen=f"H{index}", at="2026-01-01T00:00:00Z")
+                record["decision"]["candidates"] = [
+                    {"action": f"H{index}", "type": "repair", "target": "H1", "eig": "high",
+                     "cost": "low"}]
+                try:
+                    dt.append_record(path, record, state=state, route="A")
+                except Exception as exc:  # pragma: no cover - failure path
+                    errors.append(repr(exc))
+
+            threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            records, diagnostics = dt.load_records(path)
+            self.assertEqual(errors, [])
+            self.assertEqual(diagnostics, [])
+            self.assertEqual([item["seq"] for item in records], list(range(1, 9)))
+
+    def test_the_same_dispatch_a_second_later_is_still_a_duplicate(self):
+        """The identity used to include the wall clock, so a duplicate dispatch a second
+        later received a new id and was accepted."""
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            state = fixture_state()
+            first = decision_record(state, at="2026-01-01T00:00:00Z")
+            second = decision_record(state, at="2026-01-01T00:05:00Z")
+            self.assertEqual(first["trajectory_id"], second["trajectory_id"])
+            self.assertEqual(dt.append_record(path, first, state=state, route="A")["status"],
+                             "APPENDED")
+            self.assertEqual(dt.append_record(path, second, state=state, route="A")["status"],
+                             "DUPLICATE")
+            self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_a_blank_line_does_not_look_like_tampering(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            state = fixture_state()
+            dt.append_record(path, decision_record(state), state=state, route="A")
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines.insert(1, "")
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            records, diagnostics = dt.load_records(path)
+            self.assertEqual(diagnostics, [])
+            self.assertEqual(len(records), 1)
+
+    def test_a_trajectory_artifact_cannot_be_cited_as_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            state = fixture_state()
+            record = decision_record(state)
+            dt.append_record(path, record, state=state, route="A")
+            outcome = dt.build_outcome_record(
+                record["trajectory_id"], at_state_version=3,
+                result={"kind": "experiment_result", "summary": "observed value 0.42"},
+                evidence_refs=[{"evidence": "E1", "source":
+                                "<route>/decision-trajectory.jsonl"}],
+                decision_delta="decision", evidence_qualification="qualified",
+                observed_at="2026-01-02T00:00:00Z")
+            result = dt.append_record(path, outcome, state=state, route="A")
+            self.assertEqual(result["status"], "INVALID")
+            self.assertIn("DT7", result["codes"])
+
+    def test_a_renamed_duplicate_dispatch_is_refused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            state = fixture_state()
+            first = decision_record(state, dispatch_status="dispatched")
+            dt.append_record(path, first, state=state, route="A")
+            renamed = decision_record(state, at="2026-01-01T00:00:00Z")
+            renamed["trajectory_id"] = "DT-forged-renamed-id"
+            renamed["decision"]["dispatch_status"] = "dispatched"
+            result = dt.append_record(path, renamed, state=state, route="A")
+            self.assertEqual(result["status"], "INVALID")
+            self.assertIn("DT8", result["codes"])

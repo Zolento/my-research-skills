@@ -346,3 +346,58 @@ class TestAblationHarness(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLatentBugRegressions(RsiProject):
+    """Regressions for integration defects found by the adversarial review."""
+
+    def test_a_tampered_policy_store_stops_policy_consumption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            self.propose_policy(state_path)
+            self.activate(state_path)
+            store = pe.candidates_path(state_path)
+            lines = store.read_text(encoding="utf-8").splitlines()
+            first = json.loads(lines[0])
+            first["strategy_changes"] = [{"kind": "same_tier_preference",
+                                          "prefer_action": "R1"}]
+            lines[0] = json.dumps(first, ensure_ascii=False, sort_keys=True)
+            store.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            # The tampered log is no longer a valid ACTIVE policy source.
+            self.assertIsNone(pr.scoped_policy_state(pr.project_context(state_path))["candidate"])
+            payload = pr.run_preset("research-loop", state_path)[0]
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertEqual(payload["hold_reason"], "policy_store_tampered")
+            self.assertEqual(payload["decision"]["policy_delta"]["status"], "none")
+
+    def test_a_damaged_trajectory_store_holds_instead_of_crashing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            self.propose_policy(state_path)
+            self.activate(state_path)
+            (state_path.parent / dt.TRAJECTORY_NAME).write_text('{"broken\n', encoding="utf-8")
+            payload, diagnostics, code = pr.run_preset("research-loop", state_path, apply=True)
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertIn("decision_trajectory", payload["hold_reason"])
+            self.assertTrue(payload["canonical_untouched"])
+            self.assertEqual(payload["decision"]["policy_delta"]["status"], "none")
+
+    def test_no_policy_delta_is_claimed_when_nothing_is_dispatched(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            context = pr.project_context(state_path)
+            scheduler = dict(context["scheduler"],
+                             strategy_decisions=[{
+                                 "state_version": context["state"]["state_version"],
+                                 "advice": {}, "discovery_operator": "reframe",
+                                 "candidates_before": [], "chosen": "R9", "adopted": True,
+                                 "strategy_applied": True, "decision_changed": True,
+                                 "reason_if_not": None,
+                                 "hard_gates": {"scheduler_check": "PASS"},
+                                 "dispatch": {"action": "R9", "type": "repair",
+                                              "target": "C1"},
+                                 "dispatch_result": "dispatched R9"}])
+            (state_path.parent / cg.SCHEDULER_NAME).write_text(
+                json.dumps(scheduler, ensure_ascii=False), encoding="utf-8")
+            payload = pr.run_preset("research-loop", state_path)[0]
+            self.assertEqual(payload["decision"]["policy_delta"]["status"], "none")

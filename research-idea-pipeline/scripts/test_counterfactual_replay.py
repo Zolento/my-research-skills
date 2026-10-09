@@ -236,3 +236,68 @@ class TestRealHistoryIngestion(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLatentBugRegressions(unittest.TestCase):
+    """Regressions for defects the first suite did not expose."""
+
+    def test_a_policy_may_not_promote_a_lower_tier_when_no_choice_exists_yet(self):
+        """The tier comparison was skipped when the runner had not produced a choice, so a
+        low-EIG/high-cost preference was selected over an available high-EIG/low-cost one."""
+        case = json.loads(json.dumps(base_case()))
+        case["visible"]["legal_actions"] = [
+            {"action": "XTOP", "type": "repair", "target": "C1", "eig": "high", "cost": "low"},
+            {"action": "XLOW", "type": "repair", "target": "C1", "eig": "low", "cost": "high"}]
+        case["visible"]["evidence_support"] = {
+            "observed_actions": [], "replay_supported_actions": ["XTOP", "XLOW"]}
+        case["visible"]["policy_candidates"] = [{
+            "policy_id": "P-TIER", "status": "ACTIVE",
+            "strategy_changes": [{"kind": "same_tier_preference", "prefer_action": "XLOW"}],
+            "supporting_trajectory_ids": ["DT-1"],
+            "evaluation_refs": [{"independent": True}],
+            "scope": {"problem_structure": "x"}}]
+        decision = rr.run_case(case, "rsi_full")["decision"]
+        self.assertNotEqual(decision.get("chosen_intervention"), "XLOW")
+        self.assertIn("another_tier", decision.get("policy_reason_if_not", ""))
+
+    def test_a_promoted_candidate_is_not_accused_of_bypassing_a_guard(self):
+        """The flags were set whenever the guard was absent, even for a candidate that had
+        satisfied every requirement."""
+        decision = rr.run_case(policy_case(), "rsi_without_promotion")["decision"]
+        self.assertTrue(decision.get("policy_applied"))
+        self.assertNotIn("policy_gate_bypassed", decision)
+        self.assertNotIn("policy_scope_bypassed", decision)
+        self.assertNotIn("policy_support_bypassed", decision)
+        self.assertFalse(rr._behaviour_present("apply_unpromoted_policy", decision,
+                                               policy_case()))
+
+    def test_an_unpromoted_candidate_is_still_flagged(self):
+        decision = rr.run_case(policy_case(status="PROPOSED"), "rsi_without_promotion")["decision"]
+        self.assertTrue(decision.get("policy_gate_bypassed"))
+
+    def test_coverage_counts_trajectories_not_distinct_actions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            route = pathlib.Path(temp) / "A"
+            route.mkdir()
+            state = {"state_version": 5, "contract": {"goal": "g", "primary_anchor": "A0"},
+                     "hypotheses": [], "uncertainties": []}
+            path = route / dt.TRAJECTORY_NAME
+            for index in range(3):
+                context = dt.build_context(state, scientific_question=f"q{index}",
+                                           decided_at="2026-01-01T00:00:00Z")
+                decision = dt.build_decision_record(
+                    state, route="A", project="A", context=context,
+                    candidates=[{"action": "R2", "type": "repair", "target": "C1",
+                                 "eig": "high", "cost": "low"}],
+                    chosen="R2", scheduler_priority={"level": 4, "label": "x"},
+                    recorded_at="2026-01-01T00:00:00Z")
+                dt.append_record(path, decision, state=state, route="A")
+                dt.append_record(path, dt.build_outcome_record(
+                    decision["trajectory_id"], at_state_version=5,
+                    result={"kind": "experiment_result", "summary": f"observed {index} x=0.42"},
+                    decision_delta="decision", evidence_qualification="qualified",
+                    observed_at="2026-01-02T00:00:00Z"), state=state, route="A")
+            report = rr.coverage_report(path)
+            self.assertEqual(report["trajectories"], 3)
+            self.assertEqual(report["evaluable_trajectories"], 3)
+            self.assertEqual(report["evaluable_fraction"], 1.0)
