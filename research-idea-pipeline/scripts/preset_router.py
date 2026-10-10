@@ -3070,24 +3070,41 @@ def run_preset(
         return ({"error": f"unknown preset: {preset_id}", "known": list(PRESET_IDS)}, [], EXIT_ERROR)
     handler = HANDLERS[preset_id]
     context = project_context(state_path, cognition_dir)
-    # Skill-RSI source freeze: only a run that may write can violate the boundary, so the
-    # before/after digest check runs on the applying path and is reported either way.
-    integrity: Dict[str, Any] = {"status": "SKIPPED", "reason": "read-only run"}
-    if apply:
-        import source_freeze as sf
-        freeze = sf.SourceFreeze(route_dir=context["route_dir"], context=f"preset:{preset_id}")
-        freeze.__enter__()
-        try:
-            payload = handler(context, apply)
-        finally:
-            freeze.__exit__(None, None, None)
-        integrity = dict(freeze.result or {})
-        payload["source_integrity"] = integrity
-        if integrity.get("status") != "PASS":
-            payload["status"] = "HOLD"
-            payload["hold_reason"] = "skill_source_modified"
-    else:
+    # Skill-RSI source freeze: the before/after digest check runs on EVERY preset execution,
+    # including read-only diagnosis (Skill-RSI §9 asks for the loaded source digest at the
+    # start of a research run). The audit EVENT is written only when the caller authorised
+    # action (`apply`), because a read-only request must not itself write.
+    import source_freeze as sf
+    freeze = sf.SourceFreeze(route_dir=None, context=f"preset:{preset_id}")
+    freeze.__enter__()
+    try:
         payload = handler(context, apply)
+    finally:
+        freeze.__exit__(None, None, None)
+    integrity: Dict[str, Any] = dict(freeze.result or {})
+    payload["source_integrity"] = integrity
+    violated = integrity.get("status") != "PASS"
+    # The audit event is written only when this run is allowed to write: `apply` was passed,
+    # the handler declared at least one write, or the source boundary was violated (a security
+    # event is recorded even for a read-only preset). A read-only request stays write-free.
+    if apply and (violated or payload.get("writes")):
+        if violated:
+            hold = sf.hold_on_violation(context["route_dir"], integrity,
+                                        context=f"preset:{preset_id}")
+            event = hold.get("event")
+        else:
+            event = sf.record_integrity_event(context["route_dir"], {
+                "action": "VERIFY_PASS", "status": "PASS",
+                "context": f"preset:{preset_id}", "checked": integrity.get("checked"),
+            })
+        if event:
+            # Declare the audit write; an undeclared write is a contract violation even when
+            # the file is legitimate telemetry.
+            payload.setdefault("writes", []).append(sf.INTEGRITY_NAME)
+            integrity["event"] = str(event)
+    if violated:
+        payload["status"] = "HOLD"
+        payload["hold_reason"] = "skill_source_modified"
     payload["canonical_digest_before"] = context["canonical_digest"]
     payload["canonical_digest_after"] = cg.digest_of(cg.load_state(state_path))
     payload["canonical_untouched"] = (payload["canonical_digest_before"]

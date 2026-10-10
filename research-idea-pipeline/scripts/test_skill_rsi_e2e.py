@@ -468,3 +468,35 @@ class TestRepeatLoopRegressions(RsiProject):
             result = dt.append_record(path, rewritten, state=state, route="A")
             self.assertEqual(result["status"], "INVALID")
             self.assertIn("DT2", result["codes"])
+
+
+class TestSourceFreezeOnEveryRun(RsiProject):
+    """The freeze check must cover read-only diagnosis; the audit write must be declared."""
+
+    def test_a_read_only_run_is_verified_but_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            for preset_id in ("research-review", "research-audit", "loop-health-check"):
+                for apply in (False, True):
+                    payload, _, _ = pr.run_preset(preset_id, state_path, apply=apply)
+                    integrity = payload.get("source_integrity") or {}
+                    self.assertEqual(integrity.get("status"), "PASS", (preset_id, apply))
+                    self.assertEqual(payload["writes"], [], (preset_id, apply))
+                    self.assertFalse(integrity.get("event"), (preset_id, apply))
+
+    def test_an_applying_run_declares_its_audit_write(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            payload, _, _ = pr.run_preset("research-loop", state_path, apply=True)
+            self.assertIn("source-integrity.jsonl", payload["writes"])
+            self.assertTrue((payload.get("source_integrity") or {}).get("event"))
+            self.assertTrue((state_path.parent / "source-integrity.jsonl").is_file())
+
+    def test_the_audit_log_chain_is_readable_after_a_run(self):
+        import source_freeze as sf
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            pr.run_preset("research-loop", state_path, apply=True)
+            events = sf.integrity_events(state_path.parent)
+            self.assertTrue(events)
+            self.assertEqual(events[-1]["action"], "VERIFY_PASS")
