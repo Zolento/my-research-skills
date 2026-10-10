@@ -1,0 +1,255 @@
+.E.FF.FFFEE.EE.EEEFFFFF.FFF.FF.
+======================================================================
+ERROR: test_a_real_benefit_with_intact_reliability_is_supported (test_promotion_integrity.TestBenefitDirection.test_a_real_benefit_with_intact_reliability_is_supported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 395, in test_a_real_benefit_with_intact_reliability_is_supported
+    self.assertTrue(outcome["benefit_dimensions"])
+                    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'benefit_dimensions'
+
+======================================================================
+ERROR: test_a_head_with_invalid_ascii_is_a_trajectory_error (test_promotion_integrity.TestDamagedHead.test_a_head_with_invalid_ascii_is_a_trajectory_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 528, in test_a_head_with_invalid_ascii_is_a_trajectory_error
+    dt.load_records(path)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/decision_trajectory.py", line 283, in load_records
+    return load_chained(path, tolerant=tolerant)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/decision_trajectory.py", line 182, in load_chained
+    if head.read_text(encoding="ascii").strip() != expected_head:
+       ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 789, in read_text
+    return f.read()
+           ~~~~~~^^
+  File "/usr/lib/python3.14/encodings/ascii.py", line 26, in decode
+    return codecs.ascii_decode(input, self.errors)[0]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+UnicodeDecodeError: 'ascii' codec can't decode byte 0xff in position 0: ordinal not in range(128)
+
+======================================================================
+ERROR: test_a_tolerant_read_reports_the_head_problem (test_promotion_integrity.TestDamagedHead.test_a_tolerant_read_reports_the_head_problem)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 541, in test_a_tolerant_read_reports_the_head_problem
+    _, diagnostics = dt.load_records(path, tolerant=True)
+                     ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/decision_trajectory.py", line 283, in load_records
+    return load_chained(path, tolerant=tolerant)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/decision_trajectory.py", line 182, in load_chained
+    if head.read_text(encoding="ascii").strip() != expected_head:
+       ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 789, in read_text
+    return f.read()
+           ~~~~~~^^
+  File "/usr/lib/python3.14/encodings/ascii.py", line 26, in decode
+    return codecs.ascii_decode(input, self.errors)[0]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+UnicodeDecodeError: 'ascii' codec can't decode byte 0xff in position 0: ordinal not in range(128)
+
+======================================================================
+ERROR: test_a_replaced_evaluation_result_is_detected (test_promotion_integrity.TestEvaluationArtifactBinding.test_a_replaced_evaluation_result_is_detected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 285, in test_a_replaced_evaluation_result_is_detected
+    artifact = pe.latest_evaluation_artifact(self.state_path, "P-1", records)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'latest_evaluation_artifact'
+
+======================================================================
+ERROR: test_an_artifact_for_another_policy_cannot_promote_this_one (test_promotion_integrity.TestEvaluationArtifactBinding.test_an_artifact_for_another_policy_cannot_promote_this_one)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 276, in test_an_artifact_for_another_policy_cannot_promote_this_one
+    artifact = pe.latest_evaluation_artifact(self.state_path, "P-1", records)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'latest_evaluation_artifact'
+
+======================================================================
+ERROR: test_evaluation_rules_tampering_invalidates_the_artifact (test_promotion_integrity.TestEvaluationArtifactBinding.test_evaluation_rules_tampering_invalidates_the_artifact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 314, in test_evaluation_rules_tampering_invalidates_the_artifact
+    pe.latest_evaluation_artifact(
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'latest_evaluation_artifact'
+
+======================================================================
+ERROR: test_the_artifact_is_bound_to_policy_and_rules (test_promotion_integrity.TestEvaluationArtifactBinding.test_the_artifact_is_bound_to_policy_and_rules)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 262, in test_the_artifact_is_bound_to_policy_and_rules
+    artifact = pe.latest_evaluation_artifact(self.state_path, "P-1", records)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'latest_evaluation_artifact'
+
+======================================================================
+ERROR: test_the_full_controlled_lifecycle_still_reaches_active (test_promotion_integrity.TestEvaluationArtifactBinding.test_the_full_controlled_lifecycle_still_reaches_active)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 322, in test_the_full_controlled_lifecycle_still_reaches_active
+    trial = pe.begin_bounded_trial(self.state_path, "P-1",
+            ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'begin_bounded_trial'
+
+======================================================================
+FAIL: test_an_insufficient_sample_is_never_supported (test_promotion_integrity.TestBenefitDirection.test_an_insufficient_sample_is_never_supported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 378, in test_an_insufficient_sample_is_never_supported
+    self.assertEqual(outcome["verdict"], "INSUFFICIENT_SAMPLE", outcome)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'SUPPORTED' != 'INSUFFICIENT_SAMPLE'
+- SUPPORTED
++ INSUFFICIENT_SAMPLE
+ : {'verdict': 'SUPPORTED', 'reasons': [], 'comparison': {'distinguishable': True, 'dimensions': {'mechanistic_understanding': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'prediction_quality': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'intervention_quality': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'scientific_novelty': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'search_efficiency': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'stagnation_recovery': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'memory_accumulation': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}}, 'reason': '至少一个维度差异超过容差'}, 'degraded_dimensions': [], 'unobservable_decisions': 0, 'note': 'discovery replay 的维度各自独立，没有加权总分'}
+
+======================================================================
+FAIL: test_better_is_distinguished_from_merely_different (test_promotion_integrity.TestBenefitDirection.test_better_is_distinguished_from_merely_different)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 342, in test_better_is_distinguished_from_merely_different
+    self.assertEqual(block.get("direction"), "BETTER", block)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: None != 'BETTER' : {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}
+
+======================================================================
+FAIL: test_only_a_non_critical_dimension_improves_is_not_supported (test_promotion_integrity.TestBenefitDirection.test_only_a_non_critical_dimension_improves_is_not_supported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 359, in test_only_a_non_critical_dimension_improves_is_not_supported
+    self.assertNotEqual(outcome["verdict"], "SUPPORTED", outcome)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'SUPPORTED' == 'SUPPORTED' : {'verdict': 'SUPPORTED', 'reasons': [], 'comparison': {'distinguishable': True, 'dimensions': {'mechanistic_understanding': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'prediction_quality': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'intervention_quality': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'scientific_novelty': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'search_efficiency': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'stagnation_recovery': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'memory_accumulation': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}}, 'reason': '至少一个维度差异超过容差'}, 'degraded_dimensions': [], 'unobservable_decisions': 0, 'note': 'discovery replay 的维度各自独立，没有加权总分'}
+
+======================================================================
+FAIL: test_only_efficiency_degradation_is_not_supported (test_promotion_integrity.TestBenefitDirection.test_only_efficiency_degradation_is_not_supported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 350, in test_only_efficiency_degradation_is_not_supported
+    self.assertNotEqual(outcome["verdict"], "SUPPORTED", outcome)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'SUPPORTED' == 'SUPPORTED' : {'verdict': 'SUPPORTED', 'reasons': [], 'comparison': {'distinguishable': True, 'dimensions': {'mechanistic_understanding': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'prediction_quality': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'intervention_quality': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'scientific_novelty': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'search_efficiency': {'delta': -0.8, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'stagnation_recovery': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}, 'memory_accumulation': {'delta': 0.0, 'overlapping': True, 'status': 'UNDIFFERENTIATED'}}, 'reason': '至少一个维度差异超过容差'}, 'degraded_dimensions': ['search_efficiency'], 'unobservable_decisions': 0, 'note': 'discovery replay 的维度各自独立，没有加权总分'}
+
+======================================================================
+FAIL: test_unobserved_decisions_block_support (test_promotion_integrity.TestBenefitDirection.test_unobserved_decisions_block_support)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 386, in test_unobserved_decisions_block_support
+    self.assertNotEqual(outcome["verdict"], "SUPPORTED", outcome)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'SUPPORTED' == 'SUPPORTED' : {'verdict': 'SUPPORTED', 'reasons': ['3 个决策为 NO_SUPPORT：不得计入晋升证据'], 'comparison': {'distinguishable': True, 'dimensions': {'mechanistic_understanding': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'prediction_quality': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'intervention_quality': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'scientific_novelty': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'search_efficiency': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'stagnation_recovery': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}, 'memory_accumulation': {'delta': 0.6, 'overlapping': False, 'status': 'DISTINGUISHABLE'}}, 'reason': '至少一个维度差异超过容差'}, 'degraded_dimensions': [], 'unobservable_decisions': 3, 'note': 'discovery replay 的维度各自独立，没有加权总分'}
+
+======================================================================
+FAIL: test_a_stale_digest_field_cannot_mask_edited_rules (test_promotion_integrity.TestFrozenRulesIntegrity.test_a_stale_digest_field_cannot_mask_edited_rules)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 471, in test_a_stale_digest_field_cannot_mask_edited_rules
+    self.assertNotEqual(pe.evaluation_rules_digest(self.state_path), self.digest)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'sha256:9c767342f2904373331db77f23c4656c53dc183fdbc82c15218e898d9e63e6b4' == 'sha256:9c767342f2904373331db77f23c4656c53dc183fdbc82c15218e898d9e63e6b4'
+
+======================================================================
+FAIL: test_concurrent_promotions_yield_one_active_policy (test_promotion_integrity.TestFrozenRulesIntegrity.test_concurrent_promotions_yield_one_active_policy)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 509, in test_concurrent_promotions_yield_one_active_policy
+    self.assertEqual(len(actives_appended), 1, "a promotion was applied twice")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 4 != 1 : a promotion was applied twice
+
+======================================================================
+FAIL: test_evaluation_refuses_a_candidate_bound_to_other_rules (test_promotion_integrity.TestFrozenRulesIntegrity.test_evaluation_refuses_a_candidate_bound_to_other_rules)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 483, in test_evaluation_refuses_a_candidate_bound_to_other_rules
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_fabricated_report_is_not_an_execution_record (test_promotion_integrity.TestNoBooleanPromotion.test_a_fabricated_report_is_not_an_execution_record)
+A report with no per-case results is not a trusted execution record.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 239, in test_a_fabricated_report_is_not_an_execution_record
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_missing_evaluation_record_blocks_validated (test_promotion_integrity.TestNoBooleanPromotion.test_a_missing_evaluation_record_blocks_validated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 233, in test_a_missing_evaluation_record_blocks_validated
+    self.assertEqual(forged["status"], "INVALID", forged)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': '', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_report_without_the_ablation_schema_is_refused (test_promotion_integrity.TestNoBooleanPromotion.test_a_report_without_the_ablation_schema_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 244, in test_a_report_without_the_ablation_schema_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '', 'diagnostics': []}
+
+======================================================================
+FAIL: test_all_true_booleans_cannot_reach_replay_evaluated (test_promotion_integrity.TestNoBooleanPromotion.test_all_true_booleans_cannot_reach_replay_evaluated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 164, in test_all_true_booleans_cannot_reach_replay_evaluated
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '', 'diagnostics': []}
+
+======================================================================
+FAIL: test_all_true_booleans_cannot_reach_validated_or_active (test_promotion_integrity.TestNoBooleanPromotion.test_all_true_booleans_cannot_reach_validated_or_active)
+Even after a legitimate replay evaluation, L3 steps need a real L3 artifact.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 181, in test_all_true_booleans_cannot_reach_validated_or_active
+    self.assertEqual(result["status"], "INVALID", (target, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('VALIDATED', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': '', 'diagnostics': []})
+
+======================================================================
+FAIL: test_the_whole_ladder_cannot_climb_on_booleans_alone (test_promotion_integrity.TestNoBooleanPromotion.test_the_whole_ladder_cannot_climb_on_booleans_alone)
+OLD behaviour: every gated step accepted hand-written booleans end to end.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 219, in test_the_whole_ladder_cannot_climb_on_booleans_alone
+    self.assertEqual(result["status"], "INVALID", (target, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : ('REPLAY_EVALUATED', {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '', 'diagnostics': []})
+
+======================================================================
+FAIL: test_every_reference_must_be_backed_not_just_one (test_promotion_integrity.TestPT9PerReference.test_every_reference_must_be_backed_not_just_one)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_promotion_integrity.py", line 449, in test_every_reference_must_be_backed_not_just_one
+    self.assertEqual(decision["status"], "BLOCK", decision)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ALLOW' != 'BLOCK'
+- ALLOW
++ BLOCK
+ : {'status': 'ALLOW', 'reasons': [], 'codes': [], 'similarity': {'score': 1.0, 'basis': ['operators: 1/1', 'islands: 1/1', 'structural_signature: 0/1', '声明结构 token Jaccard=1.0，阈值=0.5'], 'shared_operators': ['reframe'], 'shared_islands': ['P1'], 'structural_match': True, 'threshold': 0.5}, 'boundaries': ['scope:global'], 'schema': 'research-idea-pipeline/policy-transfer@1', 'cross_project': True}
+
+----------------------------------------------------------------------
+Ran 31 tests in 0.088s
+
+FAILED (failures=15, errors=8)
