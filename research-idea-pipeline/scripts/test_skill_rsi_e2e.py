@@ -36,13 +36,18 @@ PREFERRED_XID = "R2"
 def arm(mean):
     return {"dimensions": {name: {"mean": mean, "min": mean - 0.05, "max": mean + 0.05}
                            for name in rr.METRIC_DIMENSIONS},
-            "results": [], "evidence_support": {}}
+            "results": [{"case_id": f"C{i}", "leak_checked": True,
+                         "isolation_verified": True,
+                         "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
+                        for i in range(5)],
+            "evidence_support": {"OBSERVED": 5}}
 
 
 def replay_report(candidate_mean=0.9, control_mean=0.3):
     return {"schema": "research-idea-pipeline/replay-ablation@1",
             "sufficient_sample": True, "unobservable_decisions": 0,
             "delta_vs_baseline": {}, "cases": 5, "runs_per_case": 2,
+            "runner": "offline CIE runner (no model calls)",
             "per_arm": {"rsi_full": arm(candidate_mean), "full_cie": arm(control_mean)}}
 
 
@@ -110,14 +115,10 @@ class RsiProject(unittest.TestCase):
                                                  "permissions_ok": True})["status"], "SHADOW")
         self.assertEqual(pe.evaluate_candidate(state_path, policy_id,
                                                replay_report())["status"], "REPLAY_EVALUATED")
-        self.assertEqual(pe.transition(
-            state_path, policy_id, "BOUNDED_TRIAL", level="L2",
-            evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                      "dispatch_evidence": True})["status"], "BOUNDED_TRIAL")
-        self.assertEqual(pe.transition(
-            state_path, policy_id, "VALIDATED", level="L3",
-            evidence={"independent": True, "distinguishable": True,
-                      "degraded_dimensions": []})["status"], "VALIDATED")
+        self.assertEqual(pe.begin_bounded_trial(
+            state_path, policy_id,
+            dispatch_evidence={"dispatched": "R2"})["status"], "BOUNDED_TRIAL")
+        self.assertEqual(pe.validate_candidate(state_path, policy_id)["status"], "VALIDATED")
         self.assertEqual(pe.promote_to_active(state_path, policy_id,
                                               {"scope_evidence_ok": True})["status"], "ACTIVE")
 

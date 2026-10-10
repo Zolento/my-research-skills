@@ -121,11 +121,46 @@ PROPOSED → SHADOW → REPLAY_EVALUATED → BOUNDED_TRIAL → VALIDATED → ACT
 ```
 
 - 这些状态只存在于策略控制记录，**不是**科学状态枚举。
-- 评价规则在候选生成前冻结（`policy/evaluation-rules.json`），候选不能修改评价器、隐藏测试、
-  评分定义或自己的晋升阈值。
+- 评价规则在候选生成前冻结（`policy/evaluation-rules.json`）：读取时**重算** digest 并与存储值
+  比对，不一致即视为被改写（fail closed）；候选在生成时绑定该 digest，评价时再次核对。
 - 性能差异落在容差内或区间重叠时报告**不可区分**，不强行选胜者。
 - 回滚恢复上一有效策略、保留完整失败轨迹、不改既有实验结果、不重置 AALG 或其他预算、
   不动 canonical Research State。
+- **整个生命周期转换在策略存储锁内原子执行**：校验、追加、supersede 与快照是同一临界区，
+  两个并发晋升不会产生两个 ACTIVE 或错误的 supersede。
+
+### 5.3.1 晋升只能经受控入口，且必须有评价产物
+
+`REPLAY_EVALUATED`、`BOUNDED_TRIAL`、`VALIDATED`、`ACTIVE` 是**受控目标**：
+
+- `transition --to <受控目标>`（以及任何直接调用 `transition()`）一律拒绝，
+  必须使用四个受控入口：`evaluate` / `trial` / `validate` / `promote`。
+- 调用方自述的 JSON 布尔字段（`independent`、`distinguishable`、`sample_adequate` …）
+  **不构成晋升证据**；这些门由入口从评价产物重新计算。
+- 每个受控入口把评价产物写入 `<route>/policy/evaluations|trials/<policy>.<digest>.json`，
+  并在转换记录里只留下对产物的**引用**。产物必须满足：
+
+  | 要素 | 要求 |
+  |---|---|
+  | 明确来源 | 产物路径规范化后必须位于策略存储目录内（拒绝越界/符号链接逃逸） |
+  | 完整性摘要 | `digest` 由产物内容重算并比对；引用声明的摘要也必须一致 |
+  | 策略版本绑定 | `policy_id` + `policy_signature` + `policy_schema_version` 必须匹配当前候选 |
+  | 冻结评价规则 | 产物记录的 `rules_digest` 必须等于当前重算规则 digest，且等于候选绑定的版本 |
+  | 可信执行记录 | 报告必须带 `schema`、逐 case 的 `results`（含 `leak_checked`/`isolation_verified`）与具名 `runner`；否则不是评价证据 |
+  | 证据等级 | 等级由产物的门与结论**重算**，不接受产物自报；各目标要求 L2 / L3 |
+
+- 等级重算规则：`SUPPORTED` 且可评维度 ≥2、`runs ≥ min_runs`、`cases ≥ min_cases`、
+  有具名 `runner` → L3；`SUPPORTED` 但不满足 → L2；其余 → L1。
+
+### 5.3.2 收益方向：DIFFERENT ≠ BETTER
+
+- 评价按维度给出 `direction`（`BETTER` / `WORSE` / `NONE`），容差取自冻结规则。
+- 只有**预先定义的收益维度**（`search_efficiency` / `stagnation_recovery` /
+  `memory_accumulation`）出现 `BETTER`，且**科学可靠性维度**（`prediction_quality` /
+  `intervention_quality` / `scientific_novelty`）没有 `WORSE`，才可能得到 `SUPPORTED`。
+- 样本不足 → `INSUFFICIENT_SAMPLE`；未观测（`NO_SUPPORT`）→ `INSUFFICIENT_COVERAGE`；
+  没有任何收益维度正向改善 → `UNDIFFERENTIATED`；可靠性退化 → `REJECTED`。
+- 非收益、非可靠性维度退化单独报告，不允许用某一维度的收益补偿科学可靠性或证据资格的退化。
 
 ### 5.4 真实消费者
 

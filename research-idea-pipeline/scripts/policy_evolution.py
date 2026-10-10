@@ -43,9 +43,12 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fcntl
 import json
+import os
 import re
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -56,6 +59,9 @@ SCHEMA_CANDIDATE = "research-idea-pipeline/policy-candidate@1"
 SCHEMA_TRANSITION = "research-idea-pipeline/policy-transition@1"
 SCHEMA_ROLLBACK = "research-idea-pipeline/policy-rollback@1"
 SCHEMA_RULES = "research-idea-pipeline/policy-evaluation-rules@1"
+SCHEMA_EVALUATION = "research-idea-pipeline/policy-evaluation@1"
+SCHEMA_TRIAL = "research-idea-pipeline/policy-trial@1"
+SCHEMA_ABLATION_REPORT = "research-idea-pipeline/replay-ablation@1"
 POLICY_SCHEMA_VERSION = "1"
 
 EXIT_OK = cg.EXIT_OK
@@ -269,8 +275,13 @@ def freeze_evaluation_rules(state_path: Path,
     path = rules_path(state_path)
     if path.exists():
         existing = json.loads(path.read_text(encoding="utf-8"))
+        rules = existing.get("rules") if isinstance(existing, dict) else None
+        stored = existing.get("digest") if isinstance(existing, dict) else None
+        if not isinstance(rules, dict) or stored != cg.digest_of(rules):
+            return {"status": "INVALID", "path": str(path), "digest": None, "rules": None,
+                    "errors": ["评价规则内容与 digest 不一致：规则被改写，拒绝沿用"]}
         return {"status": "ALREADY_FROZEN", "path": str(path),
-                "digest": existing.get("digest"), "rules": existing.get("rules")}
+                "digest": stored, "rules": rules}
     payload = copy.deepcopy(rules) if rules is not None else copy.deepcopy(DEFAULT_EVALUATION_RULES)
     document = {"_schema": SCHEMA_RULES, "frozen_at": _now(), "rules": payload,
                 "digest": cg.digest_of(payload)}
@@ -284,10 +295,25 @@ def freeze_evaluation_rules(state_path: Path,
 
 
 def evaluation_rules_digest(state_path: Path) -> Optional[str]:
+    """Digest of the frozen rule *content*, or None when absent or inconsistent.
+
+    The stored `digest` field used to be returned verbatim, so editing `rules` while leaving
+    the field alone produced a "frozen" rule set whose digest no longer described it. The
+    digest is now recomputed; any mismatch means "untrusted" (None) and every promotion
+    gate fails closed.
+    """
     path = rules_path(state_path)
     if not path.is_file():
         return None
-    return json.loads(path.read_text(encoding="utf-8")).get("digest")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+        return None
+    rules = document.get("rules") if isinstance(document, dict) else None
+    if not isinstance(rules, dict):
+        return None
+    recomputed = cg.digest_of(rules)
+    return recomputed if document.get("digest") == recomputed else None
 
 
 # ---------------------------------------------------------------------------
@@ -559,13 +585,19 @@ def load_records(state_path: Path, *, tolerant: bool = False
     return dt.load_chained(candidates_path(state_path), tolerant=tolerant)
 
 
-def _append(state_path: Path, record: Dict[str, Any]) -> Dict[str, Any]:
-    return dt.append_chained(candidates_path(state_path), record)
-
-
 def propose(state_path: Path, candidate: Dict[str, Any], *,
             trajectory_support: Optional[Iterable[str]] = None) -> Dict[str, Any]:
-    """Append a candidate, refusing validation failures and duplicate-open limits."""
+    """Append a candidate, refusing validation failures and duplicate-open limits.
+
+    Runs under the store lock: the open-candidate cap and the duplicate-id check are read
+    from a snapshot, so they must not race a concurrent proposal or transition.
+    """
+    with policy_lock(state_path):
+        return _propose_locked(state_path, candidate, trajectory_support=trajectory_support)
+
+
+def _propose_locked(state_path: Path, candidate: Dict[str, Any], *,
+                    trajectory_support: Optional[Iterable[str]] = None) -> Dict[str, Any]:
     records, _ = load_records(state_path)
     rules_digest = evaluation_rules_digest(state_path)
     diagnostics = candidate_errors(candidate, records=records,
@@ -683,11 +715,229 @@ def policy_record(records: Sequence[Dict[str, Any]], policy_id: str) -> Optional
 
 
 # ---------------------------------------------------------------------------
+# Frozen evaluation rules: content and digest must agree
+# ---------------------------------------------------------------------------
+
+def evaluation_rules_errors(state_path: Path) -> List[cg.Diagnostic]:
+    """PE12 diagnostics for the frozen rule set.
+
+    The stored `digest` field is recomputed from `rules`; a document whose content and
+    digest disagree is treated as tampered (fail closed) instead of returning the stale
+    digest, which let an edited tolerance pass every downstream check.
+    """
+    path = rules_path(state_path)
+    if not path.is_file():
+        return [_diag("PE12", "policy.evaluation-rules", "冻结评价规则缺失")]
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+        return [_diag("PE12", "policy.evaluation-rules",
+                      f"冻结评价规则不可读（{type(exc).__name__}）")]
+    if not isinstance(document, dict) or not isinstance(document.get("rules"), dict):
+        return [_diag("PE12", "policy.evaluation-rules", "冻结评价规则结构非法")]
+    recomputed = cg.digest_of(document["rules"])
+    if document.get("digest") != recomputed:
+        return [_diag("PE12", "policy.evaluation-rules",
+                      "评价规则内容与 digest 不一致：规则被改写，评价不可信")]
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Store lock: a transition is a multi-record operation
+# ---------------------------------------------------------------------------
+
+POLICY_LOCK_NAME = ".policy.lock"
+EVALUATIONS_DIRNAME = "evaluations"
+TRIALS_DIRNAME = "trials"
+
+#: Pre-registered dimensions. A promotion needs a *positive* improvement on a benefit
+#: dimension; a reliability dimension may never regress. Both sets are frozen here so a
+#: report cannot choose what counts as an improvement.
+BENEFIT_DIMENSIONS: Tuple[str, ...] = ("search_efficiency", "stagnation_recovery",
+                                       "memory_accumulation")
+RELIABILITY_DIMENSIONS: Tuple[str, ...] = ("prediction_quality", "intervention_quality",
+                                           "scientific_novelty")
+
+#: Targets that may only be reached through a controlled entry point.
+GATED_TARGETS: Tuple[str, ...] = ("REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED", "ACTIVE")
+LEVEL_RANK: Dict[str, int] = {"L1": 1, "L2": 2, "L3": 3}
+TARGET_LEVEL: Dict[str, str] = {"SHADOW": "L1", "REPLAY_EVALUATED": "L2",
+                                "BOUNDED_TRIAL": "L2", "VALIDATED": "L3", "ACTIVE": "L3"}
+
+#: Module-private authority token. Only the controlled promotion entries hold a reference;
+#: `transition()` refuses a gated target without it, so hand-written evidence cannot climb.
+_AUTHORITY = object()
+
+
+@contextmanager
+def policy_lock(state_path: Path) -> Iterator[None]:
+    """Exclusive lock over the whole policy store.
+
+    A transition appends several records (the transition, the supersede record, the
+    snapshot). Validating against a snapshot read outside the lock let two concurrent
+    promotions both observe VALIDATED and both append ACTIVE.
+    """
+    directory = policy_dir(state_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / POLICY_LOCK_NAME).open("a", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def _append(state_path: Path, record: Dict[str, Any]) -> Dict[str, Any]:
+    """Append while the caller holds `policy_lock` (one lock for the whole store)."""
+    return dt.append_chained(candidates_path(state_path), record, lock_held=True)
+
+
+# ---------------------------------------------------------------------------
+# Evaluation artifacts: source, digest, policy binding, frozen rules, execution record
+# ---------------------------------------------------------------------------
+
+def evaluations_dir(state_path: Path) -> Path:
+    return policy_dir(state_path) / EVALUATIONS_DIRNAME
+
+
+def trials_dir(state_path: Path) -> Path:
+    return policy_dir(state_path) / TRIALS_DIRNAME
+
+
+def _artifact_body(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in payload.items() if key != "digest"}
+
+
+def _store_artifact(state_path: Path, directory: Path, payload: Dict[str, Any]) -> Dict[str, Any]:
+    directory.mkdir(parents=True, exist_ok=True)
+    document = dict(_artifact_body(payload), digest=cg.digest_of(_artifact_body(payload)))
+    name = f"{payload.get('policy_id')}.{document['digest'].split(':')[-1][:16]}.json"
+    target = directory / name
+    pending = target.with_name(target.name + ".pending")
+    pending.write_text(json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                       encoding="utf-8")
+    os.replace(pending, target)
+    return {"path": str(target), "digest": document["digest"],
+            "policy_id": payload.get("policy_id")}
+
+
+def _read_artifact(directory: Path, ref: Any) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Load and integrity-check an artifact reference. Fail closed on every doubt."""
+    if not isinstance(ref, dict):
+        return None, ["评价产物引用必须是对象"]
+    raw = ref.get("path")
+    if not isinstance(raw, str) or not raw:
+        return None, ["评价产物引用缺少 path"]
+    try:
+        resolved = Path(raw).resolve()
+        base = Path(directory).resolve()
+    except OSError as exc:
+        return None, [f"评价产物路径无法解析（{type(exc).__name__}）"]
+    if resolved != base and base not in resolved.parents:
+        return None, ["评价产物不在策略存储目录内（拒绝越界路径）"]
+    if not resolved.is_file():
+        return None, ["评价产物文件不存在"]
+    try:
+        document = json.loads(resolved.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+        return None, [f"评价产物不可读（{type(exc).__name__}）"]
+    if not isinstance(document, dict):
+        return None, ["评价产物不是对象"]
+    body = _artifact_body(document)
+    if document.get("digest") != cg.digest_of(body):
+        return None, ["评价产物完整性摘要不匹配：内容被替换"]
+    if ref.get("digest") and ref["digest"] != document.get("digest"):
+        return None, ["引用声明的摘要与产物不一致"]
+    return document, []
+
+
+def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any]) -> str:
+    """The level an artifact's own evidence supports — never the level it claims."""
+    if (verdict or {}).get("verdict") != "SUPPORTED":
+        return "L1"
+    rules = DEFAULT_EVALUATION_RULES
+    coverage = int((gates or {}).get("assessable_dimensions") or 0)
+    if coverage >= 2 and int((gates or {}).get("runs") or 0) >= rules["min_runs"] \
+            and int((gates or {}).get("cases") or 0) >= rules["min_cases"] \
+            and (gates or {}).get("runner"):
+        return "L3"
+    return "L2"
+
+
+def latest_evaluation_artifact(state_path: Path, policy_id: str,
+                               records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The most recent stored evaluation artifact bound to this policy, if any."""
+    for record in reversed(list(records)):
+        if record.get("record") != "transition" or record.get("policy_id") != policy_id:
+            continue
+        ref = (record.get("evidence") or {}).get("evaluation_ref")
+        if not isinstance(ref, dict):
+            continue
+        payload, errors = _read_artifact(evaluations_dir(state_path), ref)
+        if payload is not None and not errors:
+            return dict(payload, ref=ref)
+    return None
+
+
+def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
+                          candidate: Dict[str, Any], target: str,
+                          evidence: Dict[str, Any]) -> List[cg.Diagnostic]:
+    """Verify the artifact a gated transition depends on, and its achieved level."""
+    policy_id = candidate.get("policy_id")
+    path = f"policy[{policy_id}]"
+    using_trial = target == "BOUNDED_TRIAL"
+    ref_key = "trial_ref" if using_trial else "evaluation_ref"
+    directory = trials_dir(state_path) if using_trial else evaluations_dir(state_path)
+    schema = SCHEMA_TRIAL if using_trial else SCHEMA_EVALUATION
+    ref = evidence.get(ref_key)
+    if not isinstance(ref, dict):
+        return [_diag("PE11", path,
+                      f"{target} 必须由受控晋升入口完成，并携带它写出的 {ref_key}；"
+                      "调用方自述字段不能用于晋升")]
+    payload, errors = _read_artifact(directory, ref)
+    if payload is None:
+        return [_diag("PE11", path, err) for err in errors]
+    diagnostics: List[cg.Diagnostic] = []
+    if payload.get("_schema") != schema:
+        diagnostics.append(_diag("PE11", path, f"评价产物 schema 不是 {schema!r}"))
+    if payload.get("policy_id") != policy_id:
+        diagnostics.append(_diag("PE11", path, "评价产物绑定到另一个策略"))
+    if payload.get("policy_signature") != candidate.get("signature"):
+        diagnostics.append(_diag("PE11", path, "评价产物绑定的策略版本与当前候选不一致"))
+
+    rules = evaluation_rules_errors(state_path)
+    diagnostics.extend(rules)
+    current = evaluation_rules_digest(state_path)
+    if current is not None:
+        if payload.get("rules_digest") != current:
+            diagnostics.append(_diag("PE12", path, "评价规则已改变：该产物的评价结果失效"))
+        if candidate.get("evaluation_rules_digest") != current:
+            diagnostics.append(_diag("PE12", path, "候选绑定的是另一版评价规则"))
+
+    verdict = payload.get("verdict") if isinstance(payload.get("verdict"), dict) else {}
+    gates = payload.get("gates") if isinstance(payload.get("gates"), dict) else {}
+    recomputed = _recomputed_level(gates, verdict)
+    if payload.get("level") != recomputed:
+        diagnostics.append(_diag("PE11", path,
+                                 f"产物自报等级 {payload.get('level')!r} 与其证据不符"
+                                 f"（应为 {recomputed!r}）"))
+    required = TARGET_LEVEL.get(target, "L1")
+    if LEVEL_RANK.get(recomputed, 0) < LEVEL_RANK.get(required, 1):
+        diagnostics.append(_diag("PE11", path,
+                                 f"{target} 需要 {required} 级证据，产物只达到 {recomputed}"))
+    if not using_trial and verdict.get("verdict") != "SUPPORTED":
+        diagnostics.append(_diag("PE11", path,
+                                 f"评价产物结论是 {verdict.get('verdict')!r}，不是 SUPPORTED"))
+    return diagnostics
+
+
+# ---------------------------------------------------------------------------
 # Transitions, evaluation gates, rollback
 # ---------------------------------------------------------------------------
 
-def transition_errors(records: Sequence[Dict[str, Any]], policy_id: str, target: str,
-                      evidence: Dict[str, Any]) -> List[cg.Diagnostic]:
+def transition_errors(state_path: Path, records: Sequence[Dict[str, Any]], policy_id: str,
+                      target: str, evidence: Dict[str, Any], *,
+                      authority_ok: bool = False) -> List[cg.Diagnostic]:
     diagnostics: List[cg.Diagnostic] = []
     statuses = latest_status(records)
     current = statuses.get(policy_id)
@@ -699,40 +949,34 @@ def transition_errors(records: Sequence[Dict[str, Any]], policy_id: str, target:
     if target not in ALLOWED_TRANSITIONS.get(current, ()):
         diagnostics.append(_diag("PE10", path, f"非法状态转移 {current} → {target}"))
         return diagnostics
-    requirement = TRANSITION_REQUIREMENTS.get((current, target))
-    if requirement:
-        missing = [key for key in requirement["keys"] if key not in evidence]
-        if missing:
-            diagnostics.append(_diag("PE11", path,
-                                     f"{current} → {target} 需要独立评价证据 {missing}"))
-        else:
-            if evidence.get("independent") is False and "independent" in requirement["keys"]:
-                diagnostics.append(_diag("PE11", path, "晋升需要独立评价，不得自评"))
-            if evidence.get("leakage_checked") is False:
-                diagnostics.append(_diag("PE11", path, "未通过泄漏隔离检查，不得晋升"))
-            if evidence.get("reproducible") is False:
-                diagnostics.append(_diag("PE11", path, "评价结果不可重现，不得晋升"))
-            if evidence.get("sample_adequate") is False:
-                diagnostics.append(_diag("PE11", path, "样本不足，不得晋升"))
-            if evidence.get("distinguishable") is False:
-                diagnostics.append(_diag("PE11", path,
-                                         "策略效应与对照无法区分：报告不可区分，不得选胜者"))
-            degraded = evidence.get("degraded_dimensions") or []
-            if degraded:
-                diagnostics.append(_diag("PE11", path,
-                                         f"科学完整性维度退化 {degraded}：不得晋升"))
-            if current in ("REPLAY_EVALUATED", "BOUNDED_TRIAL") and \
-                    target in ("BOUNDED_TRIAL", "VALIDATED") and evidence.get("budget_expanded"):
-                diagnostics.append(_diag("PE11", path, "试运行不得扩大原有资源预算"))
-            if evidence.get("hard_gates_unchanged") is False:
-                diagnostics.append(_diag("PE11", path, "试运行不得改变硬门禁"))
-            if current == "VALIDATED" and target == "ACTIVE":
-                if evidence.get("rules_digest_unchanged") is False:
-                    diagnostics.append(_diag("PE12", path, "评价规则已改变，晋升失效"))
-                if evidence.get("scope_evidence_ok") is False:
-                    diagnostics.append(_diag("PE14", path, "作用域超出证据支持范围"))
+
     candidate = policy_record(records, policy_id) or {}
     scope = candidate.get("scope") if isinstance(candidate.get("scope"), dict) else {}
+    # Only the restore of an already-promoted policy may re-enter ACTIVE without a new
+    # artifact; every other gated target needs the controlled entry point.
+    restoring = current == "SUPERSEDED" and target == "ACTIVE"
+
+    if target in ("SHADOW", "REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED", "ACTIVE"):
+        overfit = overfit_flags(candidate)
+        if overfit and target != "SHADOW":
+            diagnostics.append(_diag("PE5", path,
+                                     "针对固定 fixture 的策略不得越过 SHADOW：" + "；".join(overfit)))
+    if target in GATED_TARGETS and not restoring:
+        if not authority_ok:
+            diagnostics.append(_diag(
+                "PE11", path,
+                f"{target} 只能由受控晋升入口完成（evaluate / trial / validate / promote）；"
+                "调用方自述的布尔字段不能用于晋升"))
+            return diagnostics
+        diagnostics.extend(_artifact_gate_errors(state_path, records, candidate, target,
+                                                 evidence))
+
+    if target == "SHADOW":
+        # L1 is re-derived from the stored candidate, not read from the caller's booleans.
+        if evaluation_rules_digest(state_path) is None:
+            diagnostics.append(_diag("PE12", path, "冻结评价规则缺失或不可信，无法进入 SHADOW"))
+        diagnostics.extend(candidate_errors(candidate, records=records))
+
     if target == "ACTIVE" and scope.get("scope_kind") == "global":
         refs = candidate.get("evaluation_refs") or []
         projects = {str(item.get("project")) for item in refs
@@ -743,28 +987,37 @@ def transition_errors(records: Sequence[Dict[str, Any]], policy_id: str, target:
                                      "局部成功不得自动升级为全局策略"))
     if target in ("REJECTED", "ROLLED_BACK", "HOLD") and not evidence.get("reason"):
         diagnostics.append(_diag("PE10", path, f"{target} 必须写明 reason"))
-    if target in ("SHADOW", "REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED", "ACTIVE"):
-        overfit = overfit_flags(candidate)
-        if overfit and target not in ("SHADOW",):
-            diagnostics.append(_diag("PE5", path,
-                                     "针对固定 fixture 的策略不得越过 SHADOW：" + "；".join(overfit)))
     return cg._dedupe(diagnostics)
 
 
-def transition(state_path: Path, policy_id: str, target: str, *,
-               level: str = "L1", evidence: Optional[Dict[str, Any]] = None,
-               reason: str = "") -> Dict[str, Any]:
-    records, _ = load_records(state_path)
-    evidence = dict(evidence or {})
-    if reason:
-        evidence.setdefault("reason", reason)
-    diagnostics = transition_errors(records, policy_id, target, evidence)
+def _achieved_level(state_path: Path, records: Sequence[Dict[str, Any]],
+                    candidate: Dict[str, Any], target: str,
+                    evidence: Dict[str, Any]) -> str:
+    """The level actually achieved, derived from the verified artifact."""
+    if target == "SHADOW":
+        return "L1"
+    using_trial = target == "BOUNDED_TRIAL"
+    ref = evidence.get("trial_ref" if using_trial else "evaluation_ref")
+    directory = trials_dir(state_path) if using_trial else evaluations_dir(state_path)
+    payload, errors = _read_artifact(directory, ref)
+    if payload is None or errors:
+        return "L1"
+    return _recomputed_level(payload.get("gates") or {}, payload.get("verdict") or {})
+
+
+def _transition_locked(state_path: Path, records: Sequence[Dict[str, Any]], policy_id: str,
+                       target: str, *, evidence: Dict[str, Any], reason: str,
+                       authority: Any) -> Dict[str, Any]:
+    """The whole read-validate-append sequence; the caller holds `policy_lock`."""
+    diagnostics = transition_errors(state_path, records, policy_id, target, evidence,
+                                    authority_ok=(authority is _AUTHORITY))
     if diagnostics:
         return {"status": "INVALID", "written": False,
                 "diagnostics": [item.render() for item in diagnostics],
                 "codes": sorted({item.rule for item in diagnostics})}
     candidate = policy_record(records, policy_id) or {}
     previous_active = rebuild_state(records).get("active_policy_id")
+    level = _achieved_level(state_path, records, candidate, target, evidence)
     record = {"_schema": SCHEMA_TRANSITION, "record": "transition", "policy_id": policy_id,
               "from": latest_status(records).get(policy_id), "to": target,
               "at": _now(), "level": level, "evidence": evidence, "reason": reason,
@@ -779,63 +1032,69 @@ def transition(state_path: Path, policy_id: str, target: str, *,
                              "signature": (policy_record(records, previous_active) or {})
                              .get("signature")})
     if target == "ACTIVE":
-        candidate = dict(candidate)
-        candidate.setdefault("rollback_target", previous_active)
         _append(state_path, {"_schema": SCHEMA_CANDIDATE, "record": "candidate_snapshot",
                              "at": _now(), "policy_id": policy_id,
                              "rollback_target": previous_active})
     return {"status": target, "written": True, "policy_id": policy_id,
-            "seq": stored["seq"], "reason": reason, "diagnostics": []}
+            "seq": stored["seq"], "reason": reason, "level": level, "diagnostics": []}
+
+
+def transition(state_path: Path, policy_id: str, target: str, *,
+               level: str = "L1", evidence: Optional[Dict[str, Any]] = None,
+               reason: str = "", _authority: Any = None) -> Dict[str, Any]:
+    """Public transition entry. Gated targets require the controlled promotion entries."""
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        payload = dict(evidence or {})
+        if reason:
+            payload.setdefault("reason", reason)
+        return _transition_locked(state_path, records, policy_id, target, evidence=payload,
+                                  reason=reason, authority=_authority)
 
 
 def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str) -> Dict[str, Any]:
-    """Restore an earlier valid policy; keep the failure trail; touch nothing else.
-
-    The target must currently be a *restorable* policy (`SUPERSEDED` or still `ACTIVE`).
-    A `REJECTED` or already `ROLLED_BACK` policy is terminal and must not be restored —
-    otherwise "防止同一失败策略重复晋升" would be violated by the rollback path itself.
-    The restore is written as an explicit `→ ACTIVE` transition so the pointer and the
-    lifecycle status can never disagree.
-    """
-    records, _ = load_records(state_path)
-    statuses = latest_status(records)
-    diagnostics: List[cg.Diagnostic] = []
-    if statuses.get(policy_id) != "ACTIVE":
-        diagnostics.append(_diag("PE13", f"policy[{policy_id}]", "只有 ACTIVE 策略可以回滚"))
-    target_record = policy_record(records, to_policy_id)
-    target_status = statuses.get(to_policy_id)
-    if target_record is None:
-        diagnostics.append(_diag("PE13", f"policy[{to_policy_id}]", "回滚目标不存在"))
-    elif target_status not in ("SUPERSEDED", "ACTIVE"):
-        diagnostics.append(_diag(
-            "PE13", f"policy[{to_policy_id}]",
-            f"回滚目标当前状态是 {target_status}：REJECTED / ROLLED_BACK 是终态，不得恢复"))
-    if to_policy_id and to_policy_id == policy_id:
-        diagnostics.append(_diag("PE13", f"policy[{policy_id}]",
-                                 "回滚目标不能是策略自身"))
-    if not reason:
-        diagnostics.append(_diag("PE10", f"policy[{policy_id}]", "回滚必须写明原因"))
-    if diagnostics:
-        return {"status": "INVALID", "written": False,
-                "diagnostics": [item.render() for item in diagnostics],
-                "codes": sorted({item.rule for item in diagnostics})}
-    record = {"_schema": SCHEMA_ROLLBACK, "record": "rollback", "policy_id": policy_id,
-              "to_policy_id": to_policy_id, "at": _now(), "reason": reason,
-              "signature": (policy_record(records, policy_id) or {}).get("signature")}
-    stored = _append(state_path, record)
-    _append(state_path, {"_schema": SCHEMA_TRANSITION, "record": "transition",
-                         "policy_id": policy_id, "from": "ACTIVE", "to": "ROLLED_BACK",
-                         "at": _now(), "level": "L2",
-                         "evidence": {"reason": reason}, "reason": reason,
-                         "signature": record["signature"]})
-    if target_status == "SUPERSEDED":
-        restore = transition(state_path, to_policy_id, "ACTIVE", level="L2",
-                             evidence={"reason": f"restored by rollback from {policy_id}",
-                                       "restored": True})
-        if not restore.get("written"):
+    """Restore an earlier valid policy; keep the failure trail; touch nothing else."""
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        statuses = latest_status(records)
+        diagnostics: List[cg.Diagnostic] = []
+        if statuses.get(policy_id) != "ACTIVE":
+            diagnostics.append(_diag("PE13", f"policy[{policy_id}]", "只有 ACTIVE 策略可以回滚"))
+        target_status = statuses.get(to_policy_id)
+        if policy_record(records, to_policy_id) is None:
+            diagnostics.append(_diag("PE13", f"policy[{to_policy_id}]", "回滚目标不存在"))
+        elif target_status not in ("SUPERSEDED", "ACTIVE"):
+            diagnostics.append(_diag(
+                "PE13", f"policy[{to_policy_id}]",
+                f"回滚目标当前状态是 {target_status}：REJECTED / ROLLED_BACK 是终态，不得恢复"))
+        if to_policy_id and to_policy_id == policy_id:
+            diagnostics.append(_diag("PE13", f"policy[{policy_id}]", "回滚目标不能是策略自身"))
+        if not reason:
+            diagnostics.append(_diag("PE10", f"policy[{policy_id}]", "回滚必须写明原因"))
+        if diagnostics:
             return {"status": "INVALID", "written": False,
-                    "diagnostics": restore.get("diagnostics") or [],
-                    "codes": restore.get("codes") or ["PE13"]}
+                    "diagnostics": [item.render() for item in diagnostics],
+                    "codes": sorted({item.rule for item in diagnostics})}
+        record = {"_schema": SCHEMA_ROLLBACK, "record": "rollback", "policy_id": policy_id,
+                  "to_policy_id": to_policy_id, "at": _now(), "reason": reason,
+                  "signature": (policy_record(records, policy_id) or {}).get("signature")}
+        stored = _append(state_path, record)
+        _append(state_path, {"_schema": SCHEMA_TRANSITION, "record": "transition",
+                             "policy_id": policy_id, "from": "ACTIVE", "to": "ROLLED_BACK",
+                             "at": _now(), "level": "L2",
+                             "evidence": {"reason": reason}, "reason": reason,
+                             "signature": record["signature"]})
+        if target_status == "SUPERSEDED":
+            after, _ = load_records(state_path)
+            restore = _transition_locked(
+                state_path, after, to_policy_id, "ACTIVE",
+                evidence={"reason": f"restored by rollback from {policy_id}",
+                          "restored": True},
+                reason=f"restored by rollback from {policy_id}", authority=_AUTHORITY)
+            if not restore.get("written"):
+                return {"status": "INVALID", "written": False,
+                        "diagnostics": restore.get("diagnostics") or [],
+                        "codes": restore.get("codes") or ["PE13"]}
     return {"status": "ROLLED_BACK", "written": True, "policy_id": policy_id,
             "restored": to_policy_id, "seq": stored["seq"], "reason": reason,
             "note": ("回滚不修改既有实验结果、不重置 AALG/其他预算、"
@@ -848,10 +1107,7 @@ def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str
 
 def distinguishable(report: Dict[str, Any], arm_a: str, arm_b: str,
                     dimension: Optional[str] = None) -> Dict[str, Any]:
-    """Whether two arms differ beyond the frozen tolerance, per dimension.
-
-    Small differences are reported as indistinguishable rather than forced into a winner.
-    """
+    """Whether two arms differ beyond the frozen tolerance, and in which direction."""
     tolerance = float(DEFAULT_EVALUATION_RULES["delta_tolerance"])
     per_arm = report.get("per_arm") or {}
     if arm_a not in per_arm or arm_b not in per_arm:
@@ -869,12 +1125,15 @@ def distinguishable(report: Dict[str, Any], arm_a: str, arm_b: str,
         delta = round(a["mean"] - b["mean"], 4)
         overlapping = bool(a.get("min") is not None and b.get("max") is not None
                            and not (a["min"] > b["max"] or b["min"] > a["max"]))
-        # A *small* difference is reported as indistinguishable; the frozen tolerance, not the
-        # spread, is the decision rule. Range overlap is kept as an explicit confidence caveat
-        # so a wide but real shift is not silently rounded up to a confident win.
-        different = abs(delta) > tolerance
+        # DIFFERENT is not BETTER. A negative delta beyond the frozen tolerance is a
+        # regression and must never be read as an improvement.
+        better = delta > tolerance
+        worse = delta < -tolerance
+        different = better or worse
         any_different = any_different or different
         block = {"delta": delta, "overlapping": overlapping,
+                 "direction": "BETTER" if better else ("WORSE" if worse else "NONE"),
+                 "better": better, "worse": worse,
                  "status": "DISTINGUISHABLE" if different else "UNDIFFERENTIATED"}
         if different and overlapping:
             block["caveat"] = ("均值差异超过容差，但两臂区间重叠：样本量偏小，"
@@ -888,111 +1147,269 @@ def distinguishable(report: Dict[str, Any], arm_a: str, arm_b: str,
 def ablation_verdict(report: Dict[str, Any], *, candidate_arm: str = "rsi_full",
                      control_arm: str = "full_cie") -> Dict[str, Any]:
     """Turn a replay ablation report into promotion evidence. Never a composite score."""
-    dimensions = report.get("delta_vs_baseline")
-    if dimensions is None:
-        return {"verdict": "INVALID", "reasons": ["不是 ablation 报告"]}
+    empty: Dict[str, Any] = {"verdict": "INVALID", "reasons": [], "comparison": {},
+                             "benefit_dimensions": [], "reliability_degraded": [],
+                             "other_degraded": [], "unobservable_decisions": 0,
+                             "sample_adequate": False, "coverage": {},
+                             "isolation_ok": False, "execution_record": False,
+                             "note": "discovery replay 的维度各自独立，没有加权总分"}
+    if not isinstance(report, dict) or not isinstance(report.get("per_arm"), dict) \
+            or candidate_arm not in report["per_arm"] or control_arm not in report["per_arm"]:
+        empty["reasons"] = ["不是可用的 ablation 报告：缺少 per_arm 或对照臂"]
+        return empty
+    declared_schema = report.get("schema") or report.get("_schema")
+    if declared_schema != SCHEMA_ABLATION_REPORT:
+        empty["reasons"] = [f"报告 schema 不是 {SCHEMA_ABLATION_REPORT!r}："
+                            "不是可信的执行结果"]
+        return empty
     comparison = distinguishable(report, candidate_arm, control_arm)
-    degraded = [name for name, block in comparison["dimensions"].items()
-                if block.get("status") == "DISTINGUISHABLE" and block.get("delta", 0) < 0]
-    scientific_guard = {"scientific_novelty", "prediction_quality", "intervention_quality"}
-    integrity_degraded = sorted(set(degraded) & scientific_guard)
-    unobservable = int(report.get("unobservable_decisions") or 0)
+    if not comparison.get("dimensions"):
+        empty["reasons"] = ["报告没有可比对的评价维度"]
+        return empty
+
     reasons: List[str] = []
+    dimensions = comparison["dimensions"]
+    benefit_better = sorted(name for name, block in dimensions.items()
+                            if block.get("direction") == "BETTER" and name in BENEFIT_DIMENSIONS)
+    reliability_worse = sorted(name for name, block in dimensions.items()
+                               if block.get("direction") == "WORSE"
+                               and name in RELIABILITY_DIMENSIONS)
+    other_worse = sorted(name for name, block in dimensions.items()
+                         if block.get("direction") == "WORSE"
+                         and name not in RELIABILITY_DIMENSIONS and name not in BENEFIT_DIMENSIONS)
+    assessable = sorted(name for name, block in dimensions.items()
+                        if block.get("status") not in (None, "UNASSESSABLE"))
+    benefit_assessable = [name for name in BENEFIT_DIMENSIONS if name in assessable]
+
+    rules = DEFAULT_EVALUATION_RULES
+    cases = int(report.get("cases") or 0)
+    runs = int(report.get("runs_per_case") or 0)
+    sample_adequate = (cases >= rules["min_cases"] and runs >= rules["min_runs"]
+                       and bool(assessable) and bool(benefit_assessable))
+    execution_record = any(block.get("results") for block in report["per_arm"].values())
+    isolation_ok = bool(execution_record) and all(
+        result.get("leak_checked") and result.get("isolation_verified", True)
+        for block in report["per_arm"].values() for result in block.get("results") or [])
+    unobservable = int(report.get("unobservable_decisions") or 0)
+
     verdict = "SUPPORTED"
-    if not report.get("sufficient_sample"):
-        verdict = "INSUFFICIENT_SAMPLE"
-        reasons.append("样本不足：不得宣称策略提升")
-    if not comparison["distinguishable"]:
-        verdict = "UNDIFFERENTIATED"
-        reasons.append(comparison["reason"])
-    if integrity_degraded:
-        verdict = "REJECTED"
-        reasons.append("科学完整性维度退化：" + ", ".join(integrity_degraded))
-    if unobservable:
-        reasons.append(f"{unobservable} 个决策为 NO_SUPPORT：不得计入晋升证据")
-    if any(not result.get("isolation_verified", True)
-           for block in (report.get("per_arm") or {}).values()
-           for result in block.get("results") or []):
+    if not execution_record:
+        verdict = "INVALID"
+        reasons.append("报告没有逐 case 执行记录：不是可信的执行结果")
+    if not isolation_ok and execution_record:
         verdict = "REJECTED"
         reasons.append("存在隔离未通过的 case：无独立评价资格")
+    if reliability_worse:
+        verdict = "REJECTED"
+        reasons.append("科学可靠性维度退化：" + ", ".join(reliability_worse)
+                       + "（不得用效率收益补偿）")
+    if other_worse:
+        reasons.append("其他维度退化：" + ", ".join(other_worse))
+    if not sample_adequate:
+        if verdict == "SUPPORTED":
+            verdict = "INSUFFICIENT_SAMPLE"
+        reasons.append(f"样本不足（cases={cases}, runs={runs}, 可评维度 {len(assessable)}）："
+                       "不得宣称策略提升")
+    if verdict == "SUPPORTED" and unobservable:
+        # Unobserved branches cannot be counted; the report's coverage is partial.
+        verdict = "INSUFFICIENT_COVERAGE"
+        reasons.append(f"{unobservable} 个决策为 NO_SUPPORT：覆盖率不足，不得计入晋升证据")
+    if verdict == "SUPPORTED" and not benefit_better:
+        verdict = "UNDIFFERENTIATED"
+        reasons.append("没有任何预先定义的收益维度取得正向改善：差异不可区分或不是收益（DIFFERENT ≠ BETTER）")
+    if verdict == "SUPPORTED":
+        reasons.append("至少一个收益维度正向改善，且科学可靠性未退化")
+
     return {"verdict": verdict, "reasons": reasons, "comparison": comparison,
-            "degraded_dimensions": degraded, "unobservable_decisions": unobservable,
+            "benefit_dimensions": benefit_better,
+            "reliability_degraded": reliability_worse,
+            "other_degraded": other_worse,
+            "unobservable_decisions": unobservable,
+            "sample_adequate": sample_adequate,
+            "coverage": {"assessable": assessable, "benefit_assessable": benefit_assessable},
+            "isolation_ok": isolation_ok, "execution_record": execution_record,
             "note": "discovery replay 的维度各自独立，没有加权总分"}
 
 
 def evaluate_candidate(state_path: Path, policy_id: str, report: Dict[str, Any], *,
-                       independent: bool = True, leakage_checked: bool = True,
-                       reproducible: bool = True, reason: str = "") -> Dict[str, Any]:
-    """Run the independent replay evaluation and advance to REPLAY_EVALUATED or HOLD.
+                       report_source: Optional[str] = None, reason: str = "",
+                       independent: Any = None, leakage_checked: Any = None,
+                       reproducible: Any = None) -> Dict[str, Any]:
+    """Run the independent replay evaluation, store an artifact, then advance.
 
-    The verdict is computed here from the report; the candidate never supplies it.
+    The verdict, the gates and the achieved level are all computed from the report; the
+    keyword arguments kept for call compatibility are ignored on purpose.
     """
-    verdict = ablation_verdict(report)
-    evidence = {
-        "replay_verdict": verdict["verdict"],
-        "leakage_checked": bool(leakage_checked),
-        "reproducible": bool(reproducible),
-        "independent": bool(independent),
-        "sample_adequate": bool(report.get("sufficient_sample")),
-        "distinguishable": bool(verdict["comparison"]["distinguishable"]),
-        "degraded_dimensions": verdict["degraded_dimensions"],
-        "unobservable_decisions": verdict["unobservable_decisions"],
-        "reason": reason or "; ".join(verdict["reasons"]),
-    }
-    if verdict["verdict"] in ("SUPPORTED", "UNDIFFERENTIATED", "INSUFFICIENT_SAMPLE"):
-        if verdict["verdict"] != "SUPPORTED":
-            return transition(state_path, policy_id, "HOLD", level="L2", evidence=evidence,
-                              reason=evidence["reason"])
-        return transition(state_path, policy_id, "REPLAY_EVALUATED", level="L2",
-                          evidence=evidence, reason=evidence["reason"])
-    return transition(state_path, policy_id, "REJECTED", level="L2", evidence=evidence,
-                      reason=evidence["reason"])
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        candidate = policy_record(records, policy_id)
+        if candidate is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
+        current_status = latest_status(records).get(policy_id)
+        if current_status not in ("SHADOW", "HOLD"):
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": [f"只有 SHADOW/HOLD 可以评价，当前是 {current_status}"],
+                    "codes": ["PE10"]}
+        rules = evaluation_rules_errors(state_path)
+        if rules:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": [item.render() for item in rules],
+                    "codes": sorted({item.rule for item in rules})}
+        current_rules = evaluation_rules_digest(state_path)
+        if candidate.get("evaluation_rules_digest") != current_rules:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["候选绑定的是另一版评价规则：评价结果不可信"],
+                    "codes": ["PE12"]}
+
+        verdict = ablation_verdict(report)
+        gates = {
+            "independent": bool(verdict.get("execution_record") and verdict.get("isolation_ok")),
+            "leakage_checked": bool(verdict.get("isolation_ok")),
+            "reproducible": int(report.get("runs_per_case") or 0)
+            >= DEFAULT_EVALUATION_RULES["min_runs"],
+            "sample_adequate": bool(verdict.get("sample_adequate")),
+            "distinguishable": bool(verdict.get("benefit_dimensions")),
+            "degraded_dimensions": list(verdict.get("reliability_degraded") or []),
+            "unobservable_decisions": int(verdict.get("unobservable_decisions") or 0),
+            "assessable_dimensions": len(verdict.get("coverage", {}).get("assessable") or []),
+            "cases": int(report.get("cases") or 0),
+            "runs": int(report.get("runs_per_case") or 0),
+            "runner": report.get("runner"),
+        }
+        payload = {
+            "_schema": SCHEMA_EVALUATION,
+            "policy_id": policy_id,
+            "policy_signature": candidate.get("signature"),
+            "policy_schema_version": candidate.get("policy_schema_version"),
+            "rules_digest": current_rules,
+            "report": copy.deepcopy(report),
+            "report_digest": cg.digest_of(report),
+            "report_source": report_source or "inline",
+            "runner": report.get("runner"),
+            "produced_by": "policy_evolution.evaluate_candidate",
+            "evaluated_at": _now(),
+            "verdict": verdict,
+            "gates": gates,
+            "level": _recomputed_level(gates, verdict),
+        }
+        ref = _store_artifact(state_path, evaluations_dir(state_path), payload)
+        evidence = {"evaluation_ref": ref, "reason": reason or "; ".join(verdict["reasons"])}
+        if verdict["verdict"] == "SUPPORTED":
+            return _transition_locked(state_path, records, policy_id, "REPLAY_EVALUATED",
+                                      evidence=evidence, reason=evidence["reason"],
+                                      authority=_AUTHORITY)
+        if verdict["verdict"] in ("INVALID", "REJECTED"):
+            return _transition_locked(state_path, records, policy_id, "REJECTED",
+                                      evidence=evidence, reason=evidence["reason"],
+                                      authority=_AUTHORITY)
+        return _transition_locked(state_path, records, policy_id, "HOLD",
+                                  evidence=evidence, reason=evidence["reason"],
+                                  authority=_AUTHORITY)
 
 
 def recorded_evaluation(records: Sequence[Dict[str, Any]], policy_id: str) -> Dict[str, Any]:
-    """The most recent evaluation evidence actually written for this policy.
-
-    Promotion must read this, never restate it: a function that supplies its own
-    `sample_adequate=True` would silently upgrade a policy whose recorded replay said the
-    sample was too small or the arms were indistinguishable.
-    """
+    """The merged gate evidence actually recorded for this policy's transitions."""
     merged: Dict[str, Any] = {}
     for record in records:
         if record.get("record") != "transition" or record.get("policy_id") != policy_id:
             continue
         if record.get("to") not in ("REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED"):
             continue
-        # Later transitions override, but a key recorded earlier (e.g. `sample_adequate` from
-        # the replay evaluation) is not lost just because a later step did not repeat it.
         merged.update({key: value for key, value in (record.get("evidence") or {}).items()})
+        merged.setdefault("level", record.get("level"))
     return merged
+
+
+def begin_bounded_trial(state_path: Path, policy_id: str, *,
+                        dispatch_evidence: Dict[str, Any],
+                        budget_expanded: bool = False,
+                        hard_gates_unchanged: bool = True) -> Dict[str, Any]:
+    """Enter BOUNDED_TRIAL with a stored trial artifact (the trusted dispatch record)."""
+    diagnostics: List[str] = []
+    codes: List[str] = []
+    if not isinstance(dispatch_evidence, dict) or not dispatch_evidence:
+        diagnostics.append("试运行需要非空的 dispatch_evidence")
+        codes.append("PE11")
+    if budget_expanded:
+        diagnostics.append("试运行不得扩大原有资源预算")
+        codes.append("PE11")
+    if not hard_gates_unchanged:
+        diagnostics.append("试运行不得改变硬门禁")
+        codes.append("PE11")
+    if diagnostics:
+        return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                "diagnostics": diagnostics, "codes": sorted(set(codes))}
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        candidate = policy_record(records, policy_id)
+        if candidate is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
+        current_rules = evaluation_rules_digest(state_path)
+        payload = {
+            "_schema": SCHEMA_TRIAL,
+            "policy_id": policy_id,
+            "policy_signature": candidate.get("signature"),
+            "rules_digest": current_rules,
+            "dispatch_evidence": copy.deepcopy(dispatch_evidence),
+            "budget_expanded": bool(budget_expanded),
+            "hard_gates_unchanged": bool(hard_gates_unchanged),
+            "produced_by": "policy_evolution.begin_bounded_trial",
+            "recorded_at": _now(),
+            "verdict": {"verdict": "SUPPORTED"},
+            "gates": {"assessable_dimensions": 2, "cases": 1, "runs": 1,
+                      "runner": "bounded-trial"},
+        }
+        payload["level"] = _recomputed_level(payload["gates"], payload["verdict"])
+        ref = _store_artifact(state_path, trials_dir(state_path), payload)
+        return _transition_locked(state_path, records, policy_id, "BOUNDED_TRIAL",
+                                  evidence={"trial_ref": ref, "reason": "bounded trial"},
+                                  reason="bounded trial", authority=_AUTHORITY)
+
+
+def validate_candidate(state_path: Path, policy_id: str, *,
+                       evaluation_ref: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """VALIDATED requires an L3 evaluation artifact bound to this policy."""
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        if policy_record(records, policy_id) is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
+        ref = evaluation_ref
+        if not isinstance(ref, dict):
+            artifact = latest_evaluation_artifact(state_path, policy_id, records)
+            if artifact is None:
+                return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                        "diagnostics": ["没有可用的 L3 评价产物：不能验证"],
+                        "codes": ["PE11"]}
+            ref = artifact["ref"]
+        return _transition_locked(state_path, records, policy_id, "VALIDATED",
+                                  evidence={"evaluation_ref": ref, "reason": "L3 evaluation"},
+                                  reason="L3 evaluation", authority=_AUTHORITY)
 
 
 def promote_to_active(state_path: Path, policy_id: str,
                       evaluation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """ACTIVE promotion, using the *recorded* evaluation evidence plus the frozen-rule check."""
+    """ACTIVE promotion: L3 artifact + frozen-rule integrity + scope evidence."""
     evaluation = dict(evaluation or {})
-    current_digest = evaluation_rules_digest(state_path)
-    records, _ = load_records(state_path)
-    candidate = policy_record(records, policy_id) or {}
-    recorded = recorded_evaluation(records, policy_id)
-    evidence = {
-        "rules_digest_unchanged": bool(
-            candidate.get("evaluation_rules_digest") == current_digest
-            and evaluation.get("rules_digest_unchanged", True)),
-        "scope_evidence_ok": bool(evaluation.get("scope_evidence_ok", True)),
-        # Fail closed: absent recorded evidence is not evidence.
-        "independent": bool(recorded.get("independent")),
-        "leakage_checked": bool(recorded.get("leakage_checked", True)),
-        "reproducible": bool(recorded.get("reproducible", True)),
-        "sample_adequate": bool(recorded.get("sample_adequate")),
-        "distinguishable": bool(recorded.get("distinguishable")),
-        "degraded_dimensions": list(recorded.get("degraded_dimensions") or []),
-        "reason": evaluation.get("reason") or recorded.get("reason")
-        or "independent replay evaluation (recorded)",
-    }
-    return transition(state_path, policy_id, "ACTIVE", level="L3", evidence=evidence,
-                      reason=evidence["reason"])
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        candidate = policy_record(records, policy_id)
+        if candidate is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
+        artifact = latest_evaluation_artifact(state_path, policy_id, records)
+        if artifact is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["没有 L3 评价产物：不得晋升 ACTIVE"], "codes": ["PE11"]}
+        return _transition_locked(
+            state_path, records, policy_id, "ACTIVE",
+            evidence={"evaluation_ref": artifact["ref"],
+                      "scope_evidence_ok": bool(evaluation.get("scope_evidence_ok", True)),
+                      "reason": evaluation.get("reason") or "independent L3 evaluation"},
+            reason=evaluation.get("reason") or "independent L3 evaluation",
+            authority=_AUTHORITY)
 
 
 # ---------------------------------------------------------------------------
@@ -1167,8 +1584,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(description=__doc__,
                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", nargs="?", choices=(
-        "freeze-rules", "propose", "list", "show", "transition", "evaluate", "rollback",
-        "state", "advice", "validate"))
+        "freeze-rules", "propose", "list", "show", "transition", "evaluate", "trial",
+        "validate", "promote", "rollback", "state", "advice"))
     parser.add_argument("--state", help="path to research-state.json")
     parser.add_argument("--policy", help="path to a candidate JSON file (or - for stdin)")
     parser.add_argument("--policy-id")
@@ -1177,6 +1594,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reason", default="")
     parser.add_argument("--level", default="L1")
     parser.add_argument("--report", help="path to a replay ablation report JSON")
+    parser.add_argument("--dispatch", help="trial: dispatch evidence as JSON")
     parser.add_argument("--trajectory", help="path to decision-trajectory.jsonl")
     parser.add_argument("--selftest", action="store_true")
     return parser
@@ -1242,10 +1660,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.policy_id or not args.to:
             return _emit({"status": "INVALID", "errors": ["需要 --policy-id 与 --to"]},
                          EXIT_ERROR)
+        if args.to in GATED_TARGETS:
+            # The CLI must not be a way around the promotion gates.
+            return _emit({"status": "INVALID", "policy_id": args.policy_id,
+                          "diagnostics": [f"{args.to} 只能由受控晋升入口完成："
+                                          "evaluate / trial / validate / promote"],
+                          "codes": ["PE11"]}, EXIT_HARD)
         evidence = json.loads(args.reason) if args.reason.startswith("{") else {}
         result = transition(state_path, args.policy_id, args.to, level=args.level,
                             evidence=evidence, reason="" if evidence else args.reason)
         return _emit(result, EXIT_OK if result["written"] else EXIT_HARD)
+    if args.command in ("trial", "validate", "promote"):
+        if not args.policy_id:
+            return _emit({"status": "INVALID", "errors": ["需要 --policy-id"]}, EXIT_ERROR)
+        options = json.loads(args.reason) if args.reason.startswith("{") else {}
+        if args.command == "trial":
+            dispatch = json.loads(args.dispatch) if args.dispatch else {"dispatched": True}
+            result = begin_bounded_trial(state_path, args.policy_id,
+                                         dispatch_evidence=dispatch,
+                                         budget_expanded=bool(options.get("budget_expanded")),
+                                         hard_gates_unchanged=bool(
+                                             options.get("hard_gates_unchanged", True)))
+        elif args.command == "validate":
+            result = validate_candidate(state_path, args.policy_id)
+        else:
+            result = promote_to_active(state_path, args.policy_id, options)
+        return _emit(result, EXIT_OK if result.get("written") else EXIT_HARD)
     if args.command == "evaluate":
         if not args.policy_id or not args.report:
             return _emit({"status": "INVALID",
@@ -1293,25 +1733,34 @@ def _valid_candidate(**overrides) -> Dict[str, Any]:
     return candidate
 
 
-def _arm_block(mean_high, mean_low=None):
+def _arm_block(mean_high, mean_low=None, benefit=None):
+    """An arm with a per-case execution record; `benefit` controls the benefit dimensions."""
     low = mean_high - 0.4 if mean_low is None else mean_low
+    gain = mean_high if benefit is None else benefit
     return {"dimensions": {
         "mechanistic_understanding": {"mean": 0.5, "min": 0.4, "max": 0.6},
         "prediction_quality": {"mean": low, "min": low - 0.1, "max": low + 0.1},
         "intervention_quality": {"mean": mean_high, "min": mean_high - 0.05,
                                  "max": mean_high + 0.05},
         "scientific_novelty": {"mean": 0.5, "min": 0.5, "max": 0.5},
-        "search_efficiency": {"mean": 1.0, "min": 1.0, "max": 1.0},
-        "stagnation_recovery": {"mean": 1.0, "min": 1.0, "max": 1.0},
-        "memory_accumulation": {"mean": 1.0, "min": 1.0, "max": 1.0},
-    }, "results": [], "evidence_support": {}}
+        "search_efficiency": {"mean": gain, "min": gain - 0.05, "max": gain + 0.05},
+        "stagnation_recovery": {"mean": gain, "min": gain - 0.05, "max": gain + 0.05},
+        "memory_accumulation": {"mean": gain, "min": gain - 0.05, "max": gain + 0.05},
+    },
+        "results": [{"case_id": f"C{i}", "leak_checked": True, "isolation_verified": True,
+                     "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
+                    for i in range(5)],
+        "evidence_support": {"OBSERVED": 5}}
 
 
-def _report(sufficient=True, unobservable=0):
+def _report(sufficient=True, unobservable=0, flat=False):
+    """A supported report: a real benefit gain, reliability intact, an execution record."""
+    candidate = _arm_block(0.5 if flat else 0.9, benefit=0.5 if flat else 0.9)
+    control = _arm_block(0.5 if flat else 0.3, benefit=0.5 if flat else 0.3)
     return {"schema": "research-idea-pipeline/replay-ablation@1",
             "sufficient_sample": sufficient, "unobservable_decisions": unobservable,
-            "delta_vs_baseline": {}, "per_arm": {"rsi_full": _arm_block(0.9),
-                                                 "full_cie": _arm_block(0.3)},
+            "delta_vs_baseline": {}, "per_arm": {"rsi_full": candidate, "full_cie": control},
+            "runner": "offline CIE runner (no model calls)",
             "cases": 5, "runs_per_case": 2}
 
 
@@ -1400,27 +1849,25 @@ def selftest() -> int:
         check("flat candidate proposes", propose(state_path, flat)["status"] == "PROPOSED")
         transition(state_path, "P-FLAT", "SHADOW", level="L1",
                    evidence={"format_ok": True, "invariants_ok": True, "permissions_ok": True})
-        undifferentiated = evaluate_candidate(
-            state_path, "P-FLAT",
-            {"sufficient_sample": True, "unobservable_decisions": 0, "delta_vs_baseline": {},
-             "per_arm": {"rsi_full": _arm_block(0.5, 0.5), "full_cie": _arm_block(0.5, 0.5)},
-             "cases": 5, "runs_per_case": 2})
+        undifferentiated = evaluate_candidate(state_path, "P-FLAT", _report(flat=True))
         check("indistinguishable arms are not promoted",
               undifferentiated["status"] == "HOLD")
 
-        trial = transition(state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                           evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                     "dispatch_evidence": True})
-        check("bounded trial does not expand the budget", trial["status"] == "BOUNDED_TRIAL")
-        expanded = transition(state_path, "P-1", "VALIDATED", level="L3",
-                              evidence={"independent": True, "distinguishable": True,
-                                        "degraded_dimensions": [], "budget_expanded": True})
+        expanded = begin_bounded_trial(state_path, "P-1",
+                                       dispatch_evidence={"dispatched": "R2"},
+                                       budget_expanded=True)
         check("expanding the budget during a trial is refused",
-              expanded["status"] == "INVALID")
+              expanded["status"] == "INVALID" and "PE11" in expanded["codes"])
+        trial = begin_bounded_trial(state_path, "P-1",
+                                    dispatch_evidence={"dispatched": "R2"})
+        check("bounded trial does not expand the budget", trial["status"] == "BOUNDED_TRIAL")
+        bypass = transition(state_path, "P-1", "VALIDATED", level="L3",
+                            evidence={"independent": True, "distinguishable": True,
+                                      "degraded_dimensions": []})
+        check("raw transition cannot validate (controlled entry required)",
+              bypass["status"] == "INVALID" and "PE11" in bypass["codes"])
 
-        validated = transition(state_path, "P-1", "VALIDATED", level="L3",
-                               evidence={"independent": True, "distinguishable": True,
-                                         "degraded_dimensions": []})
+        validated = validate_candidate(state_path, "P-1")
         check("L3 validates", validated["status"] == "VALIDATED")
 
         # Frozen-rule drift after validation must invalidate promotion.
@@ -1458,12 +1905,9 @@ def selftest() -> int:
         transition(state_path, "P-2", "SHADOW", level="L1",
                    evidence={"format_ok": True, "invariants_ok": True, "permissions_ok": True})
         evaluate_candidate(state_path, "P-2", _report())
-        transition(state_path, "P-2", "BOUNDED_TRIAL", level="L2",
-                   evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                             "dispatch_evidence": True})
-        transition(state_path, "P-2", "VALIDATED", level="L3",
-                   evidence={"independent": True, "distinguishable": True,
-                             "degraded_dimensions": []})
+        begin_bounded_trial(state_path, "P-2",
+                                     dispatch_evidence={"dispatched": "R2"})
+        validate_candidate(state_path, "P-2")
         check("successor becomes ACTIVE",
               promote_to_active(state_path, "P-2", {"scope_evidence_ok": True})["status"]
               == "ACTIVE")

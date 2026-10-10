@@ -67,9 +67,15 @@
 | R3 | Shadow 评价 | `python3 scripts/policy_evolution.py transition --state <state> --policy-id <P> --to SHADOW` |
 | R4 | 独立回放评价 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2` |
 | R5 | 记录评价结论 | `python3 scripts/policy_evolution.py evaluate --state <state> --policy-id <P> --report <report.json>` |
-| R6 | 有限试运行与晋升 | `python3 scripts/policy_evolution.py transition --state <state> --policy-id <P> --to BOUNDED_TRIAL` |
-| R7 | 回滚 | `python3 scripts/policy_evolution.py rollback --state <state> --policy-id <P> --to-policy-id <prev> --reason <why>` |
-| R8 | 真实消费 | `python3 scripts/strategy_memory.py decide --state <state> --scheduler <scheduler> --record` |
+| R6 | 有限试运行 | `python3 scripts/policy_evolution.py trial --state <state> --policy-id <P> --dispatch '{"dispatched":"R2"}'` |
+| R7 | L3 验证 | `python3 scripts/policy_evolution.py validate --state <state> --policy-id <P>` |
+| R8 | 晋升 ACTIVE | `python3 scripts/policy_evolution.py promote --state <state> --policy-id <P> --reason '{"scope_evidence_ok":true}'` |
+| R9 | 回滚 | `python3 scripts/policy_evolution.py rollback --state <state> --policy-id <P> --to-policy-id <prev> --reason <why>` |
+| R10 | 真实消费 | `python3 scripts/strategy_memory.py decide --state <state> --scheduler <scheduler> --record` |
+
+> `REPLAY_EVALUATED` / `BOUNDED_TRIAL` / `VALIDATED` / `ACTIVE` **不能**用 `transition --to` 达到：
+> 它们必须由 `evaluate` / `trial` / `validate` / `promote` 四个受控入口完成，并由入口写出、
+> 绑定策略版本与冻结评价规则的评价产物作为依据。
 
 > 上表是**策略演化**的操作面，不进 `preset_router.py` 的自动步骤；晋升后的策略由
 > 现有 Strategy Decision Adapter 消费。详见 [references/skill-rsi-policy.md](../references/skill-rsi-policy.md)。

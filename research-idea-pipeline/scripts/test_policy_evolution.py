@@ -58,18 +58,24 @@ def candidate(**overrides):
 
 
 def arm(mean):
+    """A per-case execution record is part of the report: without it, it is not evidence."""
     return {"dimensions": {name: {"mean": mean, "min": mean - 0.05, "max": mean + 0.05}
                            for name in ("mechanistic_understanding", "prediction_quality",
                                         "intervention_quality", "scientific_novelty",
                                         "search_efficiency", "stagnation_recovery",
                                         "memory_accumulation")},
-            "results": [], "evidence_support": {}}
+            "results": [{"case_id": f"C{i}", "leak_checked": True,
+                         "isolation_verified": True,
+                         "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
+                        for i in range(5)],
+            "evidence_support": {"OBSERVED": 5}}
 
 
 def report(candidate_mean=0.9, control_mean=0.3, sufficient=True, unobservable=0):
     return {"schema": "research-idea-pipeline/replay-ablation@1",
             "sufficient_sample": sufficient, "unobservable_decisions": unobservable,
             "delta_vs_baseline": {}, "cases": 5, "runs_per_case": 2,
+            "runner": "offline CIE runner (no model calls)",
             "per_arm": {"rsi_full": arm(candidate_mean), "full_cie": arm(control_mean)}}
 
 
@@ -217,23 +223,22 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
             {"mean": 0.9, "min": 0.85, "max": 0.95}
         outcome = pe.evaluate_candidate(self.state_path, "P-1", fast_but_wrong)
         self.assertEqual(outcome["status"], "REJECTED")
-        self.assertIn("科学完整性", outcome["reason"])
+        self.assertIn("科学可靠性", outcome["reason"])
 
     def test_no_support_decisions_are_never_promotion_evidence(self):
+        """Unobserved branches cannot be counted: the verdict must not support promotion."""
         verdict = pe.ablation_verdict(report(unobservable=4))
-        self.assertEqual(verdict["verdict"], "SUPPORTED")
+        self.assertNotEqual(verdict["verdict"], "SUPPORTED")
+        self.assertEqual(verdict["verdict"], "INSUFFICIENT_COVERAGE")
         self.assertTrue(any("NO_SUPPORT" in reason for reason in verdict["reasons"]))
 
     def test_promotion_requires_an_unchanged_frozen_rule_set(self):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                "dispatch_evidence": True})
-        pe.transition(self.state_path, "P-1", "VALIDATED", level="L3",
-                      evidence={"independent": True, "distinguishable": True,
-                                "degraded_dimensions": []})
+        pe.begin_bounded_trial(self.state_path, "P-1",
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, "P-1")
         document = json.loads(pe.rules_path(self.state_path).read_text(encoding="utf-8"))
         document["rules"]["delta_tolerance"] = 0.99
         document["digest"] = cg.digest_of(document["rules"])
@@ -246,10 +251,9 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        outcome = pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                                evidence={"budget_expanded": True,
-                                          "hard_gates_unchanged": True,
-                                          "dispatch_evidence": True})
+        outcome = pe.begin_bounded_trial(self.state_path, "P-1",
+                                         dispatch_evidence={"dispatched": "R2"},
+                                         budget_expanded=True)
         self.assertEqual(outcome["status"], "INVALID")
         self.assertIn("PE11", outcome["codes"])
 
@@ -261,12 +265,9 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
                      evaluation_refs=[{"independent": True, "project": "A"}])
         self.to_shadow("P-WORLD")
         pe.evaluate_candidate(self.state_path, "P-WORLD", report())
-        pe.transition(self.state_path, "P-WORLD", "BOUNDED_TRIAL", level="L2",
-                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                "dispatch_evidence": True})
-        pe.transition(self.state_path, "P-WORLD", "VALIDATED", level="L3",
-                      evidence={"independent": True, "distinguishable": True,
-                                "degraded_dimensions": []})
+        pe.begin_bounded_trial(self.state_path, "P-WORLD",
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, "P-WORLD")
         outcome = pe.promote_to_active(self.state_path, "P-WORLD",
                                        {"scope_evidence_ok": True})
         self.assertEqual(outcome["status"], "INVALID")
@@ -278,12 +279,9 @@ class TestRollbackAndComplexity(PolicyStoreCase):
         self.propose(policy_id=policy_id, **({"scope": scope} if scope else {}))
         self.to_shadow(policy_id)
         pe.evaluate_candidate(self.state_path, policy_id, report())
-        pe.transition(self.state_path, policy_id, "BOUNDED_TRIAL", level="L2",
-                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                "dispatch_evidence": True})
-        pe.transition(self.state_path, policy_id, "VALIDATED", level="L3",
-                      evidence={"independent": True, "distinguishable": True,
-                                "degraded_dimensions": []})
+        pe.begin_bounded_trial(self.state_path, policy_id,
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})
 
@@ -383,12 +381,9 @@ class TestCrossSessionAndConsumer(PolicyStoreCase):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                "dispatch_evidence": True})
-        pe.transition(self.state_path, "P-1", "VALIDATED", level="L3",
-                      evidence={"independent": True, "distinguishable": True,
-                                "degraded_dimensions": []})
+        pe.begin_bounded_trial(self.state_path, "P-1",
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, "P-1")
         pe.promote_to_active(self.state_path, "P-1", {"scope_evidence_ok": True})
         state = fixture_state()
         records, _ = pe.load_records(self.state_path)
@@ -449,12 +444,9 @@ class TestLatentBugRegressions(PolicyStoreCase):
         self.propose(policy_id=policy_id, **(scope or {}))
         self.to_shadow(policy_id)
         pe.evaluate_candidate(self.state_path, policy_id, report(*means))
-        pe.transition(self.state_path, policy_id, "BOUNDED_TRIAL", level="L2",
-                      evidence={"budget_expanded": False, "hard_gates_unchanged": True,
-                                "dispatch_evidence": True})
-        pe.transition(self.state_path, policy_id, "VALIDATED", level="L3",
-                      evidence={"independent": True, "distinguishable": True,
-                                "degraded_dimensions": []})
+        pe.begin_bounded_trial(self.state_path, policy_id,
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})
 
