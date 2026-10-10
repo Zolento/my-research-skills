@@ -259,7 +259,10 @@ def protected_files(root: Path = SKILL_ROOT) -> List[Path]:
     files: List[Path] = []
     for entry in _iter_protected_entries(root):
         try:
-            if entry.is_dir():      # symlink 到目录：不当作文件
+            # A symlink is an entry in its own right, even when it points at a directory:
+            # skipping it made an in-root link invisible to the manifest, to `added`/`removed`
+            # and to the escape list. A real directory is not a file.
+            if entry.is_dir() and not entry.is_symlink():
                 continue
         except OSError:             # pragma: no cover - 不可 stat 时仍保守登记
             pass
@@ -376,23 +379,39 @@ def verify(manifest_payload: Dict[str, Any], root: Path = SKILL_ROOT) -> Dict[st
         info = source_digest(path, root)
         current[info["path"]] = info
 
+    def differs(entry: Dict[str, Any], observed: Dict[str, Any]) -> bool:
+        if entry.get("sha256") != observed["sha256"]:
+            return True
+        # Same bytes are not the same entry: a protected file swapped for an in-root symlink
+        # to an identical copy used to report PASS with empty changed/added/removed.
+        if bool(entry.get("symlink")) != bool(observed["symlink"]):
+            return True
+        recorded = entry.get("realpath")
+        return bool(recorded) and recorded != observed["realpath"]
+
     changed = sorted(
         rel for rel, info in current.items()
-        if rel in expected and (
-            not isinstance(expected[rel], dict)
-            or expected[rel].get("sha256") != info["sha256"]))
+        if rel in expected and (not isinstance(expected[rel], dict)
+                                or differs(expected[rel], info)))
     added = sorted(rel for rel in current if rel not in expected)
     removed = sorted(rel for rel in expected if rel not in current)
     escapes = _symlink_escapes(root)
 
-    status = ("PASS" if not (changed or added or removed or escapes or malformed)
-              else "VIOLATION")
+    # A manifest belongs to one tree. Verifying tree B against tree A's manifest must fail
+    # rather than silently pass when the relative paths and hashes happen to line up.
+    recorded_root = manifest_payload.get("root") if isinstance(manifest_payload, dict) else None
+    root_mismatch = bool(recorded_root) and str(Path(recorded_root).resolve()) != str(root.resolve())
+
+    status = ("PASS" if not (changed or added or removed or escapes or malformed
+                             or root_mismatch) else "VIOLATION")
     return {
         "status": status,
         "changed": changed,
         "added": added,
         "removed": removed,
         "malformed": malformed,
+        "root_mismatch": root_mismatch,
+        "recorded_root": recorded_root,
         "symlink_escapes": escapes,
         "checked": len(expected),
     }
@@ -603,7 +622,10 @@ def guard_write(target: Any, *, skill_root: Path = SKILL_ROOT,
                      f"{resolved}", resolved)
 
     # 显式 route 内：只放行已知 scope（canonical 已在上方按 allow_canonical 处理）。
-    canonical_ok = (resolved.name == STATE_NAME and allow_canonical)
+    # `allow_canonical` is not a blanket permission: it is only meaningful inside an explicit
+    # route scope, otherwise `/etc/research-state.json` would be writable.
+    canonical_ok = (resolved.name == STATE_NAME and allow_canonical
+                    and (inside_root or bool(roots)))
     if not canonical_ok:
         scope = _write_scope_of(resolved, roots)
         if scope is not None and not _scope_allowed(scope):
@@ -918,10 +940,13 @@ def read_only_deployment_plan() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 class SourceFreeze:
-    """上下文管理器：进入时取清单，退出时核验并记录事件。
+    """上下文管理器：进入时取清单，退出时核验；**给了 route 才记录事件**。
 
     **违规不抛异常**：`self.result` 暴露 `verify()` 结果，调用方决定是否
     `hold_on_violation()`。上下文管理器本身也**从不修复源码**。
+
+    没有 `route_dir` 时不写任何审计事件（没有安全的落点），`self.event` 保持 `None`
+    且 `self.result["event_recorded"] is False` —— 这一点必须显式，不能靠文档暗示。
     """
 
     def __init__(self, root: Path = SKILL_ROOT, route_dir: Optional[Path] = None,
@@ -940,6 +965,7 @@ class SourceFreeze:
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
         self.result = verify(self.start or {}, self.root)
+        self.result["event_recorded"] = False
         if self.route_dir is not None:
             if self.result["status"] != "PASS":
                 self.hold = hold_on_violation(self.route_dir, self.result,
@@ -953,6 +979,7 @@ class SourceFreeze:
                     "context": self.context,
                     "checked": self.result["checked"],
                 })
+            self.result["event_recorded"] = self.event is not None
         return False
 
 

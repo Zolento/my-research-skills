@@ -545,3 +545,81 @@ class TestGuardWriteDeltaRegressions(unittest.TestCase):
             verdict = sf.guard_write(self.route / rel, skill_root=self.root,
                                      allowed_roots=[self.route])
             self.assertTrue(verdict["allowed"], (rel, verdict))
+
+
+class TestPreviouslyOpenFindings(unittest.TestCase):
+    """E-5 / E-9 / E-11 / E-12: findings that were recorded as open and are now closed."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.temp.name) / "skill"
+        self.root.mkdir(parents=True)
+        for name in sf.PROTECTED:
+            path = self.root / name
+            if name.endswith((".md", ".json")):
+                path.write_text("x\n", encoding="utf-8")
+            else:
+                path.mkdir()
+                (path / "x.txt").write_text("x\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_a_manifest_belongs_to_one_tree(self):
+        """E-5: tree B used to PASS against tree A's manifest."""
+        other = pathlib.Path(self.temp.name) / "other"
+        other.mkdir()
+        for name in sf.PROTECTED:
+            path = other / name
+            if name.endswith((".md", ".json")):
+                path.write_text("x\n", encoding="utf-8")
+            else:
+                path.mkdir()
+                (path / "x.txt").write_text("x\n", encoding="utf-8")
+        result = sf.verify(sf.manifest(self.root), other)
+        self.assertEqual(result["status"], "VIOLATION")
+        self.assertTrue(result["root_mismatch"])
+
+    def test_a_same_content_symlink_swap_is_detected(self):
+        """E-5: identical bytes behind a symlink used to report PASS."""
+        frozen = sf.manifest(self.root)
+        (self.root / "SKILL.md").unlink()
+        (self.root / "SKILL.md").symlink_to(self.root / "shared-contract.md")
+        result = sf.verify(frozen, self.root)
+        self.assertEqual(result["status"], "VIOLATION")
+        self.assertIn("SKILL.md", result["changed"])
+
+    def test_an_in_root_symlink_directory_is_visible(self):
+        """E-9: a symlinked directory under a protected tree was in no list at all."""
+        frozen = sf.manifest(self.root)
+        (self.root / "scripts" / "vendor").symlink_to(self.root / "templates",
+                                                      target_is_directory=True)
+        result = sf.verify(frozen, self.root)
+        self.assertEqual(result["status"], "VIOLATION")
+        self.assertIn("scripts/vendor", result["added"])
+
+    def test_allow_canonical_is_bound_to_a_route_scope(self):
+        """E-11: allow_canonical used to permit any research-state.json anywhere."""
+        outside = sf.guard_write("/etc/research-state.json", skill_root=self.root,
+                                 allow_canonical=True)
+        self.assertFalse(outside["allowed"])
+        route = pathlib.Path(self.temp.name) / "route"
+        route.mkdir()
+        inside = sf.guard_write(route / "research-state.json", skill_root=self.root,
+                                allowed_roots=[route], allow_canonical=True)
+        self.assertTrue(inside["allowed"], inside)
+
+    def test_no_event_is_recorded_without_a_route_and_that_is_explicit(self):
+        """E-12: the docstring implied an event; the result now says so."""
+        freeze = sf.SourceFreeze(route_dir=None)
+        freeze.__enter__()
+        freeze.__exit__(None, None, None)
+        self.assertIsNone(freeze.event)
+        self.assertFalse(freeze.result["event_recorded"])
+        route = pathlib.Path(self.temp.name) / "route"
+        route.mkdir()
+        recorded = sf.SourceFreeze(route_dir=route)
+        recorded.__enter__()
+        recorded.__exit__(None, None, None)
+        self.assertTrue(recorded.result["event_recorded"])
+        self.assertIsNotNone(recorded.event)
