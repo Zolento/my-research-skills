@@ -26,6 +26,7 @@ P2    非法 ASCII / 截断 / 不可读的 `.head` 必须转为可预期错误�
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -267,54 +268,95 @@ class TestEvaluationArtifactBinding(PromotionCase):
         self.assertTrue(artifact["produced_by"])
         self.assertTrue(artifact["report_digest"])
 
-    def test_an_artifact_for_another_policy_cannot_promote_this_one(self):
-        self.ready("P-1")
-        self.stored_report("P-1")
-        self.assertEqual(self.propose("P-2")["status"], "PROPOSED")
-        self.assertEqual(self.to_shadow("P-2")["status"], "SHADOW")
+    def _artifact(self, policy_id="P-1"):
         records, _ = pe.load_records(self.state_path)
-        artifact = pe.latest_evaluation_artifact(self.state_path, "P-1", records)
-        stolen = pe.transition(self.state_path, "P-2", "REPLAY_EVALUATED", level="L2",
-                               evidence={"evaluation_ref": artifact["ref"]})
-        self.assertEqual(stolen["status"], "INVALID", stolen)
-
-    def test_a_replaced_evaluation_result_is_detected(self):
-        self.ready()
-        self.stored_report()
-        records, _ = pe.load_records(self.state_path)
-        artifact = pe.latest_evaluation_artifact(self.state_path, "P-1", records)
-        path = pathlib.Path(artifact["ref"]["path"])
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        payload["gates"]["distinguishable"] = True
-        payload["verdict"]["verdict"] = "SUPPORTED"
-        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        result = pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                               evidence={"evaluation_ref": artifact["ref"]})
-        self.assertEqual(result["status"], "INVALID", result)
+        artifact = pe.latest_evaluation_artifact(self.state_path, policy_id, records)
+        self.assertIsNotNone(artifact, "no evaluation artifact was stored")
+        return artifact
 
     def test_an_artifact_outside_the_policy_store_is_refused(self):
+        """Routed through a controlled entry, so the ARTIFACT check is what refuses."""
         self.ready()
         self.stored_report()
         outside = pathlib.Path(self.temp.name) / "forged.json"
         outside.write_text(json.dumps({"policy_id": "P-1"}), encoding="utf-8")
-        result = pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                               evidence={"evaluation_ref": {"path": str(outside),
-                                                            "digest": "sha256:x"}})
+        result = pe.validate_candidate(self.state_path, "P-1",
+                                       evaluation_ref={"path": str(outside),
+                                                       "digest": "sha256:x"})
         self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("策略存储目录", " ".join(result["diagnostics"]))
+
+    def test_a_symlinked_artifact_escape_is_refused(self):
+        """A symlink inside the store that resolves outside must not be accepted."""
+        self.ready()
+        self.stored_report()
+        outside = pathlib.Path(self.temp.name) / "outside.json"
+        outside.write_text(json.dumps({"policy_id": "P-1"}), encoding="utf-8")
+        link = pe.evaluations_dir(self.state_path) / "evil.json"
+        os.symlink(outside, link)
+        result = pe.validate_candidate(self.state_path, "P-1",
+                                       evaluation_ref={"path": str(link),
+                                                       "digest": "sha256:x"})
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("策略存储目录", " ".join(result["diagnostics"]))
+
+    def test_an_artifact_for_another_policy_cannot_validate_this_one(self):
+        self.ready("P-1")
+        self.stored_report("P-1")
+        self.ready("P-2")
+        self.stored_report("P-2")
+        stolen = self._artifact("P-1")
+        result = pe.validate_candidate(self.state_path, "P-2",
+                                       evaluation_ref=stolen["ref"])
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("另一个策略", " ".join(result["diagnostics"]))
+
+    def test_a_replaced_evaluation_result_is_detected(self):
+        self.ready()
+        self.stored_report()
+        artifact = self._artifact()
+        path = pathlib.Path(artifact["ref"]["path"])
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        # A REAL change: the digest must no longer describe the body.
+        payload["verdict"]["sample_adequate"] = False
+        payload["gates"]["assessable_dimensions"] = 0
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        result = pe.validate_candidate(self.state_path, "P-1",
+                                       evaluation_ref=artifact["ref"])
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("完整性摘要", " ".join(result["diagnostics"]))
 
     def test_evaluation_rules_tampering_invalidates_the_artifact(self):
         self.ready()
         self.stored_report()
+        artifact = self._artifact()
         document = json.loads(pe.rules_path(self.state_path).read_text(encoding="utf-8"))
         document["rules"]["delta_tolerance"] = 0.99
         document["digest"] = cg.digest_of(document["rules"])
         pe.rules_path(self.state_path).write_text(json.dumps(document), encoding="utf-8")
-        result = pe.transition(self.state_path, "P-1", "BOUNDED_TRIAL", level="L2",
-                               evidence={"evaluation_ref":
-                                         pe.latest_evaluation_artifact(
-                                             self.state_path, "P-1",
-                                             pe.load_records(self.state_path)[0])["ref"]})
+        result = pe.validate_candidate(self.state_path, "P-1",
+                                       evaluation_ref=artifact["ref"])
         self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("评价规则", " ".join(result["diagnostics"]))
+
+    def test_an_artifact_whose_level_exceeds_its_evidence_is_refused(self):
+        """The stored level is recomputed; an inflated level must not be believed."""
+        self.ready()
+        self.stored_report()
+        artifact = self._artifact()
+        path = pathlib.Path(artifact["ref"]["path"])
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["level"] = "L3"
+        payload["gates"]["runner"] = None          # no executor -> only L2
+        payload["gates"]["casec"] = 5
+        body = {k: v for k, v in payload.items() if k != "digest"}
+        payload["digest"] = cg.digest_of(body)     # keep the digest self-consistent
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        result = pe.validate_candidate(self.state_path, "P-1",
+                                       evaluation_ref={"path": str(path),
+                                                       "digest": payload["digest"]})
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("等级", " ".join(result["diagnostics"]))
 
     def test_the_full_controlled_lifecycle_still_reaches_active(self):
         self.ready()

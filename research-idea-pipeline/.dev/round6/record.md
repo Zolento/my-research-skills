@@ -246,3 +246,38 @@ FAILED (failures=14, errors=9)     # 23/31 失败
 | 全量单元测试 | **1742 OK（skipped=3）** |
 | `release_check.py` | **PASS（18 步）** |
 | 5 个模块 selftest | 全 OK |
+
+## 11. 二次复核（第九段）：我自己的 4 项「产物校验」测试是空转
+
+对抗性复核继续时发现：`TestEvaluationArtifactBinding` 里有 **4 项测试并没有走到产物校验层**，
+它们只被「受控目标必须经受控入口」的授权检查拦下，因此**断言永远成立**：
+
+| 测试 | 修复前的实际路径 | 问题 |
+|---|---|---|
+| `test_an_artifact_outside_the_policy_store_is_refused` | 只触发 `PE11 受控入口` | 越界路径校验从未执行 |
+| `test_an_artifact_for_another_policy_cannot_promote_this_one` | 同上 | 候选绑定校验从未执行 |
+| `test_a_replaced_evaluation_result_is_detected` | 同上 | 摘要校验从未执行；且「篡改」把 `distinguishable`/`verdict` 设成了**它本来就已经是**的值，是空操作 |
+| `test_evaluation_rules_tampering_invalidates_the_artifact` | 同上 | 规则绑定校验从未执行 |
+
+**修复**：把这 4 项改为经**受控入口** `validate_candidate(evaluation_ref=...)` 传入引用
+（该入口持授权令牌，因此会真正执行产物校验），并断言**产物层的具体诊断**；
+另新增符号链接逃逸、等级虚报两项。总计 6 项转为真实测试 + 1 项回归保护 = 7 项。
+
+**变异测试证明有牙齿**：把 `_artifact_gate_errors()` 改成直接 `return []`（产物校验全部架空）后：
+
+| 测试文件 | 变异后的结果 |
+|---|---|
+| 重写前（`98292f5` 版本，34 项） | **仅 1 项失败**（且是 schema 检查，不是校验层） |
+| 重写后（36 项） | **7 项失败**（越界、符号链接逃逸、跨策略绑定、摘要替换、等级虚报、规则篡改、试运行冒充评价） |
+
+即：重写前有 6 项测试对「产物校验是否存在」完全不敏感；重写后它们能捕获该缺陷。
+
+### 11.1 复核后的最终计数
+
+| 项 | 值 |
+|---|---|
+| `test_promotion_integrity.py` | **36 tests OK** |
+| 变异（产物校验架空） | 36 项中 **7 项失败**（旧版仅 1 项） |
+| 全量单元测试 | **1744 OK（skipped=3）** |
+| `release_check.py` | **PASS（18 步）** |
+| 5 个模块 selftest | 全 OK |
