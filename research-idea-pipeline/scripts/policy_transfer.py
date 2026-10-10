@@ -1351,22 +1351,49 @@ def _evidence_level_errors(policy: Dict[str, Any], scope: Optional[Dict[str, Any
     kind = (scope or {}).get("kind")
     level = _evidence_level(policy)
 
-    projects = _evidence_projects(policy)
+    declared_projects = _evidence_projects(policy)
+    projects = set(declared_projects)
     if isinstance(source_project, str) and source_project.strip():
         projects.add(source_project.strip())
-    qualified_projects: Set[str] = set()
-    for record in list(source_trajectories or ()) + list(records or ()):
-        if not isinstance(record, dict):
+
+    # Attested evidence is a *trajectory* that carries BOTH a decision and a qualified
+    # outcome. A self-declared project list, and a bare outcome line with no decision behind
+    # it, are not evidence: both used to satisfy the cross-project requirement on their own.
+    views: Dict[str, Any] = {}
+    try:
+        import decision_trajectory as dt
+        views = dt.rebuild_trajectories(list(records or ()) + list(source_trajectories or ()))
+    except Exception:  # pragma: no cover - a malformed store means "no attested evidence"
+        views = {}
+    attested: Dict[str, Set[str]] = {}
+    for ident, view in views.items():
+        decision = view.get("decision")
+        outcome = view.get("outcome")
+        if not isinstance(decision, dict) or not isinstance(outcome, dict):
             continue
-        project = record.get("project")
+        if outcome.get("evidence_qualification") != "qualified":
+            continue
+        project = (outcome.get("project") or decision.get("project") or view.get("project"))
         if isinstance(project, str) and project.strip():
-            projects.add(project.strip())
-        if record.get("record") == "outcome" and \
-                record.get("evidence_qualification") == "qualified":
-            if isinstance(project, str) and project.strip():
-                qualified_projects.add(project.strip())
+            attested.setdefault(project.strip(), set()).add(ident)
+    attested_projects: Set[str] = set(attested)
+    attested_trajectories = {ident for idents in attested.values() for ident in idents}
+    unbacked = sorted(item for item in declared_projects if item not in attested_projects)
 
     independent = _independent_refs(policy)
+    def _ref_key(ref: Any) -> str:
+        if isinstance(ref, str):
+            return ref.strip()
+        if isinstance(ref, dict):
+            for key in ("project", "trajectory_id", "trajectory", "id", "ref"):
+                value = ref.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return ""
+
+    independent_backed = any(
+        _ref_key(ref) in attested_projects or _ref_key(ref) in attested_trajectories
+        for ref in independent)
     diagnostic_path = "policy.scope"
 
     if level in WEAK_EVIDENCE_LEVELS:
@@ -1384,15 +1411,35 @@ def _evidence_level_errors(policy: Dict[str, Any], scope: Optional[Dict[str, Any
             f"scope 声称 {kind!r}，但历史成功证据等级只有 {level!r}"))
 
     if kind in BROAD_SCOPES:
-        if len(projects) < 2:
+        if len(attested_projects) < 2:
             diagnostics.append(_diag(
                 "PT9", diagnostic_path,
-                f"{kind!r} scope 只有 {len(projects)} 个项目的历史证据 "
-                f"{sorted(projects)}；跨项目迁移至少需要 2 个独立项目"))
-        if not independent and len(qualified_projects) < 2:
+                f"{kind!r} scope 需要 ≥2 个有真实轨迹（决策 + 合格 outcome）的项目；"
+                f"当前只有 {len(attested_projects)} 个：{sorted(attested_projects)}。"
+                f"自述项目列表与没有决策的 outcome 行都不算证据"))
+        if unbacked:
             diagnostics.append(_diag(
                 "PT9", diagnostic_path,
-                "缺少独立评价引用（independent_evaluation_refs 或 ≥2 个项目的合格 outcome）"))
+                "以下项目是策略自述、没有轨迹证据支撑：" + ", ".join(unbacked[:5])
+                + "（自述证据不构成跨项目依据）"))
+        supporting = [str(item) for item in (policy.get("supporting_trajectory_ids") or [])
+                      if str(item)]
+        missing = sorted(item for item in supporting if item not in attested_trajectories)
+        if missing:
+            diagnostics.append(_diag(
+                "PT9", diagnostic_path,
+                "supporting_trajectory_ids 未指向有「决策 + 合格 outcome」的轨迹："
+                + ", ".join(missing[:5])
+                + "（依赖的轨迹必须自己站得住）"))
+        if independent and not independent_backed:
+            diagnostics.append(_diag(
+                "PT9", diagnostic_path,
+                "independent_evaluation_refs 的项目没有一个能得到轨迹证据背书："
+                "自述的独立评价不算独立评价"))
+        if not independent and len(attested_projects) < 2:
+            diagnostics.append(_diag(
+                "PT9", diagnostic_path,
+                "缺少独立评价引用，且没有 ≥2 个项目的合格 outcome 轨迹"))
     return diagnostics
 
 

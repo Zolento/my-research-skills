@@ -1018,12 +1018,15 @@ def _order_actions(
     best = max((item["tier_rank"] for item in annotated), default=0)
     top = [item for item in annotated if item["tier_rank"] == best]
     rest = [item for item in annotated if item["tier_rank"] != best]
-    # Aligned first; among aligned candidates an explicit requested rank wins over declaration
-    # order, so a policy that asked for A-before-B actually gets A-before-B.
-    top.sort(key=lambda item: (0 if item["aligned"] else 1,
-                               item["prefer_rank"] if item["prefer_rank"] is not None
-                               else item["declared_order"],
-                               item["declared_order"]))
+    # Aligned first, and an explicitly requested rank always beats alignment that came from an
+    # operator/island match. Without this, `prefer_actions` lost to any earlier-declared
+    # operator-aligned action, which contradicted the comment and the policy contract.
+    explicit = len(set((advice or {}).get("prefer_actions") or [])) if advice else 0
+    top.sort(key=lambda item: (
+        0 if item["aligned"] else 1,
+        item["prefer_rank"] if item["prefer_rank"] is not None
+        else explicit + item["declared_order"],
+        item["declared_order"]))
     return top + rest
 
 

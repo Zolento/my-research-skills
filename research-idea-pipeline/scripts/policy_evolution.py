@@ -184,7 +184,12 @@ SCALAR = (str, int, float, bool)
 # ---------------------------------------------------------------------------
 
 def policy_dir(state_path: Path) -> Path:
-    return Path(state_path).resolve().parent / POLICY_DIRNAME
+    """`<route>/policy`, derived lexically like the other route control files.
+
+    Resolving first made a symlinked state path read the policy store of the *real* route
+    while the scheduler, trajectory, cognition and audit files stayed with the lexical route.
+    """
+    return Path(state_path).expanduser().parent / POLICY_DIRNAME
 
 
 def candidates_path(state_path: Path) -> Path:
@@ -625,12 +630,25 @@ def rebuild_state(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             if record.get("to") in ("REJECTED", "ROLLED_BACK"):
                 signature = str(record.get("signature") or "")
                 failed[signature] = failed.get(signature, 0) + 1
-    active = None
+    # The pointer and the lifecycle status must agree. Taking the last `-> ACTIVE` transition
+    # unconditionally left a still-ACTIVE policy dropped as soon as a later policy went HOLD,
+    # and a rollback pointer could name a policy that had since been rejected.
+    order: List[str] = []
     for record in records:
         if record.get("record") == "transition" and record.get("to") == "ACTIVE":
-            active = record.get("policy_id")
+            ident = record.get("policy_id")
+            if ident in order:
+                order.remove(ident)
+            order.append(ident)
         elif record.get("record") == "rollback":
-            active = record.get("to_policy_id")
+            target = record.get("to_policy_id")
+            if isinstance(target, str) and target not in order:
+                order.append(target)
+    active = None
+    for ident in reversed(order):
+        if statuses.get(ident) == "ACTIVE":
+            active = ident
+            break
     return {"schema": "research-idea-pipeline/policy-state@1",
             "count": len(statuses), "status": statuses, "history": history,
             "active_policy_id": active, "failures_by_signature": failed,

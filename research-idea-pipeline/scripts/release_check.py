@@ -57,6 +57,7 @@
 from __future__ import annotations
 
 import pathlib
+import ast
 import json
 import re
 import shutil
@@ -799,25 +800,78 @@ def step_skill_rsi() -> Tuple[bool, str]:
             tail = [line for line in proc_out.strip().splitlines() if line.strip()]
             return False, f"{pattern} failed: {tail[-1][:160] if tail else proc_code}"
         details.append(pattern.replace("test_", "").replace(".py", ""))
-    # The shipped skill must not depend on `.dev/` (root AGENTS.md §15). The scan matches
-    # path construction and file reads, not an exclusion tuple or a diagnostic message, and it
-    # skips selftest/fixture helpers, which legitimately build a throwaway `.dev` tree.
-    dev_pattern = re.compile(r"""(Path\([^)]*\.dev)|([/]\s*["']\.dev["'])"""
-                             r"""|(["']\.dev/)|(open\(\s*["'][^"']*\.dev)""")
-    offenders = []
+    # The shipped skill must not depend on `.dev/` (root AGENTS.md §15). This is an AST scan
+    # for string literals whose value has `.dev` as a whole path segment AND that are actually
+    # used to build or open a path. Regex line matching missed `os.path.join(root, ".dev", x)`
+    # and matched `config.dev.json`; a raw AST scan flags docstrings and the legitimate
+    # exclusion tuples. Only real usage counts:
+    #   * a literal passed to a call, or joined with `/`, or
+    #   * a module-level constant like `DEV = ".dev"` that is then used in a call/path operand.
+    # Selftest/fixture helpers legitimately build a throwaway `.dev` tree and are skipped by
+    # enclosing-function name. A name assembled at runtime (`"." + "dev"`) still evades this;
+    # that limit is stated rather than pretended away.
+    offenders: List[str] = []
+
+    def _is_dev_segment(value: str) -> bool:
+        return ".dev" in re.split(r"[/\\]", value)
+
+    def _iter_with_context(node, enclosing):
+        for child in ast.iter_child_nodes(node):
+            inner = enclosing
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                inner = child.name
+            yield child, inner
+            yield from _iter_with_context(child, inner)
+
     for path in sorted(SCRIPTS.glob("*.py")):
         if path.name.startswith("test_"):
             continue
-        current = ""
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if line.startswith(("def ", "class ")):
-                current = line.split("(")[0].strip()
-            if "selftest" in current or "fixture" in current:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:
+            return False, f"{path.name} does not parse: {exc}"
+
+        # module-level constants that hold a `.dev` path
+        dev_names: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                if any(isinstance(target, ast.Name) for target in node.targets) \
+                        and isinstance(node.value, ast.Constant) \
+                        and isinstance(node.value.value, str) and _is_dev_segment(node.value.value):
+                    dev_names.update(target.id for target in node.targets
+                                     if isinstance(target, ast.Name))
+
+        def _used_as_path(node) -> bool:
+            for child, enclosing in _iter_with_context(tree, ""):
+                pass
+            return False
+
+        used_names: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Call, ast.BinOp)):
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Name):
+                        used_names.add(sub.id)
+
+        for child, enclosing in _iter_with_context(tree, ""):
+            if enclosing and ("selftest" in enclosing or "fixture" in enclosing):
                 continue
-            if dev_pattern.search(line):
-                offenders.append(f"{path.name}:{lineno}")
+            if not isinstance(child, ast.Constant) or not isinstance(child.value, str):
+                continue
+            if not _is_dev_segment(child.value):
+                continue
+            parent_is_usage = False
+            for ancestor in ast.walk(tree):
+                if isinstance(ancestor, (ast.Call, ast.BinOp)) and any(
+                        item is child for item in ast.walk(ancestor)):
+                    parent_is_usage = True
+                    break
+            if parent_is_usage:
+                offenders.append(f"{path.name}:{child.lineno}")
+        for name in sorted(dev_names & used_names):
+            offenders.append(f"{path.name}:{name}")
     if offenders:
-        return False, "shipped scripts depend on .dev/: " + ", ".join(offenders)
+        return False, "shipped scripts depend on .dev/: " + ", ".join(sorted(set(offenders)))
     return True, ("5 selftests + 7 RSI suites green; policy promotion needs an independent "
                   "replay; NO_SUPPORT decisions cannot be promoted; no .dev/ runtime dependency; "
                   "levels: " + ", ".join(details[:5]) + " ...")

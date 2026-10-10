@@ -142,15 +142,23 @@ def ablations(cases: Sequence[Dict[str, Any]], *, runs: int = 2) -> Dict[str, An
         if not variant:
             continue
         report = rr.run_suite(variant, ("full_cie",) + LEAVE_ONE_OUT, runs)
+        # Divergence means the arm let the policy ACT. A refused candidate can still carry a
+        # bypass flag (the guard was absent, then a later check refused), so flags alone
+        # listed an arm as diverging while its choice was identical to full_cie's.
         diverging = sorted(
+            arm for arm, block in report["per_arm"].items()
+            if arm != "full_cie" and any(
+                item["decision"].get("policy_applied")
+                for item in block.get("results") or []))
+        bypassed = sorted(
             arm for arm, block in report["per_arm"].items()
             if arm != "full_cie" and any(
                 item["decision"].get("policy_gate_bypassed")
                 or item["decision"].get("policy_scope_bypassed")
                 or item["decision"].get("policy_support_bypassed")
-                or item["decision"].get("policy_applied")
                 for item in block.get("results") or []))
         guard_probes[name] = {"cases": len(variant), "diverging_arms": diverging,
+                              "bypass_flags_seen": bypassed,
                               "leave_one_out": report}
     comparisons: Dict[str, Any] = {}
     for arm in ("full_cie",) + LEAVE_ONE_OUT:
@@ -214,6 +222,7 @@ def overhead_report(*, iterations: int = 200) -> Dict[str, Any]:
     token figure.
     """
     import decision_trajectory as dt
+    iterations = max(1, int(iterations))
     state = json.loads((ROOT / "templates" / "research-state.template.json")
                        .read_text(encoding="utf-8"))
     context = dt.build_context(state, scientific_question="overhead probe",

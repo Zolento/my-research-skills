@@ -465,11 +465,14 @@ class TestLatentBugRegressions(PolicyStoreCase):
         records, _ = pe.load_records(self.state_path)
         self.assertEqual(pe.latest_status(records)["P-1"], "SUPERSEDED")
         self.assertEqual(pe.active_policy(records)["policy_id"], "P-2")
-        # A pointer to a superseded policy (what a buggy rollback used to leave behind) must
-        # not be consumed as if it were in force.
+        # The pointer follows the lifecycle status: a bare rollback record with no matching
+        # transition cannot move it (previously a stale pointer could be consumed).
         forced = list(records) + [{"record": "rollback", "policy_id": "P-2",
                                    "to_policy_id": "P-1"}]
-        self.assertIsNone(pe.active_policy(forced))
+        self.assertEqual(pe.active_policy(forced)["policy_id"], "P-2")
+        # And when the last ACTIVE policy goes HOLD, nothing is in force.
+        held = list(records) + [{"record": "transition", "policy_id": "P-2", "to": "HOLD"}]
+        self.assertIsNone(pe.active_policy(held))
 
     def test_rollback_makes_the_target_active_not_just_pointed_at(self):
         self.activate("P-1")

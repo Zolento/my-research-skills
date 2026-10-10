@@ -500,3 +500,40 @@ class TestSourceFreezeOnEveryRun(RsiProject):
             events = sf.integrity_events(state_path.parent)
             self.assertTrue(events)
             self.assertEqual(events[-1]["action"], "VERIFY_PASS")
+
+
+class TestUnreadableStoresAndRouteNames(RsiProject):
+    """K-2/K-3/K-8/K-10: unreadable control-plane stores and an empty route name."""
+
+    def test_an_unreadable_policy_store_holds(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            store = pe.candidates_path(state_path)
+            store.parent.mkdir(parents=True, exist_ok=True)
+            store.write_bytes(b"\xff\xfe\x00not utf-8")
+            payload, _, code = pr.run_preset("research-loop", state_path, apply=True)
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertEqual(code, pr.EXIT_ENV)
+            self.assertEqual(payload["hold_reason"], "policy_store_tampered")
+
+    def test_an_unreadable_trajectory_store_holds(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            self.propose_policy(state_path)
+            self.activate(state_path)
+            (state_path.parent / dt.TRAJECTORY_NAME).write_bytes(b"\xff\xfe\x00not utf-8")
+            payload, _, code = pr.run_preset("research-loop", state_path, apply=True)
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertIn("decision_trajectory_unreadable", payload["hold_reason"])
+
+    def test_an_orphan_head_digest_is_tampering(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            dt.head_path(path).write_text("sha256:deadbeef", encoding="ascii")
+            with self.assertRaises(dt.TrajectoryError):
+                dt.load_records(path)
+
+    def test_an_empty_route_name_never_reaches_the_gate(self):
+        """A bare relative state path used to yield route "" and skipped the gate."""
+        self.assertEqual(pr._route_name(pathlib.Path("research-state.json")), pathlib.Path.cwd().name)
+        self.assertTrue(pr._route_name(pathlib.Path("/tmp/x/A/research-state.json")))

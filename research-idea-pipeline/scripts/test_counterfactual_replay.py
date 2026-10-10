@@ -18,7 +18,9 @@ import unittest
 
 import cognition as cg
 import decision_trajectory as dt
+import rsi_ablation as ra
 import research_replay as rr
+import strategy_memory as sm
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -301,3 +303,85 @@ class TestLatentBugRegressions(unittest.TestCase):
             self.assertEqual(report["trajectories"], 3)
             self.assertEqual(report["evaluable_trajectories"], 3)
             self.assertEqual(report["evaluable_fraction"], 1.0)
+
+
+class TestHarnessHonestyRegressions(unittest.TestCase):
+    """L-3/L-4/L-6/L-7/L-9: defects the first suites did not expose."""
+
+    def test_an_explicit_preference_beats_operator_alignment(self):
+        """L-2: prefer_actions lost to an operator-aligned action declared earlier."""
+        state = {"hypotheses": [{"id": "H1", "operator": "reframe", "island": "P1"}],
+                 "uncertainties": []}
+        actions = [{"action": "A", "type": "repair", "target": "H1", "eig": "high",
+                    "cost": "low"},
+                   {"action": "B", "type": "repair", "target": "H1", "eig": "high",
+                    "cost": "low"},
+                   {"action": "C", "type": "repair", "target": "H1", "eig": "high",
+                    "cost": "low"}]
+        advice = {"operator": "reframe", "prefer_actions": ["B"], "menu": None,
+                  "island": None, "basis": [], "reason": ""}
+        order = [item["action"] for item in sm._order_actions(state, actions, advice)]
+        self.assertEqual(order[0], "B", order)
+
+    def test_undifferentiated_arms_consider_pass_rate_and_violations(self):
+        """L-3: means alone grouped an arm with violations and one without."""
+        def block(mean, passed, violations):
+            return {"dimensions": {name: {"mean": mean, "min": mean, "max": mean}
+                                   for name in rr.METRIC_DIMENSIONS},
+                    "pass_rate": passed, "violations": violations,
+                    "results": [], "evidence_support": {}}
+        report = {"per_arm": {"a": block(0.5, 1.0, []),
+                              "b": block(0.5, 0.0, ["self_certify_novelty"])}}
+        signature = {json.dumps({"means": {n: report["per_arm"][arm]["dimensions"][n]["mean"]
+                                           for n in rr.METRIC_DIMENSIONS},
+                                 "pass_rate": report["per_arm"][arm]["pass_rate"],
+                                 "violations": report["per_arm"][arm]["violations"]},
+                                sort_keys=True)
+                     for arm in ("a", "b")}
+        self.assertNotEqual(len(set(signature)), 1)
+
+    def test_an_invalid_case_is_refused_instead_of_scored(self):
+        """L-4: an empty answer produced all-None dimensions but a 'sufficient' sample."""
+        broken = json.loads(json.dumps(rr.adversarial_cases()[0]))
+        broken["hidden"]["answer"] = {}
+        with self.assertRaises(cg.CognitionError):
+            rr.run_suite([broken], runs=1)
+
+    def test_coverage_requires_a_decision_and_an_outcome(self):
+        """L-6: an outcome with no decision counted as evaluable coverage."""
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / dt.TRAJECTORY_NAME
+            dt.append_chained(path, {
+                "_schema": "research-idea-pipeline/decision-trajectory@1",
+                "record": "outcome", "trajectory_id": "DT-orphan", "project": "A",
+                "evidence_qualification": "qualified",
+                "result": {"kind": "experiment_result", "summary": "observed 0.42"},
+                "observed_at": "2026-01-02T00:00:00Z", "at_state_version": 3})
+            report = rr.coverage_report(path)
+            self.assertEqual(report["evaluable_trajectories"], 0)
+            self.assertEqual(report["evaluable_fraction"], 0.0)
+
+    def test_a_guard_probe_only_diverges_when_the_policy_actually_acts(self):
+        cases = ra.default_cases()[:4]
+        report = ra.ablations(cases, runs=1)
+        variants = report["with_policy_candidates"]["guard_probes"]["variants"]
+        for name, block in variants.items():
+            for arm in block["diverging_arms"]:
+                arm_block = block["leave_one_out"]["per_arm"][arm]
+                self.assertTrue(any(item["decision"].get("policy_applied")
+                                    for item in arm_block.get("results") or []),
+                                (name, arm))
+
+    def test_rp7_scans_bytecode_and_skips_the_case_file(self):
+        case = base_case()
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "cached.pyc").write_bytes(
+                b"\x00\x00" + case["hidden"]["later_results"][0].encode("utf-8"))
+            audit = rr.leak_audit(case, rr.visible_view(case), case_dir=root)
+            self.assertTrue(any("cached.pyc" in item for item in audit), audit)
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "case.json").write_text(json.dumps(case), encoding="utf-8")
+            audit = rr.leak_audit(case, rr.visible_view(case), case_dir=root)
+            self.assertFalse(any("case.json" in item for item in audit), audit)

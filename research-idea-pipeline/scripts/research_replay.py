@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -126,6 +127,21 @@ METRIC_DIMENSIONS: Tuple[str, ...] = (
 #: Keys that must never reach the runner.
 HIDDEN_KEYS: Tuple[str, ...] = ("hidden", "evaluation_only", "reference", "answer",
                                 "later_results", "future")
+
+#: Regions that are genuine decision-time inputs: the agent is meant to see the canonical
+#: state, the candidate actions, the scheduler, the case's own question, the observation
+#: packet and any recalled projection. An identifier that appears here is legitimate history,
+#: not a leak.
+LEGITIMATE_VISIBLE_REGIONS: Tuple[str, ...] = ("state", "legal_actions", "scheduler",
+                                              "revisions", "question", "observation_packet",
+                                              "insight_cards", "cognition",
+                                              "policy_candidates")
+
+#: Only *identifier-shaped* short tokens are treated as answer markers: 2-11 ASCII chars,
+#: starting with a letter and containing a digit (`X1`, `LIT1`, `P3`, `ADV4`). Natural
+#: language fragments such as "mechanism A" are deliberately excluded — they legitimately
+#: appear in the question, and a guard that fires on them is noise, not protection.
+SHORT_TOKEN_PATTERN = re.compile(r"^(?=.{2,11}$)(?=.*[0-9])[A-Za-z][A-Za-z0-9_.\-]*$")
 
 #: Behaviours an adversarial case may forbid.
 FORBIDDEN_BEHAVIOURS: Tuple[str, ...] = (
@@ -279,8 +295,65 @@ def forbidden_strings(case: Dict[str, Any]) -> List[str]:
 
 
 def leak_scan(case: Dict[str, Any], visible: Any) -> List[str]:
+    """Hidden strings reachable from the visible payload.
+
+    Tier 1 is the original substring guard over strings of 12+ characters. Tier 2 covers the
+    shorter answer tokens the length filter used to drop entirely: an identifier such as an
+    intervention id is legitimate inside the decision-time inputs (the agent must see the
+    candidate set), so it is only a leak when it also appears *outside* those inputs, where
+    nothing could have put it except a smuggled answer.
+    """
     blob = json.dumps(visible, ensure_ascii=False)
-    return [text for text in forbidden_strings(case) if text in blob]
+    found = [text for text in forbidden_strings(case) if text in blob]
+    found.extend(f"<short:{token}>" for token in short_token_leaks(case, visible))
+    return sorted(set(found))
+
+
+def short_answer_tokens(case: Dict[str, Any]) -> List[str]:
+    """Hidden answer tokens too short for the substring guard but specific enough to matter."""
+    hidden = case.get("hidden") or {}
+    evaluation = case.get("evaluation_only") or {}
+
+    def walk(value: Any) -> Iterable[str]:
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from walk(item)
+
+    tokens: List[str] = []
+    for value in list(walk(hidden)) + list(walk(evaluation)):
+        text = value.strip()
+        if SHORT_TOKEN_PATTERN.match(text):
+            tokens.append(text)
+    return sorted(set(tokens))
+
+
+def _region_blob(visible: Dict[str, Any], *, inside: bool) -> str:
+    return json.dumps({key: value for key, value in visible.items()
+                       if (key in LEGITIMATE_VISIBLE_REGIONS) is inside},
+                      ensure_ascii=False)
+
+
+def short_token_leaks(case: Dict[str, Any], visible: Dict[str, Any]) -> List[str]:
+    """Answer identifiers the agent could not have derived from its inputs.
+
+    A short identifier is only a leak when it appears in the authored context **and** is
+    absent from every decision-time input. An intervention id that the agent can already see
+    in the candidate set or the observation packet reveals nothing; the same id appearing
+    only in a hand-written `known_conditions` entry reveals the answer.
+    """
+    inside = _region_blob(visible, inside=True)
+    outside = _region_blob(visible, inside=False)
+    leaks: List[str] = []
+    for token in short_answer_tokens(case):
+        pattern = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(token) + r"(?![A-Za-z0-9_])")
+        if pattern.search(outside) and not pattern.search(inside):
+            leaks.append(token)
+    return sorted(set(leaks))
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +527,7 @@ def decision_errors(decision: Any) -> List[Diagnostic]:
         diagnostics.append(Diagnostic(
             "RP5", "decision.novelty_self_rating",
             "agent 自评不是 novelty 证据；评分只读 case 携带的独立标签或文献近邻"))
-    if decision.get("arm") not in ABLATION_ARMS:
+    if decision.get("arm") not in ABLATION_ARMS + RSI_ARMS:
         diagnostics.append(Diagnostic("RP3", "decision.arm", "未知的 ablation arm"))
     return diagnostics
 
@@ -866,6 +939,8 @@ def leak_audit(case: Dict[str, Any], visible: Dict[str, Any], *,
     """
     findings: List[str] = []
     findings.extend(f"RP2: {text}" for text in leak_scan(case, visible))
+    findings.extend(f"RP2-short: 隐藏答案短 token {token!r} 出现在决策时输入之外"
+                    for token in short_token_leaks(case, visible))
 
     decision_time = _year(visible.get("decision_time"))
     if decision_time is not None:
@@ -896,11 +971,18 @@ def leak_audit(case: Dict[str, Any], visible: Dict[str, Any], *,
                 continue
             if not resolved.is_file():
                 continue
-            if resolved.suffix in (".pyc",):
-                continue
             try:
                 text = resolved.read_text(encoding="utf-8", errors="ignore")
             except OSError:
+                continue
+            # A bytecode cache can hold the hidden text too, so it is scanned like any other
+            # file. The case file itself is skipped: it necessarily contains its own answer.
+            try:
+                parsed = json.loads(text)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                parsed = None
+            if isinstance(parsed, dict) and parsed.get("_schema") == SCHEMA_CASE \
+                    and parsed.get("id") == case.get("id"):
                 continue
             for marker in hidden_strings:
                 if marker in text:
@@ -987,7 +1069,8 @@ def coverage_report(path: Path) -> Dict[str, Any]:
     # Count trajectories that actually have a real outcome. Dividing the number of distinct
     # action ids by the trajectory count under-reported coverage whenever several observed
     # trajectories happened to choose the same action.
-    evaluable = sum(1 for view in views.values() if view.get("outcome") is not None)
+    evaluable = sum(1 for view in views.values()
+                    if view.get("outcome") is not None and view.get("decision") is not None)
     return {
         "schema": "research-idea-pipeline/replay-coverage@1",
         "source": support["source"],
@@ -1030,7 +1113,8 @@ def cases_from_trajectory(path: Path, *, state: Dict[str, Any],
                         "known_conditions": [],
                         "decision_time": (decision.get("context") or {}).get("decided_at"),
                         "evidence_support": {
-                            "observed_actions": [str(chosen)] if view.get("outcome") else [],
+                            "observed_actions": ([str(chosen)]
+                                                 if chosen and view.get("outcome") else []),
                             "replay_supported_actions": [str(chosen)] if chosen else [],
                         }},
             "hidden": {"later_results": [], "answer": answer},
@@ -1124,7 +1208,15 @@ def run_suite(
     runs: int = 1,
     runner: Optional[Callable[[Dict[str, Any], str], Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Run the ablation. Reports measured values and uncertainty, never a claimed gain."""
+    """Run the ablation. Reports measured values and uncertainty, never a claimed gain.
+
+    An invalid case is refused rather than scored: a case with no usable answer produced
+    all-`None` dimensions while the report still claimed an adequate sample.
+    """
+    invalid = [case.get("id") for case in cases if case_errors(case)]
+    if invalid:
+        raise cg.CognitionError(
+            "replay suite received invalid cases: " + ", ".join(str(item) for item in invalid))
     per_arm: Dict[str, Any] = {}
     for arm in arms:
         results = []
@@ -1167,13 +1259,22 @@ def run_suite(
     # instead of implying that the extra capability was measured.
     signature: Dict[str, List[str]] = {}
     for arm, block in per_arm.items():
-        key = json.dumps({dimension: block["dimensions"][dimension]["mean"]
-                          for dimension in METRIC_DIMENSIONS}, sort_keys=True)
+        # Means alone hid real differences: an arm with pass_rate 1.0 and no violations and
+        # one with pass_rate 0.0 plus a violation were grouped as "undifferentiated".
+        key = json.dumps({"means": {dimension: block["dimensions"][dimension]["mean"]
+                                    for dimension in METRIC_DIMENSIONS},
+                          "pass_rate": block["pass_rate"],
+                          "violations": block["violations"]}, sort_keys=True)
         signature.setdefault(key, []).append(arm)
     undifferentiated = sorted(group for group in signature.values() if len(group) > 1)
 
     sample_size = len(cases) * max(1, runs)
-    sufficient = sample_size >= 2 and len(cases) >= 3
+    assessable = any(
+        metric["value"] is not None
+        for block in per_arm.values()
+        for result in block.get("results") or []
+        for metric in result["evaluation"]["metrics"].values())
+    sufficient = sample_size >= 2 and len(cases) >= 3 and assessable
     unobservable = sum(block["evidence_support"].get("NO_SUPPORT", 0)
                        for block in per_arm.values())
     return {

@@ -116,6 +116,35 @@ def allow_policy(**overrides):
     return policy
 
 
+def attested_trajectories(*projects):
+    """Minimal real trajectory records: one decision plus one qualified outcome each.
+
+    PT9 accepts a project only when the trajectory carries BOTH, so these are what
+    legitimate cross-project evidence looks like.
+    """
+    records = []
+    for project in projects:
+        ident = f"DT-{project.lower()}"
+        records.append({"_schema": "research-idea-pipeline/decision-trajectory@1",
+                        "record": "decision", "trajectory_id": ident, "project": project,
+                        "route": project,
+                        "context": {"state_version": 3, "state_digest": "sha256:x",
+                                    "scientific_question": "q",
+                                    "decided_at": "2026-01-01T00:00:00Z"},
+                        "decision": {"chosen": "X1", "dispatch_status": "dispatched",
+                                     "candidates": []},
+                        "recorded_at": "2026-01-01T00:00:00Z"})
+        records.append({"_schema": "research-idea-pipeline/decision-trajectory@1",
+                        "record": "outcome", "trajectory_id": ident, "project": project,
+                        "evidence_qualification": "qualified",
+                        "result": {"kind": "experiment_result",
+                                   "summary": "observed x=0.42"},
+                        "observed_at": "2026-01-02T00:00:00Z", "at_state_version": 3,
+                        "scientific_delta": "none", "decision_delta": "none",
+                        "policy_delta": "none"})
+    return records
+
+
 def transfer(policy, target, source, **kwargs):
     options = {"source_state": source, "target_tools": ["evaluation-harness"],
                "source_project": "A", "target_project": "B"}
@@ -367,11 +396,46 @@ class TestTransferDecision(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCK")
         self.assertIn("PT9", result["codes"])
 
-    def test_global_scope_with_two_projects_and_independent_eval_is_allowed(self):
-        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B"])
+    def test_global_scope_with_two_attested_projects_is_allowed(self):
+        """PT9 tightened: the projects must be backed by real trajectory evidence."""
+        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B"],
+                              supporting_trajectory_ids=["DT-a", "DT-b"],
+                              independent_evaluation_refs=["DT-a", "DT-b"])
         result = transfer(policy, self.target, self.source,
-                          source_trajectories=[{"project": "A"}, {"project": "B"}])
+                          source_trajectories=attested_trajectories("A", "B"))
         self.assertEqual(result["status"], "ALLOW", result["reasons"])
+
+    def test_a_self_declared_project_list_is_not_cross_project_evidence(self):
+        """PT9: `evidence_projects: [A, B]` with zero records used to ALLOW."""
+        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B"])
+        result = transfer(policy, self.target, self.source)
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])
+
+    def test_a_bare_outcome_line_is_not_evidence(self):
+        """PT9: two forged outcome records with no decision behind them used to ALLOW."""
+        forged = [{"record": "outcome", "trajectory_id": f"DT-{project}",
+                   "project": project, "evidence_qualification": "qualified"}
+                  for project in ("A", "B")]
+        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B"])
+        result = transfer(policy, self.target, self.source, records=forged)
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])
+
+    def test_an_unbacked_declared_project_blocks(self):
+        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B", "Z"])
+        result = transfer(policy, self.target, self.source,
+                          source_trajectories=attested_trajectories("A", "B"))
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])
+
+    def test_a_supporting_trajectory_that_is_not_attested_blocks(self):
+        policy = allow_policy(scope={"kind": "global"}, evidence_projects=["A", "B"],
+                              supporting_trajectory_ids=["DT-a", "DT-ghost"])
+        result = transfer(policy, self.target, self.source,
+                          source_trajectories=attested_trajectories("A", "B"))
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])
 
     def test_blocked_when_counterexamples_cover_the_target_PT10(self):
         policy = allow_policy(counterexamples=[
@@ -931,3 +995,34 @@ class TestTransferDeltaRegressions(unittest.TestCase):
         decision = pt.transfer_decision(policy, state)
         self.assertEqual(decision["status"], "BLOCK")
         self.assertTrue(any("PT8" in str(reason) for reason in decision["reasons"]))
+
+
+class TestAttestedCrossProjectEvidence(unittest.TestCase):
+    """PT9 tightened: a self-declared project list is not cross-project evidence."""
+
+    def _policy(self, **over):
+        options = {"scope": {"kind": "global", "structures": ["reframe"]},
+                   "evidence_projects": ["A", "B"]}
+        options.update(over)
+        return allow_policy(**options)
+
+    def test_two_attested_projects_allow(self):
+        policy = self._policy(supporting_trajectory_ids=["DT-a", "DT-b"],
+                              independent_evaluation_refs=["DT-a", "DT-b"])
+        result = transfer(policy, fixture_state(), fixture_state(),
+                          source_trajectories=attested_trajectories("A", "B"))
+        self.assertEqual(result["status"], "ALLOW", result["reasons"])
+
+    def test_a_bare_outcome_line_without_a_decision_is_not_evidence(self):
+        forged = [{"record": "outcome", "trajectory_id": f"DT-{p}", "project": p,
+                   "evidence_qualification": "qualified"} for p in ("A", "B")]
+        result = transfer(self._policy(), fixture_state(), fixture_state(), records=forged)
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])
+
+    def test_an_unbacked_declared_project_blocks(self):
+        policy = self._policy(evidence_projects=["A", "B", "Z"])
+        result = transfer(policy, fixture_state(), fixture_state(),
+                          source_trajectories=attested_trajectories("A", "B"))
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertIn("PT9", result["codes"])

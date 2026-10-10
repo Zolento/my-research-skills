@@ -124,10 +124,27 @@ def load_chained(path: Path, *, tolerant: bool = False
     path = Path(path)
     name = path.name
     diagnostics: List[cg.Diagnostic] = []
+    head = head_path(path)
     if not path.exists():
+        # An orphan head digest means the log was deleted: that is tampering, not an empty store.
+        if head.exists():
+            diagnostics.append(_diag("DT0", str(head),
+                                     "存在头部摘要但没有日志：历史被删除"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render())
+        return [], diagnostics
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError) as exc:
+        # A store that cannot be decoded is unreadable, not absent. It used to escape as a
+        # UnicodeDecodeError traceback through every caller.
+        diagnostics.append(_diag("DT0", name,
+                                 f"存储不可读或不是 UTF-8（{type(exc).__name__}）：拒绝继续"))
+        if not tolerant:
+            raise TrajectoryError(diagnostics[-1].render()) from exc
         return [], diagnostics
     records: List[Dict[str, Any]] = []
-    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
+    for index, line in enumerate(raw.splitlines()):
         if not line.strip():
             continue
         try:
@@ -160,7 +177,6 @@ def load_chained(path: Path, *, tolerant: bool = False
         records.append(record)
     if diagnostics and not tolerant:
         raise TrajectoryError(diagnostics[0].render())
-    head = head_path(path)
     expected_head = _digest(records[-1]) if records else None
     if head.exists():
         if head.read_text(encoding="ascii").strip() != expected_head:

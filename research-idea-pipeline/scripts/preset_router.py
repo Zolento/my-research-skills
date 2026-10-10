@@ -2067,6 +2067,30 @@ def _loop_step(ctx: Dict[str, Any], *,
             "blocked": False, "hold": True, "hold_reason": "no_legal_action",
             "assurance": guarantee, "pending_r10": []}
 
+def _atomic_write_json(path: Path, value: Any) -> None:
+    """Write JSON through a pending file plus `os.replace`, so a reader never sees a partial
+    scheduler telemetry file."""
+    import os
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pending = path.with_name(path.name + ".pending")
+    pending.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+                       encoding="utf-8")
+    os.replace(pending, path)
+
+
+def _route_name(state_path: Path) -> str:
+    """The route directory name, never the empty string.
+
+    `cg.route_of` returns `state_path.parent.name`, which is "" for a bare relative path such
+    as `research-state.json` in the current directory. An empty route silently produced
+    trajectory records with `route: ""` and skipped the cross-project gate.
+    """
+    resolved = Path(state_path).expanduser()
+    if not resolved.is_absolute():
+        resolved = Path.cwd() / resolved
+    return resolved.parent.name
+
+
 def scoped_policy_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """The ACTIVE Skill-RSI scoped policy (if any) and the adapter advice it produces.
 
@@ -2118,7 +2142,7 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     if candidate and policy["advice"]:
         conditions_ok, unmet = pe.scope_conditions_hold(candidate, ctx["state"])
         transfer = pe.cross_project_transfer_allowed(
-            candidate, ctx["state"], current_route=cg.route_of(ctx["state_path"]))
+            candidate, ctx["state"], current_route=_route_name(ctx["state_path"]))
         if conditions_ok and transfer["status"] != "BLOCK":
             decision = sm.strategy_decision(ctx["state"], ctx["index"], ctx["scheduler"],
                                             ctx["revisions"], advice=policy["advice"])
@@ -2196,7 +2220,9 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     write_failure = None
     if dispatch.get("tampered"):
         # A tampered policy store stops policy consumption; it is not a "no policy" state.
-        status = "HOLD"
+        # It must not downgrade a handler-derived BLOCKED (exit 3) to HOLD (exit 4).
+        if status != "BLOCKED":
+            status = "HOLD"
         write_failure = "policy_store_tampered"
     next_action = step["action"]
     if guidance and not guidance["stale"] and guidance["dispatch"].get("action"):
@@ -2211,7 +2237,10 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     # strategy memory rather than a scoped policy) is a false Delta.
     policy_delta: Dict[str, Any] = {"status": "none", "level": None, "policy_id": None,
                                     "scope": None}
-    if dispatch["applied"] and strategy_changed_dispatch and step.get("dispatched_action"):
+    if dispatch["applied"] and strategy_changed_dispatch and step.get("dispatched_action") \
+            and dispatch.get("policy_id"):
+        # A dispatch that came from the recorded strategy telemetry has no policy behind it;
+        # reporting an L2 policy delta there would be a policy claim without a policy.
         policy_delta = {"status": "applied", "level": dispatch.get("level") or "L2",
                         "policy_id": dispatch.get("policy_id"),
                         "scope": (dispatch.get("advice") or {}).get("scope")}
@@ -2223,7 +2252,7 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
             context = dt.record_context(state, state_path=ctx["state_path"],
                                         scheduler=ctx["scheduler"])
             record = dt.build_decision_record(
-                state, route=cg.route_of(ctx["state_path"]), project=ctx["route_dir"].name,
+                state, route=_route_name(ctx["state_path"]), project=ctx["route_dir"].name,
                 context=context,
                 candidates=[{"action": item.get("action"), "type": item.get("type"),
                              "target": item.get("target"), "eig": item.get("eig"),
@@ -2237,8 +2266,11 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                 dispatch_status="dispatched")
             outcome = dt.append_record(trajectory, record, state=state,
                                        route=cg.route_of(ctx["state_path"]))
-            if outcome["status"] in ("APPENDED", "DUPLICATE"):
+            if outcome["status"] == "APPENDED":
                 writes.append(dt.TRAJECTORY_NAME)
+            elif outcome["status"] == "DUPLICATE":
+                # Nothing new was written; claiming a write would be a false write report.
+                pass
             else:
                 # An INVALID trajectory write is a real failure, not a silent no-op.
                 write_failure = "decision_trajectory_rejected"
@@ -2250,8 +2282,7 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                 updated = sm.record_strategy_decision(
                     ctx["scheduler"], dispatch["decision"],
                     dispatch_result=f"dispatched {step['dispatched_action']}")
-                (ctx["route_dir"] / cg.SCHEDULER_NAME).write_text(
-                    json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                _atomic_write_json(ctx["route_dir"] / cg.SCHEDULER_NAME, updated)
                 writes.append(cg.SCHEDULER_NAME)
             except OSError as exc:
                 write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
@@ -3069,7 +3100,18 @@ def run_preset(
     if preset is None:
         return ({"error": f"unknown preset: {preset_id}", "known": list(PRESET_IDS)}, [], EXIT_ERROR)
     handler = HANDLERS[preset_id]
-    context = project_context(state_path, cognition_dir)
+    try:
+        context = project_context(state_path, cognition_dir)
+    except (cg.CognitionError, OSError, UnicodeDecodeError) as exc:
+        # A malformed project artefact is a diagnosable HOLD, not a traceback.
+        return ({"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                 "protocol": preset["protocol"], "entry": preset["entry"],
+                 "execution_scope": preset["execution_scope"],
+                 "reused": list(preset["reuses"]),
+                 "observed": {"context_error": f"{type(exc).__name__}: {exc}"},
+                 "decision": {}, "steps": [], "writes": [], "changed_decision": None,
+                 "next_action": None, "hold_reason": "project_context_unreadable"},
+                [Diagnostic("PR10", "context", f"无法读取项目上下文：{exc}")], EXIT_ENV)
     # Skill-RSI source freeze: the before/after digest check runs on EVERY preset execution,
     # including read-only diagnosis (Skill-RSI §9 asks for the loaded source digest at the
     # start of a research run). The audit EVENT is written only when the caller authorised
@@ -3085,7 +3127,8 @@ def run_preset(
         # out of the router. Genuinely unrecoverable errors (MemoryError, KeyboardInterrupt)
         # still propagate.
         handler_error = f"{type(exc).__name__}: {exc}"
-        payload = {"preset_id": preset_id, "status": "HOLD", "protocol": preset["protocol"],
+        payload = {"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                   "protocol": preset["protocol"],
                    "entry": preset["entry"], "execution_scope": preset["execution_scope"],
                    "reused": list(preset["reuses"]), "observed": {"handler_error": handler_error},
                    "decision": {}, "steps": [], "writes": [], "changed_decision": None,
@@ -3095,19 +3138,27 @@ def run_preset(
     integrity: Dict[str, Any] = dict(freeze.result or {})
     payload["source_integrity"] = integrity
     violated = integrity.get("status") != "PASS"
-    # The audit event is written only when this run is allowed to write: `apply` was passed,
-    # the handler declared at least one write, or the source boundary was violated (a security
-    # event is recorded even for a read-only preset). A read-only request stays write-free.
+    # The audit event is written only when `apply` was passed AND (the handler declared at
+    # least one write OR the source boundary was violated). Without `apply` a read-only
+    # request stays completely write-free, even if something looked like a violation — the
+    # caller still sees the VIOLATION in source_integrity and gets a HOLD.
     if apply and (violated or payload.get("writes")):
-        if violated:
-            hold = sf.hold_on_violation(context["route_dir"], integrity,
-                                        context=f"preset:{preset_id}")
-            event = hold.get("event")
-        else:
-            event = sf.record_integrity_event(context["route_dir"], {
-                "action": "VERIFY_PASS", "status": "PASS",
-                "context": f"preset:{preset_id}", "checked": integrity.get("checked"),
-            })
+        try:
+            if violated:
+                hold = sf.hold_on_violation(context["route_dir"], integrity,
+                                            context=f"preset:{preset_id}")
+                event = hold.get("event")
+            else:
+                event = sf.record_integrity_event(context["route_dir"], {
+                    "action": "VERIFY_PASS", "status": "PASS",
+                    "context": f"preset:{preset_id}", "checked": integrity.get("checked"),
+                })
+        except OSError as exc:
+            # An unwritable route means the control plane cannot be trusted for this run.
+            event = None
+            integrity["event_error"] = f"{type(exc).__name__}: {exc}"
+            payload["status"] = "HOLD"
+            payload["hold_reason"] = "control_plane_unwritable"
         if event:
             # Declare the audit write; an undeclared write is a contract violation even when
             # the file is legitimate telemetry.
