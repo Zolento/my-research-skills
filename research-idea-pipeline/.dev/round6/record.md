@@ -197,3 +197,52 @@ FAILED (failures=14, errors=9)     # 23/31 失败
 
 同一文件在本轮修复后的树上：`Ran 31 tests ... OK`（31/31）。
 因此这 23 项是旧版行为的真实复现，而不是修复后的追认。
+
+## 10. 二次复核（第八段）：在新代码里又发现两个缺陷并修复
+
+对第六轮自身改动做对抗性复核，发现两处**由本轮引入**的缺陷：
+
+### 10.1 回滚恢复 ACTIVE 时等级被误报为 L1
+
+- **复现**：P-1（L3 晋升）→ P-2 晋升使 P-1 变 SUPERSEDED → `rollback(P-2 → P-1)`。
+  修复前该恢复记录写成 `P-1 SUPERSEDED → ACTIVE  level=L1`，而 P-1 本是以 L3 证据晋升的。
+- **原因**：新的 `_achieved_level()` 只从「本次携带的评价产物」推导等级；回滚恢复不携带新产物，
+  于是回落到默认 `L1`。`level` 是关于证据的陈述，误报 L1 是**虚假陈述**。
+- **修复**：`_achieved_level()` 在没有新产物时，取该策略**历史转换记录中出现过的最高等级**。
+- **验证**：`test_a_restored_policy_keeps_its_evidence_level`（在复核前代码上失败，现通过）。
+
+### 10.2 试运行产物伪装成「评价结论」
+
+- **复现**：`begin_bounded_trial` 写出的 trial 产物带 `"verdict": {"verdict": "SUPPORTED"}`，
+  而它并没有做任何评价（`cases=1, runs=1` 是硬编码）。
+- **原因**：等级重算函数只认 `SUPPORTED`，为了让试运行达到 L2 便伪造了结论。
+- **修复**：
+  - trial 产物改为 `"verdict": {"verdict": "DISPATCHED"}`，并显式记录
+    `gates = {dispatch_record, budget_expanded, hard_gates_unchanged}`；
+  - `_recomputed_level(..., schema=SCHEMA_TRIAL)` 对试运行**单独判定**：
+    有派遣记录、未扩预算、未改硬门禁 → L2，否则 L1。试运行不再声称任何评价结论。
+- **验证**：`test_a_bounded_trial_records_a_dispatch_not_an_evaluation_verdict`
+  （复核前代码上失败，现通过）；`test_a_trial_artifact_cannot_stand_in_for_an_evaluation`
+  为回归保护（旧版已正确地按 schema 拒绝）。
+
+### 10.3 复核中确认**不是**缺陷的三项
+
+- **HOLD 后重试评价**：`evaluate_candidate` 接受 `HOLD` 起始状态，且
+  `ALLOWED_TRANSITIONS["HOLD"]` 含 `REPLAY_EVALUATED` → 重试链路完整（实测 HOLD → 重试 →
+  BOUNDED_TRIAL → VALIDATED → ACTIVE）。
+- **真实回放数据**：对 `examples/replay/adversarial` 的真实报告（14 case × 2 runs），
+  基线 198a420 与本轮新代码的 `ablation_verdict` **都是** `UNDIFFERENTIATED → HOLD`；
+  遍历真实报告的全部臂对（10 个臂）也没有出现「旧版 SUPPORTED / 新版非 SUPPORTED」的情形。
+  即：方向缺陷由受控报告测试复现，出货 fixture 上两者都不会晋升。
+- **真实 CLI 链路**：`freeze-rules → propose → SHADOW → evaluate → trial → validate →
+  promote → rollback` 全部按文档工作，等级依次
+  `L1 → L3 → L2 → L3 → L3`，`rollback` 自环被 `PE13` 拒绝。
+
+### 10.4 二次复核后的计数
+
+| 项 | 值 |
+|---|---|
+| `test_promotion_integrity.py` | **34 tests OK**（第六轮 31 + 复核 3） |
+| 全量单元测试 | **1742 OK（skipped=3）** |
+| `release_check.py` | **PASS（18 步）** |
+| 5 个模块 selftest | 全 OK |

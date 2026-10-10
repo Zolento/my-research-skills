@@ -544,3 +544,60 @@ class TestDamagedHead(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Second-pass review of round six: two defects found in the new code itself
+# ---------------------------------------------------------------------------
+
+class TestSecondPassReview(PromotionCase):
+    def _promote(self, policy_id):
+        self.ready(policy_id)
+        self.stored_report(policy_id)
+        pe.begin_bounded_trial(self.state_path, policy_id,
+                               dispatch_evidence={"dispatched": "R2"})
+        pe.validate_candidate(self.state_path, policy_id)
+        self.assertEqual(pe.promote_to_active(self.state_path, policy_id,
+                                              {"scope_evidence_ok": True})["status"],
+                         "ACTIVE")
+
+    def test_a_restored_policy_keeps_its_evidence_level(self):
+        """Restoring an L3-backed policy must not relabel it L1."""
+        self._promote("P-1")
+        self._promote("P-2")
+        self.assertEqual(pe.rollback(self.state_path, "P-2", to_policy_id="P-1",
+                                     reason="regression")["status"], "ROLLED_BACK")
+        records, _ = pe.load_records(self.state_path)
+        restores = [item for item in records
+                    if item.get("record") == "transition" and item.get("policy_id") == "P-1"
+                    and item.get("from") == "SUPERSEDED" and item.get("to") == "ACTIVE"]
+        self.assertEqual(len(restores), 1, records)
+        self.assertEqual(restores[0]["level"], "L3", restores[0])
+
+    def test_a_bounded_trial_records_a_dispatch_not_an_evaluation_verdict(self):
+        """A trial artifact must not claim an evaluation result it never produced."""
+        self.ready("P-1")
+        self.stored_report("P-1")
+        self.assertEqual(pe.begin_bounded_trial(
+            self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})["status"],
+            "BOUNDED_TRIAL")
+        artifacts = list(pe.trials_dir(self.state_path).glob("*.json"))
+        self.assertEqual(len(artifacts), 1, artifacts)
+        payload = json.loads(artifacts[0].read_text(encoding="utf-8"))
+        self.assertEqual(payload["_schema"], pe.SCHEMA_TRIAL)
+        self.assertNotEqual(payload["verdict"]["verdict"], "SUPPORTED")
+        self.assertTrue(payload["gates"]["dispatch_record"])
+        self.assertFalse(payload["gates"]["budget_expanded"])
+        self.assertEqual(payload["level"], "L2")
+
+    def test_a_trial_artifact_cannot_stand_in_for_an_evaluation(self):
+        """Pointing VALIDATED at a trial artifact must not satisfy the L3 requirement."""
+        self.ready("P-1")
+        self.stored_report("P-1")
+        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        trial = json.loads(next(pe.trials_dir(self.state_path).glob("*.json"))
+                           .read_text(encoding="utf-8"))
+        ref = {"path": str(next(pe.trials_dir(self.state_path).glob("*.json"))),
+               "digest": trial["digest"]}
+        result = pe.validate_candidate(self.state_path, "P-1", evaluation_ref=ref)
+        self.assertEqual(result["status"], "INVALID", result)

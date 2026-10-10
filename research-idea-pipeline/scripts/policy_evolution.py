@@ -851,8 +851,17 @@ def _read_artifact(directory: Path, ref: Any) -> Tuple[Optional[Dict[str, Any]],
     return document, []
 
 
-def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any]) -> str:
+def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any], *,
+                      schema: Optional[str] = None) -> str:
     """The level an artifact's own evidence supports — never the level it claims."""
+    if schema == SCHEMA_TRIAL:
+        # A bounded trial is a *dispatch* record, not an evaluation verdict: it earns L2 only
+        # when it records the dispatch and keeps the budget and the hard gates unchanged.
+        gates = gates or {}
+        safe = (bool(gates.get("dispatch_record"))
+                and not gates.get("budget_expanded")
+                and bool(gates.get("hard_gates_unchanged")))
+        return "L2" if safe else "L1"
     if (verdict or {}).get("verdict") != "SUPPORTED":
         return "L1"
     rules = DEFAULT_EVALUATION_RULES
@@ -916,7 +925,7 @@ def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
 
     verdict = payload.get("verdict") if isinstance(payload.get("verdict"), dict) else {}
     gates = payload.get("gates") if isinstance(payload.get("gates"), dict) else {}
-    recomputed = _recomputed_level(gates, verdict)
+    recomputed = _recomputed_level(gates, verdict, schema=payload.get("_schema"))
     if payload.get("level") != recomputed:
         diagnostics.append(_diag("PE11", path,
                                  f"产物自报等级 {payload.get('level')!r} 与其证据不符"
@@ -993,16 +1002,26 @@ def transition_errors(state_path: Path, records: Sequence[Dict[str, Any]], polic
 def _achieved_level(state_path: Path, records: Sequence[Dict[str, Any]],
                     candidate: Dict[str, Any], target: str,
                     evidence: Dict[str, Any]) -> str:
-    """The level actually achieved, derived from the verified artifact."""
+    """The level actually achieved, derived from the verified artifact.
+
+    When there is no new artifact (the rollback restore of an already-promoted policy), the
+    highest level that policy previously recorded is kept. Defaulting to L1 misreported an
+    L3-backed policy as L1 the moment it was superseded and restored.
+    """
     if target == "SHADOW":
         return "L1"
     using_trial = target == "BOUNDED_TRIAL"
     ref = evidence.get("trial_ref" if using_trial else "evaluation_ref")
     directory = trials_dir(state_path) if using_trial else evaluations_dir(state_path)
     payload, errors = _read_artifact(directory, ref)
-    if payload is None or errors:
-        return "L1"
-    return _recomputed_level(payload.get("gates") or {}, payload.get("verdict") or {})
+    if payload is not None and not errors:
+        return _recomputed_level(payload.get("gates") or {}, payload.get("verdict") or {},
+                                 schema=payload.get("_schema"))
+    prior = [record.get("level") for record in records
+             if record.get("record") == "transition"
+             and record.get("policy_id") == candidate.get("policy_id")
+             and record.get("level") in LEVEL_RANK]
+    return max(prior, key=lambda item: LEVEL_RANK[item]) if prior else "L1"
 
 
 def _transition_locked(state_path: Path, records: Sequence[Dict[str, Any]], policy_id: str,
@@ -1291,7 +1310,7 @@ def evaluate_candidate(state_path: Path, policy_id: str, report: Dict[str, Any],
             "evaluated_at": _now(),
             "verdict": verdict,
             "gates": gates,
-            "level": _recomputed_level(gates, verdict),
+            "level": _recomputed_level(gates, verdict, schema=SCHEMA_EVALUATION),
         }
         ref = _store_artifact(state_path, evaluations_dir(state_path), payload)
         evidence = {"evaluation_ref": ref, "reason": reason or "; ".join(verdict["reasons"])}
@@ -1357,11 +1376,15 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
             "hard_gates_unchanged": bool(hard_gates_unchanged),
             "produced_by": "policy_evolution.begin_bounded_trial",
             "recorded_at": _now(),
-            "verdict": {"verdict": "SUPPORTED"},
-            "gates": {"assessable_dimensions": 2, "cases": 1, "runs": 1,
+            "verdict": {"verdict": "DISPATCHED",
+                        "note": "试运行派遣记录，不是评价结论"},
+            "gates": {"dispatch_record": True,
+                      "budget_expanded": bool(budget_expanded),
+                      "hard_gates_unchanged": bool(hard_gates_unchanged),
                       "runner": "bounded-trial"},
         }
-        payload["level"] = _recomputed_level(payload["gates"], payload["verdict"])
+        payload["level"] = _recomputed_level(payload["gates"], payload["verdict"],
+                                             schema=SCHEMA_TRIAL)
         ref = _store_artifact(state_path, trials_dir(state_path), payload)
         return _transition_locked(state_path, records, policy_id, "BOUNDED_TRIAL",
                                   evidence={"trial_ref": ref, "reason": "bounded trial"},
