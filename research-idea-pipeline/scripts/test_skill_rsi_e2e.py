@@ -25,6 +25,7 @@ import cognition as cg
 import decision_trajectory as dt
 import execution_gate as eg
 import policy_evolution as pe
+import rsi_test_support as support
 import preset_router as pr
 import research_replay as rr
 import strategy_memory as sm
@@ -33,13 +34,20 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 PREFERRED_XID = "R2"
 
 
-def arm(mean):
-    return {"dimensions": {name: {"mean": mean, "min": mean - 0.05, "max": mean + 0.05}
-                           for name in rr.METRIC_DIMENSIONS},
-            "results": [{"case_id": f"C{i}", "leak_checked": True,
-                         "isolation_verified": True,
-                         "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
-                        for i in range(5)],
+def arm(mean, spread=0.05):
+    """An arm whose declared summary is derived from its own per-case execution record."""
+    base = [round(mean - spread + 2 * spread * index / 4, 4) for index in range(5)]
+    # 5 cases x 2 runs, so the declared counts match the execution record exactly.
+    rows = [(f"C{index}", value) for _ in range(2) for index, value in enumerate(base)]
+    results = [{"case_id": case_id, "leak_checked": True, "isolation_verified": True,
+                "evaluation": {"metrics": {name: {"value": value}
+                                           for name in rr.METRIC_DIMENSIONS},
+                               "evidence_support": {"class": "OBSERVED"}}}
+               for case_id, value in rows]
+    dimensions = {name: {"mean": round(sum(base) / len(base), 4),
+                         "min": min(base), "max": max(base)}
+                  for name in rr.METRIC_DIMENSIONS}
+    return {"dimensions": dimensions, "results": results,
             "evidence_support": {"OBSERVED": 5}}
 
 
@@ -118,7 +126,12 @@ class RsiProject(unittest.TestCase):
         self.assertEqual(pe.begin_bounded_trial(
             state_path, policy_id,
             dispatch_evidence={"dispatched": "R2"})["status"], "BOUNDED_TRIAL")
-        self.assertEqual(pe.validate_candidate(state_path, policy_id)["status"], "VALIDATED")
+        signature = pe.policy_record(pe.load_records(state_path)[0], policy_id)["signature"]
+        credential = support.research_validation(
+            state_path, policy_id, pathlib.Path(state_path).parent,
+            signature=signature, rules_digest=pe.evaluation_rules_digest(state_path))
+        self.assertEqual(pe.record_research_validation(
+            state_path, policy_id, credential)["status"], "VALIDATED")
         self.assertEqual(pe.promote_to_active(state_path, policy_id,
                                               {"scope_evidence_ok": True})["status"], "ACTIVE")
 

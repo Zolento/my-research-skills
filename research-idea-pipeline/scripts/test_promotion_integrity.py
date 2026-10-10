@@ -37,6 +37,7 @@ import unittest
 import cognition as cg
 import decision_trajectory as dt
 import policy_evolution as pe
+import rsi_test_support as support
 import policy_transfer as pt
 import research_replay as rr
 
@@ -67,18 +68,29 @@ def fixture_state(version=3):
 def report(*, candidate=None, control=None, cases=5, runs=2, results=True,
            unobservable=0, schema="research-idea-pipeline/replay-ablation@1",
            runner="offline CIE runner (no model calls)", arms=("rsi_full", "full_cie")):
-    """A realistic ablation report with a per-case execution record."""
+    """A realistic ablation report whose declared summary matches its execution record."""
     candidate = dict(candidate or {d: 0.9 for d in DIMENSIONS})
     control = dict(control or {d: 0.3 for d in DIMENSIONS})
 
     def block(means):
-        dims = {d: {"mean": means.get(d, 0.5), "min": means.get(d, 0.5) - 0.05,
-                    "max": means.get(d, 0.5) + 0.05} for d in DIMENSIONS}
-        records = ([{"case_id": f"C{i}", "leak_checked": True, "isolation_verified": True,
-                     "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
-                    for i in range(cases)] if results else [])
-        return {"dimensions": dims, "results": records,
-                "evidence_support": {"OBSERVED": cases} if results else {}}
+        rows = []
+        if results:
+            for run in range(runs):
+                for index in range(cases):
+                    rows.append({
+                        "case_id": f"C{index}", "run": run,
+                        "leak_checked": True, "isolation_verified": True,
+                        "evaluation": {"metrics": {d: {"value": means.get(d, 0.5)}
+                                                   for d in DIMENSIONS},
+                                       "evidence_support": {"class": "OBSERVED"}}})
+        dims = {}
+        for d in DIMENSIONS:
+            values = [row["evaluation"]["metrics"][d]["value"] for row in rows]
+            dims[d] = {"mean": round(sum(values) / len(values), 4) if values else None,
+                       "min": min(values) if values else None,
+                       "max": max(values) if values else None}
+        return {"dimensions": dims, "results": rows,
+                "evidence_support": {"OBSERVED": len(rows)} if rows else {}}
 
     return {"schema": schema, "cases": cases, "runs_per_case": runs,
             "sample_size": cases * runs, "sufficient_sample": True,
@@ -146,6 +158,18 @@ class PromotionCase(unittest.TestCase):
 
     def stored_report(self, policy_id="P-1", **kwargs):
         return pe.evaluate_candidate(self.state_path, policy_id, report(**kwargs))
+
+    def record_l3(self, policy_id="P-1", **overrides):
+        """Record a valid L3 research-validation credential (the only route to L3)."""
+        records, _ = pe.load_records(self.state_path)
+        signature = pe.policy_record(records, policy_id)["signature"]
+        credential = support.research_validation(
+            self.state_path, policy_id, pathlib.Path(self.temp.name),
+            signature=signature, rules_digest=pe.evaluation_rules_digest(self.state_path),
+            **overrides)
+        result = pe.record_research_validation(self.state_path, policy_id, credential)
+        assert result["status"] == "VALIDATED", result
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -274,17 +298,22 @@ class TestEvaluationArtifactBinding(PromotionCase):
         self.assertIsNotNone(artifact, "no evaluation artifact was stored")
         return artifact
 
+    def _gate(self, ref, target="REPLAY_EVALUATED", policy_id="P-1"):
+        """Run the artifact verification layer directly (that is the layer under test)."""
+        records, _ = pe.load_records(self.state_path)
+        candidate = pe.policy_record(records, policy_id)
+        key = "trial_ref" if target == "BOUNDED_TRIAL" else "evaluation_ref"
+        return [item.render() for item in pe._artifact_gate_errors(
+            self.state_path, records, candidate, target, {key: ref})]
+
     def test_an_artifact_outside_the_policy_store_is_refused(self):
-        """Routed through a controlled entry, so the ARTIFACT check is what refuses."""
         self.ready()
         self.stored_report()
         outside = pathlib.Path(self.temp.name) / "forged.json"
         outside.write_text(json.dumps({"policy_id": "P-1"}), encoding="utf-8")
-        result = pe.validate_candidate(self.state_path, "P-1",
-                                       evaluation_ref={"path": str(outside),
-                                                       "digest": "sha256:x"})
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("策略存储目录", " ".join(result["diagnostics"]))
+        diagnostics = self._gate({"path": str(outside), "digest": "sha256:x"})
+        self.assertTrue(diagnostics, "an outside artifact was accepted")
+        self.assertIn("策略存储目录", " ".join(diagnostics))
 
     def test_a_symlinked_artifact_escape_is_refused(self):
         """A symlink inside the store that resolves outside must not be accepted."""
@@ -294,22 +323,19 @@ class TestEvaluationArtifactBinding(PromotionCase):
         outside.write_text(json.dumps({"policy_id": "P-1"}), encoding="utf-8")
         link = pe.evaluations_dir(self.state_path) / "evil.json"
         os.symlink(outside, link)
-        result = pe.validate_candidate(self.state_path, "P-1",
-                                       evaluation_ref={"path": str(link),
-                                                       "digest": "sha256:x"})
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("策略存储目录", " ".join(result["diagnostics"]))
+        diagnostics = self._gate({"path": str(link), "digest": "sha256:x"})
+        self.assertTrue(diagnostics, "a symlinked escape was accepted")
+        self.assertIn("策略存储目录", " ".join(diagnostics))
 
-    def test_an_artifact_for_another_policy_cannot_validate_this_one(self):
+    def test_an_artifact_for_another_policy_is_refused(self):
         self.ready("P-1")
         self.stored_report("P-1")
         self.ready("P-2")
         self.stored_report("P-2")
         stolen = self._artifact("P-1")
-        result = pe.validate_candidate(self.state_path, "P-2",
-                                       evaluation_ref=stolen["ref"])
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("另一个策略", " ".join(result["diagnostics"]))
+        diagnostics = self._gate(stolen["ref"], policy_id="P-2")
+        self.assertTrue(diagnostics, "another policy's artifact was accepted")
+        self.assertIn("另一个策略", " ".join(diagnostics))
 
     def test_a_replaced_evaluation_result_is_detected(self):
         self.ready()
@@ -321,10 +347,9 @@ class TestEvaluationArtifactBinding(PromotionCase):
         payload["verdict"]["sample_adequate"] = False
         payload["gates"]["assessable_dimensions"] = 0
         path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        result = pe.validate_candidate(self.state_path, "P-1",
-                                       evaluation_ref=artifact["ref"])
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("完整性摘要", " ".join(result["diagnostics"]))
+        diagnostics = self._gate(artifact["ref"])
+        self.assertTrue(diagnostics, "a replaced result was accepted")
+        self.assertIn("完整性摘要", " ".join(diagnostics))
 
     def test_evaluation_rules_tampering_invalidates_the_artifact(self):
         self.ready()
@@ -334,10 +359,9 @@ class TestEvaluationArtifactBinding(PromotionCase):
         document["rules"]["delta_tolerance"] = 0.99
         document["digest"] = cg.digest_of(document["rules"])
         pe.rules_path(self.state_path).write_text(json.dumps(document), encoding="utf-8")
-        result = pe.validate_candidate(self.state_path, "P-1",
-                                       evaluation_ref=artifact["ref"])
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("评价规则", " ".join(result["diagnostics"]))
+        diagnostics = self._gate(artifact["ref"])
+        self.assertTrue(diagnostics, "a rules mismatch was accepted")
+        self.assertIn("评价规则", " ".join(diagnostics))
 
     def test_an_artifact_whose_level_exceeds_its_evidence_is_refused(self):
         """The stored level is recomputed; an inflated level must not be believed."""
@@ -347,16 +371,28 @@ class TestEvaluationArtifactBinding(PromotionCase):
         path = pathlib.Path(artifact["ref"]["path"])
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["level"] = "L3"
-        payload["gates"]["runner"] = None          # no executor -> only L2
-        payload["gates"]["casec"] = 5
+        payload["gates"]["runner"] = None          # no executor -> not L2 either
         body = {k: v for k, v in payload.items() if k != "digest"}
         payload["digest"] = cg.digest_of(body)     # keep the digest self-consistent
         path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        result = pe.validate_candidate(self.state_path, "P-1",
-                                       evaluation_ref={"path": str(path),
-                                                       "digest": payload["digest"]})
-        self.assertEqual(result["status"], "INVALID", result)
-        self.assertIn("等级", " ".join(result["diagnostics"]))
+        diagnostics = self._gate({"path": str(path), "digest": payload["digest"]})
+        self.assertTrue(diagnostics, "an inflated level was accepted")
+        self.assertIn("等级", " ".join(diagnostics))
+
+    def test_a_trial_artifact_cannot_stand_in_for_a_replay_evaluation(self):
+        self.ready()
+        self.stored_report()
+        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        # Place the dispatch record where an evaluation artifact is expected: the credential
+        # class, not merely the location, is what must refuse it.
+        trial = pathlib.Path(support.trial_ref(self.state_path, "P-1")["path"])
+        relocated = pe.evaluations_dir(self.state_path) / "disguised-trial.json"
+        relocated.write_bytes(trial.read_bytes())
+        payload = json.loads(relocated.read_text(encoding="utf-8"))
+        diagnostics = self._gate({"path": str(relocated), "digest": payload["digest"]},
+                                 target="REPLAY_EVALUATED")
+        self.assertTrue(diagnostics, "a dispatch record was accepted as an evaluation")
+        self.assertIn("凭证", " ".join(diagnostics))
 
     def test_the_full_controlled_lifecycle_still_reaches_active(self):
         self.ready()
@@ -364,7 +400,7 @@ class TestEvaluationArtifactBinding(PromotionCase):
         trial = pe.begin_bounded_trial(self.state_path, "P-1",
                                        dispatch_evidence={"dispatched": "R2"})
         self.assertEqual(trial["status"], "BOUNDED_TRIAL", trial)
-        validated = pe.validate_candidate(self.state_path, "P-1")
+        validated = self.record_l3("P-1")
         self.assertEqual(validated["status"], "VALIDATED", validated)
         active = pe.promote_to_active(self.state_path, "P-1", {"scope_evidence_ok": True})
         self.assertEqual(active["status"], "ACTIVE", active)
@@ -528,7 +564,7 @@ class TestFrozenRulesIntegrity(PromotionCase):
         self.ready("P-1")
         self.stored_report("P-1")
         pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, "P-1")
+        self.record_l3("P-1")
         outcomes = []
         barrier = threading.Barrier(4)
 
@@ -598,7 +634,7 @@ class TestSecondPassReview(PromotionCase):
         self.stored_report(policy_id)
         pe.begin_bounded_trial(self.state_path, policy_id,
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, policy_id)
+        self.record_l3(policy_id)
         self.assertEqual(pe.promote_to_active(self.state_path, policy_id,
                                               {"scope_evidence_ok": True})["status"],
                          "ACTIVE")

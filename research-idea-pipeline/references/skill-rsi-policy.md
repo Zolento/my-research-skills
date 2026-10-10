@@ -149,15 +149,45 @@ PROPOSED → SHADOW → REPLAY_EVALUATED → BOUNDED_TRIAL → VALIDATED → ACT
   | 可信执行记录 | 报告必须带 `schema`、逐 case 的 `results`（含 `leak_checked`/`isolation_verified`）与具名 `runner`；否则不是评价证据 |
   | 证据等级 | 等级由产物的门与结论**重算**，不接受产物自报；各目标要求 L2 / L3 |
 
-- 等级重算规则：`SUPPORTED` 且可评维度 ≥2、`runs ≥ min_runs`、`cases ≥ min_cases`、
-  有具名 `runner` → L3；`SUPPORTED` 但不满足 → L2；其余 → L1。
+- **凭证类别决定等级上限**（合成证据不得冒充真实科研证据）：
+
+  | 凭证 | 产出入口 | 等级上限 |
+  |---|---|---|
+  | 回放凭证 `policy-evaluation@1` | `evaluate`（Replay） | **L2** |
+  | 试运行派遣记录 `policy-trial@1` | `trial` | L2 |
+  | 真实科研验证凭证 `policy-research-validation@1` | `validate-research` | **L3** |
+
+- 等级由产物的门与结论**重算**：回放凭证在 `SUPPORTED` 且可评维度 ≥2、`runs ≥ min_runs`、
+  `cases ≥ min_cases`、有具名 `runner` 时为 L2，**永远不是 L3**；真实科研验证凭证还需
+  `provenance_ok && independent_ok && dispatch_bound` 才是 L3。
+- `VALIDATED` / `ACTIVE` 只接受**真实科研验证凭证**。回放凭证出现在这两个位置会被
+  `PE11` 拒绝（凭证类别不可互换）。
+- 真实科研验证凭证的要求：`task_provenance.synthetic` 必须显式为 `false`，任务来源文件必须
+  存在、摘要匹配且不在示例/合成目录；`execution_evidence` 必须存在且摘要匹配；候选臂与对照臂
+  必须有**不同**的 `executor`；每个 case 必须显式 `isolation_verified=true`；
+  `dispatch_ref` 必须指向该策略**实际派遣**的试运行记录；受益结论用候选绑定的冻结规则重算。
 
 ### 5.3.2 收益方向：DIFFERENT ≠ BETTER
 
-- 评价按维度给出 `direction`（`BETTER` / `WORSE` / `NONE`），容差取自冻结规则。
+- 评价按维度给出 `direction`（`BETTER` / `WORSE` / `NONE`）与 `confident`，
+  容差取自**候选绑定的冻结规则**（不是编译期默认值）。
 - 只有**预先定义的收益维度**（`search_efficiency` / `stagnation_recovery` /
-  `memory_accumulation`）出现 `BETTER`，且**科学可靠性维度**（`prediction_quality` /
+  `memory_accumulation`）出现 `BETTER` **且 `confident`**（两臂区间不重叠），
+  且**科学可靠性维度**（`mechanistic_understanding` / `prediction_quality` /
   `intervention_quality` / `scientific_novelty`）没有 `WORSE`，才可能得到 `SUPPORTED`。
+- 区间重叠的“收益”只记录为不确定性（`uncertain_benefit`），**不计入晋升**：
+  声明的 caveat 必须在晋升逻辑里真正生效。
+
+### 5.3.3 报告必须能从执行记录重算
+
+- 报告的 `per_arm[*].dimensions` 会与 `per_arm[*].results[*].evaluation.metrics`
+  **重新计算**的结果逐项比对；声明的 mean/min/max 与记录不符即 `INVALID`。
+- `cases`/`runs_per_case` 必须与实际记录数与 case 集合一致。
+- 每个 case 必须显式给出 `leak_checked=true` 与 `isolation_verified=true`；
+  **缺失不再默认为通过**。
+- 报告若声明 `policy_id`/`policy_signature`/`rules_digest`，必须与候选及冻结规则一致；
+  未声明的由受控入口绑定，并记录 `binding_source`。
+- 晋升时会对产物内嵌的报告**再次重算结论**，与产物记录的结论不一致即拒绝。
 - 样本不足 → `INSUFFICIENT_SAMPLE`；未观测（`NO_SUPPORT`）→ `INSUFFICIENT_COVERAGE`；
   没有任何收益维度正向改善 → `UNDIFFERENTIATED`；可靠性退化 → `REJECTED`。
 - 非收益、非可靠性维度退化单独报告，不允许用某一维度的收益补偿科学可靠性或证据资格的退化。

@@ -18,6 +18,7 @@ import unittest
 import cognition as cg
 import decision_trajectory as dt
 import policy_evolution as pe
+import rsi_test_support as support
 import strategy_memory as sm
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -57,17 +58,25 @@ def candidate(**overrides):
     return payload
 
 
-def arm(mean):
-    """A per-case execution record is part of the report: without it, it is not evidence."""
-    return {"dimensions": {name: {"mean": mean, "min": mean - 0.05, "max": mean + 0.05}
-                           for name in ("mechanistic_understanding", "prediction_quality",
-                                        "intervention_quality", "scientific_novelty",
-                                        "search_efficiency", "stagnation_recovery",
-                                        "memory_accumulation")},
-            "results": [{"case_id": f"C{i}", "leak_checked": True,
-                         "isolation_verified": True,
-                         "evaluation": {"evidence_support": {"class": "OBSERVED"}}}
-                        for i in range(5)],
+DIMENSION_NAMES = ("mechanistic_understanding", "prediction_quality", "intervention_quality",
+                   "scientific_novelty", "search_efficiency", "stagnation_recovery",
+                   "memory_accumulation")
+
+
+def arm(mean, spread=0.05):
+    """An arm whose declared summary is derived from its own per-case execution record."""
+    base = [round(mean - spread + 2 * spread * index / 4, 4) for index in range(5)]
+    # 5 cases x 2 runs, so the declared counts match the execution record exactly.
+    rows = [(f"C{index}", value) for _ in range(2) for index, value in enumerate(base)]
+    results = [{"case_id": case_id, "leak_checked": True, "isolation_verified": True,
+                "evaluation": {"metrics": {name: {"value": value}
+                                           for name in DIMENSION_NAMES},
+                               "evidence_support": {"class": "OBSERVED"}}}
+               for case_id, value in rows]
+    dimensions = {name: {"mean": round(sum(base) / len(base), 4),
+                         "min": min(base), "max": max(base)}
+                  for name in DIMENSION_NAMES}
+    return {"dimensions": dimensions, "results": results,
             "evidence_support": {"OBSERVED": 5}}
 
 
@@ -77,6 +86,19 @@ def report(candidate_mean=0.9, control_mean=0.3, sufficient=True, unobservable=0
             "delta_vs_baseline": {}, "cases": 5, "runs_per_case": 2,
             "runner": "offline CIE runner (no model calls)",
             "per_arm": {"rsi_full": arm(candidate_mean), "full_cie": arm(control_mean)}}
+
+
+def set_arm_dimension(document, arm, dimension, value):
+    """Measure a different value for one dimension: records and declaration both change.
+
+    Editing only the declared summary is now rejected (the audit recomputes it), so a test
+    that wants a regression must really record one.
+    """
+    for row in document["per_arm"][arm]["results"]:
+        row["evaluation"]["metrics"][dimension] = {"value": value}
+    document["per_arm"][arm]["dimensions"][dimension] = {"mean": value, "min": value,
+                                                         "max": value}
+    return document
 
 
 class PolicyStoreCase(unittest.TestCase):
@@ -91,6 +113,17 @@ class PolicyStoreCase(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+
+    def record_l3(self, policy_id="P-1", **overrides):
+        """Record a valid L3 research-validation credential (the only route to L3)."""
+        signature = pe.policy_record(pe.load_records(self.state_path)[0], policy_id)["signature"]
+        credential = support.research_validation(
+            self.state_path, policy_id, self.route, signature=signature,
+            rules_digest=self.digest, **overrides)
+        result = pe.record_research_validation(self.state_path, policy_id, credential)
+        assert result["status"] == "VALIDATED", result
+        return result
 
     def propose(self, **overrides):
         payload = candidate(**overrides)
@@ -197,11 +230,9 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
     def test_an_unsupported_verdict_rejects_and_a_flat_one_holds(self):
         self.propose()
         self.to_shadow()
-        degraded = report()
-        degraded["per_arm"]["rsi_full"]["dimensions"]["prediction_quality"] = \
-            {"mean": 0.1, "min": 0.05, "max": 0.15}
-        degraded["per_arm"]["full_cie"]["dimensions"]["prediction_quality"] = \
-            {"mean": 0.9, "min": 0.85, "max": 0.95}
+        degraded = set_arm_dimension(set_arm_dimension(
+            report(), "rsi_full", "prediction_quality", 0.1),
+            "full_cie", "prediction_quality", 0.9)
         rejected = pe.evaluate_candidate(self.state_path, "P-1", degraded)
         self.assertEqual(rejected["status"], "REJECTED")
 
@@ -216,11 +247,10 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
     def test_a_scientific_dimension_cannot_regress_for_speed(self):
         self.propose()
         self.to_shadow()
-        fast_but_wrong = report(candidate_mean=0.9, control_mean=0.3)
-        fast_but_wrong["per_arm"]["rsi_full"]["dimensions"]["prediction_quality"] = \
-            {"mean": 0.1, "min": 0.05, "max": 0.15}
-        fast_but_wrong["per_arm"]["full_cie"]["dimensions"]["prediction_quality"] = \
-            {"mean": 0.9, "min": 0.85, "max": 0.95}
+        fast_but_wrong = set_arm_dimension(set_arm_dimension(
+            report(candidate_mean=0.9, control_mean=0.3),
+            "rsi_full", "prediction_quality", 0.1),
+            "full_cie", "prediction_quality", 0.9)
         outcome = pe.evaluate_candidate(self.state_path, "P-1", fast_but_wrong)
         self.assertEqual(outcome["status"], "REJECTED")
         self.assertIn("科学可靠性", outcome["reason"])
@@ -238,7 +268,7 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
         pe.evaluate_candidate(self.state_path, "P-1", report())
         pe.begin_bounded_trial(self.state_path, "P-1",
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, "P-1")
+        self.record_l3("P-1")
         document = json.loads(pe.rules_path(self.state_path).read_text(encoding="utf-8"))
         document["rules"]["delta_tolerance"] = 0.99
         document["digest"] = cg.digest_of(document["rules"])
@@ -267,7 +297,7 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
         pe.evaluate_candidate(self.state_path, "P-WORLD", report())
         pe.begin_bounded_trial(self.state_path, "P-WORLD",
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, "P-WORLD")
+        self.record_l3("P-WORLD")
         outcome = pe.promote_to_active(self.state_path, "P-WORLD",
                                        {"scope_evidence_ok": True})
         self.assertEqual(outcome["status"], "INVALID")
@@ -281,7 +311,7 @@ class TestRollbackAndComplexity(PolicyStoreCase):
         pe.evaluate_candidate(self.state_path, policy_id, report())
         pe.begin_bounded_trial(self.state_path, policy_id,
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, policy_id)
+        self.record_l3(policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})
 
@@ -383,7 +413,7 @@ class TestCrossSessionAndConsumer(PolicyStoreCase):
         pe.evaluate_candidate(self.state_path, "P-1", report())
         pe.begin_bounded_trial(self.state_path, "P-1",
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, "P-1")
+        self.record_l3("P-1")
         pe.promote_to_active(self.state_path, "P-1", {"scope_evidence_ok": True})
         state = fixture_state()
         records, _ = pe.load_records(self.state_path)
@@ -446,7 +476,7 @@ class TestLatentBugRegressions(PolicyStoreCase):
         pe.evaluate_candidate(self.state_path, policy_id, report(*means))
         pe.begin_bounded_trial(self.state_path, policy_id,
                                dispatch_evidence={"dispatched": "R2"})
-        pe.validate_candidate(self.state_path, policy_id)
+        self.record_l3(policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})
 
