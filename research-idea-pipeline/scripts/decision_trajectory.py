@@ -179,7 +179,18 @@ def load_chained(path: Path, *, tolerant: bool = False
         raise TrajectoryError(diagnostics[0].render())
     expected_head = _digest(records[-1]) if records else None
     if head.exists():
-        if head.read_text(encoding="ascii").strip() != expected_head:
+        try:
+            actual_head = head.read_text(encoding="ascii").strip()
+        except (UnicodeDecodeError, OSError) as exc:
+            # A head that is not valid ASCII, truncated or unreadable is a damaged store.
+            # It used to escape as a raw UnicodeDecodeError through every caller.
+            diagnostics.append(_diag("DT0", str(head),
+                                     f"尾部摘要不可读或非法（{type(exc).__name__}）："
+                                     "存储已损坏，拒绝继续"))
+            if not tolerant:
+                raise TrajectoryError(diagnostics[-1].render()) from exc
+            actual_head = None
+        if actual_head is not None and actual_head != expected_head:
             diagnostics.append(_diag("DT0", str(head),
                                      "尾部摘要与 head 不一致：最后一行被改写或历史被截断"))
             if not tolerant:
@@ -217,7 +228,8 @@ def guard_store_path(path: Path) -> Optional[str]:
     return f"{verdict.get('code')}: {verdict.get('reason')}"
 
 
-def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
+def append_chained(path: Path, record: Dict[str, Any], *, validate=None,
+                   lock_held: bool = False) -> Any:
     """Atomically validate-and-append one record to a chained store.
 
     The read that computes `seq`/`previous`, the validation and the append all happen under
@@ -234,8 +246,10 @@ def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
         raise TrajectoryError("refusing to write a control-plane store inside the Skill "
                               f"source: {refusal}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    with store_lock(path).open("a", encoding="utf-8") as lock:
+    lock = None if lock_held else store_lock(path).open("a", encoding="utf-8")
+    if lock is not None:
         fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
         records, _ = load_chained(path)
         if validate is not None:
             refusal = validate(records)
@@ -256,6 +270,9 @@ def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
             os.fsync(out.fileno())
         os.replace(pending, head_path(path))
         return stored
+    finally:
+        if lock is not None:
+            lock.close()
 
 
 def _digest(value: Any) -> str:
