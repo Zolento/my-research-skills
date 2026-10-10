@@ -1,0 +1,236 @@
+.EEFEEEFEFFFFFF.FFFEEEEEEE
+======================================================================
+ERROR: test_a_mechanistic_regression_blocks_promotion (test_promotion_credentials.TestFrozenParameters.test_a_mechanistic_regression_blocks_promotion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 454, in test_a_mechanistic_regression_blocks_promotion
+    rules=pe.frozen_rules(self.state_path))
+          ^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'frozen_rules'
+
+======================================================================
+ERROR: test_an_overlapping_benefit_is_not_counted_as_evidence (test_promotion_credentials.TestFrozenParameters.test_an_overlapping_benefit_is_not_counted_as_evidence)
+A mean gap inside overlapping ranges is reported but must not promote.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 466, in test_an_overlapping_benefit_is_not_counted_as_evidence
+    rules=pe.frozen_rules(self.state_path))
+          ^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'frozen_rules'
+
+======================================================================
+ERROR: test_the_frozen_min_runs_is_used_not_the_default (test_promotion_credentials.TestFrozenParameters.test_the_frozen_min_runs_is_used_not_the_default)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 434, in test_the_frozen_min_runs_is_used_not_the_default
+    rules=pe.frozen_rules(self.state_path))
+          ^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'frozen_rules'
+
+======================================================================
+ERROR: test_the_frozen_tolerance_is_used_not_the_default (test_promotion_credentials.TestFrozenParameters.test_the_frozen_tolerance_is_used_not_the_default)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 424, in test_the_frozen_tolerance_is_used_not_the_default
+    rules=pe.frozen_rules(self.state_path))
+          ^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'frozen_rules'
+
+======================================================================
+ERROR: test_two_project_names_without_trajectories_do_not_back_a_global_scope (test_promotion_credentials.TestGlobalScopeProvenance.test_two_project_names_without_trajectories_do_not_back_a_global_scope)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 482, in test_two_project_names_without_trajectories_do_not_back_a_global_scope
+    pe.record_research_validation(self.state_path, "P-GLOBAL",
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_a_self_reported_report_cannot_become_a_research_validation (test_promotion_credentials.TestReplayIsAtMostL2.test_a_self_reported_report_cannot_become_a_research_validation)
+A report that merely declares itself a validation credential is not one.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 217, in test_a_self_reported_report_cannot_become_a_research_validation
+    forged = {"_schema": pe.SCHEMA_RESEARCH_VALIDATION,
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'SCHEMA_RESEARCH_VALIDATION'
+
+======================================================================
+ERROR: test_the_entry_binds_an_unbound_report_and_records_that_it_did (test_promotion_credentials.TestReportProvenance.test_the_entry_binds_an_unbound_report_and_records_that_it_did)
+A report that declares no binding is bound by the entry, not trusted as bound.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 359, in test_the_entry_binds_an_unbound_report_and_records_that_it_did
+    self.assertEqual(artifact["binding_source"], "entry")
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'binding_source'
+
+======================================================================
+ERROR: test_a_missing_task_source_is_refused (test_promotion_credentials.TestResearchValidationCredential.test_a_missing_task_source_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 288, in test_a_missing_task_source_is_refused
+    result = pe.record_research_validation(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_a_real_research_validation_reaches_validated_and_active (test_promotion_credentials.TestResearchValidationCredential.test_a_real_research_validation_reaches_validated_and_active)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 272, in test_a_real_research_validation_reaches_validated_and_active
+    result = pe.record_research_validation(self.state_path, "P-1", self.validation())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_a_synthetic_task_source_is_refused (test_promotion_credentials.TestResearchValidationCredential.test_a_synthetic_task_source_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 280, in test_a_synthetic_task_source_is_refused
+    result = pe.record_research_validation(self.state_path, "P-1",
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_a_validation_with_a_scientific_regression_is_refused (test_promotion_credentials.TestResearchValidationCredential.test_a_validation_with_a_scientific_regression_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 311, in test_a_validation_with_a_scientific_regression_is_refused
+    result = pe.record_research_validation(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_a_validation_without_isolation_proof_is_refused (test_promotion_credentials.TestResearchValidationCredential.test_a_validation_without_isolation_proof_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 305, in test_a_validation_without_isolation_proof_is_refused
+    result = pe.record_research_validation(self.state_path, "P-1",
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+ERROR: test_self_executed_validation_is_refused (test_promotion_credentials.TestResearchValidationCredential.test_self_executed_validation_is_refused)
+The policy arm and the control cannot be run by the same executor.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 296, in test_self_executed_validation_is_refused
+    result = pe.record_research_validation(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'record_research_validation'
+
+======================================================================
+FAIL: test_mechanistic_understanding_is_a_reliability_dimension (test_promotion_credentials.TestFrozenParameters.test_mechanistic_understanding_is_a_reliability_dimension)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 444, in test_mechanistic_understanding_is_a_reliability_dimension
+    self.assertIn(SCIENCE, pe.RELIABILITY_DIMENSIONS)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'mechanistic_understanding' not found in ('prediction_quality', 'intervention_quality', 'scientific_novelty')
+
+======================================================================
+FAIL: test_a_replay_artifact_cannot_validate (test_promotion_credentials.TestReplayIsAtMostL2.test_a_replay_artifact_cannot_validate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 211, in test_a_replay_artifact_cannot_validate
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 evaluation', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_supported_replay_evaluation_is_L2 (test_promotion_credentials.TestReplayIsAtMostL2.test_a_supported_replay_evaluation_is_L2)
+Synthetic/offline replay can never earn L3, however clean it looks.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 193, in test_a_supported_replay_evaluation_is_L2
+    self.assertEqual(result["level"], "L2", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'L3' != 'L2'
+- L3
++ L2
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_recomputed_level_never_returns_L3_for_a_replay_artifact (test_promotion_credentials.TestReplayIsAtMostL2.test_recomputed_level_never_returns_L3_for_a_replay_artifact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 204, in test_recomputed_level_never_returns_L3_for_a_replay_artifact
+    self.assertNotEqual(level, "L3")
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+AssertionError: 'L3' == 'L3'
+
+======================================================================
+FAIL: test_a_report_bound_to_another_policy_is_refused (test_promotion_credentials.TestReportProvenance.test_a_report_bound_to_another_policy_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 374, in test_a_report_bound_to_another_policy_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_report_bound_to_other_rules_is_refused (test_promotion_credentials.TestReportProvenance.test_a_report_bound_to_other_rules_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 380, in test_a_report_bound_to_other_rules_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_report_declaring_a_conflicting_binding_is_refused (test_promotion_credentials.TestReportProvenance.test_a_report_declaring_a_conflicting_binding_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 367, in test_a_report_declaring_a_conflicting_binding_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_report_missing_the_isolation_proof_is_refused (test_promotion_credentials.TestReportProvenance.test_a_report_missing_the_isolation_proof_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 335, in test_a_report_missing_the_isolation_proof_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_report_whose_case_count_disagrees_with_the_records_is_refused (test_promotion_credentials.TestReportProvenance.test_a_report_whose_case_count_disagrees_with_the_records_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 348, in test_a_report_whose_case_count_disagrees_with_the_records_is_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_an_artifact_whose_report_no_longer_recomputes_is_refused (test_promotion_credentials.TestReportProvenance.test_an_artifact_whose_report_no_longer_recomputes_is_refused)
+The stored verdict is re-derived at promotion time, not trusted.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 401, in test_an_artifact_whose_report_no_longer_recomputes_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'L3 evaluation', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_declared_means_that_disagree_with_the_records_are_refused (test_promotion_credentials.TestReportProvenance.test_declared_means_that_disagree_with_the_records_are_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r7-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 327, in test_declared_means_that_disagree_with_the_records_are_refused
+    self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' == 'REPLAY_EVALUATED' : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.143s
+
+FAILED (failures=11, errors=13)
