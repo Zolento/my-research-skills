@@ -1391,9 +1391,25 @@ def _evidence_level_errors(policy: Dict[str, Any], scope: Optional[Dict[str, Any
                     return value.strip()
         return ""
 
-    independent_backed = any(
-        _ref_key(ref) in attested_projects or _ref_key(ref) in attested_trajectories
-        for ref in independent)
+    # Every reference must stand on its own. `any()` let one backed reference carry an
+    # unlimited number of unsupported ones, so "two independent refs" could mean one.
+    named_projects = {str(record.get("project")).strip()
+                      for record in list(records or ()) + list(source_trajectories or ())
+                      if isinstance(record, dict) and str(record.get("project") or "").strip()}
+
+    def _ref_reason(ref: Any) -> Optional[str]:
+        key = _ref_key(ref)
+        if not key:
+            return "引用为空或没有可识别的 id/project"
+        if key in attested_trajectories or key in attested_projects:
+            return None
+        if key in named_projects:
+            return (f"{key!r} 只是项目名：该项目没有「决策 + 合格 outcome」的轨迹，"
+                    "不能替代独立评价证明")
+        return f"{key!r} 既不是已背书的轨迹，也不是有合格结果的背书项目"
+
+    unbacked_refs = [(_ref_key(ref), _ref_reason(ref)) for ref in independent
+                     if _ref_reason(ref) is not None]
     diagnostic_path = "policy.scope"
 
     if level in WEAK_EVIDENCE_LEVELS:
@@ -1431,11 +1447,11 @@ def _evidence_level_errors(policy: Dict[str, Any], scope: Optional[Dict[str, Any
                 "supporting_trajectory_ids 未指向有「决策 + 合格 outcome」的轨迹："
                 + ", ".join(missing[:5])
                 + "（依赖的轨迹必须自己站得住）"))
-        if independent and not independent_backed:
+        if unbacked_refs:
             diagnostics.append(_diag(
                 "PT9", diagnostic_path,
-                "independent_evaluation_refs 的项目没有一个能得到轨迹证据背书："
-                "自述的独立评价不算独立评价"))
+                "以下独立评价引用没有来源支持（每一项都必须独立成立）："
+                + "；".join(reason for _key, reason in unbacked_refs[:5])))
         if not independent and len(attested_projects) < 2:
             diagnostics.append(_diag(
                 "PT9", diagnostic_path,
