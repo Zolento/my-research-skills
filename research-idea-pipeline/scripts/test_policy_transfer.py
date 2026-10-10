@@ -678,8 +678,8 @@ class TestCrossProjectGateProvenance(unittest.TestCase):
 
     def test_declared_source_with_empty_current_route_blocks(self):
         gate = pe.cross_project_transfer_allowed(
-            {"id": "E", "scope": {"scope_kind": "project",
-                                  "source_route": "B", "source_project": "B"}},
+            {"id": "E", "scope": {"scope_kind": "project"}, "origin_stamped": True,
+             "source_route": "B", "source_project": "B"},
             fixture_state(), current_route="")
         self.assertTrue(gate["required"])
         self.assertEqual(gate["status"], "BLOCK")
@@ -689,19 +689,28 @@ class TestCrossProjectGateProvenance(unittest.TestCase):
         self.assertTrue(gate["required"])
         self.assertEqual(gate["status"], "BLOCK")
 
-    def test_same_declared_route_still_needs_no_gate(self):
+    def test_a_stamped_same_route_needs_no_gate(self):
         gate = pe.cross_project_transfer_allowed(
-            {"id": "E", "scope": {"scope_kind": "project", "source_route": "A"}},
+            {"id": "E", "scope": {"scope_kind": "project"}, "origin_stamped": True,
+             "source_route": "A"},
             fixture_state(), current_route="A")
         self.assertFalse(gate["required"])
         self.assertEqual(gate["status"], "NOT_REQUIRED")
 
-    def test_candidate_level_source_route_is_honoured(self):
+    def test_a_self_declared_route_is_not_provenance(self):
+        """H-08: naming the target route as one's own origin used to skip the gate."""
+        gate = pe.cross_project_transfer_allowed(
+            {"id": "E", "scope": {"scope_kind": "project", "source_route": "A"}},
+            fixture_state(), current_route="A")
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
+
+    def test_a_candidate_level_route_without_the_stamp_is_ignored(self):
         gate = pe.cross_project_transfer_allowed(
             {"id": "E", "scope": {"scope_kind": "project"}, "source_route": "A"},
             fixture_state(), current_route="A")
-        self.assertFalse(gate["required"])
-        self.assertEqual(gate["status"], "NOT_REQUIRED")
+        self.assertTrue(gate["required"])
+        self.assertEqual(gate["status"], "BLOCK")
 
     def test_require_transfer_forces_the_gate_without_a_source(self):
         gate = pe.cross_project_transfer_allowed(
@@ -886,3 +895,39 @@ class TestAuditCliContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTransferDeltaRegressions(unittest.TestCase):
+    """H-06..H-09: incomplete fixes of the policy-transfer findings."""
+
+    def test_an_unsatisfied_condition_cannot_neutralise_pt10(self):
+        """H-06: a well-formed but unsatisfied condition used to short-circuit coverage."""
+        target = fixture_state()
+        base = {"policy_id": "P", "scope": {"kind": "local", "problem_structure": "x"},
+                "mechanism": {"id": "H1"}, "supporting_trajectory_ids": ["DT-1"]}
+        bare = dict(base, counterexamples=[{"id": "CE"}])
+        self.assertEqual(pt.transfer_decision(bare, target)["status"], "BLOCK")
+        with_condition = dict(base, counterexamples=[{
+            "id": "CE",
+            "conditions": [{"field": "contract.primary_anchor", "op": "eq",
+                            "value": "__nope__"}]}])
+        self.assertEqual(pt.transfer_decision(with_condition, target)["status"], "BLOCK")
+
+    def test_a_negative_state_version_does_not_disable_expiry(self):
+        """H-07: a negative current version made the gap comparison unreachable."""
+        records = [{"trajectory_id": "DT-x", "record": "decision",
+                    "context": {"state_version": -1000000}}]
+        self.assertEqual(pt.expired_trajectories(records, {"state_version": 10}), ["DT-x"])
+
+    def test_a_non_string_ruled_out_blocks_instead_of_disabling_pt8(self):
+        """H-09: a non-string proposition was filtered out of the match set."""
+        state = fixture_state()
+        state["failures"] = [{"id": "F1", "kind": "mechanism",
+                              "negative_knowledge": [{"ruled_out": 42,
+                                                      "finding": "explanation"}]}]
+        policy = {"policy_id": "P", "scope": {"kind": "local", "problem_structure": "x"},
+                  "mechanism": {"id": "H1"}, "supporting_trajectory_ids": ["DT-1"],
+                  "counterexamples": ["structure: operator=reframe"]}
+        decision = pt.transfer_decision(policy, state)
+        self.assertEqual(decision["status"], "BLOCK")
+        self.assertTrue(any("PT8" in str(reason) for reason in decision["reasons"]))

@@ -120,8 +120,9 @@ STATE_NAME = "research-state.json"
 #: 允许自主写入的 route 内 scope：`guard_write` 在 route（显式 `allowed_roots`）内部
 #: **实际强制**这些顶层目录/文件名；canonical state 与完整性审计日志是显式例外。
 ALLOWED_WRITE_SCOPES: Tuple[str, ...] = (
-    "policy", "decision-trajectory", "scheduler.json", "cognition",
-    ".execution", "assurance", "source-integrity.jsonl", "recovery-log.jsonl",
+    "policy", "decision-trajectory", "decision-trajectory.jsonl", "scheduler.json",
+    "cognition", ".execution", "assurance", "source-integrity.jsonl",
+    "recovery-log.jsonl",
 )
 
 #: 隐藏评测 fixture / 发布元数据：写入即拒绝。
@@ -134,10 +135,24 @@ _PROTECTED_TOKENS: Tuple[str, ...] = (
     "SKILL.md", "presets/", "scripts/", "references/", "templates/",
     "preset-registry.json", "shared-contract.md", "schemas/", "router-fixtures.json",
 )
-_SHELL_TOKENS: Tuple[str, ...] = (";", "&&", "|", "$(", "`", ">")
+#: Unambiguous shell-command constructs. A bare `;` / `|` / `>` is NOT included: ordinary
+#: English prose ("test; this avoids waste", "ratio 3/4 > half") would be rejected, which is
+#: a false positive that makes the scan useless rather than safe. Command separators are
+#: matched as a separator followed by an actual command word.
+_SHELL_TOKENS: Tuple[str, ...] = ("&&", "||", "$(", "`", ">|", ">>")
 _EXEC_TOKENS: Tuple[str, ...] = (
     "import ", "exec(", "eval(", "__import__", "os.system", "subprocess",
 )
+
+#: A dangerous command name at a word boundary. These are not ordinary English words, so
+#: matching them costs little and closes the "no separator" case (`sudo chmod 777 /`).
+_DANGEROUS_COMMAND_RE = re.compile(
+    r"\b(?:rm|curl|wget|chmod|chown|sudo|dd|mkfs|nc|netcat)\b")
+
+#: `;` or `|` followed (within a few words) by a real command name.
+_SHELL_SEPARATOR_RE = re.compile(
+    r"(?:;|\|)\s*(?:\w+\s+){0,3}(?:rm|curl|wget|chmod|chown|python3?|bash|sh|sudo|"
+    r"cat|mv|cp|dd|mkfs|nc|netcat)\b")
 
 _ABSOLUTE_RE = re.compile(r"^([A-Za-z]:[\\/]|/)")
 
@@ -461,6 +476,16 @@ def _write_scope_of(resolved: Path, roots: Sequence[Path]) -> Optional[str]:
     return rel.parts[0] if len(rel.parts) > 1 else rel.name
 
 
+def _scope_allowed(scope: str) -> bool:
+    """Whether a top-level scope under an explicit root is a declared write scope."""
+    if scope in ALLOWED_WRITE_SCOPES:
+        return True
+    # A route-root file is its own scope; accept the stem so `decision-trajectory.jsonl`
+    # and its declared stem both work.
+    stem = Path(scope).stem
+    return stem in ALLOWED_WRITE_SCOPES or scope.removesuffix(".jsonl") in ALLOWED_WRITE_SCOPES
+
+
 def _is_audit_artifact(name: str) -> bool:
     """审计日志本体、其 head 摘要 sidecar 与锁文件。"""
     return (name == INTEGRITY_NAME
@@ -517,6 +542,13 @@ def guard_write(target: Any, *, skill_root: Path = SKILL_ROOT,
                          f"目标是隐藏评测数据或发布元数据：{rel.as_posix()}（{hidden}）",
                          resolved)
 
+    # 受保护条目缺失：硬链接检测依赖 inode 集合，若原件被删除，集合就不再包含它。
+    missing = [name for name in PROTECTED if not (Path(skill_root) / name).exists()]
+    if missing:
+        return _deny("PROTECTED_SOURCE_MISSING",
+                     "受保护 Skill 源码缺失，无法判定写入边界（fail-closed）："
+                     + ", ".join(sorted(missing)[:5]), resolved)
+
     # 硬链接：路径可以漂白，inode 不能。
     identity = _stat_identity(resolved)
     if identity is not None and identity in _protected_identities(skill_root):
@@ -530,10 +562,27 @@ def guard_write(target: Any, *, skill_root: Path = SKILL_ROOT,
                      "确需写入请显式 allow_canonical=True", resolved)
 
     roots: List[Path] = []
-    for allowed in allowed_roots:
+    if allowed_roots is None:
+        allowed_sequence: Sequence[Any] = ()
+    elif isinstance(allowed_roots, (str, bytes, os.PathLike, Path)):
+        # A single path is one root. Iterating it would walk characters and make "/" an
+        # allowed root, which silently allowed every absolute path.
+        allowed_sequence = [allowed_roots]
+    else:
+        try:
+            allowed_sequence = list(allowed_roots)
+        except TypeError:
+            return _deny("RESOLUTION_ERROR",
+                         f"allowed_roots 不是路径序列：{type(allowed_roots).__name__}", resolved)
+    for allowed in allowed_sequence:
+        if isinstance(allowed, (int, float, bool)) or allowed is None:
+            return _deny("RESOLUTION_ERROR",
+                         f"allowed_roots 含非路径项 {allowed!r}", resolved)
         candidate = _resolve_allowed_root(allowed, skill_root=skill_root)
-        if candidate is not None:
-            roots.append(candidate)
+        if candidate is None:
+            return _deny("RESOLUTION_ERROR",
+                         f"allowed_roots 含无法解析的项 {allowed!r}", resolved)
+        roots.append(candidate)
 
     # 完整性审计日志只能在显式 route 内写；否则连审计记录本身都可被目标目录污染。
     if _is_audit_artifact(resolved.name):
@@ -555,9 +604,9 @@ def guard_write(target: Any, *, skill_root: Path = SKILL_ROOT,
 
     # 显式 route 内：只放行已知 scope（canonical 已在上方按 allow_canonical 处理）。
     canonical_ok = (resolved.name == STATE_NAME and allow_canonical)
-    if not inside_root and not canonical_ok:
+    if not canonical_ok:
         scope = _write_scope_of(resolved, roots)
-        if scope is not None and scope not in ALLOWED_WRITE_SCOPES:
+        if scope is not None and not _scope_allowed(scope):
             return _deny("OUTSIDE_WRITE_SCOPE",
                          f"目标不是 route 的已知写入 scope（{scope!r}）：{resolved}",
                          resolved)
@@ -593,6 +642,9 @@ def guard_errors(candidate: Any) -> List[str]:
         for token in _SHELL_TOKENS:
             if token in text:
                 add(f"SHELL_METACHARACTER: 候选包含 shell 元字符 {token!r}（{where}）")
+        command = _SHELL_SEPARATOR_RE.search(text) or _DANGEROUS_COMMAND_RE.search(text)
+        if command:
+            add(f"SHELL_COMMAND: 候选包含可执行命令 {command.group(0)[:40]!r}（{where}）")
         for token in _EXEC_TOKENS:
             if token in text:
                 add(f"EXECUTABLE_CONTENT: 候选包含可执行内容 {token!r}（{where}）")

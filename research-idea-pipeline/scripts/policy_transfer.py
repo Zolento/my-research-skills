@@ -642,13 +642,25 @@ def negated_mechanisms(state: Dict[str, Any],
             ruled_out = memory.get("ruled_out")
             # ruled_out 是被排除的命题；finding 只是解释。没有 ruled_out 时退回 finding /
             # failure.what，保证旧数据仍被覆盖。
-            statement = ruled_out or finding or failure.get("what") or ""
+            # Only strings can be compared. A non-string `ruled_out` used to be coerced by
+            # truthiness into a non-string statement and then filtered out of the match set,
+            # which silently disabled PT8 for that entry.
+            ambiguous = ruled_out is not None and not isinstance(ruled_out, str)
+            if isinstance(ruled_out, str) and ruled_out.strip():
+                statement = ruled_out
+            elif isinstance(finding, str) and finding.strip():
+                statement = finding
+            elif isinstance(failure.get("what"), str):
+                statement = failure["what"]
+            else:
+                statement = ""
             out.append({
                 "id": ident,
                 "statement": statement,
                 "finding": finding if isinstance(finding, str) else "",
                 "kind": "failure",
                 "status": failure.get("kind") or "negated",
+                "ruled_out_ambiguous": ambiguous,
             })
     if isinstance(index, dict):
         for mechanism in _as_list(index.get("mechanisms")):
@@ -1068,6 +1080,8 @@ def _counterexample_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
             if prefixed:
                 tokens.discard(token)
                 tokens.update(prefixed)
+        declared_structure = bool(tokens) or counterexample.get("structure") is not None \
+            or counterexample.get("signature") is not None
         if conditions:
             evaluations = [_condition_eval(condition, target_state) for condition in conditions]
             unresolved = [detail for _ok, resolved, detail in evaluations if not resolved]
@@ -1080,7 +1094,15 @@ def _counterexample_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
                     + "；".join(unresolved)))
                 continue
             if not any(ok for ok, _resolved, _detail in evaluations):
-                continue  # 反例条件确实不成立，不适用于目标
+                if declared_structure:
+                    continue  # 有作用域的反例：条件可判定且不成立，确实不适用
+                # 只写了不成立的条件、却没有任何适用结构：这不是“可判定不适用”，
+                # 而是缺少结构声明，必须 fail-closed（否则加一条条件即可中和 PT10）。
+                diagnostics.append(_diag(
+                    "PT10", path,
+                    "反例只声明了不成立的条件、没有任何适用结构：无法排除其覆盖目标"
+                    "（fail-closed 阻塞）"))
+                continue
         if tokens:
             union = tokens | target_tokens
             shared = tokens & target_tokens
@@ -1229,6 +1251,15 @@ def _negated_errors(policy: Dict[str, Any], target_state: Dict[str, Any],
     if not negated:
         return []
     diagnostics: List[cg.Diagnostic] = []
+    ambiguous = sorted(str(item.get("id")) for item in negated
+                       if item.get("ruled_out_ambiguous"))
+    if ambiguous:
+        # Cannot prove the policy does not re-propose these, so the transfer is blocked.
+        diagnostics.append(_diag(
+            "PT8", "negative_knowledge.ruled_out",
+            "以下已否证条目的 ruled_out 不是字符串，无法机械比较："
+            + ", ".join(ambiguous[:5])))
+        return diagnostics
     for proposed in _proposed_mechanisms(policy):
         for item in negated:
             ident = str(item.get("id") or "")
@@ -1495,7 +1526,8 @@ def expired_trajectories_report(records: Sequence[Any], state: Dict[str, Any], *
     current: Optional[int] = None
     if isinstance(state, dict):
         raw_version = state.get("state_version")
-        if isinstance(raw_version, int) and not isinstance(raw_version, bool):
+        if isinstance(raw_version, int) and not isinstance(raw_version, bool) \
+                and raw_version >= 0:
             current = raw_version
         else:
             diagnostics.append(_diag(

@@ -56,7 +56,7 @@
   - `scripts/policy_evolution.py`（Skill-RSI：有作用域的策略候选、评价、晋升、回滚）
   - `scripts/policy_transfer.py`（Skill-RSI：跨项目迁移门）
 - 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `DT0`—`DT10` / `PE1`—`PE14` /
-  `PT1`—`PT10`；科学判定仍由既有规则号给出。
+  `PT1`—`PT11`；科学判定仍由既有规则号给出。
 
 **Skill-RSI 生命周期命令（按需，不在每轮循环内执行）：**
 
@@ -103,21 +103,24 @@
 
 L1 建议、L2 实际调度影响证据、L3 独立效果证据，分别标记 verified/unverified；下一步合法探索动作。
 
-- 机器可读字段：
-  - `priors_before`
-  - `priors_after`
-  - `recommendation_before`
-  - `recommendation_after`
+- 机器可读字段（与 `_handle_strategy_evolution` 实际返回一致）：
+  - `advice`（菜单/算子/island/shift/basis）
+  - `candidates_before` / `candidates_after`
+  - `chosen_without_memory` / `chosen`（同 `state_version`、同一合法动作集下的 with/without-memory 对照）
+  - `strategy_applied` / `reason_if_not`
+  - `dispatch`（实际派遣目标；未派遣时为 `null` 而不是伪装成已派遣）
   - `changed_decision`
+  - Skill-RSI：`policy_delta` 只在实际改变了动作**且**该动作被派遣时才出现，否则为 `none`
   - 统一字段：`preset_id` / `status` / `entry` / `execution_scope` / `protocol` / `reused` / `observed` / `decision` / `steps` / `writes` / `changed_decision` / `next_action` / `canonical_untouched`。
 
 ## 8. 状态写回
 
 - 允许写入：
-  - 策略修订（append-only 修订日志）
+  - 策略修订（`cognition/model-revisions.jsonl`，append-only）
+  - `scheduler.json`（只追加 `strategy_decisions[]` 遥测，其余键逐字节不变）
   - Skill-RSI 策略候选与状态转移（`<route>/policy/`，append-only）
-  - Skill-RSI 决策轨迹（`<route>/decision-trajectory.jsonl`，append-only）
   - 运行期源码完整性审计事件（`<route>/source-integrity.jsonl`）
+- **不写** `decision-trajectory.jsonl`：决策轨迹由 `research-loop` 在 apply 路径上记录
 - canonical `research-state.json`：不写 canonical（只写策略记忆）。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 

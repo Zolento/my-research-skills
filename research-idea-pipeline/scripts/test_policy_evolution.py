@@ -370,10 +370,13 @@ class TestCrossSessionAndConsumer(PolicyStoreCase):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        pe.write_snapshot(self.state_path, pe.load_records(self.state_path)[0])
-        first = json.loads(pe.state_snapshot_path(self.state_path).read_text(encoding="utf-8"))
         records, _ = pe.load_records(self.state_path)
-        self.assertEqual(pe.rebuild_state(records), first)
+        first = pe.rebuild_state(records)
+        second = pe.rebuild_state(pe.load_records(self.state_path)[0])
+        self.assertEqual(second, first)
+        # A snapshot file is a derived cache that nothing read; `rebuild_state` is the
+        # single source, so the unused writer was removed rather than kept as dead weight.
+        self.assertFalse((pe.policy_dir(self.state_path) / "state.json").exists())
         self.assertEqual(pe.latest_status(records)["P-1"], "REPLAY_EVALUATED")
 
     def test_the_active_policy_feeds_the_existing_adapter(self):
@@ -546,3 +549,39 @@ class TestLatentBugRegressions(PolicyStoreCase):
         records, _ = pe.load_records(self.state_path)
         self.assertEqual(pe.latest_status(records)["P-1"], "ACTIVE")
         self.assertEqual(pe.active_policy(records)["policy_id"], "P-1")
+
+
+class TestApplicabilityConsumer(PolicyStoreCase):
+    """`applicability` must name an island to be consumable, and it must reach the adapter."""
+
+    def test_problem_structure_alone_is_not_consumable(self):
+        result = self.propose(policy_id="P-APPL",
+                              strategy_changes=[{"kind": "applicability",
+                                                 "problem_structure": "diagnostic-loop"}])
+        self.assertEqual(result["status"], "INVALID")
+        self.assertIn("PE2", result["codes"])
+
+    def test_an_island_applicability_reaches_the_adapter(self):
+        self.propose(policy_id="P-ISLAND",
+                     strategy_changes=[{"kind": "applicability", "island": "P3"}])
+        records, _ = pe.load_records(self.state_path)
+        advice = pe.advice_from_active_policy(
+            list(records) + [{"record": "transition", "policy_id": "P-ISLAND",
+                              "to": "ACTIVE"}], fixture_state())
+        self.assertEqual(advice["island"], "P3")
+
+    def test_an_unknown_island_is_refused(self):
+        result = self.propose(policy_id="P-BADISLAND",
+                              strategy_changes=[{"kind": "applicability",
+                                                 "island": "P99"}])
+        self.assertEqual(result["status"], "INVALID")
+        self.assertIn("PE2", result["codes"])
+
+    def test_the_source_protection_scan_is_wired_into_candidates(self):
+        """`source_freeze.guard_errors` used to be reachable only from its own tests."""
+        result = self.propose(policy_id="P-GUARD",
+                              expected_effect={"mechanism": "see scripts/guard.py",
+                                               "direction": "up"})
+        self.assertEqual(result["status"], "INVALID")
+        self.assertIn("PE2", result["codes"])
+        self.assertTrue(any("源码保护扫描" in item for item in result["diagnostics"]))

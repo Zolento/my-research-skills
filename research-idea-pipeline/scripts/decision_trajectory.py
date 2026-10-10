@@ -53,7 +53,6 @@ EXIT_HARD = cg.EXIT_HARD
 EXIT_ENV = cg.EXIT_ENV
 
 TRAJECTORY_NAME = "decision-trajectory.jsonl"
-TRAJECTORY_LOCK = ".decision-trajectory.lock"
 TRAJECTORY_HEAD_SUFFIX = ".head"
 
 RECORD_KINDS: Tuple[str, ...] = ("decision", "prediction", "outcome", "learning")
@@ -181,6 +180,27 @@ def store_lock(path: Path) -> Path:
     return Path(path).parent / ("." + Path(path).name + ".lock")
 
 
+def guard_store_path(path: Path) -> Optional[str]:
+    """Refuse a control-plane store that points into the shipped Skill source.
+
+    The whitelist used to exist only as a test-facing function, so nothing actually enforced
+    it on a write path. This is the runtime gate for the trajectory and policy stores: they
+    live in the research route, never inside the Skill installation.
+    """
+    target = Path(path).resolve()
+    try:
+        import source_freeze as sf
+        root = Path(sf.SKILL_ROOT).resolve()
+    except Exception:  # pragma: no cover - source_freeze is always importable
+        return None
+    if target != root and root not in target.parents:
+        return None
+    verdict = sf.guard_write(target, skill_root=root)
+    if verdict.get("allowed"):
+        return None
+    return f"{verdict.get('code')}: {verdict.get('reason')}"
+
+
 def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
     """Atomically validate-and-append one record to a chained store.
 
@@ -193,6 +213,10 @@ def append_chained(path: Path, record: Dict[str, Any], *, validate=None) -> Any:
     returned unchanged, so a caller can reject a duplicate without racing another writer.
     """
     path = Path(path)
+    refusal = guard_store_path(path)
+    if refusal is not None:
+        raise TrajectoryError("refusing to write a control-plane store inside the Skill "
+                              f"source: {refusal}")
     path.parent.mkdir(parents=True, exist_ok=True)
     with store_lock(path).open("a", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -401,6 +425,29 @@ VOLATILE_FIELDS: Tuple[str, ...] = ("seq", "previous", "recorded_at", "decided_a
                                     "observed_at", "scheduler_digest", "cognition_digest")
 
 
+def _decision_semantics(record: Dict[str, Any]) -> str:
+    """What makes a decision *that* decision: the chosen action and the frozen context.
+
+    The scheduler's candidate list is deliberately excluded. `scheduler.json` is telemetry
+    that may legitimately change without a state bump (for example when an assurance review
+    unblocks an action); a candidate set that grew must not look like an attempt to rewrite
+    the recorded decision, because that turned an ordinary second loop iteration into a HOLD.
+    """
+    def strip(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: strip(item) for key, item in value.items()
+                    if key not in VOLATILE_FIELDS}
+        if isinstance(value, list):
+            return [strip(item) for item in value]
+        return value
+
+    decision = record.get("decision") or {}
+    return _digest({"chosen": decision.get("chosen"),
+                    "dispatch_status": decision.get("dispatch_status"),
+                    "context": strip(record.get("context") or {}),
+                    "prediction": strip(record.get("prediction"))})
+
+
 def _payload_digest(record: Dict[str, Any]) -> str:
     """Digest of a record's meaning, ignoring volatile timing and telemetry fields.
 
@@ -557,13 +604,14 @@ def _decision_errors(record: Dict[str, Any], *, state: Optional[Dict[str, Any]],
                                    "uncertainties": context.get("key_uncertainties") or [],
                                    "evidence": context.get("visible_evidence") or []})
 
-    # Ordering: a decision for an already-observed trajectory may not be appended again
-    # with different content, and may not be back-dated behind its own outcome.
+    # Ordering: a decision for an already-observed trajectory may not be rewritten, and may
+    # not be back-dated behind its own outcome. The comparison is semantic (chosen + frozen
+    # context): a scheduler candidate list that merely grew is a re-observation, not a rewrite.
     existing = _prior(records, ident, "decision")
     if existing:
-        if _payload_digest(existing[-1]) != _payload_digest(record):
+        if _decision_semantics(existing[-1]) != _decision_semantics(record):
             diagnostics.append(_diag("DT2", path,
-                                     "同一 trajectory_id 已存在且内容不同：旧决策不可被结果改写"))
+                                     "同一 trajectory_id 已存在且决策内容不同：旧决策不可被结果改写"))
         outcomes = _prior(records, ident, "outcome")
         if outcomes and context.get("decided_at") and \
                 _text_le(context["decided_at"], outcomes[-1].get("observed_at")):
@@ -711,21 +759,27 @@ def append_record(path: Path, record: Dict[str, Any], *, state: Optional[Dict[st
         diagnostics = record_errors(record, state=state, records=records, route=route)
         if diagnostics:
             return {"status": "INVALID", "written": False, "path": str(path),
+                    "refused": True,
                     "diagnostics": [item.render() for item in diagnostics],
                     "codes": sorted({item.rule for item in diagnostics})}
         same_kind = _prior(records, ident, record["record"])
         if same_kind and record["record"] in ("decision", "outcome", "learning", "prediction"):
-            if _payload_digest(same_kind[-1]) == _payload_digest(record):
+            if record["record"] == "decision":
+                unchanged = _decision_semantics(same_kind[-1]) == _decision_semantics(record)
+            else:
+                unchanged = _payload_digest(same_kind[-1]) == _payload_digest(record)
+            if unchanged:
                 return {"status": "DUPLICATE", "written": False, "path": str(path),
-                        "trajectory_id": ident, "record": record["record"],
+                        "refused": True, "trajectory_id": ident, "record": record["record"],
                         "diagnostics": []}
             return {"status": "INVALID", "written": False, "path": str(path),
+                    "refused": True,
                     "diagnostics": [f"DT2 同一 {record['record']} 记录已存在且内容不同"],
                     "codes": ["DT2"]}
         return None
 
     stored = append_chained(path, record, validate=validate)
-    if isinstance(stored, dict) and "status" in stored and "written" in stored:
+    if isinstance(stored, dict) and stored.get("refused") is True:
         return stored
     return {"status": "APPENDED", "written": True, "path": str(path),
             "trajectory_id": ident, "record": record["record"], "seq": stored["seq"],

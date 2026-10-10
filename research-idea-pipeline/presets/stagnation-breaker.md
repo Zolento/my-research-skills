@@ -75,6 +75,8 @@
 | # | 步骤 | 命令 |
 |---|---|---|
 | 1 | 1 停滞检测 | `python3 scripts/prediction_compare.py switch --state <state>` |
+| 2 | 2 设计判别干预 | `python3 scripts/prediction_compare.py compete --state <state> --competition <CP>` |
+| 3 | 3 停手或重定义 | `python3 scripts/prediction_compare.py switch --state <state> --scheduler <scheduler>` |
 
 > 上表由 `preset_router.py run --preset stagnation-breaker` 实际返回，文档与代码由 `test_preset_router` 断言一致。
 

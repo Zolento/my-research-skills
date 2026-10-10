@@ -476,3 +476,72 @@ class SourceFreezeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGuardWriteDeltaRegressions(unittest.TestCase):
+    """H-01..H-05: incomplete fixes of the write-guard findings."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.temp.name) / "skill"
+        self.root.mkdir(parents=True)
+        for name in sf.PROTECTED:
+            path = self.root / name
+            if name.endswith((".md", ".json")):
+                path.write_text("x\n", encoding="utf-8")
+            else:
+                path.mkdir()
+                (path / "x.txt").write_text("x\n", encoding="utf-8")
+        self.route = pathlib.Path(self.temp.name) / "route"
+        self.route.mkdir()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_a_string_allowed_root_is_one_path_not_a_character_sequence(self):
+        """H-01: iterating a string made '/' an allowed root, so every absolute path passed."""
+        denied = sf.guard_write("/scheduler.json", skill_root=self.root,
+                               allowed_roots=str(self.route))
+        self.assertFalse(denied["allowed"])
+        allowed = sf.guard_write(self.route / "scheduler.json", skill_root=self.root,
+                                 allowed_roots=str(self.route))
+        self.assertTrue(allowed["allowed"], allowed)
+
+    def test_none_or_non_iterable_allowed_roots_deny_instead_of_raising(self):
+        """H-03: the fix regressed into an uncaught TypeError."""
+        for value in (None, 42, object()):
+            try:
+                verdict = sf.guard_write(self.route / "scheduler.json", skill_root=self.root,
+                                         allowed_roots=value)
+            except TypeError as exc:  # pragma: no cover - the bug this guards
+                self.fail(f"guard_write raised for allowed_roots={value!r}: {exc}")
+            self.assertFalse(verdict["allowed"], value)
+
+    def test_deleting_the_protected_original_does_not_unlock_a_hard_link(self):
+        """H-04: the inode set lost the entry once the original was removed."""
+        if not hasattr(os, "link"):  # pragma: no cover
+            self.skipTest("hard links unsupported")
+        os.link(self.root / "SKILL.md", self.route / "hard")
+        os.unlink(self.root / "SKILL.md")
+        verdict = sf.guard_write(self.route / "hard", skill_root=self.root,
+                                 allowed_roots=[self.route])
+        self.assertFalse(verdict["allowed"])
+        self.assertIn(verdict["code"], ("PROTECTED_SOURCE_MISSING", "HARD_LINK_TO_PROTECTED"))
+
+    def test_the_scope_check_applies_inside_the_skill_root_too(self):
+        """H-05: an in-root "route" was allowed regardless of its scope."""
+        local = self.root / "localroutes" / "A"
+        local.mkdir(parents=True)
+        verdict = sf.guard_write(local / "evil.sh", skill_root=self.root,
+                                 allowed_roots=[self.root / "localroutes"])
+        self.assertFalse(verdict["allowed"])
+        self.assertEqual(verdict["code"], "OUTSIDE_WRITE_SCOPE")
+
+    def test_the_real_route_scopes_are_all_accepted(self):
+        """H-02: the whitelist named `decision-trajectory` while the real store is a file."""
+        for rel in ("scheduler.json", "decision-trajectory.jsonl", "policy/candidates.jsonl",
+                    "cognition/index.json", ".execution/events.jsonl",
+                    "assurance/x.json", "source-integrity.jsonl"):
+            verdict = sf.guard_write(self.route / rel, skill_root=self.root,
+                                     allowed_roots=[self.route])
+            self.assertTrue(verdict["allowed"], (rel, verdict))

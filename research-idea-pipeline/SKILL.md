@@ -1007,7 +1007,7 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 | **Skill-RSI 政策（策略级自我改进）** | [references/skill-rsi-policy.md](references/skill-rsi-policy.md) | 在既有 R0—R14 与硬门禁内让**科研策略**演化：三层记忆分离（科学 / 决策经验 / 策略）、反事实证据分级（`OBSERVED` / `REPLAY_SUPPORTED` / `NO_SUPPORT`）、有作用域的策略候选与生命周期（`PROPOSED`→…→`ACTIVE`，失败 `REJECTED`/`HOLD`/`ROLLED_BACK`）、独立评价晋升、回滚、源码冻结与写入白名单；**不新增 canonical 对象、不新增 Preset、不在运行期修改 Skill 源码** |
 | **决策轨迹脚本** | [scripts/decision_trajectory.py](scripts/decision_trajectory.py) | `<route>/decision-trajectory.jsonl`：append-only + 哈希链 + 尾部摘要；Context / Decision / Prediction / Outcome / Learning；规则 `DT0`—`DT10`（过期状态、事后预测、结果泄漏、来源悬空、未合格证据不得声称科学增量）；**轨迹不是科学证据，永不写入 `evidence[]`** |
 | **策略演化脚本** | [scripts/policy_evolution.py](scripts/policy_evolution.py) | 有作用域的策略候选（`PE1`—`PE14`）、评价规则冻结、生命周期与晋升门、回滚、失败签名上限（换 `policy_id` 无效）；晋升后只经既有 `strategy_decision()` 生效 |
-| **策略迁移脚本** | [scripts/policy_transfer.py](scripts/policy_transfer.py) | 只读的三层记忆分离视图、基于**声明结构**（不是领域关键词）的迁移门 `PT1`—`PT10`、过期经验与已否证机制的拒绝、无损记忆压缩检查 |
+| **策略迁移脚本** | [scripts/policy_transfer.py](scripts/policy_transfer.py) | 只读的三层记忆分离视图、基于**声明结构**（不是领域关键词）的迁移门 `PT1`—`PT11`、过期经验与已否证机制的拒绝、无损记忆压缩检查 |
 | **源码冻结脚本** | [scripts/source_freeze.py](scripts/source_freeze.py) | 受保护源码清单 + 规范路径/符号链接核验 + 写入白名单 + 哈希链审计事件；运行期检测到源码被改即 `HOLD` 且**不自动修订**；如实声明残余风险（Prompt 禁令不是安全边界） |
 | **RSI 消融与开销** | [scripts/rsi_ablation.py](scripts/rsi_ablation.py) | 四臂冻结之上追加 `rsi_full` 与 leave-one-out；逐维比较、报告不可区分与 `NO_SUPPORT`；字节/延迟/额外调用开销；L1/L2/L3 分别如实申报 |
 

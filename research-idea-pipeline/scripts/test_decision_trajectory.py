@@ -432,3 +432,27 @@ class TestLatentBugRegressions(unittest.TestCase):
             result = dt.append_record(path, renamed, state=state, route="A")
             self.assertEqual(result["status"], "INVALID")
             self.assertIn("DT8", result["codes"])
+
+
+class TestWriteGuardIsWired(unittest.TestCase):
+    """The write whitelist used to be a test-only function; the store now enforces it."""
+
+    def test_a_store_pointed_into_the_skill_source_is_refused(self):
+        import source_freeze as sf
+        with self.assertRaises(dt.TrajectoryError):
+            dt.append_chained(pathlib.Path(sf.SKILL_ROOT) / "scripts" / "_rsi_probe.jsonl",
+                              {"_schema": "x", "record": "candidate", "policy_id": "P"})
+        self.assertFalse((pathlib.Path(sf.SKILL_ROOT) / "scripts" / "_rsi_probe.jsonl").exists())
+
+    def test_a_route_store_is_still_writable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "A" / dt.TRAJECTORY_NAME
+            stored = dt.append_chained(path, {"_schema": "x", "record": "candidate",
+                                              "policy_id": "P"})
+            self.assertEqual(stored["seq"], 1)
+
+    def test_the_store_file_not_the_directory_decides(self):
+        """A store whose *name* looks protected but which lives in the route is fine."""
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "A" / "SKILL.md.jsonl"
+            self.assertEqual(dt.append_chained(path, {"_schema": "x"})["seq"], 1)

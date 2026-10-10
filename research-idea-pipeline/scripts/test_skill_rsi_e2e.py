@@ -267,7 +267,10 @@ class TestAdversarialDecisionCases(RsiProject):
         with tempfile.TemporaryDirectory() as temp:
             state_path = self.project(pathlib.Path(temp) / "A")
             candidate = self.propose_policy(state_path)
+            # `propose()` stamps the origin; emulate the stored record here.
             candidate["scope"]["source_route"] = "A"
+            candidate["origin_stamped"] = True
+            candidate["source_route"] = "A"
             gate = pe.cross_project_transfer_allowed(candidate, cg.load_state(state_path),
                                                      current_route="A")
             self.assertFalse(gate["required"])
@@ -401,3 +404,67 @@ class TestLatentBugRegressions(RsiProject):
                 json.dumps(scheduler, ensure_ascii=False), encoding="utf-8")
             payload = pr.run_preset("research-loop", state_path)[0]
             self.assertEqual(payload["decision"]["policy_delta"]["status"], "none")
+
+
+class TestRepeatLoopRegressions(RsiProject):
+    """A loop that runs again without a state change must not HOLD.
+
+    `scheduler.json` is telemetry: it may legitimately gain a candidate action without a
+    state bump (an assurance review unblocking work). The trajectory identity used to be
+    compared field-by-field, so a grown candidate list looked like an attempt to rewrite a
+    recorded decision and the whole run went to HOLD.
+    """
+
+    def test_running_the_loop_again_at_the_same_state_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            self.propose_policy(state_path)
+            self.activate(state_path)
+            for _ in range(3):
+                payload, _, code = pr.run_preset("research-loop", state_path, apply=True)
+                self.assertEqual(payload["status"], "OK", payload.get("hold_reason"))
+                self.assertEqual(code, 0)
+                self.assertEqual(payload["decision"]["dispatched_action"], PREFERRED_XID)
+            trajectory = state_path.parent / dt.TRAJECTORY_NAME
+            lines = trajectory.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 1, "the same decision must not be recorded twice")
+
+    def test_a_grown_scheduler_candidate_set_does_not_hold(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            self.propose_policy(state_path)
+            self.activate(state_path)
+            scheduler_path = state_path.parent / cg.SCHEDULER_NAME
+            self.assertEqual(pr.run_preset("research-loop", state_path, apply=True)[0]["status"],
+                             "OK")
+            scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+            scheduler["next_actions"] = list(scheduler["next_actions"]) + [
+                {"action": "R3", "type": "repair", "target": "C1", "eig": "high", "cost": "low"}]
+            scheduler_path.write_text(json.dumps(scheduler, ensure_ascii=False),
+                                      encoding="utf-8")
+            payload, _, code = pr.run_preset("research-loop", state_path, apply=True)
+            self.assertEqual(payload["status"], "OK", payload.get("hold_reason"))
+            self.assertEqual(payload["decision"]["dispatched_action"], PREFERRED_XID)
+
+    def test_a_real_rewrite_of_a_recorded_decision_is_still_refused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = self.project(pathlib.Path(temp) / "A")
+            state = cg.load_state(state_path)
+            path = state_path.parent / dt.TRAJECTORY_NAME
+            context = dt.build_context(state, scientific_question="q",
+                                       decided_at="2026-01-01T00:00:00Z")
+            first = dt.build_decision_record(
+                state, route="A", project="A", context=context,
+                candidates=[{"action": "R1", "type": "repair", "target": "C1", "eig": "high",
+                             "cost": "low"}],
+                chosen="R1", scheduler_priority={"level": 4, "label": "x"},
+                recorded_at="2026-01-01T00:00:00Z")
+            self.assertEqual(dt.append_record(path, first, state=state, route="A")["status"],
+                             "APPENDED")
+            rewritten = dict(first)
+            rewritten["decision"] = dict(first["decision"], chosen="R2")
+            rewritten["decision"]["candidates"] = [
+                {"action": "R2", "type": "repair", "target": "C1", "eig": "high", "cost": "low"}]
+            result = dt.append_record(path, rewritten, state=state, route="A")
+            self.assertEqual(result["status"], "INVALID")
+            self.assertIn("DT2", result["codes"])

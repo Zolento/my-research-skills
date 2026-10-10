@@ -907,7 +907,7 @@ def step_release_metadata() -> Tuple[bool, str]:
     # Once the tag exists it must point *exactly* at the release commit (never merely an
     # ancestor). `tag == HEAD` is a release-branch invariant: on a development branch or
     # worktree HEAD advances by design, so there the release invariant is checked against
-    # `refs/heads/main` plus an ancestry rule instead. See `.dev/decisions.md` D5.
+    # `refs/heads/main` plus an ancestry rule instead.
     tag = f'research-idea-pipeline/v{version}'
     tagged = sub.run(['git', 'rev-parse', f'{tag}^{{}}'], capture_output=True, text=True,
                      cwd=str(root.parent))

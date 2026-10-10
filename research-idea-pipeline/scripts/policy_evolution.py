@@ -66,7 +66,6 @@ EXIT_ENV = cg.EXIT_ENV
 POLICY_DIRNAME = "policy"
 CANDIDATES_NAME = "candidates.jsonl"
 RULES_NAME = "evaluation-rules.json"
-STATE_NAME = "state.json"
 
 #: The suggested policy lifecycle. It lives in this control record; it is **not** a new
 #: scientific state enum and never appears in `research-state.json`.
@@ -120,7 +119,7 @@ CHANGE_KINDS: Dict[str, Dict[str, Any]] = {
     "menu_choice": {"required": ("menu",)},
     "same_tier_preference": {"required": ("prefer_action",)},
     "same_tier_order": {"required": ("order",)},
-    "applicability": {"required": ("problem_structure",)},
+    "applicability": {"required": ()},
     "probe_order": {"required": ("order",)},
     "local_resource_allocation": {"required": ("allocation",), "keep_exploration_floor": True},
 }
@@ -194,10 +193,6 @@ def candidates_path(state_path: Path) -> Path:
 
 def rules_path(state_path: Path) -> Path:
     return policy_dir(state_path) / RULES_NAME
-
-
-def state_snapshot_path(state_path: Path) -> Path:
-    return policy_dir(state_path) / STATE_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +316,22 @@ def _forbidden_target_errors(candidate: Dict[str, Any], path: str) -> List[cg.Di
     return diagnostics
 
 
+def _is_consumable_change(change: Any) -> bool:
+    """Whether the Strategy Decision Adapter can act on this change.
+
+    `applicability` only changes an ordering when it names an island the adapter can match
+    against `hypotheses[].island`; a bare problem-structure string is context, not a consumer.
+    """
+    if not isinstance(change, dict):
+        return False
+    kind = change.get("kind")
+    if kind not in CONSUMABLE_CHANGE_KINDS:
+        return False
+    if kind == "applicability":
+        return bool(change.get("island"))
+    return True
+
+
 def overfit_flags(candidate: Dict[str, Any]) -> List[str]:
     """A policy fitted to a fixed fixture may never be promoted past SHADOW."""
     flagged: List[str] = []
@@ -396,6 +407,18 @@ def candidate_errors(candidate: Any, *, records: Sequence[Dict[str, Any]] = (),
                                                  f"未知菜单 {change.get('menu')!r}"))
                 except Exception:  # pragma: no cover - strategy memory always importable
                     pass
+            if kind == "applicability":
+                island = change.get("island")
+                if island in (None, "") and change.get("problem_structure") in (None, ""):
+                    diagnostics.append(_diag("PE1", cpath,
+                                             "applicability 需要 island 或 problem_structure"))
+                if island not in (None, ""):
+                    try:
+                        import state_check as sc
+                        if island not in sc.ISLANDS:
+                            diagnostics.append(_diag("PE2", cpath, f"未知 island {island!r}"))
+                    except Exception:  # pragma: no cover
+                        pass
             if kind == "same_tier_order":
                 order = change.get("order")
                 if not isinstance(order, list) or not all(isinstance(item, str) and item
@@ -417,13 +440,20 @@ def candidate_errors(candidate: Any, *, records: Sequence[Dict[str, Any]] = (),
                 except Exception:  # pragma: no cover
                     pass
     diagnostics += _forbidden_target_errors(candidate, path)
+    # Second, independent scan for protected-target and executable-content attempts. The
+    # guard used to be reachable only from its own tests, which is not an enforcement path.
+    try:
+        import source_freeze as sf
+        for reason in sf.guard_errors(candidate):
+            diagnostics.append(_diag("PE2", path, f"源码保护扫描拒绝：{reason}"))
+    except Exception:  # pragma: no cover - source_freeze is always importable
+        pass
 
     # A policy must be able to change a decision. Advisory-only changes (resource allocation)
     # may accompany a consumable one but may not be the whole policy, otherwise a promoted
     # policy could never have a real consumer.
     if isinstance(changes, list) and changes and \
-            not any(isinstance(item, dict) and item.get("kind") in CONSUMABLE_CHANGE_KINDS
-                    for item in changes):
+            not any(_is_consumable_change(item) for item in changes):
         diagnostics.append(_diag(
             "PE2", path,
             "策略至少需要一个可被 Strategy Decision Adapter 消费的变更类型"
@@ -555,8 +585,10 @@ def propose(state_path: Path, candidate: Dict[str, Any], *,
                    "evaluation_rules_digest": rules_digest,
                    "schema_version": POLICY_SCHEMA_VERSION})
     # Stamp the origin so a later cross-project application is verifiable instead of
-    # unprovable; the transfer gate blocks a candidate whose provenance is missing.
-    record.setdefault("source_route", cg.route_of(Path(state_path)))
+    # unprovable. This OVERRIDES any value the candidate declared: `setdefault` let a
+    # candidate claim the target route as its own and skip the transfer gate entirely.
+    record["source_route"] = cg.route_of(Path(state_path))
+    record["origin_stamped"] = True
     stored = _append(state_path, record)
     return {"status": "PROPOSED", "written": True, "policy_id": ident,
             "signature": stored["signature"], "seq": stored["seq"],
@@ -630,17 +662,6 @@ def policy_record(records: Sequence[Dict[str, Any]], policy_id: str) -> Optional
         if record.get("record") == "candidate" and record.get("policy_id") == policy_id:
             found = record
     return found
-
-
-def write_snapshot(state_path: Path, records: Sequence[Dict[str, Any]]) -> Path:
-    import os
-    path = state_snapshot_path(state_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    pending = path.with_name(path.name + ".pending")
-    pending.write_text(json.dumps(rebuild_state(records), ensure_ascii=False, indent=2) + "\n",
-                       encoding="utf-8")
-    os.replace(pending, path)
-    return path
 
 
 # ---------------------------------------------------------------------------
@@ -1004,7 +1025,8 @@ def advice_from_active_policy(records: Sequence[Dict[str, Any]], state: Dict[str
             advice.setdefault("prefer_actions", [])
             advice["prefer_actions"].extend(change.get("order") or [])
         elif kind == "applicability":
-            advice["island"] = advice.get("island") or change.get("problem_structure")
+            advice["island"] = (advice.get("island") or change.get("island")
+                                or change.get("problem_structure"))
     if not any(advice.get(key) for key in ("menu", "operator", "island", "prefer_actions")):
         return None
     return advice
@@ -1067,12 +1089,12 @@ def cross_project_transfer_allowed(candidate: Dict[str, Any], target_state: Dict
     `scope.source_route` / `scope.source_project` must pass the structural transfer gate
     (`policy_transfer.PT*`); domain-keyword resemblance is never enough.
 
-    Fail-closed provenance: `propose()` does not stamp `source_route`/`source_project`, so a
-    candidate with no declared source is *unverifiable*, not "same route". When the caller
+    Fail-closed provenance: only a source **stamped by `propose()`** (`origin_stamped`) counts.
+    A candidate-declared `source_route`/`source_project` is self-attested and ignored, so a
+    candidate cannot name the target route as its own origin to skip the gate. When the caller
     supplies a `current_route` (or passes `require_transfer=True`), the gate must not silently
-    return `NOT_REQUIRED`: an absent source, or an absent `current_route` when a source *is*
-    declared, is a BLOCK. `require_transfer=True` forces the transfer gate even without a
-    declared source, leaving the PT* rules to decide.
+    return `NOT_REQUIRED`: an absent/unstamped source, or an absent `current_route` when a
+    stamped source exists, is a BLOCK. `require_transfer=True` forces the PT* rules to decide.
     """
     def blocked(reason: str) -> Dict[str, Any]:
         return {"required": True, "status": "BLOCK", "reasons": [reason], "similarity": None}
@@ -1081,8 +1103,11 @@ def cross_project_transfer_allowed(candidate: Dict[str, Any], target_state: Dict
         return blocked("策略候选不是对象；无法判定跨项目迁移边界（fail-closed 阻塞）")
     raw_scope = candidate.get("scope")
     scope = raw_scope if isinstance(raw_scope, dict) else {}
-    source = (scope.get("source_route") or scope.get("source_project")
-              or candidate.get("source_route") or candidate.get("source_project"))
+    # Provenance must be STAMPED by `propose()`. A candidate-declared source is not
+    # provenance: letting it win meant a policy could name the target route as its own origin
+    # and skip the structural transfer gate entirely.
+    stamped = candidate.get("origin_stamped") is True
+    source = (candidate.get("source_route") or candidate.get("source_project")) if stamped else None
     source_declared = bool(source)
     if source_declared and current_route and str(source) == str(current_route):
         return {"required": False, "status": "NOT_REQUIRED", "reasons": [], "similarity": None}

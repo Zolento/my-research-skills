@@ -52,9 +52,12 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 | `outcome` | `observed_at` / `at_state_version` / `result` / `evidence_refs` / 三类 Delta / `policy_effect_observed` / 成本 / 未解决问题 / `evidence_qualification` |
 | `learning` | `learning_value` / `bias_hypothesis` / `applicability` / `counterexamples` / `needs_validation` |
 
-机械规则：`DT0` 链完整性（含尾部）、`DT1` 结构、`DT2` 已记录决策不得被结果改写、
+机械规则（`DT0`—`DT10`）：`DT0` 链完整性（含尾部）、`DT1` 结构、`DT2` 已记录决策不得被改写
+（比较**决策语义**：被选动作与冻结上下文；调度器候选集变化属于重新观测，不是改写）、
 `DT3` 来源引用必须存在、`DT4` 过期状态与时间倒挂、`DT5` 事后补写预测、
-`DT6` 结果泄漏进冻结上下文、`DT9` 未合格证据不得声称科学增量、`DT10` route 绑定。
+`DT6` 结果泄漏进冻结上下文、`DT7` 轨迹/策略存储不得作为科学证据来源、
+`DT8` 同一 `state_version` 下同一行动不得改名重复派遣、`DT9` 未合格证据不得声称科学增量、
+`DT10` route 绑定。
 
 命令：`open` / `outcome` / `learning` / `show` / `list` / `validate` / `--selftest`。
 
@@ -160,6 +163,17 @@ L2 不能推出 L3。稳定策略的 L3 主张必须经过独立真实评价；�
 已知反例、历史成功的证据等级。领域关键词相似不足以判定适用。
 过期经验（绑定过旧 state_version 或引用已被失效的对象）失效；被否证的机制不得再次提出。
 记忆压缩不得丢失证据与停止规则。
+
+机械规则（`PT1`—`PT11`）：`PT1` 三层记忆不得混用、`PT2` 策略不得声称科学效果、
+`PT3` scope 必须结构化、`PT4` 结构不匹配不得迁移（自证签名不算证据）、
+`PT5` 适用条件不满足或**不可解析**即拒绝、`PT6` 必需工具缺失、
+`PT7` 验证协议不兼容、`PT8` 不得重提已被否证的机制
+（含 `hypotheses[].status = killed`；匹配的是被排除的 `ruled_out` 命题）、
+`PT9` 证据等级低于 scope 主张、`PT10` 已知反例覆盖目标结构
+（**畸形条件 fail-closed**，不得用来抵消覆盖判定）、`PT11` 经验状态版本缺失或非法即视为过期。
+
+**跨项目来源是必需项：** `propose()` 会为候选打上来源路由；缺少来源而当前路由已知时迁移门直接
+BLOCK。用户自带正则（`op: regex`/`matches`）一律拒绝，避免 ReDoS。
 
 ## 9. Source Freeze 与写入白名单（`scripts/source_freeze.py`）
 

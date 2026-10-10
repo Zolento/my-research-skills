@@ -117,6 +117,9 @@
   - research-state.json（只经既有 R 阶段与门禁）
   - cognition/ 投影
   - 执行账本
+  - `decision-trajectory.jsonl`（**仅 apply 路径**：把本次实际派遣写入决策轨迹）
+  - `scheduler.json`（**仅 apply 路径**：把策略决策追加到既有 `strategy_decisions[]` 遥测）
+  - `source-integrity.jsonl`（运行前后的源码完整性审计事件）
 - canonical `research-state.json`：只经既有 R 阶段与门禁写。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 
