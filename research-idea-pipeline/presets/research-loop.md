@@ -60,7 +60,7 @@
   - `scripts/evidence_outcome.py`
   - `scripts/policy_evolution.py`（Skill-RSI：读取 ACTIVE 策略；只读，不在此处晋升）
   - `scripts/decision_trajectory.py`（Skill-RSI：应用路径记录实际派遣）
-- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
 
 **策略消费（Skill-RSI，只读）：** 若存在 ACTIVE 且有作用域的策略，Loop 通过现有
 `strategy_memory.strategy_decision()` 在同一 `EIG ÷ cost` 层内重排已通过硬门禁的动作，

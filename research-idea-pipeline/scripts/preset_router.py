@@ -3077,8 +3077,19 @@ def run_preset(
     import source_freeze as sf
     freeze = sf.SourceFreeze(route_dir=None, context=f"preset:{preset_id}")
     freeze.__enter__()
+    handler_error: Optional[str] = None
     try:
         payload = handler(context, apply)
+    except (cg.CognitionError, OSError) as exc:
+        # A handler that cannot do its job must produce a diagnosable HOLD, not a traceback
+        # out of the router. Genuinely unrecoverable errors (MemoryError, KeyboardInterrupt)
+        # still propagate.
+        handler_error = f"{type(exc).__name__}: {exc}"
+        payload = {"preset_id": preset_id, "status": "HOLD", "protocol": preset["protocol"],
+                   "entry": preset["entry"], "execution_scope": preset["execution_scope"],
+                   "reused": list(preset["reuses"]), "observed": {"handler_error": handler_error},
+                   "decision": {}, "steps": [], "writes": [], "changed_decision": None,
+                   "next_action": None, "hold_reason": "handler_error"}
     finally:
         freeze.__exit__(None, None, None)
     integrity: Dict[str, Any] = dict(freeze.result or {})
@@ -3111,6 +3122,9 @@ def run_preset(
                                       == payload["canonical_digest_after"])
     payload["apply"] = apply
     hard = [item for item in context["diagnostics"] if not cg.is_warning(item.rule)]
+    if handler_error is not None:
+        hard.append(Diagnostic("PR10", "handler",
+                               f"Preset 处理器无法完成：{handler_error}（HOLD，不重试、不放宽门禁）"))
     if integrity.get("status") not in (None, "PASS", "SKIPPED"):
         hard.append(Diagnostic("SRC1", "skill-source",
                                "运行期间 Skill 源码被修改：立即 HOLD，记录审计事件，"

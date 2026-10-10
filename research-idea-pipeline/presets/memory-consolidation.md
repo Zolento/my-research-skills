@@ -53,7 +53,7 @@
   - `scripts/strategy_memory.py`
   - `scripts/state_check.py`
   - `scripts/policy_transfer.py`（Skill-RSI：三层记忆分离、过期经验、无损压缩检查）
-- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `PT1`—`PT11`；科学判定仍由既有规则号给出。
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `PT1`—`PT11`；科学判定仍由既有规则号给出。
 
 **三层记忆不得互相替代（Skill-RSI）：** Scientific Memory 由 canonical 科学对象及其派生投影提供；
 Decision Experience 保存历史行动、选择条件、结果与执行成本（决策轨迹）；Policy Memory 保存经过

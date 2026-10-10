@@ -52,7 +52,7 @@ Router 负责解析（显式 id > 别名 > 意图词 + 入口 > 意图词 > Loop
 | `hypothesis-rebalance` | `explore` | `portfolio` | 「所有 idea 都一样」、「重新平衡假设组合」 |
 | `discovery-replay` | `continue-research` | `evaluation_only` | 「做一次历史研究回放」、「检验自进化策略是否真的更好」 |
 
-**安全规则（`PR1`—`PR9`）：** 否定不触发（「不要审计」→ `HOLD`）；歧义取最小授权并要求确认；
+**安全规则（`PR1`—`PR10`）：** 否定不触发（「不要审计」→ `HOLD`）；歧义取最小授权并要求确认；
 只给 `phase=R<n>` 时交回既有阶段；只陈述问题先只读诊断；**只读提问绝不升级为执行**；
 工程故障不写成科学否证。
 

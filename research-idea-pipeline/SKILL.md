@@ -870,7 +870,7 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 
 ---
 
-### 1.10 Research Preset Library 与 Intent Router（`PR1`—`PR9`）
+### 1.10 Research Preset Library 与 Intent Router（`PR1`—`PR10`）
 
 **用户说人话，Router 选协议。** 内容包（`shared-contract.md` + `preset-registry.json` +
 `presets/<id>.md` 16 份独立协议 + `router-fixtures.json`）已集成；`scripts/preset_router.py` 是可执行

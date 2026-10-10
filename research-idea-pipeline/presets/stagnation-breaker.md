@@ -53,7 +53,7 @@
   - `scripts/cognition.py`
   - `scripts/strategy_memory.py`
   - `scripts/decision_trajectory.py`（Skill-RSI：判断重复诊断是否真的改变过任何后续决定）
-- 规则号：本仓库自身产生 `PR1`—`PR9`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
 
 **行为切换的证据必须是真实决定（Skill-RSI）：** 多次实验没有产生新的可区分预测、不断增加新解释却没有
 新的识别实验、新假设与已失败机制结构等价、只缩小缺陷范围却不改方法设计、相同证据下重复审查、

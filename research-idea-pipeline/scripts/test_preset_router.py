@@ -1138,3 +1138,62 @@ class TestReviewFixes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHandlerFailureIsDiagnosable(unittest.TestCase):
+    """A handler that cannot complete must HOLD, not traceback out of the router (PR10)."""
+
+    def test_an_environment_failure_becomes_a_hold(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
+            original = pr.HANDLERS["research-loop"]
+
+            def failing(context, apply):
+                raise OSError("disk full")
+
+            pr.HANDLERS["research-loop"] = failing
+            try:
+                payload, diagnostics, code = pr.run_preset("research-loop", state_path,
+                                                           apply=True)
+            finally:
+                pr.HANDLERS["research-loop"] = original
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertEqual(code, pr.EXIT_ENV)
+            self.assertEqual(payload["hold_reason"], "handler_error")
+            self.assertIn("disk full", payload["observed"]["handler_error"])
+            self.assertIn("PR10", [item.rule for item in diagnostics])
+
+    def test_a_cognition_error_becomes_a_hold_too(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
+            original = pr.HANDLERS["research-review"]
+
+            def failing(context, apply):
+                raise cg.CognitionError("projection unreadable")
+
+            pr.HANDLERS["research-review"] = failing
+            try:
+                payload, diagnostics, code = pr.run_preset("research-review", state_path)
+            finally:
+                pr.HANDLERS["research-review"] = original
+            self.assertEqual(payload["status"], "HOLD")
+            self.assertEqual(code, pr.EXIT_ENV)
+            self.assertIn("PR10", [item.rule for item in diagnostics])
+
+    def test_a_programming_error_still_propagates(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = pr._fixture(pathlib.Path(temp) / "A")
+            cg.op_build(state_path, state_path.parent / cg.COGNITION_DIRNAME)
+            original = pr.HANDLERS["research-review"]
+
+            def failing(context, apply):
+                raise ValueError("bug")
+
+            pr.HANDLERS["research-review"] = failing
+            try:
+                with self.assertRaises(ValueError):
+                    pr.run_preset("research-review", state_path)
+            finally:
+                pr.HANDLERS["research-review"] = original
