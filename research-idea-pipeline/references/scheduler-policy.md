@@ -85,32 +85,19 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 - 同一结果、同一证据快照下，不重复审计。只有新证据或明确未完成项才触发复核。
 - 资源被占用时，继续候选推导、代码实现或独立低成本测试。不要反复轮询代替研究。
 
-**运行时可执行的 I2M 规则（`scripts/insight_to_method.py`，优先级 4—8 之内生效）：**
+**I2M 与调度（要点；完整规则以 `scripts/insight_to_method.py` 为唯一权威）：**
 
-- 机制证据足以形成干预时，**方法合成进入可执行动作集合**：动作 `type` 取 `method_synthesis`
-  （首选）、`method_design`、`method_minimal_test`（见 §4 类型表），其产物是方法候选 +
-  设计契约 + 最小干预测试计划，而不是又一份解释。
-- I2M **只在优先级 1—3 与既有门禁之后**被咨询（`preset_router._loop_step` 的末尾）：
-  它不得越过完整性、未决攻击、失效传播、PEIG、AALG、预算或人工审批，也不得解阻 stop rule。
-- 触发条件：**readiness 成立即可**（不必等停滞）；此外 `eig_calibration` 连续 ≥2 次
-  `actual_information_gain == "zero"`、`diagnosis_switch` 给出 `CONTINUE_ATTRIBUTION` 以外的结论、
-  或已存在冻结的方法契约也会触发。**判据是执行记录，不是叙述**：同一证据快照下反复改写解释
-  不会重置该计数。
-- 动作状态必须显式：`proposed` → `admissible` → `authorized_in_queue` → `dispatched` →
-  `executed`（`advisory`/`planned` 为其中的建议与计划态）。**授权必须绑定候选身份**：
-  队列条目需携带 `method_candidate`/`method_version`/`method_digest`/`state_version`；
-  仅同类型不足以授权。
-  I2M 输出的只是**候选动作**（`method_synthesis` 等）；要真正执行，该动作必须进入本文件的
-  `next_actions[]` 合法集合，并通过 PEIG/AALG、预算与授权。
-- `planned` 实验在派遣前核对**当前决策价值**：目标问题已全部解决/否证、或与已结束实验
-  （同设计**且**同目标）重复者不得继续占据队列（保留冻结预注册与历史）。**running 不得被终止。**
-- I2M 建议不得取代 1—3 级必要动作：队列中有 `repair`/`propagate_invalidation` 时 I2M 仅作建议。
-- 诊断动作（`type=discriminating_experiment`）必须声明它会改变哪个研究决定
-  （`changes_decision` 或 `decision_targets`）；没有决策价值的诊断不得仅凭便宜反复优先。
-- readiness 不足时，动作是「补做能改变方法决定的判别实验」，**不得**强行包装成新方法。
-- 主锚点不是方法/性能时，I2M 走 `anchor_native` 分支，产出该锚点自己的贡献类型
-  （理论/现象/基准/可行性/负结果），**不把非方法锚点强行转成算法**。
-- 非配对或未核验的对照不得进入方法收益结论；方法进展必须同时有新证据与方法指纹变化。
+- 动作状态 `proposed → admissible → authorized_in_queue → dispatched → executed`；授权必须绑定
+  候选 id/版本/摘要/状态版本，**仅同类型不授权**；新方法经 `register_method_candidate` 首入。
+- 触发：**readiness 成立即可**（不必等停滞）或零信息增益；**I2M 只提建议**，仍受 PEIG/AALG、预算、
+  授权与人工审批约束；队列存在 1—3 级必要动作（`repair` / 失效传播）时 I2M 让位。
+- `planned` 实验在派遣前做决策价值检查；**running 不得为切换方法而中断**。
+- 诊断动作须声明它会改变哪个研究决定，否则不得仅凭便宜反复优先。
+
+**科学回报的软性偏好（不改变任何硬优先级与门禁）：** 在同一层合法动作之间，优先推进能把重要
+Insight 转化为**关键方法干预**、并可能产生独立科学贡献的动作；方法干预若能区分竞争机制，
+它本身也可以是高信息增益实验，不必被归类为低优先级的局部优化。偏好必须给出理由并说明不确定性，
+**不得**凌驾完整性、未决攻击、失效传播、科学有效性与资源资格。
 
 在对应阶段产物的动作说明中记录依赖、预期改变的决定和重选条件，按 `next_actions[].action` 关联。
 方法检索调用见 [phase-r2-r5-field-mapping-retrieval.md](phase-r2-r5-field-mapping-retrieval.md) §R5.1。

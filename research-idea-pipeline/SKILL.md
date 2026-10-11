@@ -341,7 +341,7 @@ B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用�
 - 纯超参数调整**不算**方法合成；候选不得同构凑数；未经核实的创新性不得写成事实。
 - 最小实验失败必须区分**实现错误 / 干预无效 / 机制被削弱 / 实验不可判别**，
   **不得自动归因，也不得事后修改预注册判据**。
-- **新增解释、文档、实验数量或自评得分都不算方法进展**；进展要求方法指纹变化 **且**有新执行证据。
+- **新增解释、文档、实验数量或自评得分都不算方法进展**；进展要求存在可归属的新证据或方法版本变化（定义见运行时）。
   同一证据快照下重复改写解释**不得重置**停滞计数。
 - 生成候选、改写报告、策略自评**不得**作为 RSI 的 L3 能力提升证据（`PE17`）。
 
@@ -367,63 +367,28 @@ anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_st
 
 **决策完整性（第十三轮，机械可校验）：**
 
-- **动作状态必须分清**：`advisory`（建议文本）→ `planned` → `authorized_in_queue`（已进入
-  Scheduler 合法动作集合）→ `dispatched` → `executed`。**建议文本不得冒充执行**；I2M 只能
-  **提出候选动作**，真正的派遣要过 Scheduler 硬约束、优先级、PEIG/AALG、预算与授权。
-- **不得等停滞**：readiness 一旦成立，贡献开发就是 Scheduler 的合法候选动作；
-  `planned` 实验派遣前要做**有效性检查**（目标问题是否已经解决、是否与已结束实验重复），
-  无决策价值的 planned 不得长期占据执行队列；**running 真实任务不得为切换方法而被终止**。
-- **诊断必须说明它会改变哪个研究决定**；否则不得仅凭便宜反复排在方法开发之前。
-- **Insight 必须绑定同一候选**：机制、干预、预测、判别实验、对照都必须来自**同一个 H** 及其
-  可追溯依赖链；不得跨对象拼接，不得用 refuted/killed/stale 对象凑就绪。
-  关联无法证明时，返回**部分就绪 + 具体缺口**，不直接形成可执行契约。
-- **证据方向不可混淆**：`depends_on` ≠ `supports`。依赖只记依赖；只有方向为支持、且通过
-  证据资格（观测等级/有效性/来源/验证层级）的证据才能抬高机制结论，并且必须区分
-  **观察到预测现象 / 干预改善结果 / 机制得到支持**——前者不等于后者。
-- **Anchor Eligibility 必须与目标锚点绑定**：项目里任意一条 supported claim 不等于目标 anchor
-  的有效证据；supporting 路线只能形成辅助贡献，**不得使项目主锚点达标**；orthogonal 保留
-  独立价值且不得成为原项目主线。主锚点未满足**不阻碍**方法探索，但**局部有效不等于 Anchor
-  Satisfaction**。
-- **进展分五个维度且不得互相冒充**：Epistemic（新证据真正改变假设或研究决定）/
-  Design（形成可实现的新干预与冻结方法定义）/ Implementation（实现通过工程正确性检查）/
-  Validation（**同一方法版本**获得新的有效支持或反驳）/ Anchor（可信证据缩小主锚点缺口）。
-  **指纹变化本身不是验证成功**；无关新证据不加进展；同方法完成独立验证**无须改算法**；
-  可信负结果与排除关键假设同样是有效进展。
-- **契约必须绑定版本**：不得取「遇到的第一个契约」，也**不得用摘要字典序判断新旧**（按版本号/
-  登记时间）；废弃/被取代/archived 契约不得主导 Loop，显式引用历史契约仅供审计；方法实质变化
-  不得沿用旧版本的确认性结论；结果之后才登记的实验只能算探索性证据。
-- **授权必须绑定候选身份**：`proposed → admissible → authorized_in_queue → dispatched →
-  executed`；队列里同类型的方法动作**不足以**授权当前候选，条目必须携带
-  `method_candidate`/`method_version`/`method_digest`/`state_version`。新方法通过
-  `register_method_candidate` 生成合法首入条目，不会被永久锁死。
-- **进展必须归属到方法版本**：证据经 `Evidence → Experiment → Method Version → Hypothesis →
-  Anchor` 链条核验；其他方法版本的证据不得计入本方法（misattributed）；**同一证据不得重复消费**
-  来重置停滞；同一版本独立验证仍算 Validation Progress。
-- **关联不得靠文字匹配**：Anchor 关联必须显式（`anchor`/`target_metric`）或由测量目标指标的
-  实验 targeting；自由文本提及只算 `text_only`，不足以证明资格。Project Objective、
-  Research Progress、Defensible Contribution、Anchor Eligibility、Anchor Satisfaction
-  **分别记录**；缺少冻结条件时缺口为 `undetermined`，**不默认满足**；**缺少证据不等于已被证伪**。
-- **独立复现是合法科学**：同设计同目标不等于重复——声明独立性（种子/实验单位）、统计目的、
-  冻结规则与防泄漏措施后可通过；但**同一次执行事件不得重复计数**，改名/改 ID 不得绕过。
-- **claim 的 supported 必须有支持证据**：`status: supported` 只是声明；必须由合格证据
-  （`supporting_evidence` 或证据 `supports` 该 claim）支撑，否则记入 `unbacked_claims`，
-  **不能**使 Anchor 资格成立。
-- **冻结要求逐项判定**：每项要求分别标 `satisfied / unsatisfied / refuted / undetermined` 并附
-  证据引用；**自然语言要求无法机械核验时为 `undetermined`**，不默认满足也不视为已被否证；
-  调用方传入的 `satisfied` 只作参考（`provided_satisfied_ignored`），**不得改变机械判定**。
-- **泛化实验不等于锚点验证**：实验必须**显式测量目标指标**（`metric` == `contract.target_metric`）
-  才能构成 targeting 关联；无指标约束的实验 targeting 不构成 Anchor Eligibility。
-- **进展必须可归属**：证据须解析到真实 Experiment 且与该**方法版本/契约摘要**匹配；引用不可解析、
-  无版本绑定或版本冲突 → `unattributed/misattributed`，**不获得验证进展**；
-  **Design Progress 要求冻结 `definition_digest` 真的变化**（仅改字段不算新设计）。
-- **去重跨重启有效**：消费水位由持久化产物（已做 outcome analysis 的实验）推导，
-  同一次结果不会在 Loop 重启/重复执行后被再次计入；证据去重不依赖单次调用参数。
-- **I2M 建议不得取代硬优先级动作**：队列中存在 `repair`/`propagate_invalidation`（1—3 级）时，
-  I2M 保持建议态，不成为 Loop 的下一步。
-- **契约版本不可排序时返回歧义**：整数与不可解析版本并存、或缺版本且无登记时间 →
-  `ambiguous` + 候选列表，**不猜「最新」**；不同候选的契约不得互相抢占。
-- **机制自述不是审查**：`mechanism_support`/`conclusion` 等自述字段未经 R8/R10 审查
-  （`review_status=PASS` / T3+ / `assurance_ref`）只能记为「观察到预测现象」，不得判定机制已验证。
+**决策完整性（要点；实现细节以运行时与 policy 文档为唯一权威，本节不再复制）：**
+
+| 约束 | 一句话 | 权威来源 |
+|---|---|---|
+| 动作状态 | `proposed → admissible → authorized_in_queue → dispatched → executed`；建议文本不是执行 | `references/scheduler-policy.md` §3.1、`insight_to_method.candidate_method_action` |
+| 授权绑定 | 队列条目须带 `method_candidate`/`method_version`/`method_digest`/`state_version`；仅同类型不授权；新方法走 `register_method_candidate` 首入 | 同上 |
+| 证据方向 | `depends_on` ≠ `supports`；只有合格 `supports` 才抬高机制结论；自述审查不是审查 | `insight_to_method._mechanism_support`、`_review_credential` |
+| 进展五维 | Epistemic / Design / Implementation / Validation / Anchor，互不冒充；**同一方法版本的独立验证即 Validation Progress，无须改算法** | `insight_to_method.method_progress`（唯一定义处） |
+| 进展归属 | 证据须解析到真实 Experiment 并与方法版本/契约摘要匹配；去重跨重启有效 | 同上 |
+| 契约版本 | 按版本号/登记时间；不可排序返回 `ambiguous`；失效契约仅审计 | `insight_to_method.select_method_contract` |
+| 锚点判定 | 逐项 requirement 判定；文字提及不算关联；缺条件为 `undetermined` | `insight_to_method.anchor_gap`、`references/claim-first-policy.md` §6 |
+| 调度让位 | I2M 仅建议；1—3 级必要动作（`repair`/失效传播）优先 | `insight_to_method.loop_step` |
+
+**科研品味（选择值得做的贡献，不做评分）：** 在**都可执行**的候选之间，按四轴给出**偏好理由**并说明
+最大不确定性——`Importance` 问题是否真的重要 / `Insight` 发现了什么改变设计的结构或规律 /
+`Elegance` 是否直接、简洁且能解释「为何不更简单」/ `Evidence` 什么关键实验能区分作用与替代解释。
+比较是**建议**，不是门禁，也不是分数；**保留备选路线**，不因当前偏好删除。
+**不强制凑候选**：机制只指向一种自然干预时，提交**一个**候选并写明「不存在值得比较的设计分歧」即可；
+只有存在**真实设计分歧**时才比较 2—3 个。探索阶段用 **Method Sketch** 四问（解决什么问题 / 利用什么
+Insight / 修改什么算法 / 什么结果会否定它），**完整 Design Contract 只在冻结实验前要求**。
+每个方法候选应能用三句话建立 `Problem → Insight → Method → 判别实验` 的连贯性；连不起来通常说明
+其中一环尚未想清楚（这是**一致性检查**，不是让你为叙事修改数据）。
 
 **每轮面向用户的汇报形态：** `Problem / Insight / Method / Evidence / Next Decision`（五段），
 而不是长篇归因报告。
