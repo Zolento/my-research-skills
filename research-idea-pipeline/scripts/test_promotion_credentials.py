@@ -23,6 +23,10 @@ import unittest
 import cognition as cg
 import policy_evolution as pe
 import research_replay as rr
+import rsi_test_support as support
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts" / "policy_evolution.py"
 
 DIMENSIONS = rr.METRIC_DIMENSIONS
 BENEFIT = "search_efficiency"
@@ -521,3 +525,95 @@ class TestGlobalScopeProvenance(CredentialCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# E. 复核本轮的产物：来源链上的四个缺口 + CLI 健壮性
+# ---------------------------------------------------------------------------
+
+class TestCredentialChainGaps(CredentialCase):
+    def _validation(self, policy_id="P-1"):
+        self.evaluated(policy_id)
+        pe.begin_bounded_trial(self.state_path, policy_id,
+                               dispatch_evidence={"dispatched": "R2"})
+        return support.research_validation(
+            self.state_path, policy_id, pathlib.Path(self.temp.name),
+            signature=self.signature(policy_id),
+            rules_digest=pe.evaluation_rules_digest(self.state_path))
+
+    def test_a_credential_that_overstates_its_run_count_is_refused(self):
+        """Three records cannot support a declared runs_per_case of 2."""
+        credential = self._validation()
+        credential["runs_per_case"] = 2
+        for arm in credential["per_arm"]:
+            credential["per_arm"][arm]["results"] = credential["per_arm"][arm]["results"][:3]
+        result = pe.record_research_validation(self.state_path, "P-1", credential)
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("执行记录数", " ".join(result["diagnostics"]))
+
+    def test_arms_running_different_case_sets_are_refused(self):
+        """Equal counts are not enough: the arms must cover the same cases to be comparable."""
+        credential = self._validation()
+        for index, row in enumerate(credential["per_arm"]["control"]["results"]):
+            row["case_id"] = f"W{index % 3}"
+        result = pe.record_research_validation(self.state_path, "P-1", credential)
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("case 集合", " ".join(result["diagnostics"]))
+
+    def test_a_non_supported_credential_leaves_no_artifact_behind(self):
+        """A refused credential must not be stored as if it were a usable evaluation."""
+        credential = self._validation()
+        # Only the candidate arm loses mechanistic understanding -> reliability regression.
+        for row in credential["per_arm"]["policy"]["results"]:
+            row["evaluation"]["metrics"]["mechanistic_understanding"] = {"value": 0.1}
+        before = len(list(pe.evaluations_dir(self.state_path).glob("*.json")))
+        result = pe.record_research_validation(self.state_path, "P-1", credential)
+        self.assertEqual(result["status"], "INVALID", result)
+        after = len(list(pe.evaluations_dir(self.state_path).glob("*.json")))
+        self.assertEqual(before, after, "a refused credential was still stored")
+
+    def test_an_understated_unobserved_count_is_refused(self):
+        """The unobserved count is recomputed from the records, not read from the report."""
+        self.ready()
+        document = self.good_report()
+        for arm in document["per_arm"]:
+            for row in document["per_arm"][arm]["results"]:
+                row["evaluation"]["evidence_support"] = {"class": "NO_SUPPORT"}
+        document["unobservable_decisions"] = 0
+        result = pe.evaluate_candidate(self.state_path, "P-1", document)
+        self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+        self.assertIn("NO_SUPPORT", " ".join(result["diagnostics"]))
+
+    def test_a_tampered_trajectory_store_does_not_crash_the_attestation(self):
+        (self.route / "decision-trajectory.jsonl").write_bytes(b"\xff\xfe\x00bad")
+        self.assertEqual(pe._attested_projects(self.state_path), set())
+
+
+class TestCredentialCliRobustness(CredentialCase):
+    def _run(self, *args):
+        import subprocess
+        import sys
+        return subprocess.run([sys.executable, str(SCRIPT), *args],
+                              capture_output=True, text=True)
+
+    def test_a_missing_credential_file_is_a_clean_error(self):
+        proc = self._run("validate-research", "--state", str(self.state_path),
+                         "--policy-id", "P-1", "--validation", "/nonexistent/cred.json")
+        self.assertNotIn("Traceback", proc.stderr, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["status"], "INVALID")
+
+    def test_an_unparsable_credential_file_is_a_clean_error(self):
+        bad = pathlib.Path(self.temp.name) / "bad.json"
+        bad.write_text("not json", encoding="utf-8")
+        proc = self._run("validate-research", "--state", str(self.state_path),
+                         "--policy-id", "P-1", "--validation", str(bad))
+        self.assertNotIn("Traceback", proc.stderr, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["status"], "INVALID")
+
+    def test_an_unparsable_report_file_is_a_clean_error(self):
+        bad = pathlib.Path(self.temp.name) / "bad.json"
+        bad.write_text("not json", encoding="utf-8")
+        proc = self._run("evaluate", "--state", str(self.state_path),
+                         "--policy-id", "P-1", "--report", str(bad))
+        self.assertNotIn("Traceback", proc.stderr, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["status"], "INVALID")

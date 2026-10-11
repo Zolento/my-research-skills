@@ -1021,6 +1021,20 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
                                       "evidence_support": block.get("evidence_support") or {}}
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         errors.append("各臂执行的 case 集合不一致：无法配对比较")
+    # The unobserved count is recomputed from the execution records; a report could otherwise
+    # claim full coverage while every record said NO_SUPPORT.
+    recomputed_unobservable = 0
+    for block in normalized["per_arm"].values():
+        for row in block["results"]:
+            support = ((row.get("evaluation") or {}).get("evidence_support") or {}).get("class")
+            if support == "NO_SUPPORT":
+                recomputed_unobservable += 1
+    declared_unobservable = int(report.get("unobservable_decisions") or 0)
+    if declared_unobservable != recomputed_unobservable:
+        errors.append(
+            f"unobservable_decisions 声明 {declared_unobservable}，但执行记录（NO_SUPPORT）"
+            f"重算为 {recomputed_unobservable}")
+    normalized["unobservable_decisions"] = recomputed_unobservable
     if errors:
         return {"errors": errors, "report": None, "verdict": None}
     verdict = ablation_verdict(normalized, rules=rules)
@@ -1133,6 +1147,7 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
         bad("缺少具名 runner")
 
     dimensions = list(rules.get("dimensions") or DEFAULT_EVALUATION_RULES["dimensions"])
+    case_sets: Dict[str, set] = {}
     normalized: Dict[str, Any] = {"schema": SCHEMA_ABLATION_REPORT,
                                   "cases": cases if isinstance(cases, int) else 0,
                                   "runs_per_case": runs if isinstance(runs, int) else 1,
@@ -1162,10 +1177,24 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             ids = {str(row.get("case_id")) for row in results if isinstance(row, dict)}
             if len(ids) != cases:
                 bad(f"{arm} 的 case 数 {len(ids)} 与声明的 {cases} 不一致")
+            if isinstance(runs, int) and runs >= 1 and len(results) != cases * runs:
+                bad(f"{arm} 的执行记录数 {len(results)} 与 cases×runs "
+                    f"({cases}×{runs}) 不一致")
+            case_sets[arm] = ids
+    if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
+        bad("各臂执行的 case 集合不一致：不存在可配对的对照")
     if diagnostics:
         return {"errors": diagnostics, "report": None, "verdict": None}
     verdict = ablation_verdict(normalized, candidate_arm=candidate_arm,
                                control_arm=control_arm, rules=rules)
+    if verdict.get("verdict") != "SUPPORTED":
+        # Refuse before storing: a credential the very next gate rejects must not be written
+        # to the store as if it were usable evidence.
+        diagnostics.append(_diag(
+            "PE11", path,
+            f"科研验证结论是 {verdict.get('verdict')!r}，不是 SUPPORTED："
+            + "；".join(verdict.get("reasons") or [])))
+        return {"errors": diagnostics, "report": None, "verdict": None}
     return {"errors": [], "report": normalized, "verdict": verdict}
 
 
@@ -2139,6 +2168,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _read_json_input(path: str, label: str) -> Tuple[Any, Optional[str]]:
+    """Read a JSON input file, turning any failure into a diagnosable message."""
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, f"{label} 文件不存在：{path}"
+    except (UnicodeDecodeError, OSError) as exc:
+        return None, f"{label} 文件不可读（{type(exc).__name__}）：{path}"
+    except json.JSONDecodeError as exc:
+        return None, f"{label} 不是合法 JSON：{exc}"
+
+
 def _emit(payload: Any, code: int = EXIT_OK) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
     return code
@@ -2213,7 +2254,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.policy_id or not args.validation:
             return _emit({"status": "INVALID",
                           "errors": ["需要 --policy-id 与 --validation <file>"]}, EXIT_ERROR)
-        credential = json.loads(Path(args.validation).read_text(encoding="utf-8"))
+        credential, failure = _read_json_input(args.validation, "validation")
+        if failure:
+            return _emit({"status": "INVALID", "policy_id": args.policy_id,
+                          "diagnostics": [failure], "codes": ["PE11"]}, EXIT_HARD)
         result = record_research_validation(state_path, args.policy_id, credential)
         return _emit(result, EXIT_OK if result.get("written") else EXIT_HARD)
     if args.command in ("trial", "validate", "promote"):
@@ -2236,7 +2280,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.policy_id or not args.report:
             return _emit({"status": "INVALID",
                           "errors": ["需要 --policy-id 与 --report"]}, EXIT_ERROR)
-        report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+        report, failure = _read_json_input(args.report, "report")
+        if failure:
+            return _emit({"status": "INVALID", "policy_id": args.policy_id,
+                          "diagnostics": [failure], "codes": ["PE11"]}, EXIT_HARD)
         result = evaluate_candidate(state_path, args.policy_id, report)
         return _emit(result, EXIT_OK if result["written"] else EXIT_HARD)
     if args.command == "rollback":
