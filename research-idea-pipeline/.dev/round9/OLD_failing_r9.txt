@@ -1,0 +1,122 @@
+.........FF.E.....FEEEE...................
+======================================================================
+ERROR: test_a_partial_custom_rule_set_is_completed_then_frozen (test_promotion_credentials.TestFrozenParameters.test_a_partial_custom_rule_set_is_completed_then_frozen)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 479, in test_a_partial_custom_rule_set_is_completed_then_frozen
+    self.assertEqual(rules["min_runs"], pe.DEFAULT_EVALUATION_RULES["min_runs"])
+                     ~~~~~^^^^^^^^^^^^
+KeyError: 'min_runs'
+
+======================================================================
+ERROR: test_a_nan_unobserved_count_does_not_crash_the_evaluator (test_promotion_credentials.TestMalformedNumbers.test_a_nan_unobserved_count_does_not_crash_the_evaluator)
+`int(NaN)` used to escape evaluate_candidate as a raw ValueError.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 677, in test_a_nan_unobserved_count_does_not_crash_the_evaluator
+    result = pe.evaluate_candidate(self.state_path, "P-1", document)
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 2025, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 992, in audit_report
+    "unobservable_decisions": int(
+                              ~~~^
+        report.get("unobservable_decisions") or 0),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: cannot convert float NaN to integer
+
+======================================================================
+ERROR: test_ablation_verdict_survives_non_finite_counts (test_promotion_credentials.TestMalformedNumbers.test_ablation_verdict_survives_non_finite_counts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 709, in test_ablation_verdict_survives_non_finite_counts
+    outcome = pe.ablation_verdict(document, rules=pe.frozen_rules(self.state_path))
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1944, in ablation_verdict
+    unobservable = int(report.get("unobservable_decisions") or 0)
+ValueError: cannot convert float NaN to integer
+
+======================================================================
+ERROR: test_infinite_and_string_counts_are_handled_without_crashing (test_promotion_credentials.TestMalformedNumbers.test_infinite_and_string_counts_are_handled_without_crashing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 687, in test_infinite_and_string_counts_are_handled_without_crashing
+    result = pe.evaluate_candidate(self.state_path, "P-1", document)
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 2025, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 992, in audit_report
+    "unobservable_decisions": int(
+                              ~~~^
+        report.get("unobservable_decisions") or 0),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert float infinity to integer
+
+======================================================================
+ERROR: test_recomputed_level_survives_non_finite_gates (test_promotion_credentials.TestMalformedNumbers.test_recomputed_level_survives_non_finite_gates)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 717, in test_recomputed_level_survives_non_finite_gates
+    self.assertIn(pe._recomputed_level(gates, {"verdict": "SUPPORTED"},
+                  ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                       schema=pe.SCHEMA_EVALUATION),
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1283, in _recomputed_level
+    adequate = (int(gates.get("assessable_dimensions") or 0) >= 2
+                ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: cannot convert float NaN to integer
+
+======================================================================
+FAIL: test_a_hand_edited_incomplete_rule_file_cannot_reach_the_evaluator (test_promotion_credentials.TestFrozenParameters.test_a_hand_edited_incomplete_rule_file_cannot_reach_the_evaluator)
+A rules file that predates or bypasses validation must fail closed, not KeyError.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 486, in test_a_hand_edited_incomplete_rule_file_cannot_reach_the_evaluator
+    self.assertIsNone(pe.frozen_rules(self.state_path))
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'delta_tolerance': 0.05} is not None
+
+======================================================================
+FAIL: test_a_malformed_frozen_rule_set_is_refused_at_freeze_time (test_promotion_credentials.TestFrozenParameters.test_a_malformed_frozen_rule_set_is_refused_at_freeze_time)
+A rule set missing the fields the evaluation needs must not be frozen.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 470, in test_a_malformed_frozen_rule_set_is_refused_at_freeze_time
+    self.assertEqual(outcome["status"], "INVALID", (bad, outcome))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FROZEN' != 'INVALID'
+- FROZEN
++ INVALID
+ : ({'min_runs': 0}, {'status': 'FROZEN', 'path': '/tmp/tmpzdn6sdxb/A/policy/evaluation-rules.json', 'digest': 'sha256:36f46b5e21377ddc4cb02ff1e7a1fe9577e8d182f7b80473c8d642f4d79ec361', 'rules': {'dimensions': ['mechanistic_understanding', 'prediction_quality', 'intervention_quality', 'scientific_novelty', 'search_efficiency', 'stagnation_recovery', 'memory_accumulation'], 'no_composite_total': True, 'min_cases': 3, 'min_runs': 0, 'delta_tolerance': 0.05, 'require_independent_arm': True, 'require_no_support_excluded': True, 'authority': 'frozen_before_candidate_generation'}})
+
+======================================================================
+FAIL: test_a_declared_nan_mean_is_not_treated_as_consistent (test_promotion_credentials.TestMalformedNumbers.test_a_declared_nan_mean_is_not_treated_as_consistent)
+Every NaN comparison is False, which made the consistency check vacuous.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_promotion_credentials.py", line 693, in test_a_declared_nan_mean_is_not_treated_as_consistent
+    self.assertTrue(pe._numbers_differ(float("nan"), 0.5))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 42 tests in 0.290s
+
+FAILED (failures=3, errors=5)
+...................F.............
+======================================================================
+FAIL: test_a_rollback_restore_after_the_approval_expired_is_refused (test_l3_trust_boundary.TestNoSelfGrantedL3.test_a_rollback_restore_after_the_approval_expired_is_refused)
+A time-bound approval must not be bypassed by restoring a superseded policy.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r9-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 258, in test_a_rollback_restore_after_the_approval_expired_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ROLLED_BACK' != 'INVALID'
+- ROLLED_BACK
++ INVALID
+ : {'status': 'ROLLED_BACK', 'written': True, 'policy_id': 'P-2', 'restored': 'P-1', 'seq': 16, 'reason': 'recovery', 'note': '回滚不修改既有实验结果、不重置 AALG/其他预算、不改 canonical Research State；失败轨迹保留'}
+
+----------------------------------------------------------------------
+Ran 33 tests in 0.742s
+
+FAILED (failures=1)

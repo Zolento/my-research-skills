@@ -864,6 +864,17 @@ class TestReleaseGateStep(unittest.TestCase):
         self.rc = release_check
 
     def _mutate(self, path: pathlib.Path, old: str, new: str):
+        # Mutating a shipped fixture is unsafe under concurrent test runs: two processes
+        # interleave write/restore and leave the real file broken. Serialise via a lock in the
+        # system temp dir (never inside the repo).
+        import fcntl
+        import tempfile as _tempfile
+        lock_path = pathlib.Path(_tempfile.gettempdir()) / "ri-structural-equivalence.lock"
+        with lock_path.open("a", encoding="utf-8") as guard:
+            fcntl.flock(guard, fcntl.LOCK_EX)
+            return self._mutate_locked(path, old, new)
+
+    def _mutate_locked(self, path: pathlib.Path, old: str, new: str):
         original = path.read_text(encoding="utf-8")
         self.assertIn(old, original, msg=f"{path.name} 里找不到待改文本")
         path.write_text(original.replace(old, new, 1), encoding="utf-8")

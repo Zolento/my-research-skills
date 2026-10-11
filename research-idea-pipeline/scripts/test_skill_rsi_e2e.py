@@ -163,8 +163,11 @@ class TestFullChain(RsiProject):
             self.assertEqual(applied["decision"]["dispatched_action"], PREFERRED_XID)
             self.assertTrue(applied["decision"]["strategy_changed_dispatch"])
             self.assertEqual(applied["decision"]["policy_delta"]["status"], "applied")
-            self.assertEqual(applied["decision"]["policy_delta"]["level"], "L2")
+            # The level reported is the one the policy actually recorded (L3 here), not a
+            # flat "L2": the delta must not understate or overstate the evidence.
+            self.assertEqual(applied["decision"]["policy_delta"]["level"], "L3")
             self.assertEqual(applied["decision"]["policy_delta"]["policy_id"], "P-RSI")
+            self.assertTrue(applied["observed"]["scoped_policy"]["policy_approved"])
             self.assertEqual(applied["decision"]["scientific_delta"], "none")
             self.assertEqual(applied["observed"]["scoped_policy"]["source"],
                              "active_scoped_policy")

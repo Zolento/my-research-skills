@@ -27,9 +27,10 @@ Hard boundaries
   allocation that keeps the exploration floor). Everything else is refused (`PE2`).
 * A candidate may not carry executable content (`PE6`) and free text is never treated as
   an instruction.
-* Nothing reaches `ACTIVE` without an independent, leakage-checked, reproducible replay
-  evaluation (`PE11`), and the evaluation rules must be unchanged since the candidate was
-  generated (`PE12`).
+* Nothing reaches `ACTIVE` without a leakage-checked, reproducible evaluation (`PE11`) and,
+  for L3, an independently executed research-validation credential plus a human approval
+  (`PE15`); synthetic replay evidence is capped at **L2** and comparison fairness is enforced
+  (`PE16`). The evaluation rules must be unchanged since the candidate was generated (`PE12`).
 * Rollback restores an earlier valid policy, keeps the failure history, and never resets
   AALG/PEIG counters or the canonical Research State.
 * Generating a new policy id does not reset a failure count: the cap is keyed by the
@@ -617,9 +618,11 @@ def _propose_locked(state_path: Path, candidate: Dict[str, Any], *,
                     trajectory_support: Optional[Iterable[str]] = None) -> Dict[str, Any]:
     records, _ = load_records(state_path)
     rules_digest = evaluation_rules_digest(state_path)
-    diagnostics = candidate_errors(candidate, records=records,
-                                   trajectory_support=trajectory_support,
-                                   rules_digest=rules_digest)
+    diagnostics = [_diag("PE1", f"policy[{candidate.get('policy_id')}]", message)
+                   for message in policy_id_errors(candidate.get("policy_id"))]
+    diagnostics.extend(candidate_errors(candidate, records=records,
+                                        trajectory_support=trajectory_support,
+                                        rules_digest=rules_digest))
     open_ids = {item.get("policy_id") for item in records if item.get("record") == "candidate"}
     latest = latest_status(records)
     open_count = sum(1 for ident in open_ids if latest.get(ident) not in TERMINAL)
@@ -883,6 +886,35 @@ def policy_lock(state_path: Path) -> Iterator[None]:
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
+#: A policy id becomes part of an artifact filename and of diagnostic paths.
+_POLICY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def policy_id_errors(policy_id: Any) -> List[str]:
+    """Reject ids that are not a single safe path segment.
+
+    `"a/b"` reached `_store_artifact` and raised a raw FileNotFoundError; a NUL byte raised
+    ValueError. No diagnostic path may escape the policy store.
+    """
+    if not isinstance(policy_id, str) or not policy_id:
+        return ["policy_id 必须是非空字符串"]
+    if not _POLICY_ID_RE.match(policy_id):
+        return [f"policy_id {policy_id!r} 非法：只允许字母数字与 . _ -，且必须单段（≤64 字符）"]
+    if policy_id in (".", "..") or ".." in policy_id:
+        return [f"policy_id {policy_id!r} 非法：不得包含路径语义"]
+    return []
+
+
+def _discard_artifact(path: Optional[str]) -> None:
+    """Best-effort removal of an artifact written for a transition that was refused."""
+    if not path:
+        return
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _append(state_path: Path, record: Dict[str, Any]) -> Dict[str, Any]:
     """Append while the caller holds `policy_lock` (one lock for the whole store)."""
     return dt.append_chained(candidates_path(state_path), record, lock_held=True)
@@ -905,6 +937,9 @@ def _artifact_body(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _store_artifact(state_path: Path, directory: Path, payload: Dict[str, Any]) -> Dict[str, Any]:
+    problems = policy_id_errors(payload.get("policy_id"))
+    if problems:
+        raise cg.CognitionError("拒绝写入评价产物：" + "；".join(problems))
     directory.mkdir(parents=True, exist_ok=True)
     document = dict(_artifact_body(payload), digest=cg.digest_of(_artifact_body(payload)))
     name = f"{payload.get('policy_id')}.{document['digest'].split(':')[-1][:16]}.json"
@@ -1287,7 +1322,9 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
     equivalence = payload.get("equivalence")
     if equivalence is None and isinstance(payload.get("report"), dict):
         equivalence = payload["report"].get("equivalence")
-    for message in _equivalence_errors(equivalence, list(per_arm), case_sets):
+    for message in _equivalence_errors(equivalence, list(per_arm), case_sets,
+                                       candidate_arm=candidate_arm,
+                                       control_arm=control_arm):
         unfair(message)
     diagnostics.extend(_dispatch_reuse_errors(state_path, payload.get("dispatch_ref"),
                                               str(policy_id), exclude_path=artifact_path))
@@ -1440,12 +1477,35 @@ def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
                 f" {recomputed_verdict!r} 不一致"))
         verdict = audit.get("verdict") or verdict
     elif schema == SCHEMA_RESEARCH_VALIDATION:
-        check = _validation_errors(state_path, payload, candidate=candidate, rules=rules,
+        # The credential the human approved is the single source of truth. The artifact's
+        # derived fields must all be reproducible from it; otherwise an attacker can rewrite
+        # the provenance the checks read while leaving the approved copy untouched.
+        recorded = payload.get("credential") if isinstance(payload.get("credential"), dict) else None
+        if recorded is None:
+            diagnostics.append(_diag("PE15", path,
+                                     "凭证产物没有保留被批准的凭证内容：无法复核批准绑定"))
+        source = recorded if recorded is not None else payload
+        check = _validation_errors(state_path, source, candidate=candidate, rules=rules,
                                    current_rules_digest=current,
                                    artifact_path=ref.get("path"))
         diagnostics.extend(check["errors"])
         verdict = check.get("verdict") or verdict
+        if recorded is not None:
+            if payload.get("report") != check.get("report"):
+                diagnostics.append(_diag("PE15", path,
+                                         "产物中的评价报告与其保留的凭证内容不一致：派生字段被改写"))
+            # `report` is compared above and carries cases/runs/runner; these are the other
+            # derived fields the checks read.
+            for field in ("dispatch_ref", "task_provenance", "execution_evidence",
+                          "equivalence", "candidate_arm", "control_arm"):
+                if payload.get(field) != recorded.get(field):
+                    diagnostics.append(_diag(
+                        "PE15", path, f"产物字段 {field!r} 与其保留的凭证内容不一致：凭证被改写"))
         approval = payload.get("approval") if isinstance(payload.get("approval"), dict) else {}
+        if recorded is not None and approval.get("credential_digest") != cg.digest_of(recorded):
+            diagnostics.append(_diag(
+                "PE15", path,
+                "批准绑定的凭证内容摘要与该产物内的凭证不一致：批准的是另一份凭证"))
         diagnostics.extend(approval_errors(
             state_path, policy_id=policy_id, approval_digest=approval.get("digest"),
             credential_digest=approval.get("credential_digest"),
@@ -1494,6 +1554,8 @@ def _read_approvals(state_path: Path) -> Tuple[List[Dict[str, Any]], Optional[st
         return [], None
     try:
         key = key_path.read_bytes()
+        head_path = directory / "head"
+        head_expected = head_path.read_text(encoding="ascii").strip() if head_path.is_file() else None
         events: List[Dict[str, Any]] = []
         for line in events_path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
@@ -1507,8 +1569,18 @@ def _read_approvals(state_path: Path) -> Tuple[List[Dict[str, Any]], Optional[st
                 return [], "批准账本被篡改：拒绝沿用"
             event["seal"] = seal
             events.append(event)
-    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
-        return [], f"批准账本不可读（{type(exc).__name__}）：拒绝沿用"
+        # Mirror `experiment_execute.Ledger`: the head must commit to the last event, so
+        # deleting trailing events is reported as tampering instead of silently dropping them.
+        if head_expected is not None:
+            actual = eo.digest(events[-1]) if events else None
+            if actual != head_expected:
+                return [], "批准账本 head 与最后一条事件不一致：尾部事件被删除或改写，拒绝沿用"
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError, ValueError,
+            TypeError, AttributeError, KeyError) as exc:
+        # A line that is valid JSON but not an object (e.g. a list) raised AttributeError, and
+        # `Ledger.locked()` raises TypeError for the same input: both must become a PE15
+        # "ledger unusable" rather than a traceback.
+        return [], f"批准账本不可读或结构非法（{type(exc).__name__}）：拒绝沿用"
     return events, None
 
 
@@ -1539,6 +1611,15 @@ def approve_l3(state_path: Path, *, policy_id: str, credential: Dict[str, Any],
         diagnostics.append(_diag("PE15", path_label, "必须记录批准者身份（approver）"))
     if not isinstance(credential, dict) or credential.get("policy_id") != policy_id:
         diagnostics.append(_diag("PE15", path_label, "批准对象必须是该策略的 L3 凭证"))
+    problems = policy_id_errors(policy_id)
+    diagnostics.extend(_diag("PE1", path_label, problem) for problem in problems)
+    try:
+        lifetime = float(expires_in_seconds)
+    except (TypeError, ValueError, OverflowError):
+        lifetime = -1.0
+    if lifetime != lifetime or lifetime <= 0 or lifetime > 10 * 365 * 24 * 3600:
+        diagnostics.append(_diag("PE15", path_label,
+                                 f"批准有效期必须是 (0, 10 年] 内的有限秒数：{expires_in_seconds!r}"))
     if approvals_dir(state_path).is_symlink():
         diagnostics.append(_diag("PE15", path_label,
                                  "批准账本目录是符号链接：批准必须留在路由内，拒绝外移"))
@@ -1559,21 +1640,81 @@ def approve_l3(state_path: Path, *, policy_id: str, credential: Dict[str, Any],
                  "rules_digest": evaluation_rules_digest(state_path),
                  "credential_digest": cg.digest_of(credential),
                  "approver": approver.strip(), "attested_by": "human", "confirm_human": True,
-                 "scope_note": scope_note, "issued_at": now,
-                 "expires_at": now + float(expires_in_seconds),
+                 "scope_note": scope_note, "issued_at": now, "expires_at": now + lifetime,
                  "verification_limit": ("Skill 无法独立验证批准者身份；此记录是协议级人工门，"
                                         "不是密码学证明，也不是自动可信晋升")}
         try:
             with ex.Ledger(approvals_dir(state_path)).locked() as ledger:
                 stored = ledger.append(event)
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, TypeError, AttributeError, KeyError) as exc:
             return {"status": "INVALID", "written": False,
-                    "diagnostics": [f"批准账本不可用：{type(exc).__name__}: {exc}"],
+                    "diagnostics": [f"批准账本不可用（{type(exc).__name__}）：拒绝沿用"],
                     "codes": ["PE15"]}
     return {"status": "APPROVED", "written": True, "policy_id": policy_id,
             "approval_digest": _approval_event_digest(stored), "approver": stored["approver"],
             "expires_at": stored["expires_at"],
             "note": "人工批准已记录；晋升时仍会重新校验该记录是否有效"}
+
+
+def active_policy_standing(state_path: Path,
+                           records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """What the ACTIVE policy actually recorded: its evidence level and approval status.
+
+    Reporting a flat "L2" for every applied policy discarded the recorded level (an L3
+    promotion) and hid whether a human approval backs it.
+    """
+    candidate = active_policy(records)
+    if candidate is None:
+        return {"level": None, "approved": None, "policy_id": None}
+    policy_id = candidate.get("policy_id")
+    level = None
+    for record in records:
+        if record.get("record") != "transition" or record.get("policy_id") != policy_id:
+            continue
+        recorded = record.get("level")
+        if recorded in LEVEL_RANK and (level is None
+                                       or LEVEL_RANK[recorded] > LEVEL_RANK[level]):
+            level = recorded
+    approval = latest_valid_approval(state_path, policy_id=str(policy_id),
+                                     signature=candidate.get("signature"))
+    return {"level": level, "approved": bool(approval), "policy_id": policy_id,
+            "approver": (approval or {}).get("approver")}
+
+
+def latest_valid_approval(state_path: Path, *, policy_id: str,
+                          credential_digest: Optional[str] = None,
+                          approval_digest: Optional[str] = None,
+                          signature: Optional[str] = None,
+                          rules_digest: Optional[str] = None,
+                          now: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """The event `approval_errors` would accept (latest valid match), or None.
+
+    Selecting "the last matching event" instead let an expired duplicate shadow the valid
+    approval, so the artifact was written claiming an already-expired authorisation.
+    """
+    import time as _time
+    now = _time.time() if now is None else now
+    events, problem = _read_approvals(state_path)
+    if problem:
+        return None
+    best: Optional[Dict[str, Any]] = None
+    for event in events:
+        if event.get("kind") != "l3-approval" or event.get("policy_id") != policy_id:
+            continue
+        if credential_digest is not None and event.get("credential_digest") != credential_digest:
+            continue
+        if approval_digest is not None and _approval_event_digest(event) != approval_digest:
+            continue
+        if event.get("attested_by") != "human" or event.get("confirm_human") is not True:
+            continue
+        if signature is not None and event.get("policy_signature") != signature:
+            continue
+        if rules_digest is not None and event.get("rules_digest") != rules_digest:
+            continue
+        if float(event.get("expires_at") or 0) <= now:
+            continue
+        best = event
+    return best
 
 
 def approval_errors(state_path: Path, *, policy_id: str,
@@ -1586,6 +1727,11 @@ def approval_errors(state_path: Path, *, policy_id: str,
     import time as _time
     path_label = f"policy[{policy_id}]"
     now = _time.time() if now is None else now
+    if credential_digest is None and approval_digest is None:
+        # Treating a missing binding as "match anything" let an artifact with an empty
+        # approval block promote on the strength of any approval for the policy.
+        return [_diag("PE15", path_label,
+                      "没有可核验的凭证摘要或批准摘要：批准绑定不可为空，拒绝沿用")]
     events, problem = _read_approvals(state_path)
     if problem:
         return [_diag("PE15", path_label, problem)]
@@ -1619,7 +1765,9 @@ def approval_errors(state_path: Path, *, policy_id: str,
 
 
 def _equivalence_errors(record: Any, arm_names: Sequence[str],
-                        case_sets: Dict[str, set]) -> List[str]:
+                        case_sets: Dict[str, set], *,
+                        candidate_arm: Optional[str] = None,
+                        control_arm: Optional[str] = None) -> List[str]:
     """The A/B fairness check: equal controlled axes, a real contrast, distinct instances.
 
     Mirrors the existing `execution_gate` comparison semantics: a controlled variable that
@@ -1636,6 +1784,20 @@ def _equivalence_errors(record: Any, arm_names: Sequence[str],
             problems.append(f"equivalence 缺少臂 {arm!r}")
     if problems:
         return problems
+    # Compare the arms the verdict actually compares. Using the first two keys of the mapping
+    # let a decoy pair (sorted first) satisfy the fairness check while the real comparison was
+    # unfair; artifacts are stored with sort_keys=True, so the order was attacker-chosen.
+    compared = [arm for arm in (candidate_arm, control_arm) if isinstance(arm, str)]
+    if len(compared) == 2 and compared[0] != compared[1]:
+        missing = [arm for arm in compared if arm not in arms]
+        if missing:
+            problems.append(f"equivalence 缺少被比较的臂 {missing}")
+            return problems
+        if set(arms) != set(compared):
+            problems.append(f"equivalence.arms 与声明的候选/对照臂不一致："
+                            f"{sorted(arms)} vs {sorted(compared)}")
+            return problems
+        arm_names = compared
     instances = {}
     for arm in arm_names:
         block = arms.get(arm)
@@ -1661,6 +1823,11 @@ def _equivalence_errors(record: Any, arm_names: Sequence[str],
         missing = [arm for arm in arm_names if axis not in envs[arm]]
         if missing:
             problems.append(f"equivalence 缺少受控轴 {axis!r}（臂 {missing}）")
+            continue
+        # Presence is not equality: a null/empty value on both sides used to pass.
+        empty = [arm for arm in arm_names if envs[arm][axis] in (None, "", [], {})]
+        if empty:
+            problems.append(f"equivalence 的受控轴 {axis!r} 在臂 {empty} 中为空")
     for axis in contrast:
         if axis not in left or axis not in right:
             problems.append(f"对照轴 {axis!r} 未在两个臂中声明")
@@ -2228,9 +2395,12 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
         payload["level"] = _recomputed_level(payload["gates"], payload["verdict"],
                                              schema=SCHEMA_TRIAL)
         ref = _store_artifact(state_path, trials_dir(state_path), payload)
-        return _transition_locked(state_path, records, policy_id, "BOUNDED_TRIAL",
-                                  evidence={"trial_ref": ref, "reason": "bounded trial"},
-                                  reason="bounded trial", authority=_AUTHORITY)
+        result = _transition_locked(state_path, records, policy_id, "BOUNDED_TRIAL",
+                                    evidence={"trial_ref": ref, "reason": "bounded trial"},
+                                    reason="bounded trial", authority=_AUTHORITY)
+        if not result.get("written"):
+            _discard_artifact(ref.get("path"))
+        return result
 
 
 def record_research_validation(state_path: Path, policy_id: str,
@@ -2276,9 +2446,13 @@ def record_research_validation(state_path: Path, policy_id: str,
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": [item.render() for item in approval_diagnostics],
                     "codes": sorted({item.rule for item in approval_diagnostics})}
-        approval = [event for event in approval_events(state_path)
-                    if event.get("kind") == "l3-approval"
-                    and event.get("credential_digest") == cg.digest_of(validation)][-1]
+        approval = latest_valid_approval(
+            state_path, policy_id=policy_id, credential_digest=cg.digest_of(validation),
+            signature=candidate.get("signature"), rules_digest=current_rules)
+        if approval is None:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": ["没有仍然有效的人工批准记录（可能已过期或被后续记录遮蔽）"],
+                    "codes": ["PE15"]}
         verdict = check["verdict"]
         gates = {"provenance_ok": True,
                  "independent_ok": True,
@@ -2299,6 +2473,9 @@ def record_research_validation(state_path: Path, policy_id: str,
             "execution_evidence": validation.get("execution_evidence"),
             "dispatch_ref": validation.get("dispatch_ref"),
             "equivalence": validation.get("equivalence"),
+            # The submitted credential is kept verbatim so the binding can be recomputed from
+            # its content at promotion time instead of being read from this artifact's own field.
+            "credential": copy.deepcopy(validation),
             "approval": {"digest": _approval_event_digest(approval),
                          "credential_digest": cg.digest_of(validation),
                          "approver": approval.get("approver"),
@@ -2319,9 +2496,14 @@ def record_research_validation(state_path: Path, policy_id: str,
         ref = _store_artifact(state_path, evaluations_dir(state_path), payload)
         evidence = {"evaluation_ref": ref,
                     "reason": "L3 科研验证：" + "; ".join(verdict.get("reasons") or [])}
-        return _transition_locked(state_path, records, policy_id, "VALIDATED",
-                                  evidence=evidence, reason=evidence["reason"],
-                                  authority=_AUTHORITY)
+        result = _transition_locked(state_path, records, policy_id, "VALIDATED",
+                                    evidence=evidence, reason=evidence["reason"],
+                                    authority=_AUTHORITY)
+        if not result.get("written"):
+            # A refused credential must not persist: an orphan artifact would also claim the
+            # single-use dispatch record and brick every retry.
+            _discard_artifact(ref.get("path"))
+        return result
 
 
 def validate_candidate(state_path: Path, policy_id: str, *,

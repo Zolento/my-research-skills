@@ -167,11 +167,21 @@ class TestNoSelfGrantedL3(L3Case):
         self.assertEqual(result["status"], "INVALID", result)
         self.assertIn("人工批准", " ".join(result["diagnostics"]))
 
+    def test_an_approval_with_a_non_positive_lifetime_is_refused(self):
+        """An approval cannot be recorded already expired."""
+        self.ready()
+        outcome = self.approve(self.credential(), expires_in_seconds=-1)
+        self.assertEqual(outcome["status"], "INVALID", outcome)
+        self.assertIn("有效期", " ".join(outcome["diagnostics"]))
+
     def test_an_expired_approval_does_not_authorize(self):
+        import time
+        from unittest import mock
         self.ready()
         credential = self.credential()
-        self.approve(credential, expires_in_seconds=-1)
-        result = self.record(credential)
+        self.approve(credential, expires_in_seconds=60)
+        with mock.patch("time.time", return_value=time.time() + 3600):
+            result = self.record(credential)
         self.assertEqual(result["status"], "INVALID", result)
         self.assertIn("过期", " ".join(result["diagnostics"]))
 

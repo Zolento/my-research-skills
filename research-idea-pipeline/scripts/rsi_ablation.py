@@ -303,7 +303,7 @@ def level_report(*, l3_evidence: Optional[Dict[str, Any]] = None) -> Dict[str, A
         "evidence": [
             "research-loop 通过现有 Strategy Decision Adapter 改变实际派遣动作（端到端测试）",
             "决策轨迹、策略存储、replay 消融、source-freeze 均由真实 CLI/测试消费",
-            "晋升需要独立 replay 评价，且评价规则冻结后不可改动",
+            "晋升需要冻结规则的独立评价（合成回放上限 L2）；L3 另需真实科研验证凭证与人工批准",
         ],
     }
     if l3_evidence:

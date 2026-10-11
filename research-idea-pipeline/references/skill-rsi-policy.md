@@ -109,7 +109,9 @@ AALG 诊断预算、Research Contract、主研究锚点、GPU 授权、已冻结
 机械规则：`PE1` 结构、`PE2` 越权目标、`PE3` 作用域必填且结构化、`PE4` 依据必须来自有真实
 结果的轨迹、`PE5` 复杂度与 fixture 过拟合、`PE6` 可执行内容、`PE7` 自评字段、`PE8` 泛化需反例、
 `PE9` 同一机制失败上限（换 `policy_id` 无效）、`PE10` 非法状态转移、`PE11` 晋升证据不足、
-`PE12` 评价规则被改动、`PE13` 回滚目标非法、`PE14` 局部成功不得升级为全局策略。
+`PE12` 评价规则被改动、`PE13` 回滚目标非法、`PE14` 局部成功不得升级为全局策略、
+`PE15` 缺少人工批准或信任边界不成立（批准绑定不可为空、账本不可篡改）、
+`PE16` 两臂对照不公平（受控轴不一致、对照轴无差异、执行实例相同、配对任务不符）。
 
 策略数据不得包含可执行代码、Shell 命令、动态导入路径。自由文本只用于解释，永远不作为指令执行。
 
@@ -134,7 +136,8 @@ PROPOSED → SHADOW → REPLAY_EVALUATED → BOUNDED_TRIAL → VALIDATED → ACT
 `REPLAY_EVALUATED`、`BOUNDED_TRIAL`、`VALIDATED`、`ACTIVE` 是**受控目标**：
 
 - `transition --to <受控目标>`（以及任何直接调用 `transition()`）一律拒绝，
-  必须使用四个受控入口：`evaluate` / `trial` / `validate` / `promote`。
+  必须使用受控入口：`evaluate`（回放，L2 上限）/ `trial`（试运行）/ `validate-research`
+  （L3 真实科研验证凭证）/ `approve-l3`（人工批准）/ `validate` / `promote`。
 - 调用方自述的 JSON 布尔字段（`independent`、`distinguishable`、`sample_adequate` …）
   **不构成晋升证据**；这些门由入口从评价产物重新计算。
 - 每个受控入口把评价产物写入 `<route>/policy/evaluations|trials/<policy>.<digest>.json`，

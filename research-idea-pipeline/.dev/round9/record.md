@@ -59,6 +59,18 @@
   `ablation_verdict`、`_recomputed_level`；`_numbers_differ` 对非有限值不再判为相等。
 - **验证**：`TestMalformedNumbers`（5 项）；变异（`_safe_int` 不再容错、移除 NaN 判断）各被捕获。
 
+### 1.5 基线复现证据（诚实归类）
+
+把本轮新增/加严的测试放到**起点基线 `53ea200`** 上重跑：
+`test_promotion_credentials.py` + `test_l3_trust_boundary.py` 共 **9 项失败**，逐项按异常类型归类后
+**全部是真实行为复现**（5 项异常型：`KeyError`/`ValueError`/`OverflowError`；4 项断言型），
+**没有一项是接口不兼容**。完整输出见 `OLD_failing_r9.txt`。
+
+| 类别 | 数量 | 代表 |
+|---|---|---|
+| 真实缺口复现（异常） | 5 | `test_a_nan_unobserved_count_does_not_crash_the_evaluator`（ValueError）、`test_recomputed_level_survives_non_finite_gates` |
+| 真实缺口复现（断言） | 4 | `test_a_malformed_frozen_rule_set_is_refused_at_freeze_time`、`test_a_rollback_restore_after_the_approval_expired_is_refused` |
+
 ## 2. Lead 自查判定「不是缺陷」的部分（已实测）
 
 | 检查 | 结果 |
@@ -80,3 +92,77 @@
 | R8-D | 测试套件质量（变异测试、通过得「理由不对」的测试、空洞断言、确定性） | `.dev/audit/R8-D-test-quality.md` |
 
 （子代理结论见下文「附录：子代理结论与处置」，Lead 会对每条 CONFIRMED 自行复现后再决定修复。）
+
+---
+
+## 附录：子代理结论与处置（Lead 逐条自行复现）
+
+三个子代理报告已落地（`R8-A` 批准面、`R8-B` 权限管线、`R8-C` 集成/契约漂移）；
+`R8-D`（测试质量）在本记录写下时仍在运行。下表只列 **Lead 已独立复现并处置** 的项。
+
+### 子代理 A（批准面）
+
+| 编号 | 结论 | Lead 复现 | 处置 |
+|---|---|---|---|
+| A-1 | `SUPERSEDED→ACTIVE` 恢复绕过人工门 | —（与本人 1.2 重复） | **已在本轮 §1.2 修复**；A 也确认 `0fad638` 后返回 INVALID |
+| A-2 | 批准绑定摘要取自产物自身字段，缺失即「匹配任意批准」 | ✅ `approval_errors`（两摘要皆 None）返回 `[]`；伪造 `approval:{}` 的产物 `promote_to_active → ACTIVE` | **已修**：两摘要皆空 → `PE15`；批准绑定的凭证摘要必须能从产物保留的**凭证内容**重算；产物的 `report`/`dispatch_ref`/`task_provenance`/`execution_evidence`/`equivalence`/臂名必须与保留凭证逐字段一致（凭证为唯一事实来源）|
+| A-3 | 重复批准 + 取最后一条 + 先写后判 → 孤儿产物砖化一次性派遣记录 | ✅ 0 秒重复批准导致 INVALID/PE15、留下孤儿产物、此后重试永久 PE11 | **已修**：`latest_valid_approval()` 只返回**仍然有效**的那条；`record_research_validation` 拒绝时 `_discard_artifact` 回滚；非正有效期直接在 `approve_l3` 拒绝 |
+| A-4 | `policy_id` 未校验（`a/b`、NUL）→ 未捕获 FileNotFoundError/ValueError | ✅ 两者都逃逸 | **已修**：`policy_id_errors()`（单段、`[A-Za-z0-9._-]{0,63}`、禁 `..`/NUL）在 `propose` 与 `_store_artifact` 双重把关 |
+| A-5 | `_read_approvals` 不校验账本 `head`，尾部删除不可检测 | ✅ 删除尾部事件后无篡改报告 | **已修**：与 `Ledger` 一致校验 `head` 提交到最后一条事件 |
+| A-6 | `approve_l3(expires_in_seconds=10**400)` 抛 OverflowError | ✅ | **已修**：有效期必须为 `(0, 10 年]` 的有限秒数 |
+| A-7 | 被拒绝的 `begin_bounded_trial` 写孤儿试运行产物 | ✅ 从 SHADOW 调用 → INVALID/PE10 但 `trials/` 多出一份 | **已修**：拒绝时丢弃；`attempt` 身份保留 |
+
+A 的 NOT-BUGS（Lead 接受，未重复验证）：线程锁序无死锁、并发 `begin_bounded_trial` 单一胜出、
+`attempt` 计数、两种摘要格式未混用、账本各类篡改矩阵、NaN/inf/零/负有效期、产物路径围栏。
+
+### 子代理 B（既有权限管线 + 新依赖边）
+
+| 编号 | 结论 | Lead 复现 | 处置 |
+|---|---|---|---|
+| B-1 | PE16 比较的是**映射里前两个臂**，而非声明的候选/对照臂；`sort_keys=True` 使顺序可被攻击者构造 | ✅（代码级确认） | **已修**：`_equivalence_errors` 接收 `candidate_arm`/`control_arm`，比较声明臂并拒绝与 `equivalence.arms` 不一致的臂集合（两道重叠护栏）|
+| B-2 | 批准账本里「合法 JSON 但非对象」的行 → `Ledger.locked()`/读取器抛 TypeError/AttributeError（CLI traceback） | ✅ | **已修**：读取器捕获 `ValueError/TypeError/AttributeError/KeyError`；`approve_l3` 同样捕获 → `PE15` |
+| B-3 | `Ledger` 崩溃窗口（events 已 fsync、head 未 rename）永久 brick（`LEDGER_TRUNCATED_OR_INCOMPLETE`） | 接受为**既有机制的可用性限制** | **未改代码**：这是复用机制的 fail-closed 设计；已在下文「仍存在的限制」如实记录（含人工恢复步骤），本轮不新增修复机制 |
+| B-4 | PE16 受控轴只查「存在」，全空也能通过 | ✅ | **已修**：受控轴值不得为 `None/""/[]/{}` |
+| B-5 | `scheduler_check` 对畸形 `outcome_analysis` 抛 TypeError（`strategy_memory.scheduler_verdict` 未包裹） | ✅ `RAISED: TypeError string indices must be integers` | **已修**：`actual_eig` 调用加守卫 → `EIG_SOURCE_MALFORMED` + FAIL；补 `test_execution_gate.py` 回归 |
+
+B 的 SUSPECTED：`head` 未校验（= A-5，已修）、key 权限/长度未校验（与文档化限制 #1 相邻，未改）、
+`eo.digest` 非类型单射（未观察到可利用路径）。
+
+### 子代理 C（集成与契约漂移）
+
+| 编号 | 结论 | 处置 |
+|---|---|---|
+| C-1 | `research-loop` 对**所有**已应用策略硬编码 `policy_delta.level="L2"`，丢弃记录到的 L3 与人工批准 | **已修**：新增 `active_policy_standing()`（ACTIVE 策略记录到的最高等级 + 是否有人工批准 + 批准者），`preset_router` 上报真实等级与 `policy_approved`；`recorded_strategy_decision` 分支不再谎称 L2（无策略 → level None）；e2e 断言从 L2 改为 L3 并加批准断言 |
+| C-2 | 删除 `test_l3_trust_boundary.py` + `test_promotion_credentials.py` 后闸门仍 PASS | **已修**：`EXPECTED_TEST_SUITES` 清单 + `MIN_TESTS` 下限；Skill-RSI 步骤补上三个新套件。实测：删除两个套件 → **FAIL** |
+| C-3 | README 仍写旧晋升规则，完全没提 `validate-research`/`approve-l3`/PE15/PE16 | **已修** |
+| C-4 | `policy_evolution --help` 的模块 docstring 仍写「没有独立 replay 评价就到不了 ACTIVE」 | **已修** |
+| C-5 | `references/skill-rsi-policy.md` §5.1 规则索引止于 PE14；§5.3.1 只提「四个受控入口」 | **已修**（补 PE15/PE16 与 `validate-research`/`approve-l3`）|
+| C-6 | `SKILL.md` 与 `presets/strategy-evolution.md` 仍写 `PE1`—`PE14` | **已修** → `PE1`—`PE16` |
+| C-7 | `rsi_ablation.py` 仍输出「晋升需要独立 replay 评价」 | **已修** |
+| C-8 | registry↔protocol 的 `trigger` 漂移不被检出 | **已修**：`step_preset_library` 增加 16 个预设的 `registry trigger` 逐项比对。实测：把 `strategy-evolution` 改为 `manual` → 步骤 FAIL |
+| C-9 | 文档化的 R4→R5→R6 在出货 fixture 上会先 HOLD 再 PE10，文档没有 HOLD 分支 | **已修（文档）**：`presets/strategy-evolution.md` 增加「HOLD 是正常出口」说明；代码行为本身正确（诚实不晋升）|
+
+C 的 SUSPECTED 中「变异测试写真实仓库文件导致并发互相破坏」已在第九轮**两次真实发生**；
+**已修**：`test_structural_equivalence._mutate` 用系统临时目录的 flock 串行化（本记录 §0 已记录事故与恢复）。
+
+### 第九轮回归与验证
+
+| 项 | 值 |
+|---|---|
+| 全量单元测试 | **1841 OK（skipped=3）** |
+| `release_check.py` | **PASS（18 步）** |
+| 5 个模块 selftest | 全 OK |
+| 新增测试 | `test_round9_findings.py`（19 项）+ `test_execution_gate.py` 1 项 + 上一段 4 项 |
+| 变异验证 | A-2(批准绑定/内容重算/报告比对)、A-3(丢弃产物)、A-4、A-5、A-6、A-7、B-2、B-4 **各自被捕获**；B-1 的两道护栏互为重点（单独移除任一道仍被另一道拒绝，属纵深防御，非缺陷） |
+
+### 仍存在的限制（不假装已解决）
+
+1. **人工批准是协议级门**，不是密码学证明；有路由写权限者可伪造批准账本与其密钥（第八轮已声明）。
+2. **`Ledger` 崩溃窗口**：`events.jsonl` 与 `head` 之间断电会让批准账本进入
+   `LEDGER_TRUNCATED_OR_INCOMPLETE`（fail-closed）。恢复需人工核对链完整性后重建 head；
+   本轮**不新增自动修复机制**，以免削弱篡改检测。
+3. PE16 的受控轴与既有 `execution_gate.FAIR`（`compute_hours`/`data_split`/
+   `optimization.tuning_trials`）仍是两套字段：前者面向策略评价，后者面向实验臂；
+   未合并（不同域），但因此**没有**互相覆盖。
+4. 任务真实性与「外部确实执行过」仍不可验证；**L3 仍未验证**（无真实科研 A/B）。
+5. 并发仍只在同机多线程/多进程验证。

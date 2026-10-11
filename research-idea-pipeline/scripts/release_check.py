@@ -86,9 +86,62 @@ def _run(args: List[str]) -> Tuple[int, str]:
 # 各步骤
 # ---------------------------------------------------------------------------
 
+#: Every shipped test suite. Deleting one used to be invisible to this gate: the Skill-RSI
+#: step hard-coded a pre-round-6 list and no test count was asserted, so removing the
+#: credential/PE15/PE16 suites still printed PASS.
+EXPECTED_TEST_SUITES = (
+    "test_cognition.py",
+    "test_counterfactual_replay.py",
+    "test_decision_trajectory.py",
+    "test_evidence_outcome.py",
+    "test_execution_gate.py",
+    "test_golden_path.py",
+    "test_l3_trust_boundary.py",
+    "test_legacy_handoff.py",
+    "test_literature_search.py",
+    "test_loop_runtime_correctness.py",
+    "test_policy_evolution.py",
+    "test_policy_transfer.py",
+    "test_prediction_compare.py",
+    "test_preset_router.py",
+    "test_promotion_credentials.py",
+    "test_promotion_integrity.py",
+    "test_r10_liveness.py",
+    "test_refs_index.py",
+    "test_release_metadata.py",
+    "test_render_status.py",
+    "test_research_replay.py",
+    "test_rhetorical_realization.py",
+    "test_rsi_ablation.py",
+    "test_skill_rsi_e2e.py",
+    "test_source_freeze.py",
+    "test_state_check.py",
+    "test_strategy_memory.py",
+    "test_structural_equivalence.py",
+    "test_zotero_client.py",
+    "test_zotero_crud.py",
+    "test_zotero_deepread.py",
+    "test_zotero_fulltext.py",
+    "test_zotero_refs.py",
+    "test_zotero_write.py",
+)
+#: Conservative lower bound; the suite may grow but a mass deletion must fail the gate.
+MIN_TESTS = 1700
+
+
 def step_tests() -> Tuple[bool, str]:
+    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
+    missing = sorted(set(EXPECTED_TEST_SUITES) - on_disk)
+    if missing:
+        return False, "test suites missing: " + ", ".join(missing)
     code, out = _run(["-m", "unittest", "discover", "-s", "scripts", "-p", "test_*.py"])
     tail = [line for line in out.strip().splitlines() if line.startswith(("Ran ", "OK", "FAILED"))]
+    counted = re.search(r"Ran (\d+) tests?", out)
+    if counted is None:
+        return False, "could not read the test count: " + (" · ".join(tail) or out[-160:])
+    if int(counted.group(1)) < MIN_TESTS:
+        return False, (f"only {counted.group(1)} tests ran (expected >= {MIN_TESTS}): "
+                       "a suite was deleted or emptied")
     return code == 0, " · ".join(tail) or out.strip()[-160:]
 
 
@@ -794,7 +847,9 @@ def step_skill_rsi() -> Tuple[bool, str]:
         return False, "decision trajectory tests failed"
     for pattern in ("test_policy_evolution.py", "test_policy_transfer.py",
                     "test_counterfactual_replay.py", "test_source_freeze.py",
-                    "test_rsi_ablation.py", "test_skill_rsi_e2e.py"):
+                    "test_rsi_ablation.py", "test_skill_rsi_e2e.py",
+                    "test_promotion_integrity.py", "test_promotion_credentials.py",
+                    "test_l3_trust_boundary.py"):
         proc_code, proc_out = _run(["-m", "unittest", "discover", "-s", "scripts", "-p", pattern])
         if proc_code != 0:
             tail = [line for line in proc_out.strip().splitlines() if line.strip()]
@@ -902,6 +957,15 @@ def step_preset_library() -> Tuple[bool, str]:
                 return False, f"{preset['id']}: {phrase!r} did not route"
     if pr.resolve("不要审计")["action"] != "HOLD":
         return False, "a negated request still routed"
+    registry = json.loads((ROOT / "preset-registry.json").read_text(encoding="utf-8"))["presets"]
+    for preset in registry:
+        text = (ROOT / preset["path"]).read_text(encoding="utf-8")
+        match = re.search(r"\|\s*registry trigger\s*\|\s*`([^`]+)`\s*\|", text)
+        if match is None:
+            return False, f"{preset['preset_id']}: 协议未声明 registry trigger"
+        if match.group(1) != preset.get("trigger"):
+            return False, (f"{preset['preset_id']}: registry trigger 漂移 "
+                           f"({preset.get('trigger')!r} vs 协议 {match.group(1)!r})")
     if pr.resolve("总结进展")["execution_scope"] != "read_only":
         return False, "a read-only question was escalated"
     if pr.resolve("训练 OOM 了")["next_action"] != "diagnose":

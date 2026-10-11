@@ -432,3 +432,30 @@ class EndToEndTests(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class TestMalformedReceipt(unittest.TestCase):
+    """B-5: a malformed outcome_analysis must be a FAIL, never an exception."""
+
+    def test_a_malformed_receipt_is_reported_not_raised(self):
+        import json
+        import execution_gate as eg
+        state = json.loads(
+            (eg.ROOT / "examples/preflight-identifiability/ct-mri.json").read_text(
+                encoding="utf-8"))["state"]
+        experiment = state["experiments"][-1]
+        experiment.update(status="done",
+                          outcome_analysis={"audit_trail": "x",
+                                            "analysis": {"experiment_id": experiment["id"]}})
+        delta = {"claim_status_changes": [], "uncertainty_changes": [],
+                 "hypothesis_status_changes": [], "new_uncertainties": [],
+                 "unexpected_observations": 0}
+        scheduler = {"state_version": state["state_version"], "next_actions": [],
+                     "eig_calibration": {"records": [
+                         {"experiment": experiment["id"],
+                          "predicted_information_gain": "high", "observed_delta": delta,
+                          "actual_information_gain": "zero"}]}}
+        result = eg.scheduler_check(state, scheduler)
+        self.assertEqual(result["status"], "FAIL", result)
+        self.assertTrue(any("EIG_SOURCE_MALFORMED" in item or "STATE_INVALID" in item
+                            for item in result["errors"]), result["errors"])

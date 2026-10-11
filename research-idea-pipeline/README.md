@@ -406,9 +406,12 @@ condition).
 A candidate may only touch the authorised strategy surface (exploration-operator preference,
 menu choice, same-tier ordering, applicability, probe order, local allocation that keeps the
 exploration floor). It advances through `PROPOSED → SHADOW → REPLAY_EVALUATED →
-BOUNDED_TRIAL → VALIDATED → ACTIVE`, and every promotion needs an independent, leakage-checked,
-reproducible replay evaluation with the evaluation rules frozen beforehand. Difference within
-tolerance is reported as indistinguishable instead of forced into a winner. Rollback restores
+BOUNDED_TRIAL → VALIDATED → ACTIVE`. Every promotion needs a leakage-checked, reproducible
+replay evaluation with the evaluation rules frozen beforehand, but synthetic replay evidence is
+capped at **L2**: `VALIDATED`/`ACTIVE` additionally require an L3 research-validation credential
+(`validate-research`) with a real task source, independently executed arms and a reviewable
+paired-comparison record, plus a human approval (`approve-l3`, rule `PE15`; fairness is `PE16`).
+Difference within tolerance is reported as indistinguishable instead of forced into a winner. Rollback restores
 an earlier valid policy, keeps the failure trail, and touches neither scientific results nor
 any budget. Renaming a failed policy does not reset its failure count.
 

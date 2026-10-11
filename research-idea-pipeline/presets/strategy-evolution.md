@@ -55,7 +55,7 @@
   - `scripts/decision_trajectory.py`（Skill-RSI：决策轨迹，策略经验的来源）
   - `scripts/policy_evolution.py`（Skill-RSI：有作用域的策略候选、评价、晋升、回滚）
   - `scripts/policy_transfer.py`（Skill-RSI：跨项目迁移门）
-- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10` / `PE1`—`PE14` /
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10` / `PE1`—`PE16` /
   `PT1`—`PT11`；科学判定仍由既有规则号给出。
 
 **Skill-RSI 生命周期命令（按需，不在每轮循环内执行）：**
@@ -79,6 +79,11 @@
 > 需要**真实科研验证凭证（L3）**，由 `validate-research` 提交，且必须带真实任务来源、
 > 独立执行者、逐 case 隔离证明与**实际派遣记录**的绑定。合成回放不得升级为 L3。
 
+> **HOLD 是正常出口：** 若回放报告显示没有收益维度正向改善（`UNDIFFERENTIATED`）、样本不足、
+> 存在未观测分支，或两臂区间重叠导致方向不确信，`evaluate` 会返回 `HOLD` 而非进入
+> `REPLAY_EVALUATED`；此时**不得**继续 `trial`（会被 `PE10` 拒绝），应改进实验或如实记录
+> 「本轮无可晋升策略」。
+>
 > 上表是**策略演化**的操作面，不进 `preset_router.py` 的自动步骤；晋升后的策略由
 > 现有 Strategy Decision Adapter 消费。详见 [references/skill-rsi-policy.md](../references/skill-rsi-policy.md)。
 

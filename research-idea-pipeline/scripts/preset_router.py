@@ -2113,8 +2113,10 @@ def scoped_policy_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
     candidate = pe.active_policy(records)
     advice = pe.advice_from_active_policy(records, ctx["state"], ctx["index"]) \
         if candidate else None
+    standing = pe.active_policy_standing(ctx["state_path"], records)
     return {"candidate": candidate, "advice": advice, "records": records, "tampered": False,
-            "diagnostics": []}
+            "diagnostics": [], "level": standing["level"], "approved": standing["approved"],
+            "approver": standing.get("approver")}
 
 
 def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -2165,14 +2167,17 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 reason = "consumed_recorded_decision"
                 return {"policy_id": None, "advice": policy.get("advice"),
                         "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
-                        "applied": True, "action": dispatch.get("action"), "level": "L2",
+                        "applied": True, "action": dispatch.get("action"), "level": None,
                         "source": "recorded_strategy_decision", "reason": reason,
                         "recorded": recorded}
     return {"policy_id": (candidate or {}).get("policy_id"), "advice": policy.get("advice"),
             "decision": decision, "conditions_ok": conditions_ok, "unmet": unmet,
             "applied": applied, "tampered": False, "diagnostics": [],
             "action": (decision or {}).get("chosen") if applied else None,
-            "level": "L2" if applied else None,
+            # The level the policy actually recorded (L1/L2/L3), not a flat "L2".
+            "level": (policy.get("level") or "L2") if applied else None,
+            "policy_approved": policy.get("approved"),
+            "approver": policy.get("approver"),
             "source": "active_scoped_policy" if applied else "scheduler",
             "reason": reason, "recorded": None}
 
@@ -2298,6 +2303,9 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                                  "applied": dispatch.get("applied"),
                                                  "conditions_ok": dispatch.get("conditions_ok"),
                                                  "unmet_conditions": dispatch.get("unmet"),
+                                                 "level": dispatch.get("level"),
+                                                 "policy_approved": dispatch.get("policy_approved"),
+                                                 "approver": dispatch.get("approver"),
                                                  "source": dispatch.get("source"),
                                                  "tampered": dispatch.get("tampered"),
                                                  "diagnostics": dispatch.get("diagnostics"),
