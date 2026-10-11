@@ -595,9 +595,22 @@ def synthesis_errors(state: Dict[str, Any], readiness: Dict[str, Any],
                       + "）：不得强行包装成新方法")]
     if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
         return [_diag("I2M16", "candidates", "候选必须是列表")]
-    if not 2 <= len(candidates) <= 3:
-        problems.append(_diag("I2M17", "candidates",
-                              f"需要 2—3 种不同干预方案，当前 {len(candidates)} 种"))
+    count = len(candidates)
+    if count == 0:
+        problems.append(_diag("I2M17", "candidates", "至少需要一个可检验的方法候选"))
+    elif count == 1:
+        # Real research often has one idea that naturally follows from the insight.  A single
+        # candidate is accepted only when the reason for not generating alternatives is stated.
+        only = candidates[0] if isinstance(candidates[0], dict) else {}
+        if not _text(only.get("single_candidate_justification")):
+            problems.append(_diag(
+                "I2M18", "candidates[0].single_candidate_justification",
+                "只提交一个候选时必须说明理由（为什么不存在值得比较的设计分歧）："
+                "不得以数量代替判断，也不得无理由只做一个"))
+    elif count > 3:
+        problems.append(_diag(
+            "I2M17", "candidates",
+            f"候选最多 3 个（当前 {count}）：设计分歧应真实，不得为凑数量制造同构方法"))
     seen: Dict[str, str] = {}
     for position, candidate in enumerate(candidates):
         path = f"candidates[{position}]"
@@ -637,6 +650,87 @@ def synthesis_errors(state: Dict[str, Any], readiness: Dict[str, Any],
     return problems
 
 
+#: The four taste axes.  They are *reasons*, never weights or a total score.
+TASTE_AXES = ("importance", "insight", "elegance", "evidence")
+
+
+def _taste_reasons(candidate: Dict[str, Any], insight: Dict[str, Any]) -> Dict[str, str]:
+    """Derive one short reason per axis from fields the candidate already carries."""
+    complexity = _text(candidate.get("minimal_implementation_complexity")).lower()
+    return {
+        "importance": _text(candidate.get("importance_reason"))
+                      or _text(candidate.get("how_it_addresses")),
+        "insight": _text(candidate.get("mechanism_basis"))
+                   or ", ".join(str(x) for x in insight.get("insight_refs") or []),
+        "elegance": (("最小实现复杂度 " + complexity) if complexity else "")
+                    + (("；" + _text(candidate.get("why_not_simpler")))
+                       if _text(candidate.get("why_not_simpler")) else ""),
+        "evidence": ", ".join(str(x) for x in candidate.get("falsifiable_predictions") or [])
+                    or _text(candidate.get("decisive_experiment")),
+    }
+
+
+def _taste_rank(candidate: Dict[str, Any]) -> tuple:
+    """Deterministic ordering for preference: simplicity first, then decisiveness.
+
+    Deliberately not a score: it is a documented tie-break over reasons, and it never
+    overrides a hard gate, a frozen protocol or scientific validity.
+    """
+    complexity = _text(candidate.get("minimal_implementation_complexity")).lower()
+    simplicity = {"low": 0, "medium": 1, "high": 2}.get(complexity, 3)
+    # The heuristic prefers the candidate that *states* an elegance justification, a decisive
+    # experiment and a motivation - and that is simpler.  It cannot judge whether one prose
+    # motivation is scientifically more important than another; that is why the comparison
+    # returns reasons and an explicit uncertainty for a researcher (or the model) to weigh.
+    explains_simplicity = 0 if _text(candidate.get("why_not_simpler")) else 1
+    decisive = 0 if (_text(candidate.get("decisive_experiment"))
+                     or candidate.get("decisive")) else 1
+    motivated = 0 if _text(candidate.get("importance_reason")) else 1
+    return (simplicity, explains_simplicity, decisive, motivated,
+            str(candidate.get("candidate_id") or ""))
+
+
+def compare_candidates(candidates: Sequence[Dict[str, Any]], *,
+                       insight: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """A short, reasoned preference between executable candidates - not a score.
+
+    Answers "which is most worth my time?" over the four taste axes, and states the biggest
+    uncertainty.  It only runs when there is a real research choice (>= 2 legal candidates);
+    a single candidate is not compared against a copy of itself.
+    """
+    insight = insight if isinstance(insight, dict) else {}
+    legal = [item for item in candidates if isinstance(item, dict)]
+    if len(legal) < 2:
+        return {"preference": (legal[0].get("candidate_id") if legal else None),
+                "reasons": _taste_reasons(legal[0], insight) if legal else {},
+                "compared": False, "uncertainty": "",
+                "note": "只有一个候选：不做比较，也不制造备选"}
+    ranked = sorted(legal, key=_taste_rank)
+    best = ranked[0]
+    alternatives = [item.get("candidate_id") for item in ranked[1:]]
+    uncertainty = _text(best.get("main_uncertainty")) or (
+        "该选择的最大不确定性："
+        + (_text(best.get("failure_boundary")[0]) if isinstance(best.get("failure_boundary"), list)
+           and best.get("failure_boundary") else "尚未写明失败边界"))
+    return {"preference": best.get("candidate_id"), "reasons": _taste_reasons(best, insight),
+            "compared": True, "alternatives": alternatives, "uncertainty": uncertainty,
+            "axes": list(TASTE_AXES),
+            "note": "这是偏好理由，不是分数，也不是执行门禁；硬门禁、冻结协议与科学有效性优先。"}
+
+
+def method_sketch_errors(sketch: Dict[str, Any]) -> List[Diagnostic]:
+    """The lightweight exploration-stage artifact: four questions, no frozen contract yet."""
+    problems: List[Diagnostic] = []
+    if not isinstance(sketch, dict):
+        return [_diag("I2M20x", "sketch", "方法草案必须是对象")]
+    for field, question in (("problem", "解决什么问题"), ("insight", "利用什么 Insight"),
+                            ("intervention", "修改什么算法/机制"),
+                            ("falsifier", "什么结果会否定它")):
+        if not _present(sketch.get(field)):
+            problems.append(_diag("I2M21x", f"sketch.{field}", f"缺少：{question}"))
+    return problems
+
+
 def synthesize_methods(state: Dict[str, Any], readiness: Dict[str, Any],
                        candidates: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     """Validate a synthesis round and mark what may and may not be claimed."""
@@ -647,8 +741,11 @@ def synthesize_methods(state: Dict[str, Any], readiness: Dict[str, Any],
         item.setdefault("schema", SCHEMA_CANDIDATE)
         item["evidence_status"] = readiness.get("mechanism_status", VERDICT_HYPOTHESIS)
         item["novelty_verified"] = False          # never asserted, only recorded as unchecked
+    comparison = (compare_candidates(accepted) if len(accepted) > 1 else
+                  {"preference": accepted[0].get("candidate_id") if accepted else None,
+                   "compared": False, "note": "单候选：不制造备选"})
     return {"status": "SYNTHESIZED" if accepted else "INVALID",
-            "candidates": accepted,
+            "candidates": accepted, "taste": comparison,
             "diagnostics": [item.as_dict() for item in problems],
             "readiness_verdict": readiness.get("verdict"),
             "anchor_contribution": ANCHOR_CONTRIBUTION.get(readiness.get("anchor_kind", ""), "")}
@@ -2188,6 +2285,22 @@ def selftest() -> int:
     checks.append(("无用户授权不得改锚点",
                    "I2M61" in _rules(anchor_change_errors(
                        {"new_anchor": "theory", "reason": "r", "evidence": "e"}))))
+
+    single = dict(candidates[0], candidate_id="M1", minimal_implementation_complexity="low",
+                  single_candidate_justification="机制只指向一种自然干预，无真实设计分歧")
+    checks.append(("有理由的单候选可通过", not synthesis_errors(
+        state, readiness, [single])))
+    checks.append(("无理由的单候选被拒绝",
+                   "I2M18" in _rules(synthesis_errors(state, readiness,
+                                                      [dict(candidates[0])]))))
+    taste_result = synthesize_methods(state, readiness, candidates)["taste"]
+    checks.append(("两候选给出偏好而非评分",
+                   taste_result["compared"] and "score" not in taste_result
+                   and taste_result["preference"] in ("M1", "M2")))
+    checks.append(("单候选不做比较", not compare_candidates([candidates[0]])["compared"]))
+    checks.append(("方法草案四问校验", not method_sketch_errors(
+        {"problem": "p", "insight": "i", "intervention": "a", "falsifier": "f"})))
+    checks.append(("缺失草案字段被拒绝", _rules(method_sketch_errors({"problem": "p"}))))
 
     step = transition(state, insight=insight, candidates=candidates)
     checks.append(("transition 在可合成时给出综合步骤", step["step"] == "Synthesize"))
