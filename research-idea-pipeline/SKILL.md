@@ -373,12 +373,16 @@ anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_st
 |---|---|---|
 | 动作状态 | `proposed → admissible → authorized_in_queue → dispatched → executed`；建议文本不是执行 | `references/scheduler-policy.md` §3.1、`insight_to_method.candidate_method_action` |
 | 授权绑定 | 队列条目须带 `method_candidate`/`method_version`/`method_digest`/`state_version`；仅同类型不授权；新方法走 `register_method_candidate` 首入 | 同上 |
+| Insight 绑定 | 机制/干预/预测/判别实验/对照必须来自**同一个主候选 H** 及其可追溯依赖链；不得跨对象拼接，refuted/killed/stale 不得凑数 | `insight_to_method._binding_errors`（I2M60–64） |
 | 证据方向 | `depends_on` ≠ `supports`；只有合格 `supports` 才抬高机制结论；自述审查不是审查 | `insight_to_method._mechanism_support`、`_review_credential` |
 | 进展五维 | Epistemic / Design / Implementation / Validation / Anchor，互不冒充；**同一方法版本的独立验证即 Validation Progress，无须改算法** | `insight_to_method.method_progress`（唯一定义处） |
 | 进展归属 | 证据须解析到真实 Experiment 并与方法版本/契约摘要匹配；去重跨重启有效 | 同上 |
 | 契约版本 | 按版本号/登记时间；不可排序返回 `ambiguous`；失效契约仅审计 | `insight_to_method.select_method_contract` |
 | 锚点判定 | 逐项 requirement 判定；文字提及不算关联；缺条件为 `undetermined` | `insight_to_method.anchor_gap`、`references/claim-first-policy.md` §6 |
 | 调度让位 | I2M 仅建议；1—3 级必要动作（`repair`/失效传播）优先 | `insight_to_method.loop_step` |
+
+**两段式方法产物：** 探索阶段先写 **Method Sketch** 四问（由 `transition` 的 `sketch` 阶段提出）；
+**完整 Design Contract 只在冻结实验前要求**（`insight_to_method.method_sketch_errors`）。
 
 **科研品味（选择值得做的贡献，不做评分）：** 在**都可执行**的候选之间，按四轴给出**偏好理由**并说明
 最大不确定性——`Importance` 问题是否真的重要 / `Insight` 发现了什么改变设计的结构或规律 /

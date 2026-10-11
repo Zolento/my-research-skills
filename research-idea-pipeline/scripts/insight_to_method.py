@@ -1440,18 +1440,39 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                 "action": "先做能改变方法决定的判别实验：" + "、".join(readiness["missing"]),
                 "blocked": False, "hold": False,
                 "i2m": {"readiness": readiness, "path": path, "decision": decision}}
+    if contract is None and not candidates:
+        # Exploration stage: the lightweight sketch is the artifact, not a full contract.
+        problems = method_sketch_errors(insight.get("sketch") or {})
+        return {"phase": "I2M", "stage": "sketch", "step": "Sketch",
+                "action": ("先写方法草案四问（解决什么问题 / 利用什么 Insight / 修改什么算法 / "
+                           "什么结果会否定它）；完整设计契约留到冻结实验前"),
+                "blocked": False, "hold": False,
+                "i2m": {"readiness": readiness, "path": path,
+                        "sketch_missing": [item.message for item in problems],
+                        "decision": decision}}
     if contract is None:
-        stage = "synthesis"
         outcome = synthesize_methods(state, readiness, candidates or [])
-        action = ("合成 2—3 种有实质差异的方法候选并冻结设计契约"
-                  if outcome["status"] != "SYNTHESIZED"
-                  else "冻结选定方法的设计契约（R8 preregistration）")
-        if candidates and outcome["status"] == "SYNTHESIZED":
-            stage = "contract"
-        return {"phase": "I2M", "stage": stage, "step": "Synthesize", "action": action,
+        if outcome["status"] != "SYNTHESIZED":
+            return {"phase": "I2M", "stage": "synthesis", "step": "Synthesize",
+                    "action": "提交一个（有理由的）或 2—3 个有真实分歧的方法候选",
+                    "blocked": False, "hold": False,
+                    "i2m": {"readiness": readiness, "path": path, "synthesis": outcome,
+                            "decision": decision}}
+        # The preference is not a gate, but it does determine the recommended artifact: the
+        # contract skeleton is built from the candidate the comparison preferred.
+        preference = (outcome.get("taste") or {}).get("preference")
+        chosen = next((item for item in outcome["candidates"]
+                       if item.get("candidate_id") == preference), outcome["candidates"][0])
+        skeleton = contract_from_candidate(chosen, insight=insight,
+                                           rules_digest=_text(insight.get("rules_digest")))
+        return {"phase": "I2M", "stage": "contract", "step": "Synthesize",
+                "action": f"按比较偏好冻结 {chosen.get('candidate_id')} 的设计契约"
+                          "（其余候选保留为备选，不删除）",
                 "blocked": False, "hold": False,
                 "i2m": {"readiness": readiness, "path": path, "synthesis": outcome,
-                        "decision": decision}}
+                        "candidate_id": chosen.get("candidate_id"),
+                        "preferred_over": (outcome.get("taste") or {}).get("alternatives") or [],
+                        "contract_skeleton": skeleton, "decision": decision}}
     problems = design_contract_errors(state, contract)
     if problems:
         return {"phase": "I2M", "stage": "contract", "step": "HOLD",

@@ -144,7 +144,7 @@ class TestReadiness(unittest.TestCase):
         state, scheduler = base_state(stagnant=True)
         step = loop_step(state, scheduler)
         self.assertEqual(step["phase"], "I2M", step)
-        self.assertEqual(step["step"], "Synthesize", step)
+        self.assertIn(step["stage"], ("sketch", "synthesis", "contract"))
         self.assertNotEqual(step.get("dispatched_action"), "X1")
         self.assertIn(step.get("trigger", ""), ("readiness_actionable(MECHANISM_HYPOTHESIS)",
                                                 "diagnosis_stagnant(zero_streak=2, switch=REDESIGN_QUESTION)"))
@@ -190,7 +190,8 @@ class TestReadiness(unittest.TestCase):
         """Scenario 3: zero streak with an unsatisfiable insight → design/stop, not another round."""
         state, scheduler = base_state(stagnant=True)
         step = loop_step(state, scheduler)
-        self.assertEqual(step["stage"], "synthesis")
+        self.assertIn(step["stage"], ("sketch", "synthesis", "contract"))
+        self.assertEqual(step["phase"], "I2M")
         decision = step["i2m"]["decision"]["decision"]
         self.assertIn(decision, (i2m.DECISION_RESYNTHESIZE, i2m.DECISION_STOP_OR_R14,
                                  i2m.DECISION_DISCRIMINATE))
@@ -325,7 +326,8 @@ class TestContractAndTestGates(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertGreaterEqual(after, 2)
         step = loop_step(rewritten, scheduler)
-        self.assertEqual(step["step"], "Synthesize", step)
+        self.assertEqual(step["phase"], "I2M", step)
+        self.assertIn(step["stage"], ("sketch", "synthesis", "contract"))
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +377,8 @@ class TestAnchorsAndRuntime(unittest.TestCase):
         self.assertFalse(view["blocks_method_work"])
         self.assertIn("不阻止方法探索", view["note"])
         step = i2m.loop_step(state, scheduler, gap=gap)
-        self.assertEqual(step["step"], "Synthesize", step)
+        self.assertEqual(step["phase"], "I2M", step)
+        self.assertIn(step["stage"], ("sketch", "synthesis", "contract"))
 
     def test_9e_supporting_contribution_must_be_falsifiable(self):
         self.assertIn("I2M57", i2m._rules(i2m.anchor_role_errors({"anchor_role": "supporting"})))

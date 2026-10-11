@@ -49,3 +49,25 @@
   用**成对一致性 / 失败案例 / 跨场景行为变化**衡量，而不是任何单一分数。**这部分尚未进行。**
 - `_taste_rank` 无法判断语义重要性；它只是把「是否给出理由」结构化，最终判断仍需模型/研究者。
 - L3 科研有效性、真实 GPU/外部调度仍未验证；不伪造证据。
+
+---
+
+## 4. 再次复核（独立复跑 + 自审）
+
+**独立复跑（不引用上轮结论）**：`1985 OK / 3 SKIP`、闸门 `PASS`、7/7 模块 selftest、
+HEAD == 远程 == `327afc8`、工作区干净、`main` 未动、13 tags、0 merge。**与上轮声明一致。**
+
+**复核发现 3 处由本身上轮改动引入的缺陷**（均已最小修复）：
+
+| # | 缺陷 | 证据 | 修复 |
+|---|---|---|---|
+| 1 | **偏好只到 payload，未决定产物**——违反审查点 3（价值判断要与实际选择挂钩）的初衷 | `compare_candidates` 仅被 `synthesize_methods` 调用，`transition` 不消费偏好 | `transition` 现在用偏好选定候选：返回 `i2m.candidate_id`、`preferred_over`（备选保留）、`contract_skeleton`（由被偏好候选构建），动作文案点名该候选 |
+| 2 | **Method Sketch 是死代码**——只有测试与 selftest 引用，运行时从不使用 | `grep method_sketch_errors` 仅命中定义与测试 | readiness 可行动但**尚无候选**时，`transition` 返回 `stage="sketch"`（四问 + 缺失字段），探索阶段真正使用轻量产物 |
+| 3 | **精简丢了 agent 可见的绑定指令**——「Insight 必须绑定同一候选」在 SKILL/policy/prompts 中 0 处（运行时仍拒绝，属 fail-closed，但指引丢失） | `grep 绑定同一候选` → 0 | SKILL §0.4 表恢复一行「Insight 绑定」（指向 `_binding_errors` I2M60–64）+ 两段式产物一行 |
+
+**复核确认无误的部分**：精简保留的其余运行规则均有权威来源（`scheduler-policy` §3.1 仍含
+planned 决策价值、running 不得中断、诊断决策价值）；`_review_credential`/`anchor_gap`/
+`attributed` 等上轮修复在复跑中行为一致。
+
+**仍未解决（如实保留）**：无人类成对偏好验证；`_taste_rank` 无法判断语义重要性；
+taste 仍是**建议**（设计如此，非门禁）；L3 科研有效性与真实 GPU/外部调度未验证。
