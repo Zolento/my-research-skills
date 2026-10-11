@@ -167,3 +167,46 @@ promote      → ACTIVE L3
 6. L1/L2/L3 严格区分：本轮所有**自动化**结论仍是回放/合成证据，其等级上限被固定为 L2；
    L3 只有在提交真实科研验证凭证时才可能出现，本轮测试中的 L3 凭证是**测试夹具**，
    不代表本项目已获得 L3 科研能力提升。
+
+## 9. 二次复核（本轮自身）：新建的来源链上有 5 个缺口
+
+对本轮新代码做对抗性复核，用探针找到并修复 5 个**真实**缺陷（全部先写失败复现再修）。
+
+| # | 严重度 | 缺陷 | 旧行为复现 | 修复 |
+|---|---|---|---|---|
+| R7-1 | **高** | L3 凭证可**谎报 `runs_per_case`**：声明 runs=2 但只给 3 条记录（实际 1 轮）仍 `VALIDATED`。`_validation_errors()` 只查 case 数，没查**记录数 = cases×runs**（回放路径有、L3 路径没有） | `record_research_validation(...)` → **VALIDATED** | 加 `len(results) == cases × runs` 校验 → `INVALID`（`policy_evolution.py` `_validation_errors`）|
+| R7-2 | **高** | L3 凭证两臂跑**不同 case 集合**（数量相同）仍 `VALIDATED` —— 等于拿不可配对的两组任务比收益 | → **VALIDATED** | 加跨臂 case 集合一致性校验 → `INVALID` |
+| R7-3 | 中 | 回放报告可**谎报 `unobservable_decisions`**：所有记录都是 `NO_SUPPORT` 而声明 0，仍 `REPLAY_EVALUATED` —— 未观测结果被字段信任 | → **REPLAY_EVALUATED** | `audit_report()` 从 `results[*].evaluation.evidence_support.class` **重算** NO_SUPPORT 数并与声明比对 → `INVALID` |
+| R7-4 | 中 | **结论非 SUPPORTED 的 L3 凭证仍被写入产物库**（孤儿产物），随后才被门禁拒绝 | 产物计数 1→2 | `_validation_errors()` 在结论非 SUPPORTED 时直接报错，**不落盘** → 产物计数不变 |
+| R7-5 | 中 | CLI `validate-research --validation <不存在/非法>` 与 `evaluate --report <非法>` 抛**原始 traceback**（`FileNotFoundError` / `JSONDecodeError`） | 非零退出 + traceback | 新增 `_read_json_input()`，统一转为 `{"status":"INVALID","diagnostics":[...]}` + 退出码 |
+
+### 9.1 二次复核的测试与变异证据
+
+新增 7 项回归（`TestCredentialChainGaps` 5 项 + `TestCredentialCliRobustness` 3 项，共 34 项）；
+在修复前**全部失败**（6 errors + 1 failure）。
+
+五项变异逐一被捕获：
+
+| 变异 | 捕获 |
+|---|---|
+| 移除 L3 记录数检查 | `test_a_credential_that_overstates_its_run_count_is_refused` |
+| 移除 L3 case 集合检查 | `test_arms_running_different_case_sets_are_refused` |
+| 非 SUPPORTED 仍写产物 | `test_a_non_supported_credential_leaves_no_artifact_behind` |
+| 未观测数不重算 | `test_an_understated_unobserved_count_is_refused` |
+| 移除 CLI 输入错误处理 | 3 项 CLI 测试 |
+
+### 9.2 二次复核后计数
+
+| 项 | 值 |
+|---|---|
+| `test_promotion_credentials.py` | **34 tests OK**（26 + 8） |
+| 全量单元测试 | **1779 OK（skipped=3）** |
+| `release_check.py` | **PASS（18 步）** |
+| 5 个模块 selftest | 全 OK |
+
+### 9.3 复核中确认**不是**缺陷的两项
+
+- **畸形 L3 凭证（`per_arm` 非对象 / `report` 非对象）**：`_validation_errors()` 的
+  `isinstance` 守卫把它变成 `INVALID`，不抛异常。
+- **篡改的轨迹存储 + `PE14`**：`_attested_projects()` 用 tolerant 读取，损坏时返回空集合
+  → 背书项目不足 → `PE14` 拒绝，不会崩溃。
