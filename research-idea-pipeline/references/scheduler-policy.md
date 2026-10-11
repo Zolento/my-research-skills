@@ -92,9 +92,17 @@ S_t --π(S_t)--> a_t --> S_{t+1}
   设计契约 + 最小干预测试计划，而不是又一份解释。
 - I2M **只在优先级 1—3 与既有门禁之后**被咨询（`preset_router._loop_step` 的末尾）：
   它不得越过完整性、未决攻击、失效传播、PEIG、AALG、预算或人工审批，也不得解阻 stop rule。
-- 触发条件：`eig_calibration` 连续 ≥2 次 `actual_information_gain == "zero"`，
-  或 `diagnosis_switch` 给出 `CONTINUE_ATTRIBUTION` 以外的结论，或已存在冻结的方法契约。
-  **判据是执行记录，不是叙述**：同一证据快照下反复改写解释不会重置该计数。
+- 触发条件：**readiness 成立即可**（不必等停滞）；此外 `eig_calibration` 连续 ≥2 次
+  `actual_information_gain == "zero"`、`diagnosis_switch` 给出 `CONTINUE_ATTRIBUTION` 以外的结论、
+  或已存在冻结的方法契约也会触发。**判据是执行记录，不是叙述**：同一证据快照下反复改写解释
+  不会重置该计数。
+- 动作状态必须显式：`advisory` → `planned` → `authorized_in_queue` → `dispatched` → `executed`。
+  I2M 输出的只是**候选动作**（`method_synthesis` 等）；要真正执行，该动作必须进入本文件的
+  `next_actions[]` 合法集合，并通过 PEIG/AALG、预算与授权。
+- `planned` 实验在派遣前核对**当前决策价值**：目标问题已全部解决/否证、或与已结束实验
+  （同设计**且**同目标）重复者不得继续占据队列（保留冻结预注册与历史）。**running 不得被终止。**
+- 诊断动作（`type=discriminating_experiment`）必须声明它会改变哪个研究决定
+  （`changes_decision` 或 `decision_targets`）；没有决策价值的诊断不得仅凭便宜反复优先。
 - readiness 不足时，动作是「补做能改变方法决定的判别实验」，**不得**强行包装成新方法。
 - 主锚点不是方法/性能时，I2M 走 `anchor_native` 分支，产出该锚点自己的贡献类型
   （理论/现象/基准/可行性/负结果），**不把非方法锚点强行转成算法**。

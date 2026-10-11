@@ -279,6 +279,12 @@ R3—R6 / R8 为 P1。
 | `not-eligible` | 现有证据不支持；**不得**据此 anchor 组织叙事 |
 
 **anchor 枚举沿用 SKILL.md §0.1：** 理论 / 性能 / 现象 / 基准 / 可行性 / 负结果。
+
+**必须与目标锚点绑定（第十三轮）：** 项目里存在某条 `supported` claim **不等于**目标 anchor
+eligible —— 该 claim 必须能追溯到目标锚点或其目标指标（`contract.target_metric`），或由测量该
+指标的实验直接 targeting。与目标无关的 supported claim 一律记入 `irrelevant_claims`。
+`anchor_role: supporting` 的路线只能形成**辅助贡献**，**不得使项目主锚点达标**；
+`anchor_role: orthogonal` 永不参与主锚点成功判据。
 （锚点表与三层锚点体系见 [../SKILL.md](../SKILL.md) §0.1。）
 
 写到 frontmatter 的 `core_goal` **必须**用英文枚举原样：`theory` / `performance` /
