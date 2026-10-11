@@ -96,6 +96,7 @@ EXPECTED_TEST_SUITES = (
     "test_evidence_outcome.py",
     "test_execution_gate.py",
     "test_golden_path.py",
+    "test_insight_to_method.py",
     "test_l3_trust_boundary.py",
     "test_legacy_handoff.py",
     "test_literature_search.py",
@@ -148,7 +149,7 @@ def step_tests() -> Tuple[bool, str]:
 #: Modules with a `--selftest`. `unittest discover` never invokes these, so without this step a
 #: regression inside them would be invisible (and the L1 evidence they are cited for ungated).
 SELFTEST_MODULES = ("state_check", "decision_trajectory", "policy_evolution", "policy_transfer",
-                    "source_freeze", "rsi_ablation")
+                    "source_freeze", "rsi_ablation", "insight_to_method")
 
 
 def step_selftest() -> Tuple[bool, str]:

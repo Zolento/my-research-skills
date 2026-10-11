@@ -1470,6 +1470,25 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             case_sets[arm] = ids
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         bad("各臂执行的 case 集合不一致：不存在可配对的对照")
+    # PE17: generating candidates, rewriting a report or rating the policy oneself is not
+    # research-improvement evidence, however complete the surrounding structure looks.
+    non_execution = {"method_synthesis", "narrative", "report_rewrite", "self_assessment",
+                     "candidate_generation", "i2m_synthesis"}
+    declared = str(payload.get("evidence_kind") or "").strip()
+    if declared in non_execution:
+        bad(f"证据类型 {declared!r} 不是执行证据：候选生成/报告改写/自评不得作为 L3 能力提升证据")
+    for arm, block in per_arm.items():
+        if not isinstance(block, dict):
+            continue
+        for row in block.get("results") or []:
+            if not isinstance(row, dict):
+                continue
+            for field in ("evidence_kind", "kind", "produced_by"):
+                value = str(row.get(field) or "").strip()
+                if value in non_execution:
+                    bad(f"{arm} 的执行记录来自 {value!r}（{field}）："
+                        "自评/叙事/候选生成不得充当 L3 证据")
+                    break
     for message in _report_design_errors(payload):
         bad(message)
     for message in _pairing_errors({arm: (block.get("results") or [])

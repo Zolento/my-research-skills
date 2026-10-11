@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import cognition as cg
+import insight_to_method as i2m
 import evidence_outcome as eo
 import prediction_compare as pc
 import state_check as sc
@@ -1336,6 +1337,8 @@ def signal_snapshot(
         "records": len(records),
     }
 
+    # Observable I2M state: what the Loop would do about turning insight into a method.
+    signals["i2m"] = i2m.signal_snapshot(state, scheduler=scheduler)
     concentration = _portfolio_concentration(state)
     signals["portfolio_convergence"] = concentration
 
@@ -2045,6 +2048,16 @@ def _loop_step(ctx: Dict[str, Any], *,
                                for xid in unknown)),
                 "blocked": False, "hold": True, "hold_reason": "assurance_unknown",
                 "assurance_unknown": details, "assurance": guarantee, "pending_r10": []}
+    # Insight-to-Method Transition. Consulted only here, after integrity, critical attack,
+    # invalidation propagation, Assurance, planned work and every gate above has had its say,
+    # so method synthesis can never outrank them or unblock a stop rule.
+    method_step = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
+    if method_step:
+        method_step.setdefault("pending_r10", [])
+        method_step["assurance"] = guarantee
+        method_step["assurance_pending"] = pending
+        method_step["dispatched_action"] = None
+        return method_step
     actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
                if isinstance(item, dict) and item.get("action")]
     if actions:
@@ -2749,12 +2762,19 @@ def _handle_stagnation_breaker(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
                                "python3 scripts/prediction_compare.py switch --state <state>"}])
     switch = stagnation["switch"]
     action = switch.get("action")
+    # Advice alone never produced a method. When the state shows an actionable insight, the
+    # breaker hands the Loop a concrete I2M step; the switch wording stays authoritative for
+    # the diagnosis side.
+    method_step = i2m.loop_step(ctx["state"], ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
     return _result(preset, "OK",
                    observed={"zero_streak": stagnation["zero_streak"],
                              "reasons": stagnation["reasons"],
+                             "i2m": (method_step or {}).get("i2m", {}),
+                             "i2m_step": (method_step or {}).get("step"),
                              "witness": switch.get("competition_verdicts") or switch.get("basis")},
                    decision={"switch_action": action,
                              "next_intervention": switch.get("note"),
+                             "i2m_next": (method_step or {}).get("action"),
                              "single_negative_is_not_stagnation": True},
                    steps=[{"step": "1 行为切换", "command":
                            "python3 scripts/prediction_compare.py switch --state <state>"},
@@ -2762,8 +2782,9 @@ def _handle_stagnation_breaker(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
                            "python3 scripts/prediction_compare.py compete --state <state> --competition <CP>"},
                           {"step": "3 停手或重定义", "command":
                            "python3 scripts/prediction_compare.py switch --state <state> --scheduler <scheduler>"}],
-                   writes=[], changed_decision=action != "CONTINUE_ATTRIBUTION",
-                   next_action=action)
+                   writes=(method_step or {}).get("writes", []),
+                   changed_decision=action != "CONTINUE_ATTRIBUTION",
+                   next_action=(method_step or {}).get("action") or action)
 
 
 def _handle_experiment_failure_recovery(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
