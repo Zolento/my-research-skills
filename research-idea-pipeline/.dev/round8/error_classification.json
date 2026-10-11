@@ -1,0 +1,146 @@
+[
+  {
+    "kind": "ERROR",
+    "test": "test_a_mechanistic_regression_blocks_promotion",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_an_overlapping_benefit_is_not_counted_as_evidence",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_the_frozen_min_runs_is_used_not_the_default",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_the_frozen_tolerance_is_used_not_the_default",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_two_project_names_without_trajectories_do_not_back_a_global_scope",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_self_reported_report_cannot_become_a_research_validation",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_the_entry_binds_an_unbound_report_and_records_that_it_did",
+    "category": "其他",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_missing_task_source_is_refused",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_real_research_validation_reaches_validated_and_active",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_synthetic_task_source_is_refused",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_validation_with_a_scientific_regression_is_refused",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_a_validation_without_isolation_proof_is_refused",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "ERROR",
+    "test": "test_self_executed_validation_is_refused",
+    "category": "接口不兼容（API 不存在）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_mechanistic_understanding_is_a_reliability_dimension",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_replay_artifact_cannot_validate",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_supported_replay_evaluation_is_L2",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_recomputed_level_never_returns_L3_for_a_replay_artifact",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_report_bound_to_another_policy_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_report_bound_to_other_rules_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_report_declaring_a_conflicting_binding_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_report_missing_the_isolation_proof_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_a_report_whose_case_count_disagrees_with_the_records_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_an_artifact_whose_report_no_longer_recomputes_is_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "============================================================"
+  },
+  {
+    "kind": "FAIL",
+    "test": "test_declared_means_that_disagree_with_the_records_are_refused",
+    "category": "真实缺口复现（行为断言）",
+    "last_line": "FAILED (failures=11, errors=13)"
+  }
+]

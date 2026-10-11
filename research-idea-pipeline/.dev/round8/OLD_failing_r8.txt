@@ -1,0 +1,413 @@
+EEEEEEEFEFEEEEEEEEFEEEEEEFEE
+======================================================================
+ERROR: test_a_dispatch_record_already_used_by_another_credential_is_reported (test_l3_trust_boundary.TestAdversarialPaths.test_a_dispatch_record_already_used_by_another_credential_is_reported)
+White-box: the single-use guard fires when another stored credential shares it.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 387, in test_a_dispatch_record_already_used_by_another_credential_is_reported
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_dispatch_record_from_another_policy_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_a_dispatch_record_from_another_policy_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 398, in test_a_dispatch_record_from_another_policy_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_forged_task_source_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_a_forged_task_source_is_refused)
+The source file is replaced after its digest was taken.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 350, in test_a_forged_task_source_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_self_named_executor_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_a_self_named_executor_is_refused)
+The policy's own route cannot be its own independent evaluator.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 409, in test_a_self_named_executor_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_tampered_policy_binding_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_a_tampered_policy_binding_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 418, in test_a_tampered_policy_binding_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_tampered_rules_binding_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_a_tampered_rules_binding_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 427, in test_a_tampered_rules_binding_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_tampered_stored_credential_cannot_be_promoted (test_l3_trust_boundary.TestAdversarialPaths.test_a_tampered_stored_credential_cannot_be_promoted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 434, in test_a_tampered_stored_credential_cannot_be_promoted
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_old_dispatch_record_cannot_be_reused_after_a_new_trial (test_l3_trust_boundary.TestAdversarialPaths.test_an_old_dispatch_record_cannot_be_reused_after_a_new_trial)
+A dispatch record from an earlier bounded trial is not this trial's evidence.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 378, in test_an_old_dispatch_record_cannot_be_reused_after_a_new_trial
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_contrast_that_does_not_differ_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_a_contrast_that_does_not_differ_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 273, in test_a_contrast_that_does_not_differ_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_controlled_axis_difference_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_a_controlled_axis_difference_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 251, in test_a_controlled_axis_difference_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_fair_credential_records_tasks_budget_and_policy_version (test_l3_trust_boundary.TestComparisonFairness.test_a_fair_credential_records_tasks_budget_and_policy_version)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 324, in test_a_fair_credential_records_tasks_budget_and_policy_version
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_missing_equivalence_record_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_a_missing_equivalence_record_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 292, in test_a_missing_equivalence_record_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_missing_required_axis_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_a_missing_required_axis_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 303, in test_a_missing_required_axis_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_undeclared_environment_difference_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_an_undeclared_environment_difference_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 262, in test_an_undeclared_environment_difference_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_paired_task_ids_must_match_the_executed_cases (test_l3_trust_boundary.TestComparisonFairness.test_paired_task_ids_must_match_the_executed_cases)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 312, in test_paired_task_ids_must_match_the_executed_cases
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_the_same_execution_instance_for_both_arms_is_refused (test_l3_trust_boundary.TestComparisonFairness.test_the_same_execution_instance_for_both_arms_is_refused)
+Execution instance identity must differ even when the environment is equal.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 284, in test_the_same_execution_instance_for_both_arms_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_a_tampered_approval_ledger_is_refused (test_l3_trust_boundary.TestNoSelfGrantedL3.test_a_tampered_approval_ledger_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 224, in test_a_tampered_approval_ledger_is_refused
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_approval_for_another_credential_does_not_authorize_this_one (test_l3_trust_boundary.TestNoSelfGrantedL3.test_an_approval_for_another_credential_does_not_authorize_this_one)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 165, in test_an_approval_for_another_credential_does_not_authorize_this_one
+    self.approve(other)
+    ~~~~~~~~~~~~^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_approved_credential_reaches_validated_and_active (test_l3_trust_boundary.TestNoSelfGrantedL3.test_an_approved_credential_reaches_validated_and_active)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 194, in test_an_approved_credential_reaches_validated_and_active
+    self.approve(credential)
+    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_approver_identity_is_required (test_l3_trust_boundary.TestNoSelfGrantedL3.test_an_approver_identity_is_required)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 188, in test_an_approver_identity_is_required
+    outcome = self.approve(self.credential(), approver="")
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_an_expired_approval_does_not_authorize (test_l3_trust_boundary.TestNoSelfGrantedL3.test_an_expired_approval_does_not_authorize)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 173, in test_an_expired_approval_does_not_authorize
+    self.approve(credential, expires_in_seconds=-1)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_approval_requires_an_explicit_human_confirmation (test_l3_trust_boundary.TestNoSelfGrantedL3.test_approval_requires_an_explicit_human_confirmation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 181, in test_approval_requires_an_explicit_human_confirmation
+    outcome = self.approve(credential, confirm_human=False)
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_promotion_reverifies_the_approval (test_l3_trust_boundary.TestNoSelfGrantedL3.test_promotion_reverifies_the_approval)
+VALIDATED is not a blank cheque: ACTIVE re-reads the approval ledger.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 205, in test_promotion_reverifies_the_approval
+    self.approve(credential, expires_in_seconds=-1)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 124, in approve
+    return support.approve(self.state_path, policy_id, credential, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/rsi_test_support.py", line 90, in approve
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+           ^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approve_l3'
+
+======================================================================
+ERROR: test_the_automated_path_never_writes_an_approval (test_l3_trust_boundary.TestNoSelfGrantedL3.test_the_automated_path_never_writes_an_approval)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 159, in test_the_automated_path_never_writes_an_approval
+    self.assertFalse(len(pe.approval_events(self.state_path)),
+                         ^^^^^^^^^^^^^^^^^^
+AttributeError: module 'policy_evolution' has no attribute 'approval_events'
+
+======================================================================
+FAIL: test_an_internally_consistent_fake_credential_is_refused (test_l3_trust_boundary.TestAdversarialPaths.test_an_internally_consistent_fake_credential_is_refused)
+Digests all agree, flags all set - and none of it is an independent verifier.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 362, in test_an_internally_consistent_fake_credential_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_the_cli_refuses_without_an_approval (test_l3_trust_boundary.TestAdversarialPaths.test_the_cli_refuses_without_an_approval)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 461, in test_the_cli_refuses_without_an_approval
+    self.assertEqual(payload["status"], "INVALID", payload)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'diagnostics': [], 'level': 'L3', 'policy_id': 'P-1', 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'seq': 5, 'status': 'VALIDATED', 'written': True}
+
+======================================================================
+FAIL: test_a_self_consistent_credential_without_human_approval_is_refused (test_l3_trust_boundary.TestNoSelfGrantedL3.test_a_self_consistent_credential_without_human_approval_is_refused)
+Every field the agent controls (synthetic=false, two executor names, isolation
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 141, in test_a_self_consistent_credential_without_human_approval_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_flags_alone_are_never_accepted_as_authenticity (test_l3_trust_boundary.TestNoSelfGrantedL3.test_flags_alone_are_never_accepted_as_authenticity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r8-baseline/research-idea-pipeline/scripts/test_l3_trust_boundary.py", line 155, in test_flags_alone_are_never_accepted_as_authenticity
+    self.assertEqual(self.record(credential)["status"], "INVALID")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.502s
+
+FAILED (failures=4, errors=24)
