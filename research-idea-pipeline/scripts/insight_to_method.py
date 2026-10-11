@@ -292,6 +292,38 @@ def _evidence_relation(evidence: Dict[str, Any], hypothesis_ids: Sequence[str]) 
     return "none"
 
 
+def _review_credential(state: Dict[str, Any],
+                       evidence: Dict[str, Any]) -> Tuple[bool, str]:
+    """A review claim must resolve to a real assurance/review artifact in the state.
+
+    `review_status: PASS` or a T3/T4 tier is a declaration, not a review: R8/R10 artifacts are
+    the authority, so the reference must resolve to an existing PASS-ing assurance entry
+    (or the evidence's own experiment must carry one).
+    """
+    reference = _text(evidence.get("assurance_ref"))
+    for entry in _items(state, "assurance"):
+        ident = str(entry.get("id"))
+        status = _text(entry.get("status") or entry.get("verdict")).upper()
+        if reference and reference in (ident, _text(entry.get("ref"))):
+            if status in ("PASS", "VERIFIED", "VERIFIED_PASS"):
+                return True, f"assurance[{ident}]"
+            return False, f"assurance[{ident}] 状态 {status or '未知'}"
+    source = _text(evidence.get("experiment")) or _text(evidence.get("source_ref"))
+    experiment_id = source.split(":", 1)[-1]
+    record = _index(state, "experiments").get(experiment_id)
+    if record is not None:
+        for entry in _items(state, "assurance"):
+            if str(entry.get("experiment")) == experiment_id and \
+                    _text(entry.get("status") or entry.get("verdict")).upper() in \
+                    ("PASS", "VERIFIED", "VERIFIED_PASS"):
+                return True, f"assurance for experiment {experiment_id}"
+        analysis = record.get("outcome_analysis")
+        if isinstance(analysis, dict) and isinstance(analysis.get("assurance"), dict) and \
+                _text(analysis["assurance"].get("status")).upper() == "PASS":
+            return True, f"outcome analysis of {experiment_id}"
+    return False, "缺少可核验的审查产物"
+
+
 def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> Dict[str, Any]:
     """Classify how far the evidence actually goes for the referenced mechanism.
 
@@ -328,9 +360,7 @@ def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> 
         explicit = _text(evidence.get("mechanism_support") or evidence.get("conclusion"))
         # A self-declared strength is not a review: R8/R10 must have qualified it before it can
         # raise the level beyond "the prediction was observed".
-        reviewed = (_text(evidence.get("review_status")).upper() == "PASS"
-                    or _text(evidence.get("verification_tier")) in ("T3", "T4")
-                    or bool(evidence.get("assurance_ref")))
+        reviewed, review_basis = _review_credential(state, evidence)
         if explicit in ("intervention", "intervention_effect"):
             if reviewed:
                 kinds.append(SUPPORT_INTERVENTION_EFFECT)
@@ -338,7 +368,8 @@ def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> 
                 kinds.append(SUPPORT_PREDICTION_OBSERVED)
                 diagnostics.append(_diag(
                     "I2M96", f"evidence[{ident}]",
-                    "自称干预有效但未经 R8/R10 审查：只能记为「观察到预测现象」"))
+                    "自称干预有效但没有可核验的 R8/R10 审查产物（" + review_basis
+                    + "）：只能记为「观察到预测现象」"))
         elif explicit == "mechanism":
             if reviewed:
                 kinds.append(SUPPORT_MECHANISM)
@@ -346,7 +377,7 @@ def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> 
                 kinds.append(SUPPORT_PREDICTION_OBSERVED)
                 diagnostics.append(_diag(
                     "I2M97", f"evidence[{ident}]",
-                    "自称机制获支持但缺少证据审查凭证（review PASS / T3+ / assurance_ref）："
+                    "自称机制获支持但审查凭证无法追溯（" + review_basis + "）："
                     "不得据此判定机制已验证"))
         else:
             kinds.append(SUPPORT_PREDICTION_OBSERVED)
@@ -830,6 +861,28 @@ def _progress_reason(progress: bool, dimensions: Dict[str, bool],
     return "没有可核验的进展：指纹变化本身不是验证，无关或未归属证据不加进展"
 
 
+def progress_watermark(state: Dict[str, Any]) -> set:
+    """Evidence already consumed, derived from persisted artifacts (order-independent, idempotent).
+
+    Reuses what the state already records: evidence bound to a finished experiment that has an
+    outcome analysis or a result version, and evidence referenced by the scheduler's own EIG
+    calibration.  Stored nowhere new - the decision records and the state are the source.
+    """
+    consumed = set()
+    experiments = _index(state, "experiments")
+    for evidence in _items(state, "evidence"):
+        source = _text(evidence.get("experiment")) or _text(evidence.get("source_ref"))
+        record = experiments.get(source.split(":", 1)[-1] if source else "")
+        if record is None:
+            continue
+        # Consumed means *analysed* (R9.O outcome analysis), not merely executed: a fresh
+        # result that has not been through outcome analysis is still new information.
+        if _text(record.get("status")) in ("done", "failed") and \
+                record.get("outcome_analysis") is not None:
+            consumed.add(str(evidence.get("id")))
+    return consumed
+
+
 def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
                     after: Dict[str, Any], experiment_id: str = "",
                     previous_evidence: Sequence[str] = (),
@@ -855,35 +908,57 @@ def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
     qualified = [ident for ident in new_evidence if _evidence_qualified(by_id.get(ident, {}))]
 
     hypothesis_id = str(after.get("id") or "")
-    consumed = {str(item) for item in consumed_evidence}
+    if consumed_evidence:
+        consumed = {str(item) for item in consumed_evidence}
+        watermark_source = "explicit"
+    else:
+        consumed = progress_watermark(state)
+        watermark_source = "persisted"
     already_consumed = sorted(set(qualified) & consumed)
 
+    experiments = _index(state, "experiments")
+
     def attributed(ident):
-        """Evidence counts only for the method version/experiment it actually came from."""
+        """Evidence must resolve to a real experiment bound to this method version.
+
+        Conservative by construction: an unresolvable reference, or evidence with neither a
+        version nor a resolvable experiment, is `unattributed` and earns no method progress.
+        Legacy records stay readable - they simply do not become verification credentials.
+        """
         evidence = by_id.get(ident, {})
+        source = _text(evidence.get("experiment")) or _text(evidence.get("source_ref"))
+        experiment_id = source.split(":", 1)[-1] if source else ""
+        record = experiments.get(experiment_id)
         declared = _text(evidence.get("method_version")) or _text(evidence.get("method_digest"))
+        if record is None:
+            return False                      # unresolved reference: cannot be attributed
+        executed = (_text(record.get("status")) in ("done", "failed", "executed")
+                    and (record.get("result_at_state_version") is not None
+                         or record.get("status") in ("done", "failed")))
+        if not executed:
+            return False                      # only executed experiments validate a method
+        preregistration = record.get("preregistration") \
+            if isinstance(record.get("preregistration"), dict) else {}
+        contract = preregistration.get("method_contract") \
+            if isinstance(preregistration.get("method_contract"), dict) else {}
+        bound = _text(contract.get("method_digest")) or _text(contract.get("method_hypothesis_ref"))
+        expected = _text(after_method.get("definition_digest")) or version
         if declared:
-            expected = version or _text(after_method.get("definition_digest"))
             if expected and declared != expected:
                 return False
-        source = _text(evidence.get("experiment")) or _text(evidence.get("source_ref"))
-        experiment_id = source.split(":", 1)[-1]
-        record = _index(state, "experiments").get(experiment_id)
-        if record is not None:
-            preregistration = record.get("preregistration") \
-                if isinstance(record.get("preregistration"), dict) else {}
-            contract = preregistration.get("method_contract") \
-                if isinstance(preregistration.get("method_contract"), dict) else {}
-            bound = _text(contract.get("method_digest")) or \
-                _text(contract.get("method_hypothesis_ref"))
-            if bound:
-                expected = _text(after_method.get("definition_digest")) or hypothesis_id
-                if bound not in (expected, version, hypothesis_id):
-                    return False
+        elif bound:
+            if bound not in (expected, hypothesis_id):
+                return False
+        else:
+            # no version anywhere and no bound contract: not a verification credential
+            return False
+        if bound and expected and bound not in (expected, hypothesis_id):
+            return False
         return True
 
     fresh = [ident for ident in qualified if ident not in consumed]
     misattributed = [ident for ident in qualified if not attributed(ident)]
+    unattributed = [ident for ident in qualified if not attributed(ident)]
     usable = [ident for ident in fresh if attributed(ident)]
     related = [ident for ident in usable
                if _evidence_relation(by_id.get(ident, {}), [hypothesis_id]) == "supports"]
@@ -897,8 +972,10 @@ def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
                        if _anchor_relevant(state, by_id.get(ident, {}), anchor_kind(state))]
 
     definition_digest = _text(after_method.get("definition_digest"))
-    # A changed fingerprint alone is not Design Progress: it needs a frozen definition digest.
-    design = bool(method_changed and definition_digest)
+    before_digest = _text(before_method.get("definition_digest"))
+    # A changed fingerprint alone is not Design Progress: the *frozen definition digest* must
+    # actually change, otherwise editing a field without a new version is not a new design.
+    design = bool(definition_digest) and definition_digest != before_digest
     implementation = bool(isinstance(implementation_check, dict)
                           and implementation_check.get("status") == "PASS"
                           and _text(implementation_check.get("artifact_digest"))
@@ -923,7 +1000,8 @@ def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
             "related_evidence": sorted(set(related)), "refuting_evidence": sorted(set(refuting)),
             "unrelated_evidence": sorted(set(usable) - set(related) - set(refuting)),
             "misattributed_evidence": sorted(misattributed),
-            "already_consumed": already_consumed,
+            "unattributed_evidence": sorted(unattributed),
+            "already_consumed": already_consumed, "watermark_source": watermark_source,
             "fresh": bool(fresh),
             "anchor_evidence": sorted(set(anchor_hits)),
             "found": [experiment_id] if experiment_id else [],
@@ -986,7 +1064,9 @@ def anchor_link(state: Dict[str, Any], obj: Dict[str, Any], kind: str) -> str:
         if _text(experiment.get("status")) in ("abandoned", "rejected"):
             continue
         experiment_metric = _text(experiment.get("metric"))
-        if metric and experiment_metric and experiment_metric.lower() != metric.lower():
+        # A general-purpose experiment with no target metric cannot certify anchor linkage.
+        if not experiment_metric or not metric or \
+                experiment_metric.lower() != metric.lower():
             continue
         targets = set()
         for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted",
@@ -1033,11 +1113,25 @@ def anchor_eligibility(state: Dict[str, Any], target: Optional[str] = None) -> D
     contract = (state.get("contract") or {})
     role = _text(contract.get("anchor_role") or contract.get("route_anchor_role"))
     relevant_supported, relevant_partial, text_only, irrelevant = [], [], [], []
+    unbacked_claims: List[str] = []
+    qualified_ids = {str(item.get("id")) for item in _items(state, "evidence")
+                     if _evidence_qualified(item)}
     for claim in _items(state, "claims"):
         if not _is_alive(claim):
             continue
         status = _text(claim.get("status"))
         if status not in ("supported", "partially-supported"):
+            continue
+        # `status: supported` is a declaration; the claim must actually be supported by
+        # qualified evidence (explicit `supporting_evidence` or an evidence that supports it).
+        backed = {str(item) for item in claim.get("supporting_evidence") or []} & qualified_ids
+        if not backed:
+            backed = {str(item.get("id")) for item in _items(state, "evidence")
+                      if _evidence_qualified(item)
+                      and str(claim.get("id")) in
+                      {str(x) for x in item.get("supports") or []}}
+        if not backed:
+            unbacked_claims.append(str(claim.get("id")))
             continue
         link = anchor_link(state, claim, kind)
         if link == "text_only":
@@ -1058,6 +1152,9 @@ def anchor_eligibility(state: Dict[str, Any], target: Optional[str] = None) -> D
                                           "不能直接使项目主锚点达标")
     elif not observed:
         verdict, required = NOT_ELIGIBLE, "缺少经资格审查的观测证据：任何 anchor 都还不可用"
+    elif unbacked_claims and not (relevant_supported or relevant_partial):
+        verdict, required = "unknown", (
+            f"claim {unbacked_claims} 声明 supported 但没有合格证据支持：不得据此判定资格")
     elif relevant_supported:
         verdict, required = ELIGIBLE, ""
     elif text_only:
@@ -1076,7 +1173,8 @@ def anchor_eligibility(state: Dict[str, Any], target: Optional[str] = None) -> D
     return {"target_anchor": kind, "route_role": role or "primary", "verdict": verdict,
             "required_evidence": required, "supported_claims": relevant_supported,
             "partial_claims": relevant_partial, "text_only_claims": text_only,
-            "irrelevant_claims": irrelevant, "observed_evidence": observed,
+            "irrelevant_claims": irrelevant, "unbacked_claims": unbacked_claims,
+            "observed_evidence": observed,
             "frozen_requirements": requirements,
             "project_objective": _text(contract.get("goal")) or _target_metric(state, {}),
             "research_progress": {"observed_evidence": len(observed),
@@ -1122,13 +1220,43 @@ def anchor_gap(state: Dict[str, Any], gap: Optional[Dict[str, Any]] = None) -> D
     gap = gap if isinstance(gap, dict) else {}
     eligibility = anchor_eligibility(state, kind)
     requirements = eligibility["frozen_requirements"]
+    # A caller may *report* what it believes; it may not *change* the mechanical verdict.
     provided_satisfied = [str(item) for item in gap.get("satisfied") or [] if _text(item)]
     refuted = [str(item) for item in gap.get("refuted_requirements") or [] if _text(item)]
-    covered = set(eligibility["supported_claims"])
-    satisfied = [item for item in requirements if item in covered] or provided_satisfied
-    missing = [item for item in requirements if item not in satisfied]
+    # Requirement satisfaction is per requirement, and a natural-language requirement cannot be
+    # verified by matching it against a claim id: it is `undetermined` unless the state ties the
+    # requirement to a verified claim explicitly (`claim.requirement` / `claim.satisfies`).
+    per_requirement: List[Dict[str, Any]] = []
+    for requirement in requirements:
+        linked = [str(claim.get("id")) for claim in _items(state, "claims")
+                  if _is_alive(claim)
+                  and requirement in {str(x) for x in (claim.get("requirement"),
+                                                       claim.get("satisfies")) or []}
+                  and str(claim.get("id")) in set(eligibility["supported_claims"])]
+        if requirement in refuted:
+            per_requirement.append({"requirement": requirement, "status": "refuted",
+                                    "evidence": []})
+        elif linked:
+            per_requirement.append({"requirement": requirement, "status": "satisfied",
+                                    "evidence": linked})
+        elif requirement in provided_satisfied:
+            per_requirement.append({"requirement": requirement, "status": "undetermined",
+                                    "evidence": [],
+                                    "reason": "调用方声称满足，但没有可核验的关联证据"})
+        else:
+            per_requirement.append({"requirement": requirement, "status": "unsatisfied",
+                                    "evidence": [],
+                                    "reason": "尚无可核验的满足证据（不等于已被否证）"})
+    satisfied = [item["requirement"] for item in per_requirement
+                 if item["status"] == "satisfied"]
+    missing = [item["requirement"] for item in per_requirement
+               if item["status"] in ("unsatisfied", "undetermined")]
     status = "undetermined" if not requirements else (
-        "satisfied" if not missing and requirements else "unsatisfied")
+        "satisfied" if requirements and not missing else "unsatisfied")
+    if requirements and any(item["status"] == "undetermined" for item in per_requirement) \
+            and not any(item["status"] == "refuted" for item in per_requirement):
+        status = "undetermined" if len(missing) == len(requirements) or any(
+            item["status"] == "undetermined" for item in per_requirement) else status
     return {"anchor_kind": kind, "contribution": ANCHOR_CONTRIBUTION.get(kind, ""),
             "eligibility": eligibility["verdict"], "satisfaction": status,
             "frozen_requirements": requirements, "satisfied": satisfied,
@@ -1599,6 +1727,12 @@ def _method_contract_in_state(state: Dict[str, Any], *, experiment_id: str = "",
                                   method_hypothesis_ref=method_hypothesis_ref)["contract"]
 
 
+def _timestamp(item: Dict[str, Any]) -> str:
+    contract = item.get("contract") or {}
+    return (_text(contract.get("recorded_at")) or _text(contract.get("frozen_at"))
+            or str(item.get("frozen_at") or ""))
+
+
 def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
                            method_hypothesis_ref: str = "") -> Dict[str, Any]:
     candidates = method_contracts(state)
@@ -1632,21 +1766,62 @@ def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
             continue
         live.append(item)
     if not live:
-        return {"contract": None, "selected": None, "rejected": rejected,
+        return {"contract": None, "selected": None, "rejected": rejected, "ambiguous": False,
                 "reason": "没有有效（非废弃）的方法契约"}
-    def version_key(item):
-        contract = item["contract"]
-        raw = contract.get("version", contract.get("method_version"))
-        number = raw if isinstance(raw, int) and not isinstance(raw, bool) else None
-        recorded = _text(contract.get("recorded_at")) or _text(contract.get("frozen_at")) or \
-            str(item.get("frozen_at") or "")
-        # Version number first, then recording time, then the experiment id.  The definition
-        # digest is Never used for ordering: it is a content hash, not a chronology.
-        return (0 if number is not None else 1, number if number is not None else 0,
-                recorded, item["experiment_id"])
+    if not method_hypothesis_ref:
+        primary = _primary_hypothesis(state)
+        if primary is not None:
+            bound = [item for item in live if _text(
+                item["contract"].get("method_hypothesis_ref")) == str(primary.get("id"))]
+            if bound:
+                for item in live:
+                    if item not in bound:
+                        rejected.append({"experiment_id": item["experiment_id"],
+                                         "reason": "绑定的是另一个候选方法"})
+                live = bound
+    def parse_version(raw: Any) -> Optional[int]:
+        """One comparable representation: integers, `"2"`, `"v2"`, `"v10"` all parse."""
+        if isinstance(raw, bool) or raw is None:
+            return None
+        if isinstance(raw, int):
+            return raw
+        text = _text(raw)
+        if not text:
+            return None
+        digits = text[1:] if text[:1] in ("v", "V") else text
+        return int(digits) if digits.isdigit() else None
 
-    live.sort(key=version_key)
-    selected = live[-1]
+    parsed = [(item, parse_version(item["contract"].get(
+        "version", item["contract"].get("method_version")))) for item in live]
+    numbered = [pair for pair in parsed if pair[1] is not None]
+    unnumbered = [pair for pair in parsed if pair[1] is None]
+    if numbered and unnumbered:
+        # Mixed integer and non-integer versions cannot be ordered: say so instead of guessing.
+        return {"contract": None, "selected": None, "rejected": rejected, "ambiguous": True,
+                "reason": ("版本表示不一致（整数与不可解析版本并存）：无法判定最新版本，"
+                           "请统一版本表示"),
+                "candidates": [item["experiment_id"] for item, _ in parsed]}
+    if numbered:
+        numbers = {number for _, number in numbered}
+        if len(numbers) == 1:
+            recorded = [(_timestamp(item), item["experiment_id"], item)
+                        for item, _ in numbered]
+            recorded.sort()
+            selected = recorded[-1][2]
+        else:
+            selected = max(numbered, key=lambda pair: (pair[1], _timestamp(pair[0]),
+                                                       pair[0]["experiment_id"]))[0]
+    else:
+        # No comparable version at all: fall back to recording time, and only if unambiguous.
+        stamps = [(_timestamp(item), item["experiment_id"], item) for item, _ in parsed]
+        newest = sorted(stamps)[-1][0]
+        tied = [item for stamp, _, item in stamps if stamp == newest]
+        if len(tied) > 1 and newest == "":
+            return {"contract": None, "selected": None, "rejected": rejected,
+                    "ambiguous": True,
+                    "reason": "多个契约缺少版本与登记时间：无法判定最新版本",
+                    "candidates": [item["experiment_id"] for item in tied]}
+        selected = tied[0]
     for item in live[:-1]:
         rejected.append({"experiment_id": item["experiment_id"],
                          "reason": "不是当前版本（存在更新的有效契约）"})
@@ -1656,7 +1831,7 @@ def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
             explicit_id = True
             audit_only = item["status"] in _DEAD_EXPERIMENT_STATUS
     return {"contract": selected["contract"], "selected": selected, "rejected": rejected,
-            "audit_only": audit_only,
+            "ambiguous": False, "audit_only": audit_only,
             "reason": ("按显式 experiment_id 指定（历史契约仅用于审计，不自动视为当前有效方法）"
                        if audit_only else "选择最新的有效契约版本（按版本号/登记时间，不用摘要排序）")}
 
@@ -1735,6 +1910,13 @@ def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
     else:
         streak = pc.trailing_zero_streak(scheduler)
         switch = pc.diagnosis_switch(state, [], scheduler).get("action")
+    # A repair / invalidation-propagation action is a hard-priority necessity (levels 1-3):
+    # I2M stays advisory and must not stand in for it.
+    hard_types = {"repair", "propagate_invalidation"}
+    hard_actions = [item for item in scheduler.get("next_actions") or []
+                    if isinstance(item, dict) and _text(item.get("type")) in hard_types]
+    if hard_actions:
+        return None
     stagnant = streak >= 2 or (switch is not None and switch != "CONTINUE_ATTRIBUTION")
     actionable = readiness_probe["verdict"] != VERDICT_NOT_ACTIONABLE
     # A method contract in progress always continues; a ready insight may start method work
@@ -1773,20 +1955,26 @@ def _selftest_state() -> Dict[str, Any]:
                      "constraints": [], "resources": {}, "out_of_scope": [],
                      "target_metric": "recall@10"},
         "claims": [{"id": "C1", "status": "partially-supported", "anchor": "performance",
-                    "target_metric": "recall@10", "statement": "长尾检索召回仍不足"}],
+                    "target_metric": "recall@10", "supporting_evidence": ["E1"],
+                    "statement": "长尾检索召回仍不足"}],
         "evidence": [{"id": "E1", "epistemic_status": "Observed",
-                      "validity": {"status": "valid"}, "supports": ["H1"],
+                      "validity": {"status": "valid"}, "supports": ["H1", "C1"],
                       "source_ref": "exp:X1", "verification_tier": "T3",
-                      "mechanism_support": "mechanism", "review_status": "PASS"}],
+                      "mechanism_support": "mechanism", "assurance_ref": "AS1"}],
         "hypotheses": [{"id": "H1", "status": "active", "statement": "长尾被头部主导",
                         "intervention_axis": "loss_reweighting", "operator": "reframe",
                         "falsifier": "长尾召回不升", "nearest_prior": "focal loss",
                         "novelty_source": "样本层级重加权"}],
-        "experiments": [], "literature": [], "failures": [],
+        "experiments": [{"id": "X1", "status": "done", "metric": "recall@10",
+                         "result_at_state_version": 7,
+                         "preregistration": {"frozen_at_state_version": 6, "method_contract": {
+                             "method_digest": "d1", "version": 1,
+                             "method_hypothesis_ref": "H1"}}}],
+        "literature": [], "failures": [],
         "uncertainties": [{"id": "U1", "status": "open", "question": "长尾是否被头部主导",
                            "depends_on": ["H1"],
                            "cheapest_discriminating_test": "小规模长尾子集对照"}],
-        "assurance": [], "repairs": [], "narrative_view": {}, "reviews": [],
+        "assurance": [{"id": "AS1", "status": "PASS", "experiment": "X1"}], "repairs": [], "narrative_view": {}, "reviews": [],
     }
 
 
@@ -1940,18 +2128,27 @@ def selftest() -> int:
         {"id": "E2", "epistemic_status": "Observed", "validity": {"status": "valid"}}]}
     related = {**state, "evidence": state["evidence"] + [
         {"id": "E2", "epistemic_status": "Observed", "validity": {"status": "valid"},
-         "supports": ["H1"], "source_ref": "exp:X9", "verification_tier": "T2"}]}
-    checks.append(("方法变化 + 相关证据才算进展", method_progress(
-        related, before=before, after=after, previous_evidence=["E1"])["progress"]))
+         "supports": ["H1"], "source_ref": "exp:X1", "verification_tier": "T2"}]}
+    checks.append(("方法变化 + 可归属的关联证据才算进展", method_progress(
+        related, before=before, after=after, previous_evidence=["E1"],
+        method_version="d1")["progress"]))
+    unbound = {**state, "evidence": state["evidence"] + [
+        {"id": "E4", "epistemic_status": "Observed", "validity": {"status": "valid"},
+         "supports": ["H1"], "source_ref": "exp:NOPE", "verification_tier": "T2"}]}
+    checks.append(("引用不可解析的证据不构成进展", not method_progress(
+        unbound, before=before, after=after, previous_evidence=["E1"],
+        method_version="d1")["progress"]))
     unrelated_new = {**state, "evidence": state["evidence"] + [
         {"id": "E3", "epistemic_status": "Observed", "validity": {"status": "valid"},
          "source_ref": "other"}]}
     checks.append(("无关新证据不加进展", not method_progress(
         unrelated_new, before=before, after=after, previous_evidence=["E1"])["progress"]))
     same_version = related
+    stable = {"id": "H1", "method": {"intervention": "a", "definition_digest": "d1"}}
     checks.append(("同方法再验证算 Validation Progress",
-                   method_progress(same_version, before=before, after=before,
-                                   previous_evidence=["E1"])["dimensions"]["validation"]))
+                   method_progress(same_version, before=stable, after=dict(stable),
+                                   previous_evidence=["E1"],
+                                   method_version="d1")["dimensions"]["validation"]))
     checks.append(("改写解释不算进展", not method_progress(
         grown, before=before, after=before, previous_evidence=["E1"])["progress"]))
 
@@ -1962,6 +2159,11 @@ def selftest() -> int:
                    anchor_path(theory, readiness=readiness)["path"] == "ANCHOR_NATIVE"))
     checks.append(("锚点资格由与目标显式绑定的证据决定",
                    anchor_eligibility(state)["verdict"] == CONDITIONAL))
+    unbacked = {**state, "evidence": []}
+    checks.append(("声明 supported 但无支持证据不算资格",
+                   anchor_eligibility({"**": 1, **unbacked, "claims": [
+                       {"id": "C9", "status": "supported", "anchor": "performance"}]}
+                   )["verdict"] != ELIGIBLE))
     checks.append(("仅有文字提及不算显式关联",
                    anchor_link(state, {"id": "CX", "statement": "recall@10 顺带提到"},
                                "performance") == "text_only"))
@@ -1971,7 +2173,7 @@ def selftest() -> int:
     unrelated_claim = {**state, "claims": [{"id": "C9", "status": "supported",
                                             "statement": "与性能锚点无关的结论"}]}
     checks.append(("无关 supported claim 不能让 anchor eligible",
-                   anchor_eligibility(unrelated_claim)["verdict"] == NOT_ELIGIBLE))
+                   anchor_eligibility(unrelated_claim)["verdict"] in (NOT_ELIGIBLE, "unknown")))
     checks.append(("supporting 路线不能使主锚点达标",
                    anchor_eligibility({**state, "contract": dict(
                        state["contract"], anchor_role="supporting")})["verdict"]
