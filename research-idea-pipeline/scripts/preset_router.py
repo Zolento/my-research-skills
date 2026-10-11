@@ -1998,7 +1998,24 @@ def _loop_step(ctx: Dict[str, Any], *,
                        "reviewer": item.get("reviewer"),
                        "re_review_conditions": item.get("re_review_conditions")}
                  for xid, item in sorted(assurance.items())}
-    planned = [item for item in experiments if item.get("status") in ("planned", "running")]
+    running_experiments = [item for item in experiments if item.get("status") == "running"]
+    planned_raw = [item for item in experiments if item.get("status") == "planned"]
+    stale_planned: Dict[str, List[str]] = {}
+    planned = list(running_experiments)          # running work is never interrupted
+    # Only a *hard* defect removes an experiment from the queue: no decision value left, or a
+    # duplicate of finished work.  A missing frozen pre-registration is reported (PEIG owns that
+    # gate) but must not silently drop legitimate planned work.
+    hard = {"I2M80", "I2M82"}
+    for item in planned_raw:
+        findings = i2m.planned_validity_errors(state, item)
+        blocking = [item_ for item_ in findings if item_.rule in hard]
+        if blocking:
+            stale_planned[str(item.get("id"))] = [item_.message for item_ in findings]
+        else:
+            planned.append(item)
+            if findings:
+                stale_planned.setdefault(str(item.get("id")),
+                                         [item_.message for item_ in findings])
     dependent = _assurance_dependencies(state, pending)
     if dependent:
         return {"phase": "Assurance", "step": "HOLD",
@@ -2011,7 +2028,11 @@ def _loop_step(ctx: Dict[str, Any], *,
         return {"phase": "R8/R9", "step": "Intervene",
                 "action": f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行",
                 "blocked": False, "hold": False, "pending_r10": [],
+                "stale_planned": stale_planned,
                 "assurance_pending": pending, "assurance": guarantee}
+    if stale_planned:
+        # They keep their frozen pre-registration and history, but they no longer hold the queue.
+        pass
     if ctx.get("index_missing") or (ctx.get("index") or {}).get("state_version") != \
             state.get("state_version"):
         return {"phase": "R11+", "step": "Consolidate",
@@ -2062,6 +2083,20 @@ def _loop_step(ctx: Dict[str, Any], *,
                if isinstance(item, dict) and item.get("action")]
     if actions:
         scheduler_first = actions[0].get("action")
+        # A diagnosis that cannot name the decision it would change may not keep re-occupying
+        # the queue ahead of ready method work.  This is the same-tier reordering the Strategy
+        # Decision Adapter already performs; the hard priorities and gates are untouched.
+        impact = i2m.diagnosis_decision_impact(state, actions[0])
+        if impact:
+            override = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
+            if override and override.get("stage") == "synthesis":
+                override.setdefault("pending_r10", [])
+                override["assurance"] = guarantee
+                override["assurance_pending"] = pending
+                override["dispatched_action"] = None
+                override["preempted_diagnosis"] = scheduler_first
+                override["preempt_reason"] = impact[0].message
+                return override
         dispatched = scheduler_first
         overrode = False
         if strategy_choice and any(item.get("action") == strategy_choice for item in actions):

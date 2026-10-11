@@ -38,8 +38,10 @@ def base_state(*, anchor="performance", stagnant=False, greed=False):
         hypothesis.update({"intervention_axis": "loss_reweighting",
                            "nearest_prior": "focal loss",
                            "novelty_source": "样本层级重加权"})
+    primary = next((str(h.get("id")) for h in state.get("hypotheses", [])), "")
     for uncertainty in state.get("uncertainties", []):
         uncertainty["cheapest_discriminating_test"] = "小规模长尾子集对照"
+        uncertainty["depends_on"] = [primary]        # readiness requires a bound chain
     if greed:
         for evidence in state.get("evidence", []):
             evidence["epistemic_status"] = "Conjecture"
@@ -125,13 +127,24 @@ class TestReadiness(unittest.TestCase):
         self.assertEqual(step["phase"], "I2M", step)
         self.assertEqual(step["step"], "Synthesize", step)
         self.assertNotEqual(step.get("dispatched_action"), "X1")
-        self.assertIn("diagnosis_stagnant", step.get("trigger", ""))
+        self.assertIn(step.get("trigger", ""), ("readiness_actionable(MECHANISM_HYPOTHESIS)",
+                                                "diagnosis_stagnant(zero_streak=2, switch=REDESIGN_QUESTION)"))
+        self.assertIn(step["action_state"], ("advisory", "authorized_in_queue"))
 
-    def test_1b_a_healthy_loop_is_not_hijacked(self):
-        """The same state without stagnation still follows the Scheduler."""
+    def test_1b_a_ready_insight_enters_the_legal_candidate_set_without_stagnation(self):
+        """Requirement 1: contribution development no longer waits for diagnosis to stall."""
         state, scheduler = base_state(stagnant=False)
         step = loop_step(state, scheduler)
-        self.assertEqual(step["phase"], "R3—R6/R8", step)
+        self.assertEqual(step["phase"], "I2M", step)
+        self.assertIn("readiness_actionable", step["trigger"])
+        self.assertEqual(step["action_state"], "advisory")          # not executed
+        self.assertFalse(step["dispatched"] and False)
+
+    def test_1c_a_loop_without_a_ready_insight_is_still_not_hijacked(self):
+        state, scheduler = base_state(stagnant=False)
+        state["hypotheses"] = []                                    # nothing to build from
+        step = loop_step(state, scheduler)
+        self.assertIn(step["phase"], ("R3—R6", "R3—R6/R8"), step)
         self.assertFalse(step.get("i2m"))
 
     def test_2_a_method_may_rest_on_an_unverified_mechanism(self):
@@ -227,7 +240,9 @@ class TestContractAndTestGates(unittest.TestCase):
         grown = copy.deepcopy(state)
         grown["evidence"] = [*grown["evidence"],
                              {"id": "E900", "kind": "experiment_result",
-                              "epistemic_status": "Observed", "validity": {"status": "valid"}}]
+                              "epistemic_status": "Observed", "validity": {"status": "valid"},
+                              "supports": ["H42"], "source_ref": "exp:X900",
+                              "verification_tier": "T2"}]
         self.assertTrue(i2m.method_progress(
             grown, before=before, after=after,
             previous_evidence=[e["id"] for e in state["evidence"]])["progress"])
@@ -444,11 +459,14 @@ class TestAnchorsAndRuntime(unittest.TestCase):
         grown = copy.deepcopy(state)
         grown["evidence"] = [*grown["evidence"],
                              {"id": "E901", "epistemic_status": "Observed",
-                              "validity": {"status": "valid"}}]
+                              "validity": {"status": "valid"}, "supports": ["H42"],
+                              "source_ref": "exp:X901", "verification_tier": "T2"}]
         progress = i2m.method_progress(grown, before=before, after=after,
                                        previous_evidence=[e["id"] for e in state["evidence"]])
         self.assertTrue(progress["progress"])
-        self.assertEqual(progress["executed_evidence"], ["E901"])
+        self.assertEqual(progress["related_evidence"], ["E901"])
+        self.assertTrue(progress["dimensions"]["validation"])
+        self.assertEqual(progress["unrelated_evidence"], [])
 
 
 # ---------------------------------------------------------------------------
@@ -472,23 +490,27 @@ class TestEndToEnd(unittest.TestCase):
         chosen = synthesis["candidates"][0]
         frozen = i2m.contract_from_candidate(chosen, insight=insight(),
                                              rules_digest="sha256:rules")
+        frozen["method_digest"] = "sha256:method-v1"
         frozen.update({"nearest_prior": "focal loss", "distinctive_mechanism": "样本层级",
                        "falsifiers": ["不升"], "minimal_test": {"plan": "小规模"},
                        "comparators": ["no_intervention", "focal loss"],
                        "success_criteria": ["+2pt"], "stop_rules": ["无提升停止"],
                        "problem_ref": "contract", "insight_refs": ["H42"]})
-        self.assertFalse(i2m.design_contract_errors(state, frozen),
-                         i2m.design_contract_errors(state, frozen))
+        problems = i2m.design_contract_errors(state, frozen)
+        self.assertFalse(problems, [p.message for p in problems])
         plan = dict(MINIMAL_PLAN, preregistration_digest="sha256:pre")
         self.assertFalse(i2m.minimal_test_errors(state, plan))
         # 4. Result write-back and the next decision
         state_with_evidence = copy.deepcopy(state)
         state_with_evidence["evidence"] = [*state_with_evidence["evidence"],
                                            {"id": "E910", "epistemic_status": "Observed",
-                                            "validity": {"status": "valid"}}]
+                                            "validity": {"status": "valid"},
+                                            "supports": ["H42"], "source_ref": "exp:X910",
+                                            "verification_tier": "T2"}]
         state_with_evidence["hypotheses"][0]["method"] = chosen["intervention"]
         progress = i2m.method_progress(state_with_evidence,
-                                       before={"method": {"intervention": {"kind": "none"}}},
+                                       before={"id": "H42",
+                                               "method": {"intervention": {"kind": "none"}}},
                                        after=state_with_evidence["hypotheses"][0],
                                        previous_evidence=[e["id"] for e in state["evidence"]])
         self.assertTrue(progress["progress"])
@@ -507,3 +529,342 @@ class TestEndToEnd(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# 第十三轮：决策完整性（P1×5 + P2）
+# ---------------------------------------------------------------------------
+
+class TestDecisionIntegrity(unittest.TestCase):
+    # --- P1-1 调度冲突 -------------------------------------------------------
+    def test_a_ready_insight_can_be_chosen_without_waiting_for_stagnation(self):
+        state, scheduler = base_state(stagnant=False)
+        step = loop_step(state, scheduler)
+        self.assertEqual(step["phase"], "I2M", step)
+        self.assertIn("readiness_actionable", step["trigger"])
+        self.assertEqual(step["action_state"], "advisory")     # never claims dispatch
+
+    def test_an_admitted_method_action_is_only_authorized_in_the_queue(self):
+        state, scheduler = base_state(stagnant=False)
+        scheduler["next_actions"].append({"action": "M1", "type": "method_synthesis",
+                                          "target": "performance", "eig": "medium",
+                                          "cost": "medium"})
+        step = loop_step(state, scheduler)
+        self.assertEqual(step["action_state"], "authorized_in_queue")
+        self.assertFalse(step["executed"])
+        self.assertNotIn(step["action_state"], ("dispatched", "executed"))
+
+    def test_i2m_cannot_bypass_the_execution_gate(self):
+        """Requirement 13: PEIG/AALG/budget refusals are not overridable by I2M."""
+        state, _ = base_state()
+        self.assertIn("I2M52", i2m._rules(i2m.minimal_test_errors(
+            state, MINIMAL_PLAN, gate={"status": "HOLD", "errors": ["PEIG"]})))
+        self.assertIn("I2M51", i2m._rules(i2m.minimal_test_errors(
+            state, dict(MINIMAL_PLAN, gpu_required=True))))
+        self.assertFalse(hasattr(i2m, "execute_experiment"))
+        self.assertFalse(hasattr(i2m, "grant_gpu"))
+
+    def test_a_valueless_planned_experiment_does_not_hold_the_queue(self):
+        state, scheduler = base_state(stagnant=True)
+        claim_id = state["claims"][0]["id"]
+        for claim in state["claims"]:
+            claim["status"] = "refuted"
+        state["experiments"] = [{"id": "X1", "status": "planned",
+                                 "claim_targeted": [claim_id],
+                                 "preregistration": {"frozen_at_state_version": 1}}]
+        findings = i2m.planned_validity_errors(state, state["experiments"][0])
+        self.assertIn("I2M80", i2m._rules(findings))
+        step = loop_step(state, scheduler)
+        self.assertEqual(step["phase"], "I2M", step)
+        self.assertNotEqual(step.get("step"), "Intervene")
+
+    def test_running_work_is_never_interrupted_to_switch_method(self):
+        state, scheduler = base_state(stagnant=True)
+        state["experiments"] = [{"id": "X1", "status": "running",
+                                 "claim_targeted": [], "preregistration": {}}]
+        step = loop_step(state, scheduler)
+        self.assertEqual(step["step"], "Intervene", step)
+
+    def test_a_diagnosis_without_decision_value_cannot_preempt_method_work(self):
+        state, scheduler = base_state(stagnant=False)
+        action = {"action": "X1", "type": "discriminating_experiment", "target": "U3",
+                  "eig": "high", "cost": "low"}
+        self.assertIn("I2M83", i2m._rules(i2m.diagnosis_decision_impact(state, action)))
+        action["changes_decision"] = "whether to keep the reweighting route"
+        self.assertFalse(i2m.diagnosis_decision_impact(state, action))
+
+    # --- P1-2 虚假 Insight ---------------------------------------------------
+    def test_splicing_fields_across_candidates_is_refused(self):
+        state, _ = base_state()
+        state["hypotheses"].append({"id": "H99", "status": "active",
+                                    "statement": "无关方向", "intervention_axis": "other",
+                                    "falsifier": "f", "nearest_prior": "p",
+                                    "novelty_source": "n"})
+        spliced = {**insight(), "insight_refs": ["H42", "H99"]}
+        readiness = i2m.insight_readiness(state, spliced)
+        self.assertEqual(readiness["verdict"], i2m.VERDICT_NOT_ACTIONABLE)
+        self.assertIn("I2M5", {item["rule"] for item in readiness["diagnostics"]})
+
+    def test_an_unbound_prediction_is_refused(self):
+        state, _ = base_state()
+        for uncertainty in state.get("uncertainties", []):
+            uncertainty["depends_on"] = []
+        derived = i2m.insight_from_state(state)          # predictions now come from nowhere
+        self.assertTrue(derived["binding"]["related_uncertainties"] == [])
+        readiness = i2m.insight_readiness(state, derived)
+        self.assertEqual(readiness["verdict"], i2m.VERDICT_NOT_ACTIONABLE)
+        self.assertIn(i2m.CRITERION_PREDICTIONS, readiness["missing"])
+
+    def test_refuted_objects_cannot_pad_readiness(self):
+        state, _ = base_state()
+        for hypothesis in state["hypotheses"]:
+            hypothesis["status"] = "refuted"
+        derived = i2m.insight_from_state(state)
+        self.assertEqual(derived["insight_refs"], [])
+        self.assertIn("未被否证", derived["binding_note"])
+
+    def test_derivation_keeps_everything_on_one_candidate(self):
+        state, _ = base_state()
+        state["hypotheses"].append({"id": "H98", "status": "active",
+                                    "statement": "另一方向", "intervention_axis": "lever-98",
+                                    "falsifier": "f", "nearest_prior": "p2",
+                                    "novelty_source": "n2"})
+        derived = i2m.insight_from_state(state)
+        self.assertEqual(len(derived["insight_refs"]), 1)
+        self.assertNotIn("lever-98", derived["intervention_levers"])
+        self.assertEqual(derived["prior_art"][0]["hypothesis"], derived["insight_refs"][0])
+
+    # --- P1-3 机制证据过度升级 -----------------------------------------------
+    def test_dependency_is_not_support(self):
+        state, _ = base_state()
+        state["evidence"] = [{"id": "E1", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "depends_on": ["H42"],
+                              "source_ref": "exp:X1", "verification_tier": "T2"}]
+        readiness = i2m.insight_readiness(state, insight())
+        self.assertEqual(readiness["mechanism_status"], i2m.VERDICT_HYPOTHESIS)
+        self.assertIn("I2M70", {item["rule"] for item in readiness["diagnostics"]})
+        self.assertEqual(readiness["dependent_evidence"], ["E1"])
+        self.assertEqual(readiness["evidence_backing"], [])
+
+    def test_support_without_qualification_does_not_verify_the_mechanism(self):
+        state, _ = base_state()
+        state["evidence"] = [{"id": "E1", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "supports": ["H42"]}]
+        readiness = i2m.insight_readiness(state, insight())
+        self.assertEqual(readiness["mechanism_status"], i2m.VERDICT_HYPOTHESIS)
+        self.assertIn("I2M71", {item["rule"] for item in readiness["diagnostics"]})
+
+    def test_only_explicit_mechanism_support_verifies_it(self):
+        state, _ = base_state()
+        state["evidence"] = [{"id": "E1", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "supports": ["H42"],
+                              "source_ref": "exp:X1", "verification_tier": "T2",
+                              "mechanism_support": "mechanism"}]
+        readiness = i2m.insight_readiness(state, insight())
+        self.assertEqual(readiness["mechanism_level"], i2m.SUPPORT_MECHANISM)
+        self.assertEqual(readiness["mechanism_status"], i2m.VERDICT_VERIFIED)
+
+    def test_observing_a_prediction_is_not_proving_the_mechanism(self):
+        state, _ = base_state()
+        state["evidence"] = [{"id": "E1", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "supports": ["H42"],
+                              "source_ref": "exp:X1", "verification_tier": "T2"}]
+        readiness = i2m.insight_readiness(state, insight())
+        self.assertEqual(readiness["mechanism_level"], i2m.SUPPORT_PREDICTION_OBSERVED)
+        self.assertEqual(readiness["mechanism_status"], i2m.VERDICT_HYPOTHESIS)
+
+    def test_refuting_evidence_is_recorded_as_refuting(self):
+        state, _ = base_state()
+        state["evidence"] = [{"id": "E1", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "refutes": ["H42"],
+                              "source_ref": "exp:X1", "verification_tier": "T2"}]
+        readiness = i2m.insight_readiness(state, insight())
+        self.assertEqual(readiness["refuting_evidence"], ["E1"])
+        self.assertEqual(readiness["mechanism_status"], i2m.VERDICT_HYPOTHESIS)
+
+    # --- P1-4 Anchor 虚假达标 -----------------------------------------------
+    def test_an_unrelated_supported_claim_does_not_make_the_anchor_eligible(self):
+        state, _ = base_state()
+        state["claims"] = [{"id": "C1", "status": "supported",
+                            "statement": "与目标锚点无关的结论"}]
+        verdict = i2m.anchor_eligibility(state)
+        self.assertEqual(verdict["verdict"], i2m.NOT_ELIGIBLE)
+        self.assertEqual(verdict["irrelevant_claims"], ["C1"])
+
+    def test_an_anchor_bound_claim_is_eligible(self):
+        state, _ = base_state()
+        state["claims"] = [{"id": "C1", "status": "supported",
+                            "statement": f"同算力下 recall@10 提升"}]
+        self.assertEqual(i2m.anchor_eligibility(state)["verdict"], i2m.ELIGIBLE)
+
+    def test_a_supporting_route_cannot_satisfy_the_project_anchor(self):
+        state, _ = base_state()
+        state["contract"]["anchor_role"] = "supporting"
+        state["claims"] = [{"id": "C1", "status": "supported",
+                            "statement": "recall@10 提升"}]
+        verdict = i2m.anchor_eligibility(state)
+        self.assertNotEqual(verdict["verdict"], i2m.ELIGIBLE)
+        self.assertIn("辅助贡献", verdict["required_evidence"])
+
+    def test_an_orthogonal_route_never_satisfies_the_anchor(self):
+        state, _ = base_state()
+        state["contract"]["anchor_role"] = "orthogonal"
+        self.assertEqual(i2m.anchor_eligibility(state)["verdict"], i2m.NOT_ELIGIBLE)
+
+    def test_the_gap_lists_refuted_and_undecidable_conditions_with_references(self):
+        state, _ = base_state()
+        gap = i2m.anchor_gap(state, {"satisfied": ["基线已建立"],
+                                     "missing_evidence": ["同算力对比"],
+                                     "refuted_requirements": ["旧损失假设"],
+                                     "feasible_interventions": ["重加权"],
+                                     "next_discriminating_test": "小规模对照",
+                                     "exit_conditions": ["无提升则停止"]})
+        self.assertEqual(gap["refuted_requirements"], ["旧损失假设"])
+        self.assertTrue(gap["unsatisfied"])
+        self.assertFalse(gap["blocks_method_work"])
+        self.assertEqual(gap["eligibility"], i2m.anchor_eligibility(state)["verdict"])
+
+    # --- P1-5 进展判定 -------------------------------------------------------
+    def _progress(self, state, before, after, **kwargs):
+        # the E95x records are this round's new evidence; everything else is the baseline
+        previous = [e["id"] for e in state["evidence"]
+                    if not str(e["id"]).startswith("E95")]
+        return i2m.method_progress(state, before=before, after=after,
+                                   previous_evidence=previous, **kwargs)
+
+    def test_a_fingerprint_change_alone_is_not_validation(self):
+        state, _ = base_state()
+        before = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        after = {"id": "H42", "method": {"intervention": {"kind": "B"},
+                                         "definition_digest": "d2"}}
+        progress = self._progress(state, before, after)
+        self.assertTrue(progress["dimensions"]["design"])       # a frozen new definition
+        self.assertFalse(progress["dimensions"]["validation"])  # but not a verification
+        self.assertEqual(progress["dimensions"]["anchor"], False)
+
+    def test_unrelated_new_evidence_adds_no_progress(self):
+        state, _ = base_state()
+        grown = copy.deepcopy(state)
+        grown["evidence"] = [*grown["evidence"],
+                             {"id": "E950", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "source_ref": "other"}]
+        method = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        progress = self._progress(grown, copy.deepcopy(method), copy.deepcopy(method))
+        self.assertFalse(progress["progress"])
+        self.assertFalse(any(progress["dimensions"].values()))
+        self.assertEqual(progress["unrelated_evidence"], ["E950"])
+
+    def test_same_version_independent_validation_counts(self):
+        state, _ = base_state()
+        grown = copy.deepcopy(state)
+        grown["evidence"] = [*grown["evidence"],
+                             {"id": "E951", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "supports": ["H42"],
+                              "source_ref": "exp:X951", "verification_tier": "T2"}]
+        method = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        progress = self._progress(grown, method, copy.deepcopy(method))
+        self.assertFalse(progress["method_changed"])
+        self.assertTrue(progress["dimensions"]["validation"])
+        self.assertTrue(progress["progress"])
+
+    def test_a_negative_result_is_real_epistemic_progress(self):
+        state, _ = base_state()
+        grown = copy.deepcopy(state)
+        grown["evidence"] = [*grown["evidence"],
+                             {"id": "E952", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "refutes": ["H42"],
+                              "source_ref": "exp:X952", "verification_tier": "T2"}]
+        method = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        progress = self._progress(grown, method, copy.deepcopy(method))
+        self.assertTrue(progress["dimensions"]["epistemic"])
+        self.assertTrue(progress["progress"])
+
+    def test_implementation_progress_needs_a_passing_artifact_check(self):
+        state, _ = base_state()
+        method = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        ok = self._progress(state, method, copy.deepcopy(method),
+                            implementation_check={"status": "PASS",
+                                                  "artifact_digest": "sha256:a"})
+        bad = self._progress(state, method, copy.deepcopy(method),
+                             implementation_check={"status": "FAIL",
+                                                   "artifact_digest": "sha256:a"})
+        self.assertTrue(ok["dimensions"]["implementation"])
+        self.assertFalse(bad["dimensions"]["implementation"])
+
+    def test_anchor_progress_requires_anchor_relevant_evidence(self):
+        state, _ = base_state()
+        grown = copy.deepcopy(state)
+        grown["evidence"] = [*grown["evidence"],
+                             {"id": "E953", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"},
+                              "statement": "recall@10 在目标数据上提升",
+                              "source_ref": "exp:X953", "verification_tier": "T2"}]
+        method = {"id": "H42", "method": {"intervention": {"kind": "A"},
+                                          "definition_digest": "d1"}}
+        progress = self._progress(grown, method, copy.deepcopy(method))
+        self.assertTrue(progress["dimensions"]["anchor"])
+
+    # --- P2 契约选择与版本归属 ----------------------------------------------
+    def _two_contracts(self):
+        state, _ = base_state()
+        old = {"method_digest": "d0", "method_hypothesis_ref": "H42",
+               "method_hypothesis_ref_note": "old"}
+        new = {"method_digest": "d1", "method_hypothesis_ref": "H42"}
+        state["experiments"] = [
+            {"id": "X1", "status": "abandoned", "preregistration": {"method_contract": old}},
+            {"id": "X2", "status": "planned", "preregistration": {"method_contract": new}}]
+        return state, old, new
+
+    def test_the_first_contract_encountered_is_not_selected(self):
+        state, old, new = self._two_contracts()
+        self.assertEqual(i2m._method_contract_in_state(state)["method_digest"], "d1")
+
+    def test_an_abandoned_contract_is_reported_as_rejected(self):
+        state, _, _ = self._two_contracts()
+        selection = i2m.select_method_contract(state)
+        self.assertEqual(selection["selected"]["experiment_id"], "X2")
+        self.assertTrue(any(item["experiment_id"] == "X1" for item in selection["rejected"]))
+
+    def test_explicit_experiment_selection_wins(self):
+        state, old, _ = self._two_contracts()
+        state["experiments"][0]["status"] = "done"
+        selection = i2m.select_method_contract(state, experiment_id="X1")
+        self.assertEqual(selection["contract"]["method_digest"], "d0")
+
+    def test_a_contract_must_bind_a_method_version(self):
+        state, _ = base_state()
+        broken = contract(state, method_digest="", rules_digest="")
+        self.assertIn("I2M74", i2m._rules(i2m.contract_version_errors(state, broken)))
+        self.assertIn("I2M74", i2m._rules(i2m.contract_version_errors(state, {})))
+
+    def test_confirmatory_results_cannot_be_claimed_after_the_fact(self):
+        state, _ = base_state()
+        late = contract(state, method_digest="d1", confirmatory=True,
+                        registered_after_result=True)
+        self.assertIn("I2M78", i2m._rules(i2m.contract_version_errors(state, late)))
+
+    def test_string_references_are_not_split_into_characters(self):
+        state, _ = base_state()
+        broken = contract(state, insight_refs="H42")
+        self.assertIn("I2M72", i2m._rules(i2m.design_contract_errors(state, broken)))
+        readiness = i2m.insight_readiness(state, {**insight(), "insight_refs": "H42"})
+        self.assertIn("I2M60", {item["rule"] for item in readiness["diagnostics"]})
+        self.assertEqual(readiness["verdict"], i2m.VERDICT_NOT_ACTIONABLE)
+
+    def test_an_old_contract_without_a_version_is_readable_but_not_confirmatory(self):
+        state, _ = base_state()
+        legacy = {"problem_ref": "contract", "insight_refs": ["H42"],
+                  "method_hypothesis_ref": "H42", "intervention": {"kind": "objective"},
+                  "mathematical_formulation": "L", "algorithm_steps": ["a"],
+                  "nearest_prior": "focal loss", "distinctive_mechanism": "d",
+                  "predictions": [{"observation": "o"}], "falsifiers": ["f"],
+                  "minimal_test": {"plan": "p"}, "comparators": ["no_intervention", "focal loss"],
+                  "success_criteria": ["+2pt"], "stop_rules": ["stop"],
+                  "evidence_status": "supported", "rules_digest": "r"}
+        problems = i2m.design_contract_errors(state, legacy)
+        self.assertIn("I2M39", i2m._rules(problems))     # no version, no support claim

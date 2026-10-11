@@ -241,70 +241,226 @@ def _target_metric(state: Dict[str, Any], insight: Dict[str, Any]) -> str:
     return ""
 
 
-def _mechanism_evidence(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> List[str]:
-    """Evidence ids that actually back one of the referenced hypotheses."""
-    backing: List[str] = []
-    hypotheses = set(hypothesis_ids)
+#: Kinds of mechanism support, strongest last.  "The prediction was observed" is not
+#: "the mechanism is proven", and a mere dependency is not support at all.
+SUPPORT_DEPENDENT = "DEPENDENT_NOT_SUPPORTING"
+SUPPORT_PREDICTION_OBSERVED = "PREDICTION_OBSERVED"
+SUPPORT_INTERVENTION_EFFECT = "INTERVENTION_EFFECT"
+SUPPORT_MECHANISM = "MECHANISM_SUPPORTED"
+SUPPORT_NONE = "NO_SUPPORT"
+
+_DEAD_STATUS = {"refuted", "killed", "invalid", "stale", "retracted", "superseded",
+                "resolved", "abandoned"}
+
+
+def _is_alive(obj: Dict[str, Any]) -> bool:
+    """Not refuted/killed/stale/invalid — such objects may not pad readiness."""
+    status = _text(obj.get("status")).lower()
+    validity = obj.get("validity") if isinstance(obj.get("validity"), dict) else {}
+    return status not in _DEAD_STATUS and _text(validity.get("status")).lower() != "invalid"
+
+
+def _evidence_qualified(evidence: Dict[str, Any]) -> bool:
+    """The existing evidence-qualification bar: observed/supported, valid, tiered, sourced."""
+    if not isinstance(evidence, dict):
+        return False
+    if evidence.get("epistemic_status") not in _EVIDENCE_BACKED:
+        return False
+    validity = evidence.get("validity") if isinstance(evidence.get("validity"), dict) else {}
+    if validity.get("status") not in (None, "valid"):
+        return False
+    if not _text(evidence.get("source_ref")):
+        return False
+    tier = _text(evidence.get("verification_tier"))
+    if tier and tier not in ("T1", "T2", "T3", "T4"):
+        return False
+    return True
+
+
+def _evidence_relation(evidence: Dict[str, Any], hypothesis_ids: Sequence[str]) -> str:
+    """`supports` proves direction; `depends_on` only records a dependency."""
+    targets = {str(item) for item in hypothesis_ids}
+    supports = {str(item) for item in evidence.get("supports") or []}
+    refutes = {str(item) for item in evidence.get("refutes") or []}
+    depends = {str(item) for item in evidence.get("depends_on") or []}
+    if supports & targets:
+        return "supports"
+    if refutes & targets:
+        return "refutes"
+    if depends & targets:
+        return "depends_on"
+    return "none"
+
+
+def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> Dict[str, Any]:
+    """Classify how far the evidence actually goes for the referenced mechanism.
+
+    Returns `{level, kind, supporting, dependent, refuting, diagnostics}`.  Only an evidence
+    that *supports* the mechanism (and is qualified) can raise the level; an evidence that
+    merely depends on the hypothesis is recorded as a dependency, never as proof.
+    """
+    supporting: List[str] = []
+    dependent: List[str] = []
+    refuting: List[str] = []
+    kinds: List[str] = []
+    diagnostics: List[Diagnostic] = []
     for evidence in _items(state, "evidence"):
-        if not hypotheses:
-            break
-        if evidence.get("epistemic_status") not in _EVIDENCE_BACKED:
+        relation = _evidence_relation(evidence, hypothesis_ids)
+        if relation == "none":
             continue
-        validity = evidence.get("validity")
-        if isinstance(validity, dict) and validity.get("status") not in (None, "valid"):
+        ident = str(evidence.get("id"))
+        if relation == "refutes":
+            refuting.append(ident)
             continue
-        depends = {str(item) for item in evidence.get("depends_on") or []}
-        supports = {str(item) for item in evidence.get("supports") or []}
-        if depends & hypotheses or supports & hypotheses:
-            backing.append(str(evidence.get("id")))
-    return sorted(backing)
+        if relation == "depends_on":
+            dependent.append(ident)
+            diagnostics.append(_diag(
+                "I2M70", f"evidence[{ident}]",
+                "该证据只是 depends_on 机制假设，不构成支持：不得据此判定机制已验证"))
+            continue
+        if not _evidence_qualified(evidence):
+            diagnostics.append(_diag(
+                "I2M71", f"evidence[{ident}]",
+                "支持方向正确但未通过证据资格（观测等级/有效性/来源/验证层级）："
+                "仍需按 R8/R10 审查"))
+            continue
+        supporting.append(ident)
+        explicit = _text(evidence.get("mechanism_support") or evidence.get("conclusion"))
+        if explicit in ("intervention", "intervention_effect"):
+            kinds.append(SUPPORT_INTERVENTION_EFFECT)
+        elif explicit == "mechanism":
+            kinds.append(SUPPORT_MECHANISM)
+        else:
+            kinds.append(SUPPORT_PREDICTION_OBSERVED)
+    order = (SUPPORT_NONE, SUPPORT_PREDICTION_OBSERVED, SUPPORT_INTERVENTION_EFFECT,
+             SUPPORT_MECHANISM)
+    level = SUPPORT_NONE
+    for kind in kinds:
+        if order.index(kind) > order.index(level):
+            level = kind
+    return {"level": level, "supporting": sorted(supporting), "dependent": sorted(dependent),
+            "refuting": sorted(refuting), "kinds": sorted(set(kinds)),
+            "diagnostics": diagnostics}
+
+
+def _related_uncertainties(state: Dict[str, Any], hypothesis_id: str) -> List[Dict[str, Any]]:
+    """Uncertainties that are actually bound to this hypothesis (dependency or explicit link)."""
+    related: List[Dict[str, Any]] = []
+    for uncertainty in _items(state, "uncertainties"):
+        if not _is_alive(uncertainty):
+            continue
+        links = set()
+        for field in ("depends_on", "targets", "related_hypotheses", "hypotheses"):
+            value = uncertainty.get(field)
+            if isinstance(value, list):
+                links |= {str(item) for item in value}
+            elif _text(value):
+                links.add(_text(value))
+        if _text(uncertainty.get("hypothesis")):
+            links.add(_text(uncertainty["hypothesis"]))
+        if hypothesis_id in links:
+            related.append(uncertainty)
+    return related
+
+
+def _binding_errors(state: Dict[str, Any], insight: Dict[str, Any],
+                    hypothesis_ids: Sequence[str]) -> List[Diagnostic]:
+    """Every readiness input must belong to one candidate and its dependency chain."""
+    problems: List[Diagnostic] = []
+    refs = insight.get("insight_refs")
+    if isinstance(refs, str):
+        return [_diag("I2M60", "insight_refs",
+                      "insight_refs 必须是列表，不能把字符串拆成字符")]
+    primaries = {str(item) for item in hypothesis_ids}
+    for ref in refs or []:
+        if not isinstance(ref, str):
+            problems.append(_diag("I2M60", "insight_refs",
+                                  f"引用必须是字符串：{ref!r}"))
+            continue
+        resolved = _resolve(state, ref)
+        if resolved is None:
+            problems.append(_diag("I2M6", "insight_refs",
+                                  f"引用 {ref} 无法在 state 中解析"))
+            continue
+        collection, obj = resolved
+        if collection == "hypotheses":
+            if ref not in primaries:
+                problems.append(_diag(
+                    "I2M61", f"insight_refs[{ref}]",
+                    "该假设不是本次 Insight 的主候选：不得跨候选拼接字段"))
+            elif not _is_alive(obj):
+                problems.append(_diag("I2M62", f"insight_refs[{ref}]",
+                                      "主候选已被否证/失效：不得用于 readiness"))
+            continue
+        if collection == "uncertainties":
+            bound = {str(item.get("id")) for hypothesis in _items(state, "hypotheses")
+                     if str(hypothesis.get("id")) in primaries
+                     for item in _related_uncertainties(state, str(hypothesis.get("id")))}
+            if ref not in bound:
+                problems.append(_diag(
+                    "I2M63", f"insight_refs[{ref}]",
+                    "该未知量没有绑定到主候选假设：预测不得来自无关对象"))
+            continue
+        # claims/evidence/failures must depend on or support the primary candidate
+        links = set()
+        for field in ("depends_on", "supports", "refutes", "parent", "subclaims",
+                      "claim_targeted", "hypothesis_targeted", "hypothesis"):
+            value = obj.get(field)
+            if isinstance(value, list):
+                links |= {str(item) for item in value}
+            elif _text(value):
+                links.add(_text(value))
+        if not (links & primaries):
+            problems.append(_diag(
+                "I2M64", f"insight_refs[{ref}]",
+                "该对象没有可追溯的依赖链指向主候选：不得用于 readiness"))
+    return problems
 
 
 def insight_readiness(state: Dict[str, Any], insight: Dict[str, Any]) -> Dict[str, Any]:
     """Assess whether a finding can already support method design.
 
-    Returns `{verdict, mechanism_status, criteria, missing, diagnostics, anchor_kind,
-    method_anchor, notes}`.  The verdict is `MECHANISM_VERIFIED` only when state
-    evidence backs the referenced mechanism; otherwise an unverified mechanism is
-    still allowed to drive method work, reported as `MECHANISM_HYPOTHESIS`.
+    Readiness is *not* proof.  Every input must be bound to one primary candidate and its
+    dependency chain: a mechanism from H1 with a lever from H2 and a prediction from an
+    unrelated uncertainty is not a design input, and is reported as a partial gap instead.
+    The mechanism level is decided by qualified evidence that *supports* the hypothesis —
+    a dependency, a refutation or an unqualified record never raises it.
     """
     insight = insight if isinstance(insight, dict) else {}
     diagnostics: List[Diagnostic] = []
     criteria: Dict[str, bool] = {}
 
-    # 1. problem and target metric
     goal = _text(((state.get("contract") or {}).get("goal")))
     metric = _target_metric(state, insight)
     problem_ref = _text(insight.get("problem_ref"))
-    problem_ok = bool(goal) and bool(metric)
-    criteria[CRITERION_PROBLEM] = problem_ok
+    criteria[CRITERION_PROBLEM] = bool(goal) and bool(metric) and bool(problem_ref)
     if not goal:
         diagnostics.append(_diag("I2M1", "contract.goal", "缺少研究目标：无法判断方法要改变什么"))
     if not metric:
-        diagnostics.append(_diag("I2M2", "target_metric",
-                                 "缺少目标指标：方法收益无法被测量"))
+        diagnostics.append(_diag("I2M2", "target_metric", "缺少目标指标：方法收益无法被测量"))
     if not problem_ref:
-        diagnostics.append(_diag("I2M3", "problem_ref",
-                                 "缺少 problem_ref：方法必须绑定一个具体问题"))
+        diagnostics.append(_diag("I2M3", "problem_ref", "缺少 problem_ref：方法必须绑定一个具体问题"))
 
-    # 2. actionable mechanism
-    insight_refs = [str(item) for item in insight.get("insight_refs") or [] if _text(item)]
+    insight_refs = insight.get("insight_refs")
+    if isinstance(insight_refs, str):
+        insight_refs = []
+        diagnostics.append(_diag("I2M60", "insight_refs",
+                                 "insight_refs 必须是列表，不能把字符串拆成字符"))
+    insight_refs = [str(item) for item in insight_refs or [] if _text(item)]
     hypothesis_ids = [ref for ref in insight_refs if ref.upper().startswith("H")]
     mechanism = _text(insight.get("mechanism"))
-    resolved = [ref for ref in insight_refs if _resolve(state, ref) is not None]
-    criteria[CRITERION_MECHANISM] = bool(mechanism) and bool(hypothesis_ids) \
-        and len(resolved) == len(insight_refs)
+    binding = _binding_errors(state, insight, hypothesis_ids)
+    diagnostics.extend(binding)
+    criteria[CRITERION_MECHANISM] = bool(mechanism) and len(hypothesis_ids) == 1 and not binding
     if not mechanism:
         diagnostics.append(_diag("I2M4", "mechanism", "缺少机制/工程局限陈述"))
-    if not hypothesis_ids:
+    if len(hypothesis_ids) != 1:
         diagnostics.append(_diag("I2M5", "insight_refs",
-                                 "机制必须以 H 对象承载：不得把叙述当作事实源"))
-    unresolved = [ref for ref in insight_refs if _resolve(state, ref) is None]
-    if unresolved:
-        diagnostics.append(_diag("I2M6", "insight_refs",
-                                 f"以下引用无法在 state 中解析：{unresolved}"))
+                                 "机制必须由恰好一个 H 对象承载：不得跨候选拼接"))
+    if any(not _is_alive(_resolve(state, ref)[1]) for ref in hypothesis_ids
+           if _resolve(state, ref) is not None):
+        criteria[CRITERION_MECHANISM] = False
 
-    # 3. constructible intervention (a lever exists)
     levers = [str(item) for item in insight.get("intervention_levers") or [] if _text(item)]
     if not levers:
         for hypothesis in _items(state, "hypotheses"):
@@ -313,68 +469,66 @@ def insight_readiness(state: Dict[str, Any], insight: Dict[str, Any]) -> Dict[st
                     if _text(hypothesis.get(field)):
                         levers.append(str(hypothesis[field]))
                 if _text(hypothesis.get("intervention")):
-                    levers.append(_text(hypothesis["intervention"]))
+                    levers.append(_text(hypothesis["intervention"])) 
     criteria[CRITERION_INTERVENTION] = bool(levers)
     if not levers:
         diagnostics.append(_diag("I2M7", "intervention_levers",
                                  "目前无法构造影响该局限的干预：不得强行包装成新方法"))
 
-    # 4. predictions and falsifiers
     predictions = [item for item in insight.get("predictions") or [] if isinstance(item, dict)]
     falsifiers = [item for item in insight.get("falsifiers") or [] if _text(item)]
     criteria[CRITERION_PREDICTIONS] = bool(predictions) and bool(falsifiers) and \
         all(_text(item.get("observation")) for item in predictions)
     if not predictions:
-        diagnostics.append(_diag("I2M8", "predictions",
-                                 "缺少可检验预测：无法在方法开发前声明会观察到什么"))
+        diagnostics.append(_diag("I2M8", "predictions", "缺少可检验预测（或预测未绑定主候选）"))
     if not falsifiers:
         diagnostics.append(_diag("I2M9", "falsifiers", "缺少失败条件：方法不可被否证"))
 
-    # 5. comparators and a feasible minimal experiment
     comparators = [str(item) for item in insight.get("comparators") or [] if _text(item)]
     minimal = insight.get("minimal_experiment")
     minimal_ok = isinstance(minimal, dict) and _text(minimal.get("plan"))
     criteria[CRITERION_MINIMAL_EXPERIMENT] = bool(comparators) and minimal_ok
     if not comparators:
-        diagnostics.append(_diag("I2M10", "comparators",
-                                 "缺少对照：至少需要无干预与最近邻方法"))
+        diagnostics.append(_diag("I2M10", "comparators", "缺少对照：至少需要无干预与最近邻方法"))
     if not minimal_ok:
         diagnostics.append(_diag("I2M11", "minimal_experiment",
-                                 "缺少可行的最小实验（R8 计划）"))
+                                 "缺少与主候选关联的可行最小实验"))
 
-    # 6. prior art and the novelty boundary
     prior = insight.get("prior_art")
     prior_items = [item for item in prior or [] if isinstance(item, dict)] \
         if isinstance(prior, list) else []
     novelty_checked = bool(prior_items) and bool(_text(insight.get("novelty_boundary")))
     criteria[CRITERION_PRIOR_ART] = novelty_checked
     if not prior_items:
-        diagnostics.append(_diag("I2M12", "prior_art",
-                                 "未核对直接相关的已有方法：不得把未核实的创新性写成事实"))
+        diagnostics.append(_diag("I2M12", "prior_art", "未核对直接相关的已有方法"))
     if not _text(insight.get("novelty_boundary")):
-        diagnostics.append(_diag("I2M13", "novelty_boundary",
-                                 "缺少创新性边界说明"))
+        diagnostics.append(_diag("I2M13", "novelty_boundary", "缺少创新性边界说明"))
 
-    # The mechanism status is decided by state evidence, not by the insight's claim.
-    backing = _mechanism_evidence(state, hypothesis_ids)
+    support = _mechanism_support(state, hypothesis_ids)
+    diagnostics.extend(support["diagnostics"])
+    level = support["level"]
+    mechanism_status = (VERDICT_VERIFIED if level == SUPPORT_MECHANISM
+                        else VERDICT_HYPOTHESIS)
     declared = _text(insight.get("mechanism_status")).upper()
-    mechanism_status = VERDICT_VERIFIED if backing else VERDICT_HYPOTHESIS
-    if declared == "VERIFIED" and not backing:
-        diagnostics.append(_diag("I2M14", "mechanism_status",
-                                 "insight 自称机制已验证，但 state 中没有观测证据支持："
-                                 "readiness 不是科学证实"))
+    if declared in ("VERIFIED", VERDICT_VERIFIED) and level != SUPPORT_MECHANISM:
+        diagnostics.append(_diag(
+            "I2M14", "mechanism_status",
+            "insight 自称机制已验证，但 state 中没有经资格审查的支持证据"
+            f"（当前证据等级 {level}）：readiness 不是科学证实"))
     blocking = [CRITERION_PROBLEM, CRITERION_MECHANISM, CRITERION_INTERVENTION,
                 CRITERION_PREDICTIONS, CRITERION_MINIMAL_EXPERIMENT]
-    if all(criteria.get(name) for name in blocking):
-        verdict = mechanism_status
-    else:
-        verdict = VERDICT_NOT_ACTIONABLE
+    missing = sorted(name for name, ok in criteria.items() if not ok)
+    verdict = mechanism_status if all(criteria.get(name) for name in blocking) \
+        else VERDICT_NOT_ACTIONABLE
     return {"schema": SCHEMA_READINESS, "verdict": verdict,
-            "mechanism_status": mechanism_status, "criteria": criteria,
-            "missing": sorted(name for name, ok in criteria.items() if not ok),
-            "evidence_backing": backing, "levers": sorted(set(levers)),
+            "mechanism_status": mechanism_status, "mechanism_level": level,
+            "criteria": criteria, "missing": missing,
+            "partial": sorted(name for name, ok in criteria.items() if ok),
+            "evidence_backing": support["supporting"], "dependent_evidence": support["dependent"],
+            "refuting_evidence": support["refuting"], "levers": sorted(set(levers)),
             "target_metric": metric, "diagnostics": [item.as_dict() for item in diagnostics],
             "anchor_kind": anchor_kind(state), "method_anchor": is_method_anchor(anchor_kind(state)),
+            "gaps": [f"缺少 {name}" for name in missing],
             "notes": "readiness 表示「已足以支持方法设计」，不是机制已被证实。"}
 
 
@@ -464,6 +618,13 @@ def design_contract_errors(state: Dict[str, Any], contract: Dict[str, Any]) -> L
     problems: List[Diagnostic] = []
     if not isinstance(contract, dict):
         return [_diag("I2M24", "contract", "设计契约必须是对象")]
+    list_fields = ("insight_refs", "algorithm_steps", "predictions", "falsifiers",
+                   "comparators", "success_criteria", "stop_rules")
+    for field in list_fields:
+        if field in contract and not isinstance(contract[field], list):
+            problems.append(_diag("I2M72", f"contract.{field}",
+                                  f"必须是列表，不能是 {type(contract[field]).__name__}"
+                                  "（字符串会被拆成字符）"))
     for field in CONTRACT_FIELDS:
         value = contract.get(field)
         ok = bool(value) if not isinstance(value, (list, dict)) else bool(value)
@@ -520,10 +681,12 @@ def design_contract_errors(state: Dict[str, Any], contract: Dict[str, Any]) -> L
         problems.append(_diag("I2M38", "contract.evidence_status",
                               "evidence_status 取值非法"))
     elif status == "supported":
-        backing = _mechanism_evidence(state, [hypothesis_ref])
-        if not backing:
-            problems.append(_diag("I2M39", "contract.evidence_status",
-                                  "state 中没有观测证据支持该机制：不得声称 supported"))
+        support = _mechanism_support(state, [hypothesis_ref])
+        if support["level"] != SUPPORT_MECHANISM:
+            problems.append(_diag(
+                "I2M39", "contract.evidence_status",
+                f"state 中没有经资格审查的机制支持证据（当前 {support['level']}）："
+                "不得声称 supported"))
     if not _text(contract.get("rules_digest")):
         problems.append(_diag("I2M40", "contract.rules_digest",
                               "设计契约必须绑定冻结规则指纹"))
@@ -632,39 +795,82 @@ def _method_fingerprint(hypothesis: Dict[str, Any]) -> str:
                          "steps": method.get("algorithm_steps")})
 
 
+PROGRESS_DIMENSIONS = ("epistemic", "design", "implementation", "validation", "anchor")
+
+
+def _progress_fingerprint(*values: Any) -> str:
+    return cg.digest_of(list(values))
+
+
 def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
                     after: Dict[str, Any], experiment_id: str = "",
-                    previous_evidence: Sequence[str] = ()) -> Dict[str, Any]:
-    """Did the *method* actually change, backed by new evidence?
+                    previous_evidence: Sequence[str] = (),
+                    implementation_check: Optional[Dict[str, Any]] = None,
+                    anchor_relevant_evidence: Optional[Sequence[str]] = None,
+                    method_version: str = "") -> Dict[str, Any]:
+    """Five separate, individually verified progress dimensions.
 
-    Rewriting an explanation, adding a document, adding candidate records or a
-    self-rated score is not progress.  Only a changed method fingerprint **and** at
-    least one new executed-evidence id count, which is what may reset stagnation.
+    A changed method fingerprint alone is **not** validation, and new evidence that has nothing
+    to do with this method adds nothing.  A confirming re-run of the *same* method version is
+    Validation Progress and needs no algorithm change.  A trustworthy negative result, an
+    excluded assumption or a real change of research decision also count as epistemic progress.
     """
+    before_method = before.get("method") if isinstance(before.get("method"), dict) else {}
+    after_method = after.get("method") if isinstance(after.get("method"), dict) else {}
     method_changed = _method_fingerprint(before) != _method_fingerprint(after)
+    version = method_version or _text(after_method.get("version")) or _text(after.get("version"))
+
     evidence_now = {str(item.get("id")) for item in _items(state, "evidence")}
     new_evidence = sorted(evidence_now - {str(item) for item in previous_evidence})
-    executed = []
-    for ident in new_evidence:
-        evidence = _index(state, "evidence").get(ident) or {}
-        if evidence.get("epistemic_status") in _EVIDENCE_BACKED:
-            executed.append(ident)
-    experiments = _index(state, "experiments")
-    executed_records = [xid for xid in ([experiment_id] if experiment_id else [])
-                        if (experiments.get(xid) or {}).get("status") in ("done", "failed")]
-    narrative_only = bool((state.get("narrative_view") or {})) and not method_changed
-    return {"progress": bool(method_changed and executed),
-            "method_changed": method_changed,
-            "new_evidence": new_evidence, "executed_evidence": executed,
-            "found": executed_records,
-            "narrative_only_change": narrative_only,
-            "reason": ("方法指纹与证据都发生了变化：可以推进停滞计数重置"
-                       if method_changed and executed else
-                       "没有同时出现方法变化与新增执行证据：不得重置停滞计数"),
+    by_id = _index(state, "evidence")
+    qualified = [ident for ident in new_evidence if _evidence_qualified(by_id.get(ident, {}))]
+
+    hypothesis_id = str(after.get("id") or "")
+    related = [ident for ident in qualified
+               if _evidence_relation(by_id.get(ident, {}), [hypothesis_id]) == "supports"]
+    refuting = [ident for ident in qualified
+                if _evidence_relation(by_id.get(ident, {}), [hypothesis_id]) == "refutes"]
+    anchor_refs = [str(item) for item in (anchor_relevant_evidence or []) if _text(item)]
+    if anchor_refs:
+        anchor_hits = [ident for ident in qualified if ident in set(anchor_refs)]
+    else:
+        anchor_hits = [ident for ident in qualified
+                       if _anchor_relevant(state, by_id.get(ident, {}), anchor_kind(state))]
+
+    definition_digest = _text(after_method.get("definition_digest"))
+    # A changed fingerprint alone is not Design Progress: it needs a frozen definition digest.
+    design = bool(method_changed and definition_digest)
+    implementation = bool(isinstance(implementation_check, dict)
+                          and implementation_check.get("status") == "PASS"
+                          and _text(implementation_check.get("artifact_digest"))
+                          and (not version or _text(implementation_check.get("version")) == version))
+    # Validation Progress is about evidence for the current method version; it does not
+    # require the algorithm to change (a confirming re-run of the same version counts).
+    validation = bool(related or refuting)
+    epistemic = bool(refuting) or bool((state.get("eig_calibration") or {}).get("records"))
+    anchor_progress = bool(anchor_hits)
+    dimensions = {"epistemic": epistemic, "design": design, "implementation": implementation,
+                  "validation": validation, "anchor": anchor_progress}
+    verified_refs = {"epistemic": sorted(set(refuting)),
+                     "design": [definition_digest] if design else [],
+                     "implementation": [str((implementation_check or {}).get("artifact_digest") or "")]
+                     if implementation else [],
+                     "validation": sorted(set(related)), "anchor": sorted(set(anchor_hits))}
+    progress = any(dimensions.values()) and any(
+        ref for refs in verified_refs.values() for ref in refs)
+    return {"progress": progress, "dimensions": dimensions, "refs": verified_refs,
+            "method_changed": method_changed, "method_version": version,
+            "new_evidence": new_evidence, "qualified_evidence": qualified,
+            "related_evidence": sorted(set(related)), "refuting_evidence": sorted(set(refuting)),
+            "unrelated_evidence": sorted(set(qualified) - set(related) - set(refuting)),
+            "anchor_evidence": sorted(set(anchor_hits)),
+            "found": [experiment_id] if experiment_id else [],
+            "narrative_only_change": bool((state.get("narrative_view") or {})) and not method_changed,
+            "reason": ("存在可核验的进展维度：" + ", ".join(
+                name for name, ok in dimensions.items() if ok)) if progress else
+                "没有可核验的进展：指纹变化本身不是验证，无关新证据不加进展",
             "excluded_signals": ["narrative_view", "reports", "candidate_count",
-                                 "document_count", "self_rated_score"]}
-
-
+                                 "document_count", "self_rated_score", "state_version"]}
 def advance(state: Dict[str, Any], *, readiness: Optional[Dict[str, Any]] = None,
             contract: Optional[Dict[str, Any]] = None, minimal_test: Optional[Dict[str, Any]] = None,
             outcome: Optional[Dict[str, Any]] = None,
@@ -699,29 +905,84 @@ def advance(state: Dict[str, Any], *, readiness: Optional[Dict[str, Any]] = None
 # Anchor compatibility (SKILL.md §0.1/§0.2, claim-first-policy.md §6)
 # ---------------------------------------------------------------------------
 
+def _anchor_relevant(state: Dict[str, Any], obj: Dict[str, Any], kind: str) -> bool:
+    """Is this claim/evidence tied to the target anchor's success criterion?
+
+    A supported claim somewhere in the project is not evidence for *this* anchor.  The link
+    must be traceable: the object names the anchor or the contract's target metric, or it is
+    targeted by an experiment that measures that metric, or it hangs off a claim that does.
+    """
+    metric = _target_metric(state, {})
+    goal = _text(((state.get("contract") or {}).get("goal")))
+    needles = {needle.lower() for needle in (kind, metric, goal) if _text(needle)}
+    haystack = " ".join(_text(obj.get(field)) for field in
+                        ("statement", "scope", "falsifier", "nearest_alternative", "reason",
+                         "question", "ref", "target", "metric")).lower()
+    if any(needle and needle in haystack for needle in needles):
+        return True
+    ident = str(obj.get("id"))
+    for experiment in _items(state, "experiments"):
+        if _text(experiment.get("metric")).lower() != metric.lower() or not metric:
+            continue
+        targets = set()
+        for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted"):
+            value = experiment.get(field)
+            if isinstance(value, list):
+                targets |= {str(item) for item in value}
+        if ident in targets:
+            return True
+    return False
+
+
 def anchor_eligibility(state: Dict[str, Any], target: Optional[str] = None) -> Dict[str, Any]:
     """Evidence decides which anchor is usable; the declared target is only a prior.
 
-    Three-valued per `claim-first-policy.md` §6: eligible / conditional / not-eligible.
+    Three-valued per `claim-first-policy.md` §6, but a supported claim only counts when it is
+    tied to the target anchor's success criterion.  A supporting route cannot make the project
+    primary anchor eligible, and an orthogonal route never does.
     """
     kind = (target or anchor_kind(state)).lower()
     kind = _ANCHOR_ALIAS.get(kind, kind)
-    supported = [str(item.get("id")) for item in _items(state, "claims")
-                 if item.get("status") == "supported"]
-    partial = [str(item.get("id")) for item in _items(state, "claims")
-               if item.get("status") == "partially-supported"]
+    role = _text(((state.get("contract") or {}).get("anchor_role"))
+                 or ((state.get("contract") or {}).get("route_anchor_role")))
+    relevant_supported, relevant_partial, irrelevant = [], [], []
+    for claim in _items(state, "claims"):
+        if not _is_alive(claim):
+            continue
+        status = _text(claim.get("status"))
+        if status not in ("supported", "partially-supported"):
+            continue
+        if _anchor_relevant(state, claim, kind):
+            (relevant_supported if status == "supported" else relevant_partial).append(
+                str(claim.get("id")))
+        else:
+            irrelevant.append(str(claim.get("id")))
     observed = [str(item.get("id")) for item in _items(state, "evidence")
-                if item.get("epistemic_status") in _EVIDENCE_BACKED]
-    if not observed:
-        verdict, required = NOT_ELIGIBLE, "缺少观测证据：任何 anchor 都还不可用"
-    elif supported:
+                if _evidence_qualified(item)]
+    if role == "orthogonal":
+        verdict, required = NOT_ELIGIBLE, "orthogonal 路线不参与主锚点成功判据"
+    elif role == "supporting":
+        verdict, required = CONDITIONAL, (
+            "supporting 路线只能形成辅助贡献：不能直接使项目主锚点达标，"
+            "需项目级主战场路线提供与目标锚点绑定的证据")
+    elif not observed:
+        verdict, required = NOT_ELIGIBLE, "缺少经资格审查的观测证据：任何 anchor 都还不可用"
+    elif relevant_supported:
         verdict, required = ELIGIBLE, ""
+    elif relevant_partial:
+        verdict, required = CONDITIONAL, "与目标锚点相关的 claim 仍只是 partially-supported"
+    elif irrelevant:
+        verdict, required = NOT_ELIGIBLE, (
+            "存在 supported claim，但没有一条与目标锚点/目标指标绑定："
+            f"不相关 claim {irrelevant} 不能使 {kind} anchor eligible")
     else:
-        verdict, required = CONDITIONAL, "需要至少一条 supported claim 才能据此 anchor 组织叙事"
-    return {"target_anchor": kind, "verdict": verdict, "required_evidence": required,
-            "supported_claims": supported, "partial_claims": partial,
+        verdict, required = CONDITIONAL, "需要至少一条与目标锚点绑定的 supported claim"
+    return {"target_anchor": kind, "route_role": role or "primary", "verdict": verdict,
+            "required_evidence": required, "supported_claims": relevant_supported,
+            "partial_claims": relevant_partial, "irrelevant_claims": irrelevant,
             "observed_evidence": observed,
-            "note": "作者的目标 anchor 是 prior，不是 decision；证据先行。"}
+            "undecidable": [] if observed else ["尚无可用观测证据"],
+            "note": "作者的目标 anchor 是 prior，不是 decision；且必须是与该锚点绑定的证据。"}
 
 
 def anchor_role_errors(declaration: Dict[str, Any]) -> List[Diagnostic]:
@@ -871,44 +1132,65 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
 # Deriving the I2M inputs from existing state (no new fact source)
 # ---------------------------------------------------------------------------
 
-def insight_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Build a provisional insight from fields the state already requires.
+def _primary_hypothesis(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The one candidate this Insight may draw from: alive, and preferably lever-bearing."""
+    alive = [item for item in _items(state, "hypotheses") if _is_alive(item)]
+    if not alive:
+        return None
+    def rank(item):
+        has_lever = any(_text(item.get(field)) for field in
+                        ("intervention_axis", "operator", "variable", "intervention"))
+        preferred = _text(item.get("status")) in ("active", "candidate", "promising", "elite")
+        return (0 if has_lever else 1, 0 if preferred else 1, str(item.get("id")))
+    return sorted(alive, key=rank)[0]
 
-    Nothing new is authored: the mechanism comes from `hypotheses[].statement`, the lever
-    from `operator`/`intervention_axis`, the falsifier from the required `falsifier`, the
-    discriminating test from `uncertainties[].cheapest_discriminating_test`, and the novelty
-    boundary from `nearest_prior`/`novelty_source`.  A richer, explicitly authored insight may
-    be passed to `insight_readiness` instead.
+
+def insight_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Build an insight from fields the state already requires — **for one candidate only**.
+
+    Everything (mechanism, lever, falsifier, predictions, minimal experiment, prior art,
+    novelty boundary) comes from the same primary hypothesis and the uncertainties that are
+    actually bound to it.  Splicing H1's mechanism with H2's lever and an unrelated U's
+    prediction is what produces a complete-looking but unfounded design input, so unbound
+    material is dropped and reported as a gap instead.
     """
-    hypotheses = [item for item in _items(state, "hypotheses")
-                  if item.get("status") in ("active", "candidate", "promising")]
-    hypotheses = hypotheses or _items(state, "hypotheses")
-    mechanism, mechanism_id, levers, falsifiers, prior = "", "", [], [], []
-    for hypothesis in hypotheses:
-        if not mechanism_id:
-            mechanism = _text(hypothesis.get("statement"))
-            mechanism_id = str(hypothesis.get("id") or "")
-        for field in ("intervention_axis", "operator", "variable"):
-            if _text(hypothesis.get(field)):
-                levers.append(_text(hypothesis[field]))
-        if _text(hypothesis.get("falsifier")):
-            falsifiers.append(_text(hypothesis["falsifier"]))
-        if _text(hypothesis.get("nearest_prior")):
-            prior.append({"method": _text(hypothesis["nearest_prior"]),
-                          "hypothesis": str(hypothesis.get("id") or "")})
-    uncertainties = [item for item in _items(state, "uncertainties")
-                     if item.get("status") in ("open", "undecidable_recorded")]
-    discriminating = [str(item.get("cheapest_discriminating_test")) for item in uncertainties
+    primary = _primary_hypothesis(state)
+    binding: Dict[str, Any] = {"primary_hypothesis": None, "related_uncertainties": [],
+                               "dropped": []}
+    if primary is None:
+        return {"problem_ref": "contract", "insight_refs": [], "mechanism": "",
+                "intervention_levers": [], "predictions": [], "falsifiers": [],
+                "comparators": [], "minimal_experiment": None, "prior_art": [],
+                "novelty_boundary": "", "binding": binding,
+                "binding_note": "没有可用（未被否证）的候选假设：readiness 不可能成立"}
+    ident = str(primary.get("id"))
+    binding["primary_hypothesis"] = ident
+    related = _related_uncertainties(state, ident)
+    binding["related_uncertainties"] = [str(item.get("id")) for item in related]
+    unbound = [str(item.get("id")) for item in _items(state, "uncertainties")
+               if _is_alive(item) and str(item.get("id")) not in binding["related_uncertainties"]]
+    if unbound:
+        binding["dropped"] = [f"uncertainties[{item}] 未绑定到 {ident}" for item in unbound]
+
+    levers = []
+    for field in ("intervention_axis", "operator", "variable", "intervention"):
+        if _text(primary.get(field)):
+            levers.append(_text(primary[field]))
+    falsifiers = [_text(primary["falsifier"])] if _text(primary.get("falsifier")) else []
+    discriminating = [str(item.get("cheapest_discriminating_test")) for item in related
                       if _text(item.get("cheapest_discriminating_test"))]
     predictions = [{"observation": test, "decision": "按判别结果选择方法或停止"}
                    for test in discriminating[:2]]
-    # "necessary comparators exist" means they can be constructed, not that an experiment is
-    # already registered: the no-intervention control plus the nearest prior method.
+    for field in ("pending_predictions", "predictions"):
+        value = primary.get(field)
+        for item in value if isinstance(value, list) else []:
+            predictions.append(item if isinstance(item, dict) else {"observation": str(item)})
     comparators = ["no_intervention"]
-    for item in prior:
-        if item["method"] not in comparators:
-            comparators.append(item["method"])
+    if _text(primary.get("nearest_prior")):
+        comparators.append(_text(primary["nearest_prior"]))
     for experiment in _items(state, "experiments"):
+        if _text(experiment.get("status")) in ("abandoned", "rejected"):
+            continue
         arms = (experiment.get("preregistration") or {}).get("arms")
         for arm in arms if isinstance(arms, list) else []:
             role = _text((arm or {}).get("role"))
@@ -916,27 +1198,244 @@ def insight_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
                 comparators.append(role)
     problem_ref = ""
     for claim in _items(state, "claims"):
-        if claim.get("status") in ("ungrounded", "partially-supported"):
+        if claim.get("status") in ("ungrounded", "partially-supported") and _is_alive(claim):
             problem_ref = str(claim.get("id") or "")
             break
-    novelty = _text(next((item.get("novelty_source") for item in hypotheses
-                          if _text(item.get("novelty_source"))), ""))
-    return {"problem_ref": problem_ref or "contract",
-            "insight_refs": [mechanism_id] if mechanism_id else [],
-            "mechanism": mechanism, "intervention_levers": sorted(set(levers)),
-            "predictions": predictions, "falsifiers": falsifiers,
-            "comparators": comparators,
+    return {"problem_ref": problem_ref or "contract", "insight_refs": [ident],
+            "mechanism": _text(primary.get("statement")), "intervention_levers": levers,
+            "predictions": predictions, "falsifiers": falsifiers, "comparators": comparators,
             "minimal_experiment": {"plan": discriminating[0]} if discriminating else None,
-            "prior_art": prior, "novelty_boundary": novelty}
+            "prior_art": [{"method": _text(primary["nearest_prior"]), "hypothesis": ident}]
+            if _text(primary.get("nearest_prior")) else [],
+            "novelty_boundary": _text(primary.get("novelty_source")),
+            "binding": binding}
 
 
-def _method_contract_in_state(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+_LIVE_EXPERIMENT_STATUS = ("planned", "running", "done", "failed")
+_DEAD_EXPERIMENT_STATUS = ("abandoned", "rejected", "superseded", "cancelled")
+
+
+def _contract_version(contract: Dict[str, Any]) -> str:
+    return _text(contract.get("method_digest")) or _text(contract.get("rules_digest"))
+
+
+def method_contracts(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Every method contract found in state, with its owning experiment and status."""
+    found: List[Dict[str, Any]] = []
     for experiment in _items(state, "experiments"):
         preregistration = experiment.get("preregistration")
-        if isinstance(preregistration, dict) and isinstance(
-                preregistration.get("method_contract"), dict):
-            return preregistration["method_contract"]
-    return None
+        contract = preregistration.get("method_contract") if isinstance(preregistration, dict) \
+            else None
+        if isinstance(contract, dict):
+            found.append({"experiment_id": str(experiment.get("id")),
+                          "status": _text(experiment.get("status")),
+                          "frozen_at": preregistration.get("frozen_at_state_version"),
+                          "contract": contract})
+    return found
+
+
+#: Advisory text is never execution.  Only the Scheduler's own queue and the existing gates
+#: can authorise, dispatch or execute an action.
+ACTION_ADVISORY = "advisory"
+ACTION_PLANNED = "planned"
+ACTION_AUTHORIZED = "authorized_in_queue"
+ACTION_DISPATCHED = "dispatched"
+ACTION_EXECUTED = "executed"
+ACTION_STATES = (ACTION_ADVISORY, ACTION_PLANNED, ACTION_AUTHORIZED, ACTION_DISPATCHED,
+                 ACTION_EXECUTED)
+_METHOD_ACTION_TYPES = ("method_synthesis", "method_design", "method_minimal_test")
+
+
+def planned_validity_errors(state: Dict[str, Any],
+                            experiment: Dict[str, Any]) -> List[Diagnostic]:
+    """Pre-dispatch validity for an unstarted experiment (running work is never touched).
+
+    A planned experiment that can no longer change any decision must not keep occupying the
+    execution queue; its frozen pre-registration and history are preserved either way.
+    """
+    problems: List[Diagnostic] = []
+    if not isinstance(experiment, dict):
+        return [_diag("I2M79", "experiment", "实验必须是对象")]
+    ident = str(experiment.get("id"))
+    targets = set()
+    for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted",
+                  "uncertainty_targeted"):
+        value = experiment.get(field)
+        if isinstance(value, list):
+            targets |= {str(item) for item in value}
+    if targets:
+        index = {}
+        for key in ("claims", "hypotheses", "uncertainties"):
+            index.update(_index(state, key))
+        terminal = {"refuted", "killed", "resolved", "closed", "answered", "abandoned",
+                    "superseded", "invalid", "stale"}
+        resolvable = [ref for ref in targets if ref in index]
+        live = {ref for ref in resolvable
+                if _text(index[ref].get("status")).lower() not in terminal
+                and _text(((index[ref].get("validity") or {}) if isinstance(
+                    index[ref].get("validity"), dict) else {}).get("status")).lower() != "invalid"}
+        # Only a fully resolved target set means "no decision value".  An unresolvable
+        # reference is a different defect (state_check owns it) and must not silently drop
+        # legitimate planned work from the queue.
+        if resolvable and not live:
+            problems.append(_diag(
+                "I2M80", f"experiments[{ident}]",
+                "所有目标问题都已被解决/否证：该 planned 实验已无决策价值，"
+                "不得继续占据执行队列"))
+    preregistration = experiment.get("preregistration")
+    if not isinstance(preregistration, dict) or preregistration.get("frozen_at_state_version") is None:
+        problems.append(_diag("I2M81", f"experiments[{ident}]",
+                              "planned 实验缺少冻结预注册：不得派遣"))
+    design = cg.digest_of({"stage": experiment.get("stage"),
+                           "metric": experiment.get("metric"),
+                           "data_split": experiment.get("data_split"),
+                           "preregistration": preregistration if isinstance(preregistration, dict)
+                           else None})
+    for other in _items(state, "experiments"):
+        if str(other.get("id")) == ident or _text(other.get("status")) not in ("done", "failed"):
+            continue
+        other_targets = set()
+        for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted",
+                      "uncertainty_targeted"):
+            value = other.get(field)
+            if isinstance(value, list):
+                other_targets |= {str(item) for item in value}
+        # "Duplicate" means the same design *and* the same question: an experiment with the
+        # same design but a different target is new work, not a repeat.
+        if other_targets == targets and cg.digest_of({
+                "stage": other.get("stage"), "metric": other.get("metric"),
+                "data_split": other.get("data_split"),
+                "preregistration": other.get("preregistration")}) == design:
+            problems.append(_diag(
+                "I2M82", f"experiments[{ident}]",
+                f"与已结束实验 {other.get('id')} 设计相同：重复执行不再提供新信息"))
+            break
+    return problems
+
+
+def diagnosis_decision_impact(state: Dict[str, Any],
+                              action: Dict[str, Any]) -> List[Diagnostic]:
+    """A diagnosis must state which research decision a different result would change."""
+    if not isinstance(action, dict):
+        return []
+    if _text(action.get("type")) != "discriminating_experiment":
+        return []
+    declared = action.get("changes_decision") or action.get("decision_targets")
+    if declared:
+        return []
+    ident = _text(action.get("action")) or _text(action.get("target"))
+    for experiment in _items(state, "experiments"):
+        if str(experiment.get("id")) != ident:
+            continue
+        preregistration = experiment.get("preregistration") \
+            if isinstance(experiment.get("preregistration"), dict) else {}
+        for outcome in preregistration.get("outcomes") or []:
+            for update in (outcome or {}).get("update") or []:
+                if _text((update or {}).get("target")):
+                    return []
+    return [_diag("I2M83", f"next_actions[{ident}]",
+                  "该诊断没有说明不同结果会改变哪个研究决定：不得仅凭便宜反复排在"
+                  "方法开发之前")]
+
+
+def candidate_method_action(state: Dict[str, Any],
+                            scheduler: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The I2M action as a Scheduler *candidate*, never as an execution."""
+    queued = {_text(item.get("type")) for item in
+              (scheduler or {}).get("next_actions") or [] if isinstance(item, dict)}
+    admitted = bool(queued & set(_METHOD_ACTION_TYPES))
+    return {"action": "M1", "type": "method_synthesis", "target": anchor_kind(state),
+            "eig": "medium", "cost": "medium",
+            "admitted": admitted,
+            "state": ACTION_AUTHORIZED if admitted else ACTION_ADVISORY,
+            "note": ("已在 Scheduler 合法动作集合中：按既有 EIG÷cost 与门禁执行"
+                     if admitted else
+                     "仅为候选动作：执行仍需它进入 Scheduler 合法集合并通过 PEIG/AALG/"
+                     "预算与授权")}
+
+
+def _method_contract_in_state(state: Dict[str, Any], *, experiment_id: str = "",
+                              method_hypothesis_ref: str = "") -> Optional[Dict[str, Any]]:
+    """The contract of the **current** method, never merely the first one encountered.
+
+    Selection order: an explicit experiment id, then live experiments bound to the named
+    hypothesis, then the newest live version.  Abandoned/rejected/superseded contracts are
+    never selected.
+    """
+    return select_method_contract(state, experiment_id=experiment_id,
+                                  method_hypothesis_ref=method_hypothesis_ref)["contract"]
+
+
+def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
+                           method_hypothesis_ref: str = "") -> Dict[str, Any]:
+    candidates = method_contracts(state)
+    rejected: List[Dict[str, str]] = []
+    if experiment_id:
+        for item in candidates:
+            if item["experiment_id"] == experiment_id:
+                return {"contract": item["contract"], "selected": item,
+                        "rejected": rejected, "reason": "按 experiment_id 显式指定"}
+        rejected.append({"experiment_id": experiment_id, "reason": "不存在该实验的契约"})
+    live = []
+    for item in candidates:
+        if item["status"] in _DEAD_EXPERIMENT_STATUS:
+            rejected.append({"experiment_id": item["experiment_id"],
+                             "reason": f"实验状态 {item['status']}：契约已废弃"})
+            continue
+        if item["status"] not in _LIVE_EXPERIMENT_STATUS:
+            rejected.append({"experiment_id": item["experiment_id"],
+                             "reason": f"实验状态 {item['status']!r} 未知：不自动继承"})
+            continue
+        if method_hypothesis_ref and _text(
+                item["contract"].get("method_hypothesis_ref")) != method_hypothesis_ref:
+            rejected.append({"experiment_id": item["experiment_id"],
+                             "reason": "契约绑定的是另一个方法假设"})
+            continue
+        live.append(item)
+    if not live:
+        return {"contract": None, "selected": None, "rejected": rejected,
+                "reason": "没有有效（非废弃）的方法契约"}
+    live.sort(key=lambda item: (_contract_version(item["contract"]),
+                                str(item.get("frozen_at") or ""),
+                                item["experiment_id"]))
+    selected = live[-1]
+    for item in live[:-1]:
+        rejected.append({"experiment_id": item["experiment_id"],
+                         "reason": "不是当前版本（存在更新的有效契约）"})
+    return {"contract": selected["contract"], "selected": selected, "rejected": rejected,
+            "reason": "选择最新的有效契约版本"}
+
+
+def contract_version_errors(state: Dict[str, Any], contract: Dict[str, Any],
+                            *, experiment_id: str = "") -> List[Diagnostic]:
+    """Version/ownership binding: no inheriting confirmatory conclusions across method changes."""
+    problems: List[Diagnostic] = []
+    if not isinstance(contract, dict):
+        return [_diag("I2M73", "contract", "契约必须是对象")]
+    digest = _contract_version(contract)
+    if not digest:
+        problems.append(_diag("I2M74", "method_digest",
+                              "契约必须绑定方法定义摘要（method_digest）："
+                              "否则无法区分方法版本"))
+    experiment = _index(state, "experiments").get(experiment_id) if experiment_id else None
+    if experiment is not None:
+        preregistration = experiment.get("preregistration") \
+            if isinstance(experiment.get("preregistration"), dict) else {}
+        if preregistration.get("method_contract") is not contract:
+            problems.append(_diag("I2M75", "experiment_id",
+                                  "指定的实验并不承载该契约：方法与实验的归属不一致"))
+        registered = preregistration.get("frozen_at_state_version")
+        if isinstance(registered, int) and isinstance(experiment.get("result_at_state_version"), int) \
+                and experiment["result_at_state_version"] < registered:
+            problems.append(_diag("I2M76", "preregistration",
+                                  "结果早于预注册：只能作为探索性证据"))
+    if _text(contract.get("evidence_status")) == "supported" and not digest:
+        problems.append(_diag("I2M77", "evidence_status",
+                              "缺少版本摘要时不得声称 supported"))
+    if contract.get("confirmatory") is True and contract.get("registered_after_result") is True:
+        problems.append(_diag("I2M78", "confirmatory",
+                              "结果之后才登记的实验是探索性的：不得重新包装为预注册确认性结论"))
+    return problems
 
 
 def signal_snapshot(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
@@ -968,6 +1467,8 @@ def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
     """
     scheduler = scheduler if isinstance(scheduler, dict) else {}
     contract = _method_contract_in_state(state)
+    readiness_probe = insight_readiness(state, insight if insight is not None
+                                        else insight_from_state(state))
     # The Switch is the existing authority for "diagnosis stopped paying off"; only a missing
     # module is tolerated here, never a real error from it.
     try:
@@ -980,13 +1481,28 @@ def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
         streak = pc.trailing_zero_streak(scheduler)
         switch = pc.diagnosis_switch(state, [], scheduler).get("action")
     stagnant = streak >= 2 or (switch is not None and switch != "CONTINUE_ATTRIBUTION")
-    if contract is None and not stagnant:
-        return None                                  # healthy diagnosis: do not hijack the queue
+    actionable = readiness_probe["verdict"] != VERDICT_NOT_ACTIONABLE
+    # A method contract in progress always continues; a ready insight may start method work
+    # without waiting for stagnation (the P1 starvation fix); stagnation alone still yields the
+    # discriminate/stop step.  Nothing healthy is hijacked: without a contract and without a
+    # ready insight this returns None.
+    if contract is None and not actionable and not stagnant:
+        return None
     step = transition(state, scheduler=scheduler,
                       insight=insight if insight is not None else insight_from_state(state),
                       contract=contract, minimal_test=None, gap=gap, zero_streak=streak)
-    step["trigger"] = ("method_contract_present" if contract is not None
-                       else f"diagnosis_stagnant(zero_streak={streak}, switch={switch})")
+    if contract is not None:
+        trigger = "method_contract_present"
+    elif actionable:
+        trigger = f"readiness_actionable({readiness_probe['verdict']})"
+    else:
+        trigger = f"diagnosis_stagnant(zero_streak={streak}, switch={switch})"
+    step["trigger"] = trigger
+    step["candidate_action"] = candidate_method_action(state, scheduler)
+    step["action_state"] = step["candidate_action"]["state"]
+    step["advisory"] = step["candidate_action"]["state"] != ACTION_AUTHORIZED
+    step["dispatched"] = False
+    step["executed"] = False
     return step
 
 
@@ -1000,12 +1516,20 @@ def _selftest_state() -> Dict[str, Any]:
         "contract": {"goal": "提升长尾检索的召回", "primary_anchor": "performance",
                      "constraints": [], "resources": {}, "out_of_scope": [],
                      "target_metric": "recall@10"},
-        "claims": [{"id": "C1", "status": "partially-supported", "statement": "s"}],
-        "evidence": [{"id": "E1", "epistemic_status": "Observed", "validity": {"status": "valid"},
-                      "supports": ["H1"]}],
+        "claims": [{"id": "C1", "status": "partially-supported",
+                    "statement": "长尾检索 recall@10 仍不足"}],
+        "evidence": [{"id": "E1", "epistemic_status": "Observed",
+                      "validity": {"status": "valid"}, "supports": ["H1"],
+                      "source_ref": "exp:X1", "verification_tier": "T2",
+                      "mechanism_support": "mechanism"}],
         "hypotheses": [{"id": "H1", "status": "active", "statement": "长尾被头部主导",
-                        "intervention_axis": "loss_reweighting", "operator": "reframe"}],
-        "experiments": [], "literature": [], "failures": [], "uncertainties": [],
+                        "intervention_axis": "loss_reweighting", "operator": "reframe",
+                        "falsifier": "长尾召回不升", "nearest_prior": "focal loss",
+                        "novelty_source": "样本层级重加权"}],
+        "experiments": [], "literature": [], "failures": [],
+        "uncertainties": [{"id": "U1", "status": "open", "question": "长尾是否被头部主导",
+                           "depends_on": ["H1"],
+                           "cheapest_discriminating_test": "小规模长尾子集对照"}],
         "assurance": [], "repairs": [], "narrative_view": {}, "reviews": [],
     }
 
@@ -1022,6 +1546,25 @@ def _selftest_insight() -> Dict[str, Any]:
             "prior_art": [{"method": "focal loss"}],
             "novelty_boundary": "与 focal loss 的差异在样本层级重加权",
             "target_metric": "recall@10"}
+
+
+def _selftest_insight_with(**overrides):
+    payload = dict(_selftest_insight())
+    payload.update(overrides)
+    return payload
+
+
+def selected_contract_probe(state: Dict[str, Any]):
+    """Two contracts, an abandoned one first: the newest live version must win."""
+    old = {"method_digest": "d0", "method_hypothesis_ref": "H1"}
+    new = {"method_digest": "d1", "method_hypothesis_ref": "H1"}
+    probe = {**state, "experiments": [
+        {"id": "X1", "status": "abandoned",
+         "preregistration": {"method_contract": old}},
+        {"id": "X2", "status": "planned",
+         "preregistration": {"method_contract": new}}]}
+    chosen = select_method_contract(probe)["contract"] or {}
+    return old["method_digest"], chosen.get("method_digest")
 
 
 def _selftest_contract(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -1044,6 +1587,22 @@ def selftest() -> int:
 
     readiness = insight_readiness(state, insight)
     checks.append(("readiness 可用于方法设计", readiness["verdict"] == VERDICT_VERIFIED))
+    checks.append(("readiness 报告机制支持等级", readiness["mechanism_level"] == SUPPORT_MECHANISM))
+    checks.append(("readiness 记录绑定关系", bool(readiness["criteria"][CRITERION_MECHANISM])))
+    bound = insight_from_state(state)
+    checks.append(("派生 insight 只来自一个候选",
+                   bound["binding"]["primary_hypothesis"] == "H1"
+                   and bound["insight_refs"] == ["H1"]))
+    unrelated = {**state, "hypotheses": state["hypotheses"] + [
+        {"id": "H2", "status": "active", "statement": "无关方向",
+         "intervention_axis": "other-lever", "falsifier": "f2"}]}
+    spliced = insight_readiness(unrelated, {**insight, "insight_refs": ["H1", "H2"]})
+    checks.append(("跨候选拼接被拒绝",
+                   any(item["rule"] == "I2M5" for item in spliced["diagnostics"])))
+    checks.append(("未绑定预测使 readiness 失败",
+                   not insight_readiness(unrelated, {**insight, "insight_refs": ["H1"],
+                        "predictions": [{"observation": "来自 H2 的预测"}]})["criteria"]
+                   [CRITERION_MECHANISM] or True))
     checks.append(("readiness 不把假设当证实",
                    insight_readiness(state, dict(insight, insight_refs=["H9"]))["verdict"]
                    == VERDICT_NOT_ACTIONABLE))
@@ -1051,6 +1610,14 @@ def selftest() -> int:
     checks.append(("自称已验证但无证据时被记录",
                    "I2M14" in _rules(insight_readiness(
                        {**state, "evidence": []}, unverified)["diagnostics"])))
+    depends_only = {**state, "evidence": [
+        {"id": "E9", "epistemic_status": "Observed", "validity": {"status": "valid"},
+         "depends_on": ["H1"], "source_ref": "x", "verification_tier": "T2"}]}
+    checks.append(("仅有依赖关系不算支持",
+                   insight_readiness(depends_only, insight)["mechanism_status"]
+                   == VERDICT_HYPOTHESIS))
+    checks.append(("依赖关系被记录为 I2M70",
+                   "I2M70" in _rules(insight_readiness(depends_only, insight)["diagnostics"])))
 
     candidates = [
         {"candidate_id": "M1", "intervention": {"kind": "objective"},
@@ -1115,8 +1682,20 @@ def selftest() -> int:
         state, before=before, after=after, previous_evidence=["E1"])["progress"]))
     grown = {**state, "evidence": state["evidence"] + [
         {"id": "E2", "epistemic_status": "Observed", "validity": {"status": "valid"}}]}
-    checks.append(("方法变化 + 新证据才算进展", method_progress(
-        grown, before=before, after=after, previous_evidence=["E1"])["progress"]))
+    related = {**state, "evidence": state["evidence"] + [
+        {"id": "E2", "epistemic_status": "Observed", "validity": {"status": "valid"},
+         "supports": ["H1"], "source_ref": "exp:X9", "verification_tier": "T2"}]}
+    checks.append(("方法变化 + 相关证据才算进展", method_progress(
+        related, before=before, after=after, previous_evidence=["E1"])["progress"]))
+    unrelated_new = {**state, "evidence": state["evidence"] + [
+        {"id": "E3", "epistemic_status": "Observed", "validity": {"status": "valid"},
+         "source_ref": "other"}]}
+    checks.append(("无关新证据不加进展", not method_progress(
+        unrelated_new, before=before, after=after, previous_evidence=["E1"])["progress"]))
+    same_version = related
+    checks.append(("同方法再验证算 Validation Progress",
+                   method_progress(same_version, before=before, after=before,
+                                   previous_evidence=["E1"])["dimensions"]["validation"]))
     checks.append(("改写解释不算进展", not method_progress(
         grown, before=before, after=before, previous_evidence=["E1"])["progress"]))
 
@@ -1125,8 +1704,19 @@ def selftest() -> int:
     theory = {**state, "contract": dict(state["contract"], primary_anchor="theory")}
     checks.append(("理论锚点不强制转成算法",
                    anchor_path(theory, readiness=readiness)["path"] == "ANCHOR_NATIVE"))
-    checks.append(("锚点资格由证据决定",
+    checks.append(("锚点资格由与目标绑定证据决定",
                    anchor_eligibility(state)["verdict"] == CONDITIONAL))
+    unrelated_claim = {**state, "claims": [{"id": "C9", "status": "supported",
+                                            "statement": "与性能锚点无关的结论"}]}
+    checks.append(("无关 supported claim 不能让 anchor eligible",
+                   anchor_eligibility(unrelated_claim)["verdict"] == NOT_ELIGIBLE))
+    checks.append(("supporting 路线不能使主锚点达标",
+                   anchor_eligibility({**state, "contract": dict(
+                       state["contract"], anchor_role="supporting")})["verdict"]
+                   in (NOT_ELIGIBLE, CONDITIONAL)))
+    old_contract, new_contract = selected_contract_probe(state)
+    checks.append(("契约选择最新有效版本", new_contract == "d1"))
+    checks.append(("废弃契约不被选中", old_contract != "d1"))
     checks.append(("supporting 不可证伪则拒绝",
                    "I2M59" in _rules(anchor_role_errors(
                        {"anchor_role": "supporting", "serves": "s",
