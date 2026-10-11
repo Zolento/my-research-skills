@@ -239,6 +239,43 @@ class TestNoSelfGrantedL3(L3Case):
         self.assertEqual(result["status"], "INVALID", result)
         self.assertIn("PE15", result["codes"])
 
+    def test_a_rollback_restore_after_the_approval_expired_is_refused(self):
+        """A time-bound approval must not be bypassed by restoring a superseded policy."""
+        import time
+        from unittest import mock
+        for policy_id in ("P-1", "P-2"):
+            self.ready(policy_id)
+            credential = self.credential(policy_id)
+            self.approve(credential, policy_id)
+            self.assertEqual(self.record(credential, policy_id)["status"], "VALIDATED")
+            self.assertEqual(pe.promote_to_active(self.state_path, policy_id,
+                                                  {"scope_evidence_ok": True})["status"],
+                             "ACTIVE")
+        future = time.time() + 10 ** 7
+        with mock.patch("time.time", return_value=future):
+            result = pe.rollback(self.state_path, "P-2", to_policy_id="P-1",
+                                 reason="recovery")
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("PE15", result["codes"])
+        # and nothing was written: the rollback pre-validates the restore
+        statuses = pe.latest_status(pe.load_records(self.state_path)[0])
+        self.assertEqual(statuses["P-2"], "ACTIVE", statuses)
+        self.assertEqual(statuses["P-1"], "SUPERSEDED", statuses)
+
+    def test_a_rollback_restore_with_a_valid_approval_still_works(self):
+        for policy_id in ("P-1", "P-2"):
+            self.ready(policy_id)
+            credential = self.credential(policy_id)
+            self.approve(credential, policy_id)
+            self.assertEqual(self.record(credential, policy_id)["status"], "VALIDATED")
+            self.assertEqual(pe.promote_to_active(self.state_path, policy_id,
+                                                  {"scope_evidence_ok": True})["status"],
+                             "ACTIVE")
+        result = pe.rollback(self.state_path, "P-2", to_policy_id="P-1", reason="recovery")
+        self.assertEqual(result["status"], "ROLLED_BACK", result)
+        statuses = pe.latest_status(pe.load_records(self.state_path)[0])
+        self.assertEqual(statuses["P-1"], "ACTIVE", statuses)
+
     def test_a_tampered_approval_ledger_is_refused(self):
         self.ready()
         credential = self.credential()

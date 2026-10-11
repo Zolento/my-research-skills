@@ -459,6 +459,46 @@ class TestFrozenParameters(CredentialCase):
         result = pe.evaluate_candidate(self.state_path, "P-1", self.good_report())
         self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
 
+    def test_a_malformed_frozen_rule_set_is_refused_at_freeze_time(self):
+        """A rule set missing the fields the evaluation needs must not be frozen."""
+        pe.rules_path(self.state_path).unlink()
+        for bad in ({"min_runs": 0}, {"min_cases": "many"}, {"dimensions": []},
+                    {"delta_tolerance": -1}, {"dimensions": "search_efficiency"}):
+            payload = dict(pe.DEFAULT_EVALUATION_RULES)
+            payload.update(bad)
+            outcome = pe.freeze_evaluation_rules(self.state_path, payload)
+            self.assertEqual(outcome["status"], "INVALID", (bad, outcome))
+            pe.rules_path(self.state_path).unlink(missing_ok=True)
+
+    def test_a_partial_custom_rule_set_is_completed_then_frozen(self):
+        pe.rules_path(self.state_path).unlink()
+        outcome = pe.freeze_evaluation_rules(self.state_path, {"delta_tolerance": 0.2})
+        self.assertEqual(outcome["status"], "FROZEN", outcome)
+        rules = pe.frozen_rules(self.state_path)
+        self.assertEqual(rules["delta_tolerance"], 0.2)
+        self.assertEqual(rules["min_runs"], pe.DEFAULT_EVALUATION_RULES["min_runs"])
+
+    def test_a_hand_edited_incomplete_rule_file_cannot_reach_the_evaluator(self):
+        """A rules file that predates or bypasses validation must fail closed, not KeyError."""
+        pe.rules_path(self.state_path).write_text(json.dumps(
+            {"_schema": pe.SCHEMA_RULES, "rules": {"delta_tolerance": 0.05},
+             "digest": cg.digest_of({"delta_tolerance": 0.05})}), encoding="utf-8")
+        self.assertIsNone(pe.frozen_rules(self.state_path))
+        errors = pe.evaluation_rules_errors(self.state_path)
+        self.assertTrue(errors)
+        self.assertIn("PE12", [item.rule for item in errors])
+        # Whatever the propose step does, every promotion gate must fail closed.
+        payload = self.candidate("P-1")
+        payload["evaluation_rules_digest"] = cg.digest_of({"delta_tolerance": 0.05})
+        proposed = pe.propose(self.state_path, payload, trajectory_support={"DT-1"})
+        self.assertIn(proposed["status"], ("PROPOSED", "INVALID"), proposed)
+        if proposed["status"] == "PROPOSED":
+            self.assertEqual(pe.transition(self.state_path, "P-1", "SHADOW",
+                                           level="L1")["status"], "SHADOW")
+        result = pe.evaluate_candidate(self.state_path, "P-1", self.good_report())
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("PE12", result["codes"])
+
     def test_mechanistic_understanding_is_a_reliability_dimension(self):
         self.assertIn(SCIENCE, pe.RELIABILITY_DIMENSIONS)
 
@@ -622,3 +662,58 @@ class TestCredentialCliRobustness(CredentialCase):
                          "--policy-id", "P-1", "--report", str(bad))
         self.assertNotIn("Traceback", proc.stderr, proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["status"], "INVALID")
+
+
+# ---------------------------------------------------------------------------
+# F. 畸形数值不得让评价路径抛出未捕获异常
+# ---------------------------------------------------------------------------
+
+class TestMalformedNumbers(CredentialCase):
+    def test_a_nan_unobserved_count_does_not_crash_the_evaluator(self):
+        """`int(NaN)` used to escape evaluate_candidate as a raw ValueError."""
+        self.ready()
+        document = self.good_report()
+        document["unobservable_decisions"] = float("nan")
+        result = pe.evaluate_candidate(self.state_path, "P-1", document)
+        # a NaN is read as "unknown, count 0" rather than crashing the evaluator
+        self.assertIn(result["status"], ("REPLAY_EVALUATED", "HOLD", "REJECTED", "INVALID"),
+                      result)
+
+    def test_infinite_and_string_counts_are_handled_without_crashing(self):
+        self.ready()
+        for value in (float("inf"), float("-inf"), "3", None, {"a": 1}, [1], True):
+            document = self.good_report()
+            document["unobservable_decisions"] = value
+            result = pe.evaluate_candidate(self.state_path, "P-1", document)
+            self.assertIn(result["status"], ("REPLAY_EVALUATED", "HOLD", "REJECTED", "INVALID"),
+                          (value, result))
+
+    def test_a_declared_nan_mean_is_not_treated_as_consistent(self):
+        """Every NaN comparison is False, which made the consistency check vacuous."""
+        self.assertTrue(pe._numbers_differ(float("nan"), 0.5))
+        self.assertTrue(pe._numbers_differ(float("nan"), float("nan")))
+        self.assertFalse(pe._numbers_differ(float("inf"), float("inf")))
+        self.ready()
+        document = self.good_report()
+        document["per_arm"]["rsi_full"]["dimensions"]["search_efficiency"]["mean"] = float("nan")
+        result = pe.evaluate_candidate(self.state_path, "P-1", document)
+        self.assertNotEqual(result["status"], "REPLAY_EVALUATED", result)
+
+    def test_ablation_verdict_survives_non_finite_counts(self):
+        candidate, control = improving()
+        candidate[BENEFIT], control[BENEFIT] = 0.9, 0.3
+        document = report(candidate_metrics=candidate, control_metrics=control,
+                         policy_id="P-1", policy_signature="sig",
+                         rules_digest=self.digest)
+        document["unobservable_decisions"] = float("nan")
+        outcome = pe.ablation_verdict(document, rules=pe.frozen_rules(self.state_path))
+        self.assertIn(outcome["verdict"], ("SUPPORTED", "REJECTED", "UNDIFFERENTIATED",
+                                           "INSUFFICIENT_SAMPLE", "INSUFFICIENT_COVERAGE",
+                                           "INVALID"))
+
+    def test_recomputed_level_survives_non_finite_gates(self):
+        gates = {"assessable_dimensions": float("nan"), "runs": float("inf"),
+                 "cases": "many", "runner": "x"}
+        self.assertIn(pe._recomputed_level(gates, {"verdict": "SUPPORTED"},
+                                           schema=pe.SCHEMA_EVALUATION),
+                      ("L1", "L2"))

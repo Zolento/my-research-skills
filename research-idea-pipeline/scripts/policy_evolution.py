@@ -286,7 +286,20 @@ def freeze_evaluation_rules(state_path: Path,
                     "errors": ["评价规则内容与 digest 不一致：规则被改写，拒绝沿用"]}
         return {"status": "ALREADY_FROZEN", "path": str(path),
                 "digest": stored, "rules": rules}
-    payload = copy.deepcopy(rules) if rules is not None else copy.deepcopy(DEFAULT_EVALUATION_RULES)
+    if rules is None:
+        payload = copy.deepcopy(DEFAULT_EVALUATION_RULES)
+    else:
+        # A partial custom set is completed from the defaults, then validated: freezing a
+        # malformed set must fail here, not with a KeyError deep in the promotion path.
+        payload = copy.deepcopy(DEFAULT_EVALUATION_RULES)
+        if isinstance(rules, dict):
+            payload.update(copy.deepcopy(rules))
+        else:
+            payload = copy.deepcopy(rules)
+    problems = _rule_schema_errors(payload)
+    if problems:
+        return {"status": "INVALID", "path": str(path), "digest": None, "rules": None,
+                "errors": [f"评价规则结构非法：{problem}" for problem in problems]}
     document = {"_schema": SCHEMA_RULES, "frozen_at": _now(), "rules": payload,
                 "digest": cg.digest_of(payload)}
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -722,6 +735,36 @@ def policy_record(records: Sequence[Dict[str, Any]], policy_id: str) -> Optional
 # Frozen evaluation rules: content and digest must agree
 # ---------------------------------------------------------------------------
 
+_REQUIRED_RULE_KEYS = ("dimensions", "min_cases", "min_runs", "delta_tolerance")
+
+
+def _rule_schema_errors(rules: Any) -> List[str]:
+    """Structural problems in a rule set.
+
+    A frozen rule set missing `min_cases`/`min_runs`/`dimensions`/`delta_tolerance` used to
+    reach the promotion path and raise an uncaught KeyError instead of a diagnosable refusal.
+    """
+    if not isinstance(rules, dict):
+        return ["评价规则不是对象"]
+    problems: List[str] = []
+    for key in _REQUIRED_RULE_KEYS:
+        if key not in rules:
+            problems.append(f"冻结规则缺少必需字段 {key!r}")
+    dimensions = rules.get("dimensions")
+    if not isinstance(dimensions, list) or not dimensions \
+            or not all(isinstance(item, str) and item.strip() for item in dimensions):
+        problems.append("dimensions 必须是非空字符串列表")
+    for key in ("min_cases", "min_runs"):
+        value = rules.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            problems.append(f"{key} 必须是 >=1 的整数")
+    tolerance = rules.get("delta_tolerance")
+    if not isinstance(tolerance, (int, float)) or isinstance(tolerance, bool) \
+            or not tolerance >= 0:
+        problems.append("delta_tolerance 必须是 >=0 的数")
+    return problems
+
+
 def frozen_rules(state_path: Path) -> Optional[Dict[str, Any]]:
     """The frozen rule *content*, or None when it is absent or inconsistent.
 
@@ -738,6 +781,8 @@ def frozen_rules(state_path: Path) -> Optional[Dict[str, Any]]:
         return None
     rules = document.get("rules") if isinstance(document, dict) else None
     if not isinstance(rules, dict) or document.get("digest") != cg.digest_of(rules):
+        return None
+    if _rule_schema_errors(rules):
         return None
     return rules
 
@@ -763,6 +808,10 @@ def evaluation_rules_errors(state_path: Path) -> List[cg.Diagnostic]:
     if document.get("digest") != recomputed:
         return [_diag("PE12", "policy.evaluation-rules",
                       "评价规则内容与 digest 不一致：规则被改写，评价不可信")]
+    schema_problems = _rule_schema_errors(document["rules"])
+    if schema_problems:
+        return [_diag("PE12", "policy.evaluation-rules",
+                      "评价规则结构非法：" + "；".join(schema_problems))]
     return []
 
 
@@ -929,15 +978,42 @@ def _recompute_arm_dimensions(results: Sequence[Dict[str, Any]],
     return summary
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    """`int(value)` for values that may be NaN/inf/strings/None.
+
+    A report could carry `unobservable_decisions: NaN`, and `int(NaN)` raised a raw
+    ValueError out of the evaluation path instead of producing a diagnosable refusal.
+    """
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if number != number or number in (float("inf"), float("-inf")):
+        return default
+    return int(number)
+
+
 def _numbers_differ(left: Any, right: Any) -> bool:
     if left is None and right is None:
         return False
     if left is None or right is None:
         return True
     try:
-        return abs(float(left) - float(right)) > 1e-9
+        left_number, right_number = float(left), float(right)
     except (TypeError, ValueError):
         return left != right
+    # NaN/inf must not be treated as "matching": every NaN comparison is False, which made
+    # the consistency check vacuous for a declared NaN.
+    if left_number != left_number or right_number != right_number:
+        return True
+    if left_number in (float("inf"), float("-inf")) \
+            or right_number in (float("inf"), float("-inf")):
+        return left_number != right_number
+    return abs(left_number - right_number) > 1e-9
 
 
 def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] = None,
@@ -989,8 +1065,8 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
                                   "policy_id": report.get("policy_id"),
                                   "policy_signature": report.get("policy_signature"),
                                   "rules_digest": report.get("rules_digest"),
-                                  "unobservable_decisions": int(
-                                      report.get("unobservable_decisions") or 0),
+                                  "unobservable_decisions": _safe_int(
+                                      report.get("unobservable_decisions")),
                                   "delta_vs_baseline": {}, "per_arm": {}}
     case_sets: Dict[str, set] = {}
     for arm, block in per_arm.items():
@@ -1039,7 +1115,7 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
             support = ((row.get("evaluation") or {}).get("evidence_support") or {}).get("class")
             if support == "NO_SUPPORT":
                 recomputed_unobservable += 1
-    declared_unobservable = int(report.get("unobservable_decisions") or 0)
+    declared_unobservable = _safe_int(report.get("unobservable_decisions"))
     if declared_unobservable != recomputed_unobservable:
         errors.append(
             f"unobservable_decisions 声明 {declared_unobservable}，但执行记录（NO_SUPPORT）"
@@ -1280,9 +1356,9 @@ def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any], *,
         gates = gates or {}
         if (verdict or {}).get("verdict") != "SUPPORTED":
             return "L1"
-        adequate = (int(gates.get("assessable_dimensions") or 0) >= 2
-                    and int(gates.get("runs") or 0) >= rules["min_runs"]
-                    and int(gates.get("cases") or 0) >= rules["min_cases"]
+        adequate = (_safe_int(gates.get("assessable_dimensions")) >= 2
+                    and _safe_int(gates.get("runs")) >= rules["min_runs"]
+                    and _safe_int(gates.get("cases")) >= rules["min_cases"]
                     and bool(gates.get("runner")))
         return "L2" if adequate else "L1"
     if (verdict or {}).get("verdict") != "SUPPORTED":
@@ -1671,16 +1747,16 @@ def transition_errors(state_path: Path, records: Sequence[Dict[str, Any]], polic
 
     candidate = policy_record(records, policy_id) or {}
     scope = candidate.get("scope") if isinstance(candidate.get("scope"), dict) else {}
-    # Only the restore of an already-promoted policy may re-enter ACTIVE without a new
-    # artifact; every other gated target needs the controlled entry point.
-    restoring = current == "SUPERSEDED" and target == "ACTIVE"
+    # A rollback restore may reuse the policy's existing credential, but it still has to
+    # present one. Skipping the gate let a restore put a policy back into ACTIVE with no
+    # human action at all, bypassing the approval's expiry.
 
     if target in ("SHADOW", "REPLAY_EVALUATED", "BOUNDED_TRIAL", "VALIDATED", "ACTIVE"):
         overfit = overfit_flags(candidate)
         if overfit and target != "SHADOW":
             diagnostics.append(_diag("PE5", path,
                                      "针对固定 fixture 的策略不得越过 SHADOW：" + "；".join(overfit)))
-    if target in GATED_TARGETS and not restoring:
+    if target in GATED_TARGETS:
         if not authority_ok:
             diagnostics.append(_diag(
                 "PE11", path,
@@ -1807,6 +1883,18 @@ def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str
             diagnostics.append(_diag("PE13", f"policy[{policy_id}]", "回滚目标不能是策略自身"))
         if not reason:
             diagnostics.append(_diag("PE10", f"policy[{policy_id}]", "回滚必须写明原因"))
+        # Validate the restore BEFORE writing anything. Writing first left a failed restore as
+        # a half-state (the old policy rolled back, the target still superseded, no ACTIVE
+        # policy and no way to retry, since ROLLED_BACK is terminal).
+        restore_evidence: Optional[Dict[str, Any]] = None
+        if not diagnostics and target_status == "SUPERSEDED":
+            artifact = latest_evaluation_artifact(state_path, to_policy_id, records)
+            restore_evidence = {"reason": f"restored by rollback from {policy_id}",
+                                "restored": True}
+            if artifact is not None:
+                restore_evidence["evaluation_ref"] = artifact["ref"]
+            diagnostics.extend(transition_errors(state_path, records, to_policy_id, "ACTIVE",
+                                                 restore_evidence, authority_ok=True))
         if diagnostics:
             return {"status": "INVALID", "written": False,
                     "diagnostics": [item.render() for item in diagnostics],
@@ -1823,9 +1911,7 @@ def rollback(state_path: Path, policy_id: str, *, to_policy_id: str, reason: str
         if target_status == "SUPERSEDED":
             after, _ = load_records(state_path)
             restore = _transition_locked(
-                state_path, after, to_policy_id, "ACTIVE",
-                evidence={"reason": f"restored by rollback from {policy_id}",
-                          "restored": True},
+                state_path, after, to_policy_id, "ACTIVE", evidence=restore_evidence,
                 reason=f"restored by rollback from {policy_id}", authority=_AUTHORITY)
             if not restore.get("written"):
                 return {"status": "INVALID", "written": False,
@@ -1933,15 +2019,15 @@ def ablation_verdict(report: Dict[str, Any], *, candidate_arm: str = "rsi_full",
                         if block.get("status") not in (None, "UNASSESSABLE"))
     benefit_assessable = [name for name in BENEFIT_DIMENSIONS if name in assessable]
 
-    cases = int(report.get("cases") or 0)
-    runs = int(report.get("runs_per_case") or 0)
+    cases = _safe_int(report.get("cases"))
+    runs = _safe_int(report.get("runs_per_case"))
     sample_adequate = (cases >= rules["min_cases"] and runs >= rules["min_runs"]
                        and bool(assessable) and bool(benefit_assessable))
     execution_record = any(block.get("results") for block in report["per_arm"].values())
     isolation_ok = bool(execution_record) and all(
         result.get("leak_checked") and result.get("isolation_verified", True)
         for block in report["per_arm"].values() for result in block.get("results") or [])
-    unobservable = int(report.get("unobservable_decisions") or 0)
+    unobservable = _safe_int(report.get("unobservable_decisions"))
 
     verdict = "SUPPORTED"
     if not execution_record:
