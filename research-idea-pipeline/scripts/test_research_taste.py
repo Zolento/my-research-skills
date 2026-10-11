@@ -161,6 +161,52 @@ class TestExecutionCalibration(TasteCase):
         self.assertIn("一次失败不推断整个范式无价值", calibration["note"])
 
 
+class TestProductionWiring(TasteCase):
+    """The new judgement must be reached by the runtime, not only by tests."""
+
+    def _transition(self, **kwargs):
+        state, _ = shared.progress_fixture()
+        return i2m.transition(state, insight=shared.insight(), route_dir=self.route,
+                              hypothesis_id="H42", **kwargs)
+
+    def test_calibration_from_real_results_reaches_the_comparison(self):
+        i2m.record_outcome_feedback(self.route, "H42", experiment_id="X900",
+                                    outcome="supported", supported_axes=["evidence"],
+                                    judgement="prefer M-old")
+        i2m.record_outcome_feedback(self.route, "H42", experiment_id="X901",
+                                    outcome="supported", supported_axes=["evidence"])
+        step = self._transition(candidates=[
+            shared.candidate("M-a", "objective", "a", "L1", importance_level="high"),
+            shared.candidate("M-b", "architecture", "b", "L2", importance_level="low")])
+        self.assertTrue(step["i2m"]["calibration"], step["i2m"])
+        self.assertEqual(step["i2m"]["candidate_id"], "M-a")
+        self.assertTrue(step["i2m"]["synthesis"]["taste"]["calibration_hints"])
+
+    def test_the_step_reports_exploration_balance(self):
+        step = self._transition(candidates=[
+            shared.candidate("M-a", "objective", "a", "L1", importance_level="high"),
+            shared.candidate("M-b", "architecture", "b", "L2", importance_level="low",
+                             operator="crossover")])
+        self.assertIn("exploration", step["i2m"])
+        self.assertIn("paradigms", step["i2m"]["exploration"])
+
+    def test_the_feedback_entry_is_idempotent_for_the_same_experiment(self):
+        import subprocess
+        import sys
+        root = pathlib.Path(__file__).resolve().parent.parent
+        command = [sys.executable, str(root / "scripts" / "insight_to_method.py"), "--feedback",
+                   "--route-dir", str(self.route), "--hypothesis", "H42",
+                   "--experiment", "X777", "--outcome", "supported",
+                   "--supported-axes", "evidence"]
+        first = json.loads(subprocess.run(command, capture_output=True, text=True,
+                                         cwd=str(root), stdin=subprocess.DEVNULL).stdout)
+        second = json.loads(subprocess.run(command, capture_output=True, text=True,
+                                          cwd=str(root), stdin=subprocess.DEVNULL).stdout)
+        self.assertTrue(first["written"])
+        self.assertFalse(second["written"])
+        self.assertIn("不重复", second["reason"])
+
+
 class TestBoundariesAndAnchors(TasteCase):
     def test_8_a_non_method_anchor_keeps_its_native_contribution(self):
         state, _ = shared.progress_fixture()

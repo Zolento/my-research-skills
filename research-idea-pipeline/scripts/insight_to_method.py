@@ -942,7 +942,8 @@ def method_sketch_errors(sketch: Dict[str, Any]) -> List[Diagnostic]:
 
 
 def synthesize_methods(state: Dict[str, Any], readiness: Dict[str, Any],
-                       candidates: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+                       candidates: Sequence[Dict[str, Any]], *,
+                       calibration: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Validate a synthesis round and mark what may and may not be claimed."""
     problems = synthesis_errors(state, readiness, candidates)
     accepted = [dict(item) for item in candidates if isinstance(item, dict)] \
@@ -951,7 +952,8 @@ def synthesize_methods(state: Dict[str, Any], readiness: Dict[str, Any],
         item.setdefault("schema", SCHEMA_CANDIDATE)
         item["evidence_status"] = readiness.get("mechanism_status", VERDICT_HYPOTHESIS)
         item["novelty_verified"] = False          # never asserted, only recorded as unchecked
-    comparison = (compare_candidates(accepted) if len(accepted) > 1 else
+    comparison = (compare_candidates(accepted, calibration=calibration)
+                  if len(accepted) > 1 else
                   {"preference": accepted[0].get("candidate_id") if accepted else None,
                    "compared": False, "note": "单候选：不制造备选"})
     return {"status": "SYNTHESIZED" if accepted else "INVALID",
@@ -1817,7 +1819,12 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                         "sketch_missing": [item.message for item in problems],
                         "decision": decision}}
     if contract is None:
-        outcome = synthesize_methods(state, readiness, candidates or [])
+        target = hypothesis_id or str((_primary_hypothesis(state) or {}).get("id") or "")
+        calibration = (taste_calibration(route_dir, target) if route_dir is not None and target
+                       else None)
+        balance = exploration_balance(state, candidates)
+        outcome = synthesize_methods(state, readiness, candidates or [],
+                                     calibration=calibration)
         if outcome["status"] != "SYNTHESIZED":
             return {"phase": "I2M", "stage": "synthesis", "step": "Synthesize",
                     "action": "提交一个（有理由的）或 2—3 个有真实分歧的方法候选",
@@ -1855,6 +1862,8 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                         "artifacts": ({kind: item["status"] for kind, item in
                                        resolution["artifacts"].items()}
                                       if resolution else {}),
+                        "exploration": balance,
+                        "calibration": (calibration or {}).get("signals", []),
                         "candidate_id": chosen.get("candidate_id"),
                         "preferred_over": (outcome.get("taste") or {}).get("alternatives") or [],
                         "contract_skeleton": skeleton, "decision": decision}}
@@ -2745,9 +2754,33 @@ def selftest() -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Insight-to-Method Transition (I2M)")
     parser.add_argument("--selftest", action="store_true", help="run the module self-test")
+    parser.add_argument("--feedback", action="store_true",
+                        help="record what a real experiment did to a past judgement")
+    parser.add_argument("--route-dir", help="route directory (for --feedback)")
+    parser.add_argument("--hypothesis", help="method hypothesis id (for --feedback)")
+    parser.add_argument("--experiment", help="experiment id (idempotency key)")
+    parser.add_argument("--outcome", default="", help="supported | weakened | failed | inconclusive")
+    parser.add_argument("--supported-axes", default="", help="comma-separated taste axes")
+    parser.add_argument("--weakened-axes", default="", help="comma-separated taste axes")
+    parser.add_argument("--judgement", default="", help="the original judgement, kept verbatim")
+    parser.add_argument("--source", default="", help="where the result came from")
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.selftest:
         return selftest()
+    if args.feedback:
+        if not (args.route_dir and args.hypothesis and args.experiment):
+            print(json.dumps({"status": "INVALID",
+                              "reason": "--feedback 需要 --route-dir --hypothesis --experiment"},
+                             ensure_ascii=False))
+            return 1
+        split = lambda value: [item.strip() for item in value.split(",") if item.strip()]
+        result = record_outcome_feedback(args.route_dir, args.hypothesis,
+                                         experiment_id=args.experiment, outcome=args.outcome,
+                                         supported_axes=split(args.supported_axes),
+                                         weakened_axes=split(args.weakened_axes),
+                                         judgement=args.judgement, source=args.source)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
     parser.print_help()
     return 0
 
