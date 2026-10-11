@@ -326,10 +326,28 @@ def _mechanism_support(state: Dict[str, Any], hypothesis_ids: Sequence[str]) -> 
             continue
         supporting.append(ident)
         explicit = _text(evidence.get("mechanism_support") or evidence.get("conclusion"))
+        # A self-declared strength is not a review: R8/R10 must have qualified it before it can
+        # raise the level beyond "the prediction was observed".
+        reviewed = (_text(evidence.get("review_status")).upper() == "PASS"
+                    or _text(evidence.get("verification_tier")) in ("T3", "T4")
+                    or bool(evidence.get("assurance_ref")))
         if explicit in ("intervention", "intervention_effect"):
-            kinds.append(SUPPORT_INTERVENTION_EFFECT)
+            if reviewed:
+                kinds.append(SUPPORT_INTERVENTION_EFFECT)
+            else:
+                kinds.append(SUPPORT_PREDICTION_OBSERVED)
+                diagnostics.append(_diag(
+                    "I2M96", f"evidence[{ident}]",
+                    "自称干预有效但未经 R8/R10 审查：只能记为「观察到预测现象」"))
         elif explicit == "mechanism":
-            kinds.append(SUPPORT_MECHANISM)
+            if reviewed:
+                kinds.append(SUPPORT_MECHANISM)
+            else:
+                kinds.append(SUPPORT_PREDICTION_OBSERVED)
+                diagnostics.append(_diag(
+                    "I2M97", f"evidence[{ident}]",
+                    "自称机制获支持但缺少证据审查凭证（review PASS / T3+ / assurance_ref）："
+                    "不得据此判定机制已验证"))
         else:
             kinds.append(SUPPORT_PREDICTION_OBSERVED)
     order = (SUPPORT_NONE, SUPPORT_PREDICTION_OBSERVED, SUPPORT_INTERVENTION_EFFECT,
@@ -802,12 +820,23 @@ def _progress_fingerprint(*values: Any) -> str:
     return cg.digest_of(list(values))
 
 
+def _progress_reason(progress: bool, dimensions: Dict[str, bool],
+                     already_consumed: Sequence[str], usable: Sequence[str]) -> str:
+    if progress:
+        return "存在可核验的进展维度：" + ", ".join(
+            name for name, ok in dimensions.items() if ok)
+    if already_consumed and not usable:
+        return "该证据已被消费过：不得重复计入或重置停滞"
+    return "没有可核验的进展：指纹变化本身不是验证，无关或未归属证据不加进展"
+
+
 def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
                     after: Dict[str, Any], experiment_id: str = "",
                     previous_evidence: Sequence[str] = (),
                     implementation_check: Optional[Dict[str, Any]] = None,
                     anchor_relevant_evidence: Optional[Sequence[str]] = None,
-                    method_version: str = "") -> Dict[str, Any]:
+                    method_version: str = "",
+                    consumed_evidence: Sequence[str] = ()) -> Dict[str, Any]:
     """Five separate, individually verified progress dimensions.
 
     A changed method fingerprint alone is **not** validation, and new evidence that has nothing
@@ -826,15 +855,45 @@ def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
     qualified = [ident for ident in new_evidence if _evidence_qualified(by_id.get(ident, {}))]
 
     hypothesis_id = str(after.get("id") or "")
-    related = [ident for ident in qualified
+    consumed = {str(item) for item in consumed_evidence}
+    already_consumed = sorted(set(qualified) & consumed)
+
+    def attributed(ident):
+        """Evidence counts only for the method version/experiment it actually came from."""
+        evidence = by_id.get(ident, {})
+        declared = _text(evidence.get("method_version")) or _text(evidence.get("method_digest"))
+        if declared:
+            expected = version or _text(after_method.get("definition_digest"))
+            if expected and declared != expected:
+                return False
+        source = _text(evidence.get("experiment")) or _text(evidence.get("source_ref"))
+        experiment_id = source.split(":", 1)[-1]
+        record = _index(state, "experiments").get(experiment_id)
+        if record is not None:
+            preregistration = record.get("preregistration") \
+                if isinstance(record.get("preregistration"), dict) else {}
+            contract = preregistration.get("method_contract") \
+                if isinstance(preregistration.get("method_contract"), dict) else {}
+            bound = _text(contract.get("method_digest")) or \
+                _text(contract.get("method_hypothesis_ref"))
+            if bound:
+                expected = _text(after_method.get("definition_digest")) or hypothesis_id
+                if bound not in (expected, version, hypothesis_id):
+                    return False
+        return True
+
+    fresh = [ident for ident in qualified if ident not in consumed]
+    misattributed = [ident for ident in qualified if not attributed(ident)]
+    usable = [ident for ident in fresh if attributed(ident)]
+    related = [ident for ident in usable
                if _evidence_relation(by_id.get(ident, {}), [hypothesis_id]) == "supports"]
-    refuting = [ident for ident in qualified
+    refuting = [ident for ident in usable
                 if _evidence_relation(by_id.get(ident, {}), [hypothesis_id]) == "refutes"]
     anchor_refs = [str(item) for item in (anchor_relevant_evidence or []) if _text(item)]
     if anchor_refs:
-        anchor_hits = [ident for ident in qualified if ident in set(anchor_refs)]
+        anchor_hits = [ident for ident in usable if ident in set(anchor_refs)]
     else:
-        anchor_hits = [ident for ident in qualified
+        anchor_hits = [ident for ident in usable
                        if _anchor_relevant(state, by_id.get(ident, {}), anchor_kind(state))]
 
     definition_digest = _text(after_method.get("definition_digest"))
@@ -862,13 +921,14 @@ def method_progress(state: Dict[str, Any], *, before: Dict[str, Any],
             "method_changed": method_changed, "method_version": version,
             "new_evidence": new_evidence, "qualified_evidence": qualified,
             "related_evidence": sorted(set(related)), "refuting_evidence": sorted(set(refuting)),
-            "unrelated_evidence": sorted(set(qualified) - set(related) - set(refuting)),
+            "unrelated_evidence": sorted(set(usable) - set(related) - set(refuting)),
+            "misattributed_evidence": sorted(misattributed),
+            "already_consumed": already_consumed,
+            "fresh": bool(fresh),
             "anchor_evidence": sorted(set(anchor_hits)),
             "found": [experiment_id] if experiment_id else [],
             "narrative_only_change": bool((state.get("narrative_view") or {})) and not method_changed,
-            "reason": ("存在可核验的进展维度：" + ", ".join(
-                name for name, ok in dimensions.items() if ok)) if progress else
-                "没有可核验的进展：指纹变化本身不是验证，无关新证据不加进展",
+            "reason": _progress_reason(progress, dimensions, already_consumed, usable),
             "excluded_signals": ["narrative_view", "reports", "candidate_count",
                                  "document_count", "self_rated_score", "state_version"]}
 def advance(state: Dict[str, Any], *, readiness: Optional[Dict[str, Any]] = None,
@@ -905,84 +965,128 @@ def advance(state: Dict[str, Any], *, readiness: Optional[Dict[str, Any]] = None
 # Anchor compatibility (SKILL.md §0.1/§0.2, claim-first-policy.md §6)
 # ---------------------------------------------------------------------------
 
-def _anchor_relevant(state: Dict[str, Any], obj: Dict[str, Any], kind: str) -> bool:
-    """Is this claim/evidence tied to the target anchor's success criterion?
+def anchor_link(state: Dict[str, Any], obj: Dict[str, Any], kind: str) -> str:
+    """How an object is linked to the target anchor: explicit > experiment > text > none.
 
-    A supported claim somewhere in the project is not evidence for *this* anchor.  The link
-    must be traceable: the object names the anchor or the contract's target metric, or it is
-    targeted by an experiment that measures that metric, or it hangs off a claim that does.
+    Free-text similarity is never final: it only yields `text_only`, which cannot prove
+    eligibility on its own.
     """
     metric = _target_metric(state, {})
-    goal = _text(((state.get("contract") or {}).get("goal")))
-    needles = {needle.lower() for needle in (kind, metric, goal) if _text(needle)}
-    haystack = " ".join(_text(obj.get(field)) for field in
-                        ("statement", "scope", "falsifier", "nearest_alternative", "reason",
-                         "question", "ref", "target", "metric")).lower()
-    if any(needle and needle in haystack for needle in needles):
-        return True
+    declared = {_text(obj.get(field)).lower() for field in
+                ("anchor", "anchor_kind", "serves_anchor", "core_goal")}
+    declared.discard("")
+    if declared & {kind, "target", "primary"}:
+        return "explicit"
+    metrics = {_text(obj.get(field)) for field in ("target_metric", "metric", "scope_metric")}
+    metrics.discard("")
+    if metric and metric in metrics:
+        return "explicit"
     ident = str(obj.get("id"))
     for experiment in _items(state, "experiments"):
-        if _text(experiment.get("metric")).lower() != metric.lower() or not metric:
+        if _text(experiment.get("status")) in ("abandoned", "rejected"):
+            continue
+        experiment_metric = _text(experiment.get("metric"))
+        if metric and experiment_metric and experiment_metric.lower() != metric.lower():
             continue
         targets = set()
-        for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted"):
+        for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted",
+                      "uncertainty_targeted"):
             value = experiment.get(field)
             if isinstance(value, list):
                 targets |= {str(item) for item in value}
         if ident in targets:
-            return True
-    return False
+            return "experiment_targeted"
+    needles = {needle.lower() for needle in (kind, metric) if _text(needle)}
+    haystack = " ".join(_text(obj.get(field)) for field in
+                        ("statement", "scope", "falsifier", "nearest_alternative", "reason",
+                         "question", "ref", "target")).lower()
+    if any(needle and needle in haystack for needle in needles):
+        return "text_only"
+    return "none"
+
+
+def _anchor_relevant(state: Dict[str, Any], obj: Dict[str, Any], kind: str) -> bool:
+    """Kept for callers that only need a boolean: explicit or experiment-targeted links."""
+    return anchor_link(state, obj, kind) in ("explicit", "experiment_targeted")
+
+
+def _frozen_anchor_requirements(state: Dict[str, Any]) -> List[str]:
+    contract = (state.get("contract") or {})
+    for field in ("anchor_requirements", "frozen_success_criteria"):
+        value = contract.get(field)
+        if isinstance(value, list) and value:
+            return [str(item) for item in value]
+    value = contract.get("success_criteria")
+    return [str(item) for item in value] if isinstance(value, list) else []
 
 
 def anchor_eligibility(state: Dict[str, Any], target: Optional[str] = None) -> Dict[str, Any]:
-    """Evidence decides which anchor is usable; the declared target is only a prior.
+    """Evidence decides which anchor is usable; only an explicit/experiment link counts.
 
-    Three-valued per `claim-first-policy.md` §6, but a supported claim only counts when it is
-    tied to the target anchor's success criterion.  A supporting route cannot make the project
-    primary anchor eligible, and an orthogonal route never does.
+    Three-valued per `claim-first-policy.md` §6.  A text mention is reported as `text_only`
+    and can never make the anchor eligible.  Project Objective, Research Progress,
+    Defensible Contribution, Anchor Eligibility and Anchor Satisfaction are reported
+    separately so that local progress is never mistaken for anchor achievement.
     """
     kind = (target or anchor_kind(state)).lower()
     kind = _ANCHOR_ALIAS.get(kind, kind)
-    role = _text(((state.get("contract") or {}).get("anchor_role"))
-                 or ((state.get("contract") or {}).get("route_anchor_role")))
-    relevant_supported, relevant_partial, irrelevant = [], [], []
+    contract = (state.get("contract") or {})
+    role = _text(contract.get("anchor_role") or contract.get("route_anchor_role"))
+    relevant_supported, relevant_partial, text_only, irrelevant = [], [], [], []
     for claim in _items(state, "claims"):
         if not _is_alive(claim):
             continue
         status = _text(claim.get("status"))
         if status not in ("supported", "partially-supported"):
             continue
-        if _anchor_relevant(state, claim, kind):
-            (relevant_supported if status == "supported" else relevant_partial).append(
-                str(claim.get("id")))
-        else:
+        link = anchor_link(state, claim, kind)
+        if link == "text_only":
+            text_only.append(str(claim.get("id")))
+            continue
+        if link == "none":
             irrelevant.append(str(claim.get("id")))
+            continue
+        (relevant_supported if status == "supported" else relevant_partial).append(
+            str(claim.get("id")))
     observed = [str(item.get("id")) for item in _items(state, "evidence")
                 if _evidence_qualified(item)]
+    requirements = _frozen_anchor_requirements(state)
     if role == "orthogonal":
         verdict, required = NOT_ELIGIBLE, "orthogonal 路线不参与主锚点成功判据"
     elif role == "supporting":
-        verdict, required = CONDITIONAL, (
-            "supporting 路线只能形成辅助贡献：不能直接使项目主锚点达标，"
-            "需项目级主战场路线提供与目标锚点绑定的证据")
+        verdict, required = CONDITIONAL, ("supporting 路线只能形成辅助贡献："
+                                          "不能直接使项目主锚点达标")
     elif not observed:
         verdict, required = NOT_ELIGIBLE, "缺少经资格审查的观测证据：任何 anchor 都还不可用"
     elif relevant_supported:
         verdict, required = ELIGIBLE, ""
+    elif text_only:
+        verdict, required = "unknown", ("只有文字提及目标指标、没有显式关系或实验 targeting 的"
+                                        "claim 不足以证明关联")
     elif relevant_partial:
-        verdict, required = CONDITIONAL, "与目标锚点相关的 claim 仍只是 partially-supported"
+        verdict, required = CONDITIONAL, "与目标锚点显式关联的 claim 仍只是 partially-supported"
     elif irrelevant:
         verdict, required = NOT_ELIGIBLE, (
-            "存在 supported claim，但没有一条与目标锚点/目标指标绑定："
+            "存在 supported claim，但没有一条以显式关系或实验 targeting 关联到目标锚点："
             f"不相关 claim {irrelevant} 不能使 {kind} anchor eligible")
     else:
-        verdict, required = CONDITIONAL, "需要至少一条与目标锚点绑定的 supported claim"
+        verdict, required = CONDITIONAL, "需要至少一条与目标锚点显式关联的 supported claim"
+    satisfaction = "undetermined" if not requirements else (
+        "satisfied" if (relevant_supported and not required) else "unsatisfied")
     return {"target_anchor": kind, "route_role": role or "primary", "verdict": verdict,
             "required_evidence": required, "supported_claims": relevant_supported,
-            "partial_claims": relevant_partial, "irrelevant_claims": irrelevant,
-            "observed_evidence": observed,
-            "undecidable": [] if observed else ["尚无可用观测证据"],
-            "note": "作者的目标 anchor 是 prior，不是 decision；且必须是与该锚点绑定的证据。"}
+            "partial_claims": relevant_partial, "text_only_claims": text_only,
+            "irrelevant_claims": irrelevant, "observed_evidence": observed,
+            "frozen_requirements": requirements,
+            "project_objective": _text(contract.get("goal")) or _target_metric(state, {}),
+            "research_progress": {"observed_evidence": len(observed),
+                                  "partial_claims": relevant_partial},
+            "defensible_contribution": relevant_supported,
+            "anchor_satisfaction": satisfaction,
+            "undecidable": ([] if requirements else
+                            ["未声明冻结的主锚点成功条件：缺口无法判定，不得默认已满足"])
+            + ([] if observed else ["尚无可用观测证据"]),
+            "note": "作者的目标 anchor 是 prior，不是 decision；关联必须显式或由实验 targeting。"}
 
 
 def anchor_role_errors(declaration: Dict[str, Any]) -> List[Diagnostic]:
@@ -1009,24 +1113,38 @@ def anchor_role_errors(declaration: Dict[str, Any]) -> List[Diagnostic]:
 
 
 def anchor_gap(state: Dict[str, Any], gap: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Maintain the gap to an unsatisfied primary anchor (never a new fact source)."""
+    """The real distance to the frozen primary anchor, computed from frozen requirements.
+
+    With no frozen requirements the gap is `undetermined` with a reason — never "satisfied".
+    Missing evidence is not refutation, and an unsatisfied anchor does not block method work.
+    """
     kind = anchor_kind(state)
     gap = gap if isinstance(gap, dict) else {}
     eligibility = anchor_eligibility(state, kind)
-    satisfied = [str(item) for item in gap.get("satisfied") or [] if _text(item)]
-    missing = [str(item) for item in gap.get("missing_evidence") or [] if _text(item)]
+    requirements = eligibility["frozen_requirements"]
+    provided_satisfied = [str(item) for item in gap.get("satisfied") or [] if _text(item)]
     refuted = [str(item) for item in gap.get("refuted_requirements") or [] if _text(item)]
-    interventions = [str(item) for item in gap.get("feasible_interventions") or [] if _text(item)]
-    next_test = _text(gap.get("next_discriminating_test"))
-    exits = [str(item) for item in gap.get("exit_conditions") or [] if _text(item)]
+    covered = set(eligibility["supported_claims"])
+    satisfied = [item for item in requirements if item in covered] or provided_satisfied
+    missing = [item for item in requirements if item not in satisfied]
+    status = "undetermined" if not requirements else (
+        "satisfied" if not missing and requirements else "unsatisfied")
     return {"anchor_kind": kind, "contribution": ANCHOR_CONTRIBUTION.get(kind, ""),
-            "eligibility": eligibility["verdict"], "satisfied": satisfied,
-            "missing_evidence": missing, "refuted_requirements": refuted,
-            "feasible_interventions": interventions, "next_discriminating_test": next_test,
-            "exit_conditions": exits,
+            "eligibility": eligibility["verdict"], "satisfaction": status,
+            "frozen_requirements": requirements, "satisfied": satisfied,
+            "missing_evidence": missing,
+            "refuted_requirements": refuted,
+            "feasible_interventions": [str(item) for item in
+                                       gap.get("feasible_interventions") or [] if _text(item)],
+            "next_discriminating_test": _text(gap.get("next_discriminating_test")),
+            "exit_conditions": [str(item) for item in gap.get("exit_conditions") or []
+                                if _text(item)],
+            "undetermined": ([] if requirements else
+                             ["缺少冻结的主锚点成功条件：无法计算缺口"]),
             "unsatisfied": bool(missing or refuted),
             "blocks_method_work": False,
-            "note": "主锚点尚未满足不阻止方法探索；但局部进展不等于主锚点达成。"}
+            "note": ("主锚点尚未满足不阻止方法探索；但局部进展不等于主锚点达成。"
+                     "缺少证据不等于目标已被证伪。")}
 
 
 def anchor_change_errors(change: Dict[str, Any]) -> List[Diagnostic]:
@@ -1236,13 +1354,17 @@ def method_contracts(state: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 #: Advisory text is never execution.  Only the Scheduler's own queue and the existing gates
 #: can authorise, dispatch or execute an action.
+ACTION_PROPOSED = "proposed"
+ACTION_ADMISSIBLE = "admissible"
 ACTION_ADVISORY = "advisory"
 ACTION_PLANNED = "planned"
 ACTION_AUTHORIZED = "authorized_in_queue"
 ACTION_DISPATCHED = "dispatched"
 ACTION_EXECUTED = "executed"
-ACTION_STATES = (ACTION_ADVISORY, ACTION_PLANNED, ACTION_AUTHORIZED, ACTION_DISPATCHED,
-                 ACTION_EXECUTED)
+ACTION_STATES = (ACTION_PROPOSED, ACTION_ADMISSIBLE, ACTION_PLANNED, ACTION_ADVISORY,
+                 ACTION_AUTHORIZED, ACTION_DISPATCHED, ACTION_EXECUTED)
+#: fields a queued method action must carry to authorise *this* candidate
+_AUTH_FIELDS = ("method_candidate", "method_version", "method_digest", "state_version")
 _METHOD_ACTION_TYPES = ("method_synthesis", "method_design", "method_minimal_test")
 
 
@@ -1300,9 +1422,29 @@ def planned_validity_errors(state: Dict[str, Any],
             value = other.get(field)
             if isinstance(value, list):
                 other_targets |= {str(item) for item in value}
+        # A declared independent replication is legitimate science, not a duplicate: it must
+        # name its independence (seed / experimental unit), its statistical purpose, its frozen
+        # rules and how it avoids leakage.  The *same execution event* is still a repeat.
+        replication = experiment.get("independent_replication")
+        declaration_ok = (isinstance(replication, dict)
+                          and replication.get("declared") is True
+                          and _text(replication.get("seed"))
+                          and _text(replication.get("purpose"))
+                          and _text(replication.get("leakage_avoidance")))
+        if isinstance(replication, dict) and replication.get("declared") is True and not declaration_ok:
+            problems.append(_diag(
+                "I2M84", f"experiments[{ident}].independent_replication",
+                "声明为独立复现但缺少随机种子/统计目的/防泄漏措施：不得据此绕过重复检查"))
+        event = _text(experiment.get("execution_event")) or _text(experiment.get("receipt"))
+        other_event = _text(other.get("execution_event")) or _text(other.get("receipt"))
+        if event and other_event and event == other_event:
+            problems.append(_diag(
+                "I2M85", f"experiments[{ident}]",
+                f"与 {other.get('id')} 复用同一次执行事件：同一运行不得重复计数"))
+            break
         # "Duplicate" means the same design *and* the same question: an experiment with the
         # same design but a different target is new work, not a repeat.
-        if other_targets == targets and cg.digest_of({
+        if not declaration_ok and other_targets == targets and cg.digest_of({
                 "stage": other.get("stage"), "metric": other.get("metric"),
                 "data_split": other.get("data_split"),
                 "preregistration": other.get("preregistration")}) == design:
@@ -1338,20 +1480,111 @@ def diagnosis_decision_impact(state: Dict[str, Any],
                   "方法开发之前")]
 
 
+def method_identity(state: Dict[str, Any], contract: Optional[Dict[str, Any]] = None,
+                    hypothesis: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    """The identity an action must carry to authorise this candidate method."""
+    contract = contract if isinstance(contract, dict) else (
+        _method_contract_in_state(state) or {})
+    hypothesis = hypothesis if isinstance(hypothesis, dict) else {}
+    reference = _text(contract.get("method_hypothesis_ref")) or str(hypothesis.get("id") or "")
+    method = hypothesis.get("method") if isinstance(hypothesis.get("method"), dict) else {}
+    def _identity_text(value: Any) -> str:
+        if isinstance(value, bool) or value is None:
+            return ""
+        return str(value).strip() if isinstance(value, (int, str)) else _text(value)
+
+    version = (_identity_text(contract.get("version"))
+               or _identity_text(method.get("version"))
+               or _identity_text(contract.get("method_version")))
+    digest = _text(contract.get("method_digest")) or _text(method.get("definition_digest"))
+    return {"method_candidate": reference, "method_version": str(version),
+            "method_digest": digest, "state_version": str((state or {}).get("state_version"))}
+
+
+def _authorization_errors(state: Dict[str, Any], action: Dict[str, Any],
+                          identity: Dict[str, str]) -> List[Diagnostic]:
+    """Only a queue entry bound to *this* candidate and version authorises it."""
+    problems: List[Diagnostic] = []
+    ident = _text(action.get("action"))
+    for field in ("method_candidate", "method_version", "method_digest"):
+        if not _text(action.get(field)):
+            problems.append(_diag("I2M90", f"next_actions[{ident}].{field}",
+                                  f"队列动作缺少 {field}：仅凭动作类型不得授权当前候选"))
+            continue
+        if _text(action.get(field)) != identity.get(field, ""):
+            problems.append(_diag(
+                "I2M91", f"next_actions[{ident}].{field}",
+                f"队列动作为 {action.get(field)!r}，当前候选为 {identity.get(field)!r}："
+                "其他候选的动作不能授权本候选"))
+    if _text(action.get("state_version")) != identity.get("state_version", ""):
+        problems.append(_diag("I2M92", f"next_actions[{ident}].state_version",
+                              "队列动作针对另一个 state 版本：旧授权不得复用"))
+    record = action.get("dispatch_record")
+    if action.get("dispatched") and not isinstance(record, dict):
+        problems.append(_diag("I2M93", f"next_actions[{ident}].dispatch_record",
+                              "声称已派遣但缺少有效调度记录"))
+    return problems
+
+
+def register_method_candidate(state: Dict[str, Any], contract: Dict[str, Any], *,
+                              hypothesis_id: str = "", action: str = "M1",
+                              eig: str = "medium", cost: str = "medium") -> Dict[str, Any]:
+    """The legal first-entry path for a brand-new method candidate.
+
+    Returns the `next_actions[]` entry the agent must add (with the binding fields the
+    authorisation check requires), so a new method is not permanently locked out.
+    """
+    identity = method_identity(state, contract, {"id": hypothesis_id or
+                                                 _text(contract.get("method_hypothesis_ref"))})
+    entry = {"action": action, "type": "method_synthesis",
+             "target": identity["method_candidate"] or anchor_kind(state),
+             "eig": eig, "cost": cost, **identity}
+    problems = design_contract_errors(state, contract) if isinstance(contract, dict) else \
+        [_diag("I2M94", "contract", "注册候选需要有效设计契约")]
+    return {"status": "PROPOSED" if problems else "ADMISSIBLE",
+            "entry": entry, "identity": identity,
+            "diagnostics": [item.as_dict() for item in problems],
+            "note": "写入 scheduler.next_actions[] 后，下一轮才会被授权（proposed→admissible→"
+                    "authorized_in_queue）"}
+
+
 def candidate_method_action(state: Dict[str, Any],
-                            scheduler: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """The I2M action as a Scheduler *candidate*, never as an execution."""
-    queued = {_text(item.get("type")) for item in
-              (scheduler or {}).get("next_actions") or [] if isinstance(item, dict)}
-    admitted = bool(queued & set(_METHOD_ACTION_TYPES))
+                            scheduler: Optional[Dict[str, Any]] = None,
+                            contract: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The I2M action as a Scheduler *candidate*, bound to one method identity.
+
+    An entry of the same action *type* is not enough: authorisation requires the queue entry
+    to carry this candidate's id, version, definition digest and state version.
+    """
+    contract = contract if isinstance(contract, dict) else _method_contract_in_state(state)
+    identity = method_identity(state, contract)
+    entries = [item for item in (scheduler or {}).get("next_actions") or []
+               if isinstance(item, dict) and _text(item.get("type")) in _METHOD_ACTION_TYPES]
+    blockers: List[Diagnostic] = []
+    admitted = None
+    for item in entries:
+        problems = _authorization_errors(state, item, identity)
+        if not problems:
+            admitted = item
+            break
+        blockers.extend(problems)
+    if admitted is None and entries:
+        blockers.append(_diag(
+            "I2M95", "next_actions[]",
+            "队列中存在方法类动作，但没有一条绑定到当前候选与版本：不得据类型授权"))
+    state_label = ACTION_AUTHORIZED if admitted is not None else (
+        ACTION_ADMISSIBLE if identity["method_candidate"] else ACTION_PROPOSED)
+    if identity["method_candidate"] and not entries:
+        state_label = ACTION_ADMISSIBLE
     return {"action": "M1", "type": "method_synthesis", "target": anchor_kind(state),
-            "eig": "medium", "cost": "medium",
-            "admitted": admitted,
-            "state": ACTION_AUTHORIZED if admitted else ACTION_ADVISORY,
-            "note": ("已在 Scheduler 合法动作集合中：按既有 EIG÷cost 与门禁执行"
-                     if admitted else
-                     "仅为候选动作：执行仍需它进入 Scheduler 合法集合并通过 PEIG/AALG/"
-                     "预算与授权")}
+            "eig": "medium", "cost": "medium", **identity,
+            "admitted": admitted is not None,
+            "state": state_label,
+            "authorization_errors": [item.as_dict() for item in blockers],
+            "note": ("队列条目已绑定当前候选：按既有 EIG÷cost 与门禁执行"
+                     if admitted is not None else
+                     "仅为候选动作（proposed/admissible）：执行仍需写入 scheduler."
+                     "next_actions[] 并通过 PEIG/AALG/预算与授权")}
 
 
 def _method_contract_in_state(state: Dict[str, Any], *, experiment_id: str = "",
@@ -1373,8 +1606,14 @@ def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
     if experiment_id:
         for item in candidates:
             if item["experiment_id"] == experiment_id:
+                dead = item["status"] in _DEAD_EXPERIMENT_STATUS
+                if dead:
+                    rejected.append({"experiment_id": experiment_id,
+                                     "reason": "该实验已废弃/被取代：仅作审计参考"})
                 return {"contract": item["contract"], "selected": item,
-                        "rejected": rejected, "reason": "按 experiment_id 显式指定"}
+                        "rejected": rejected, "audit_only": dead,
+                        "reason": "按 experiment_id 显式指定（"
+                                  + ("历史契约，仅审计" if dead else "当前有效") + "）"}
         rejected.append({"experiment_id": experiment_id, "reason": "不存在该实验的契约"})
     live = []
     for item in candidates:
@@ -1395,15 +1634,31 @@ def select_method_contract(state: Dict[str, Any], *, experiment_id: str = "",
     if not live:
         return {"contract": None, "selected": None, "rejected": rejected,
                 "reason": "没有有效（非废弃）的方法契约"}
-    live.sort(key=lambda item: (_contract_version(item["contract"]),
-                                str(item.get("frozen_at") or ""),
-                                item["experiment_id"]))
+    def version_key(item):
+        contract = item["contract"]
+        raw = contract.get("version", contract.get("method_version"))
+        number = raw if isinstance(raw, int) and not isinstance(raw, bool) else None
+        recorded = _text(contract.get("recorded_at")) or _text(contract.get("frozen_at")) or \
+            str(item.get("frozen_at") or "")
+        # Version number first, then recording time, then the experiment id.  The definition
+        # digest is Never used for ordering: it is a content hash, not a chronology.
+        return (0 if number is not None else 1, number if number is not None else 0,
+                recorded, item["experiment_id"])
+
+    live.sort(key=version_key)
     selected = live[-1]
     for item in live[:-1]:
         rejected.append({"experiment_id": item["experiment_id"],
                          "reason": "不是当前版本（存在更新的有效契约）"})
+    audit_only = explicit_id = False
+    for item in candidates:
+        if item["experiment_id"] == experiment_id:
+            explicit_id = True
+            audit_only = item["status"] in _DEAD_EXPERIMENT_STATUS
     return {"contract": selected["contract"], "selected": selected, "rejected": rejected,
-            "reason": "选择最新的有效契约版本"}
+            "audit_only": audit_only,
+            "reason": ("按显式 experiment_id 指定（历史契约仅用于审计，不自动视为当前有效方法）"
+                       if audit_only else "选择最新的有效契约版本（按版本号/登记时间，不用摘要排序）")}
 
 
 def contract_version_errors(state: Dict[str, Any], contract: Dict[str, Any],
@@ -1498,7 +1753,8 @@ def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
     else:
         trigger = f"diagnosis_stagnant(zero_streak={streak}, switch={switch})"
     step["trigger"] = trigger
-    step["candidate_action"] = candidate_method_action(state, scheduler)
+    step["candidate_action"] = candidate_method_action(state, scheduler, contract)
+    step["method_identity"] = method_identity(state, contract)
     step["action_state"] = step["candidate_action"]["state"]
     step["advisory"] = step["candidate_action"]["state"] != ACTION_AUTHORIZED
     step["dispatched"] = False
@@ -1516,12 +1772,12 @@ def _selftest_state() -> Dict[str, Any]:
         "contract": {"goal": "提升长尾检索的召回", "primary_anchor": "performance",
                      "constraints": [], "resources": {}, "out_of_scope": [],
                      "target_metric": "recall@10"},
-        "claims": [{"id": "C1", "status": "partially-supported",
-                    "statement": "长尾检索 recall@10 仍不足"}],
+        "claims": [{"id": "C1", "status": "partially-supported", "anchor": "performance",
+                    "target_metric": "recall@10", "statement": "长尾检索召回仍不足"}],
         "evidence": [{"id": "E1", "epistemic_status": "Observed",
                       "validity": {"status": "valid"}, "supports": ["H1"],
-                      "source_ref": "exp:X1", "verification_tier": "T2",
-                      "mechanism_support": "mechanism"}],
+                      "source_ref": "exp:X1", "verification_tier": "T3",
+                      "mechanism_support": "mechanism", "review_status": "PASS"}],
         "hypotheses": [{"id": "H1", "status": "active", "statement": "长尾被头部主导",
                         "intervention_axis": "loss_reweighting", "operator": "reframe",
                         "falsifier": "长尾召回不升", "nearest_prior": "focal loss",
@@ -1704,8 +1960,14 @@ def selftest() -> int:
     theory = {**state, "contract": dict(state["contract"], primary_anchor="theory")}
     checks.append(("理论锚点不强制转成算法",
                    anchor_path(theory, readiness=readiness)["path"] == "ANCHOR_NATIVE"))
-    checks.append(("锚点资格由与目标绑定证据决定",
+    checks.append(("锚点资格由与目标显式绑定的证据决定",
                    anchor_eligibility(state)["verdict"] == CONDITIONAL))
+    checks.append(("仅有文字提及不算显式关联",
+                   anchor_link(state, {"id": "CX", "statement": "recall@10 顺带提到"},
+                               "performance") == "text_only"))
+    checks.append(("缺失冻结条件时缺口为 undetermined",
+                   anchor_gap({**state, "contract": {"goal": "g"}})["satisfaction"]
+                   == "undetermined"))
     unrelated_claim = {**state, "claims": [{"id": "C9", "status": "supported",
                                             "statement": "与性能锚点无关的结论"}]}
     checks.append(("无关 supported claim 不能让 anchor eligible",
