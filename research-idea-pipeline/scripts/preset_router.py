@@ -1956,6 +1956,24 @@ def _loop_step(ctx: Dict[str, Any], *,
     promote a lower tier, unblock a stop rule or invent an action.
     """
     state = ctx["state"]
+    # Entry classification (single implementation: legacy_handoff.resume_decision).  A normal
+    # canonical state is Research Resume and costs nothing; a genuinely unfinished takeover or an
+    # unreadable state must not be papered over by simply running the loop.
+    resume = None
+    state_path = ctx.get("state_path")
+    if state_path is not None:
+        import legacy_handoff as legacy
+        resume = legacy.resume_decision(Path(str(state_path)))
+        if resume["route"] in (legacy.COLD_HANDOFF_ROUTE, legacy.RECOVER_OR_HOLD_ROUTE):
+            cold = resume["route"] == legacy.COLD_HANDOFF_ROUTE
+            return {"phase": "Handoff", "step": "HOLD",
+                    "action": ("该路线尚未完成接管：先执行一次性 Cold Handoff"
+                               "（legacy_handoff.py take），不得直接推进科研"
+                               if cold else
+                               "canonical state 不可读：走既有恢复/修复，不得重建 state 绕过"),
+                    "blocked": True, "hold": True,
+                    "hold_reason": "cold_handoff_required" if cold else "state_recover_required",
+                    "resume_decision": resume, "pending_r10": []}
     contract = state.get("contract") or {}
     experiments = [item for item in state.get("experiments") or [] if isinstance(item, dict)]
     if not contract:
@@ -2072,8 +2090,11 @@ def _loop_step(ctx: Dict[str, Any], *,
     # Insight-to-Method Transition. Consulted only here, after integrity, critical attack,
     # invalidation propagation, Assurance, planned work and every gate above has had its say,
     # so method synthesis can never outrank them or unblock a stop rule.
-    method_step = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
+    method_step = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                route_dir=ctx.get("route_dir"))
     if method_step:
+        if resume is not None:
+            method_step["resume_decision"] = resume
         method_step.setdefault("pending_r10", [])
         method_step["assurance"] = guarantee
         method_step["assurance_pending"] = pending
@@ -2088,7 +2109,8 @@ def _loop_step(ctx: Dict[str, Any], *,
         # Decision Adapter already performs; the hard priorities and gates are untouched.
         impact = i2m.diagnosis_decision_impact(state, actions[0])
         if impact:
-            override = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
+            override = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                     route_dir=ctx.get("route_dir"))
             if override and override.get("stage") == "synthesis":
                 override.setdefault("pending_r10", [])
                 override["assurance"] = guarantee
@@ -2800,7 +2822,8 @@ def _handle_stagnation_breaker(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
     # Advice alone never produced a method. When the state shows an actionable insight, the
     # breaker hands the Loop a concrete I2M step; the switch wording stays authoritative for
     # the diagnosis side.
-    method_step = i2m.loop_step(ctx["state"], ctx.get("scheduler"), gap=ctx.get("anchor_gap"))
+    method_step = i2m.loop_step(ctx["state"], ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                route_dir=ctx.get("route_dir"))
     return _result(preset, "OK",
                    observed={"zero_streak": stagnation["zero_streak"],
                              "reasons": stagnation["reasons"],

@@ -148,6 +148,61 @@ class TestI2MHandoff(ContinuityCase):
         self.assertEqual(self.next_step(), "sketch")
 
 
+class TestLoopLevelWiring(ContinuityCase):
+    """The production entry (`preset_router._loop_step`) must use both — not just the APIs."""
+
+    def ctx(self):
+        state = self.reload()
+        return {"state_path": self.state_path, "state": state,
+                "scheduler": {"state_version": state.get("state_version"), "next_actions": [],
+                              "eig_calibration": {"records": []}},
+                "index": {"state_version": state.get("state_version")},
+                "revisions": [], "route_dir": self.route}
+
+    def test_the_loop_resolves_a_persisted_sketch_instead_of_asking_again(self):
+        first = pr._loop_step(self.ctx())
+        self.assertEqual(first["stage"], "sketch")
+        self.write("sketch", {"problem": "p", "insight": "i", "intervention": "a",
+                              "falsifier": "f"})
+        second = pr._loop_step(self.ctx())                     # fresh ctx, files only
+        self.assertEqual(second["stage"], "synthesis")
+        self.assertEqual(second["i2m"]["artifacts"]["sketch"], "present")
+
+    def test_the_loop_classifies_a_normal_state_as_research_resume(self):
+        step = pr._loop_step(self.ctx())
+        self.assertIn("Research Resume", step["resume_decision"]["route"])
+        self.assertFalse(step.get("hold_reason") == "cold_handoff_required")
+
+    def test_the_loop_holds_an_unhanded_legacy_route_instead_of_running_research(self):
+        history = self.route / "history"
+        history.mkdir(parents=True, exist_ok=True)
+        (history / "0001.json").write_text(json.dumps({"state_version": 1}), encoding="utf-8")
+        step = pr._loop_step(self.ctx())
+        self.assertEqual(step["step"], "HOLD")
+        self.assertEqual(step["hold_reason"], "cold_handoff_required")
+        self.assertIn("Cold Handoff", step["action"])
+
+    def test_a_completed_handoff_returns_to_normal_research(self):
+        history = self.route / "history"
+        history.mkdir(parents=True, exist_ok=True)
+        (history / "0001.json").write_text(json.dumps({"state_version": 1}), encoding="utf-8")
+        cognition_dir = self.route / cg.COGNITION_DIRNAME
+        cognition_dir.mkdir(parents=True, exist_ok=True)
+        (cognition_dir / lh.HANDOFF_NAME).write_text(json.dumps({"_schema": lh.SCHEMA_HANDOFF}),
+                                                     encoding="utf-8")
+        step = pr._loop_step(self.ctx())
+        self.assertNotEqual(step.get("hold_reason"), "cold_handoff_required")
+        self.assertEqual(step["phase"], "I2M")
+
+    def test_an_unreadable_state_holds_without_rebuilding(self):
+        ctx = self.ctx()                        # build the context while the file is valid
+        self.state_path.write_text("{not json", encoding="utf-8")
+        ctx["state"] = {}                       # the classifier reads the file, not this dict
+        step = pr._loop_step(ctx)
+        self.assertEqual(step["hold_reason"], "state_recover_required")
+        self.assertNotIn("Bootstrap", step["action"])
+
+
 class TestEntryClassification(ContinuityCase):
     def test_no_state_is_bootstrap(self):
         missing = self.route / "nope.json"
@@ -193,11 +248,13 @@ class TestEntryClassification(ContinuityCase):
         self.assertIn("Research Resume", decision["route"])
 
     def test_normal_continuation_does_not_run_a_full_handoff(self):
-        """The loop path must not re-audit compatibility every wake-up."""
+        """A wake-up may *classify* the entry, but must not run the takeover machinery."""
         import inspect
         source = inspect.getsource(pr._loop_step)
-        self.assertNotIn("compatibility_audit", source)
-        self.assertNotIn("legacy_handoff", source)
+        self.assertIn("resume_decision", source)          # the cheap read-only classifier
+        self.assertNotIn("compatibility_audit", source)   # no per-round compatibility audit
+        self.assertNotIn(".take(", source)                # no takeover
+        self.assertNotIn("render_report", source)         # no repeated handoff report
 
 
 if __name__ == "__main__":
