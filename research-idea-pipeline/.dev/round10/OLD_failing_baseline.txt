@@ -1,0 +1,251 @@
+..FFF.FEFFFFFEFEEFFFF.FF
+======================================================================
+ERROR: test_a_corroborated_dispatch_is_accepted (test_rsi_hardening.TestDispatchCredential.test_a_corroborated_dispatch_is_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 251, in test_a_corroborated_dispatch_is_accepted
+    self.assertEqual(payload["dispatch_state"], "dispatched")
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'dispatch_state'
+
+======================================================================
+ERROR: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='string')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 368, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    result = pe.evaluate_candidate(case.state_path, "P-1",
+                                   case.report(mutate=bad))
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 2282, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1125, in audit_report
+    recomputed = _recompute_arm_dimensions(results, dimensions)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1009, in _recompute_arm_dimensions
+    summary[name] = {"mean": round(sum(values) / len(values), 4) if values else None,
+                                   ~~~^^^^^^^^
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+
+======================================================================
+ERROR: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='list')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 368, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    result = pe.evaluate_candidate(case.state_path, "P-1",
+                                   case.report(mutate=bad))
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 2282, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1125, in audit_report
+    recomputed = _recompute_arm_dimensions(results, dimensions)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1009, in _recompute_arm_dimensions
+    summary[name] = {"mean": round(sum(values) / len(values), 4) if values else None,
+                                   ~~~^^^^^^^^
+TypeError: unsupported operand type(s) for +: 'int' and 'list'
+
+======================================================================
+ERROR: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='object')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 368, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    result = pe.evaluate_candidate(case.state_path, "P-1",
+                                   case.report(mutate=bad))
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 2282, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1125, in audit_report
+    recomputed = _recompute_arm_dimensions(results, dimensions)
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/policy_evolution.py", line 1009, in _recompute_arm_dimensions
+    summary[name] = {"mean": round(sum(values) / len(values), 4) if values else None,
+                                   ~~~^^^^^^^^
+TypeError: unsupported operand type(s) for +: 'int' and 'dict'
+
+======================================================================
+FAIL: test_unrelated_history_does_not_back_a_global_policy (test_rsi_hardening.TestAttestationBinding.test_unrelated_history_does_not_back_a_global_policy)
+Trajectories from other policies in the same route must not count.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 307, in test_unrelated_history_does_not_back_a_global_policy
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ACTIVE' != 'INVALID'
+- ACTIVE
++ INVALID
+ : {'status': 'ACTIVE', 'written': True, 'policy_id': 'P-GLOBAL', 'seq': 6, 'reason': 'independent L3 evaluation', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_cached_action_outside_the_legal_action_set_is_not_consumed (test_rsi_hardening.TestCachedDecisionValidity.test_a_cached_action_outside_the_legal_action_set_is_not_consumed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 412, in test_a_cached_action_outside_the_legal_action_set_is_not_consumed
+    self.assertFalse(dispatch["applied"], dispatch)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : {'policy_id': None, 'advice': None, 'decision': None, 'conditions_ok': None, 'unmet': [], 'applied': True, 'action': 'R9', 'level': None, 'source': 'recorded_strategy_decision', 'reason': 'consumed_recorded_decision', 'recorded': {'state_version': 3, 'advice': None, 'discovery_operator': None, 'candidates_before': None, 'chosen': 'R9', 'adopted': True, 'strategy_applied': False, 'decision_changed': False, 'reason_if_not': None, 'hard_gates': {}, 'dispatch': {'action': 'R9'}, 'dispatch_result': 'dispatched R9'}}
+
+======================================================================
+FAIL: test_a_cached_decision_from_a_policy_no_longer_in_force_is_not_consumed (test_rsi_hardening.TestCachedDecisionValidity.test_a_cached_decision_from_a_policy_no_longer_in_force_is_not_consumed)
+Rollback changes the policy without changing the state version.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 404, in test_a_cached_decision_from_a_policy_no_longer_in_force_is_not_consumed
+    self.assertFalse(dispatch["applied"], dispatch)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : {'policy_id': None, 'advice': None, 'decision': None, 'conditions_ok': None, 'unmet': [], 'applied': True, 'action': 'R2', 'level': None, 'source': 'recorded_strategy_decision', 'reason': 'consumed_recorded_decision', 'recorded': {'state_version': 3, 'advice': {'policy_id': 'P-ROLLED-BACK'}, 'discovery_operator': None, 'candidates_before': None, 'chosen': 'R2', 'adopted': True, 'strategy_applied': True, 'decision_changed': False, 'reason_if_not': None, 'hard_gates': {}, 'dispatch': {'action': 'R2'}, 'dispatch_result': 'dispatched R2'}}
+
+======================================================================
+FAIL: test_a_claim_that_contradicts_the_telemetry_is_refused (test_rsi_hardening.TestDispatchCredential.test_a_claim_that_contradicts_the_telemetry_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 242, in test_a_claim_that_contradicts_the_telemetry_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_dispatch_record_for_another_policy_is_refused (test_rsi_hardening.TestDispatchCredential.test_a_dispatch_record_for_another_policy_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 235, in test_a_dispatch_record_for_another_policy_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_self_issued_dispatch_claim_is_refused (test_rsi_hardening.TestDispatchCredential.test_a_self_issued_dispatch_claim_is_refused)
+No scheduler telemetry: a caller-supplied dict proves nothing.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 207, in test_a_self_issued_dispatch_claim_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_simulated_credential_cannot_reach_l3 (test_rsi_hardening.TestDispatchCredential.test_a_simulated_credential_cannot_reach_l3)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 263, in test_a_simulated_credential_cannot_reach_l3
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_stale_dispatch_record_is_refused (test_rsi_hardening.TestDispatchCredential.test_a_stale_dispatch_record_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 227, in test_a_stale_dispatch_record_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_the_cli_no_longer_fabricates_a_dispatch (test_rsi_hardening.TestDispatchCredential.test_the_cli_no_longer_fabricates_a_dispatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 217, in test_the_cli_no_longer_fabricates_a_dispatch
+    self.assertEqual(payload["status"], "INVALID", payload)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'diagnostics': [], 'level': 'L2', 'policy_id': 'P-1', 'reason': 'bounded trial', 'seq': 4, 'status': 'BOUNDED_TRIAL', 'written': True}
+
+======================================================================
+FAIL: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='bool')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 371, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    self.assertIn("有限数值", " ".join(result["diagnostics"]))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '有限数值' not found in 'rsi_full.search_efficiency.mean 与逐 case 执行记录重算结果不一致（声明 None / 重算 1.0） rsi_full.search_efficiency.min 与逐 case 执行记录重算结果不一致（声明 None / 重算 True） rsi_full.search_efficiency.max 与逐 case 执行记录重算结果不一致（声明 None / 重算 True） full_cie.search_efficiency.mean 与逐 case 执行记录重算结果不一致（声明 None / 重算 1.0） full_cie.search_efficiency.min 与逐 case 执行记录重算结果不一致（声明 None / 重算 True） full_cie.search_efficiency.max 与逐 case 执行记录重算结果不一致（声明 None / 重算 True）'
+
+======================================================================
+FAIL: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='nan')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 371, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    self.assertIn("有限数值", " ".join(result["diagnostics"]))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '有限数值' not found in 'rsi_full.search_efficiency.mean 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan） rsi_full.search_efficiency.min 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan） rsi_full.search_efficiency.max 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan） full_cie.search_efficiency.mean 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan） full_cie.search_efficiency.min 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan） full_cie.search_efficiency.max 与逐 case 执行记录重算结果不一致（声明 nan / 重算 nan）'
+
+======================================================================
+FAIL: test_a_non_numeric_metric_is_a_diagnosable_refusal (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_a_non_numeric_metric_is_a_diagnosable_refusal) (label='inf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 370, in test_a_non_numeric_metric_is_a_diagnosable_refusal
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'HOLD' != 'INVALID'
+- HOLD
++ INVALID
+ : ('inf', {'status': 'HOLD', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '没有任何预先定义的收益维度取得正向改善：差异不可区分或不是收益（DIFFERENT ≠ BETTER）', 'level': 'L1', 'diagnostics': []})
+
+======================================================================
+FAIL: test_the_recorded_level_uses_the_frozen_rule_snapshot (test_rsi_hardening.TestFrozenSnapshotAndMetrics.test_the_recorded_level_uses_the_frozen_rule_snapshot)
+A customised min_cases/min_runs must give the same level everywhere.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 349, in test_the_recorded_level_uses_the_frozen_rule_snapshot
+    self.assertEqual(result["level"], "L2", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'L1' != 'L2'
+- L1
++ L2
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L1', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_repeated_run_identity_is_refused (test_rsi_hardening.TestRunDistribution.test_a_repeated_run_identity_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 162, in test_a_repeated_run_identity_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_an_uneven_distribution_cannot_masquerade_as_paired_runs (test_rsi_hardening.TestRunDistribution.test_an_uneven_distribution_cannot_masquerade_as_paired_runs)
+3+1 must not pass as two runs for each of two cases.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 148, in test_an_uneven_distribution_cannot_masquerade_as_paired_runs
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'HOLD' != 'INVALID'
+- HOLD
++ INVALID
+ : {'status': 'HOLD', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '样本不足（cases=2, runs=2, 可评维度 6）：不得宣称策略提升', 'level': 'L1', 'diagnostics': []}
+
+======================================================================
+FAIL: test_an_unpaired_run_is_refused (test_rsi_hardening.TestRunDistribution.test_an_unpaired_run_is_refused)
+A case that is missing one of the arm's runs is not a complete paired sample.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/r10-baseline/research-idea-pipeline/scripts/test_rsi_hardening.py", line 178, in test_an_unpaired_run_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L2', 'diagnostics': []}
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.325s
+
+FAILED (failures=16, errors=4)
