@@ -653,69 +653,279 @@ def synthesis_errors(state: Dict[str, Any], readiness: Dict[str, Any],
 #: The four taste axes.  They are *reasons*, never weights or a total score.
 TASTE_AXES = ("importance", "insight", "elegance", "evidence")
 
+#: Judgement vocabulary.  `indeterminate` is a first-class answer: two methods that cannot be
+#: reliably compared must not be forced into a winner.
+JUDGEMENT_PREFER = "prefer"
+JUDGEMENT_INDETERMINATE = "indeterminate"
+TASTE_JUDGEMENTS = (JUDGEMENT_PREFER, JUDGEMENT_INDETERMINATE)
 
-def _taste_reasons(candidate: Dict[str, Any], insight: Dict[str, Any]) -> Dict[str, str]:
-    """Derive one short reason per axis from fields the candidate already carries."""
-    complexity = _text(candidate.get("minimal_implementation_complexity")).lower()
+_IMPORTANCE_RANK = {"high": 2, "medium": 1, "low": 0}
+_OVERLAP_RANK = {"low": 2, "medium": 1, "high": 0}
+
+
+def _taste_reasons(candidate: Dict[str, Any], insight: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    """One short reason per axis, from fields the candidate already declares."""
+    insight = insight if isinstance(insight, dict) else {}
     return {
         "importance": _text(candidate.get("importance_reason"))
                       or _text(candidate.get("how_it_addresses")),
         "insight": _text(candidate.get("mechanism_basis"))
                    or ", ".join(str(x) for x in insight.get("insight_refs") or []),
-        "elegance": (("最小实现复杂度 " + complexity) if complexity else "")
+        "elegance": (("最小实现复杂度 " + _text(candidate.get("minimal_implementation_complexity")))
+                     if _text(candidate.get("minimal_implementation_complexity")) else "")
                     + (("；" + _text(candidate.get("why_not_simpler")))
                        if _text(candidate.get("why_not_simpler")) else ""),
-        "evidence": ", ".join(str(x) for x in candidate.get("falsifiable_predictions") or [])
-                    or _text(candidate.get("decisive_experiment")),
+        "evidence": _text(candidate.get("decisive_experiment"))
+                    or ", ".join(str(x) for x in candidate.get("falsifiable_predictions") or []
+                                 if _text(x)),
     }
 
 
-def _taste_rank(candidate: Dict[str, Any]) -> tuple:
-    """Deterministic ordering for preference: simplicity first, then decisiveness.
+def _axis_view(candidate: Dict[str, Any], insight: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Judgement *grounds* per axis, read only from declared fields.
 
-    Deliberately not a score: it is a documented tie-break over reasons, and it never
-    overrides a hard gate, a frozen protocol or scientific validity.
+    Text length and field order never enter the decision, which is what keeps the judgement
+    stable when a candidate is reworded (see the taste acceptance tests).
     """
+    reasons = _taste_reasons(candidate, insight)
+    importance = _text(candidate.get("importance_level")).lower()
+    overlap = _text(candidate.get("prior_art_overlap")).lower()
     complexity = _text(candidate.get("minimal_implementation_complexity")).lower()
-    simplicity = {"low": 0, "medium": 1, "high": 2}.get(complexity, 3)
-    # The heuristic prefers the candidate that *states* an elegance justification, a decisive
-    # experiment and a motivation - and that is simpler.  It cannot judge whether one prose
-    # motivation is scientifically more important than another; that is why the comparison
-    # returns reasons and an explicit uncertainty for a researcher (or the model) to weigh.
-    explains_simplicity = 0 if _text(candidate.get("why_not_simpler")) else 1
-    decisive = 0 if (_text(candidate.get("decisive_experiment"))
-                     or candidate.get("decisive")) else 1
-    motivated = 0 if _text(candidate.get("importance_reason")) else 1
-    return (simplicity, explains_simplicity, decisive, motivated,
-            str(candidate.get("candidate_id") or ""))
+    necessary = candidate.get("complexity_necessary")
+    good, poor = [], []
+    if importance in _IMPORTANCE_RANK:
+        (good if _IMPORTANCE_RANK[importance] >= 2 else poor if importance == "low" else
+         good if importance == "medium" else poor).append("importance")
+    elif reasons["importance"]:
+        good.append("importance")                    # a stated motivation is a ground, not proof
+    directness = _text(candidate.get("insight_directness")).lower()
+    if directness == "direct":
+        good.append("insight")
+    elif directness == "indirect":
+        poor.append("insight")
+    elif reasons["insight"]:
+        good.append("insight")
+    if necessary is True or (complexity == "low" and _text(candidate.get("why_not_simpler"))):
+        good.append("elegance")                      # necessary simplicity, justified
+    elif necessary is False and complexity in ("medium", "high"):
+        poor.append("elegance")                      # extra complexity without justification
+    elif _text(candidate.get("why_not_simpler")):
+        good.append("elegance")
+    if _text(candidate.get("decisive_experiment")) or candidate.get("decisive") \
+            or [item for item in candidate.get("falsifiable_predictions") or [] if _text(item)]:
+        good.append("evidence")
+    objections = [str(item) for item in candidate.get("objections") or [] if _text(item)]
+    risk = _text(candidate.get("novelty_risk")).lower()
+    if risk == "high" and overlap in ("low", ""):
+        # High risk with low prior-art overlap is a reason to expect a *decisive* experiment,
+        # not a reason to eliminate the candidate.
+        if "evidence" not in good:
+            objections.append("高风险新颖候选缺少决定性实验：需要先做最小判别")
+    return {"good": good, "poor": poor, "objections": objections, "reasons": reasons,
+            "declared": sum(1 for name in TASTE_AXES if reasons.get(name)),
+            "risk": risk, "overlap": _OVERLAP_RANK.get(overlap, None),
+            "complexity": complexity, "complexity_necessary": necessary}
 
 
 def compare_candidates(candidates: Sequence[Dict[str, Any]], *,
-                       insight: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """A short, reasoned preference between executable candidates - not a score.
+                       insight: Optional[Dict[str, Any]] = None,
+                       calibration: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """A short, reasoned preference between executable candidates - never a score.
 
-    Answers "which is most worth my time?" over the four taste axes, and states the biggest
-    uncertainty.  It only runs when there is a real research choice (>= 2 legal candidates);
-    a single candidate is not compared against a copy of itself.
+    Returns `prefer` with the chosen candidate, or `indeterminate` when the axes conflict and
+    neither side dominates.  Objections, the necessary-complexity question and the biggest
+    uncertainty are recorded.  `calibration` (from real experiment feedback) contributes
+    *reasons*, never a numeric weight, and never rewrites a past judgement.
     """
     insight = insight if isinstance(insight, dict) else {}
     legal = [item for item in candidates if isinstance(item, dict)]
-    if len(legal) < 2:
-        return {"preference": (legal[0].get("candidate_id") if legal else None),
-                "reasons": _taste_reasons(legal[0], insight) if legal else {},
-                "compared": False, "uncertainty": "",
-                "note": "只有一个候选：不做比较，也不制造备选"}
-    ranked = sorted(legal, key=_taste_rank)
-    best = ranked[0]
-    alternatives = [item.get("candidate_id") for item in ranked[1:]]
-    uncertainty = _text(best.get("main_uncertainty")) or (
-        "该选择的最大不确定性："
-        + (_text(best.get("failure_boundary")[0]) if isinstance(best.get("failure_boundary"), list)
-           and best.get("failure_boundary") else "尚未写明失败边界"))
-    return {"preference": best.get("candidate_id"), "reasons": _taste_reasons(best, insight),
-            "compared": True, "alternatives": alternatives, "uncertainty": uncertainty,
+    if not legal:
+        return {"judgement": JUDGEMENT_INDETERMINATE, "preference": None, "compared": False,
+                "reasons": {}, "objections": {}, "uncertainty": "没有可执行候选",
+                "axes": list(TASTE_AXES), "alternatives": [],
+                "note": "只给偏好理由，不是分数，也不是执行门禁。"}
+    views = {str(item.get("candidate_id") or f"C{index}"): _axis_view(item, insight)
+             for index, item in enumerate(legal)}
+    if len(legal) == 1:
+        only = next(iter(views.values()))
+        return {"judgement": JUDGEMENT_PREFER, "preference": next(iter(views)),
+                "compared": False, "reasons": only["reasons"], "objections": only["objections"],
+                "uncertainty": _text(legal[0].get("main_uncertainty")),
+                "axes": list(TASTE_AXES), "alternatives": [],
+                "note": "只有一个候选：不做比较，也不制造备选。"}
+    ranked = sorted(views.items(), key=lambda pair: pair[0])       # id order: order-stable
+    ordering = []
+    for ident, view in ranked:
+        ordering.append((ident, len(view["good"]) - len(view["poor"]), len(view["good"]),
+                         view["declared"]))
+    ordering.sort(key=lambda row: (-row[1], -row[2], -row[3], row[0]))
+    best_id, best_margin = ordering[0][0], ordering[0][1]
+    second_id, second_margin = ordering[1][0], ordering[1][1]
+    best, second = views[best_id], views[second_id]
+    conflicts = set(best["poor"]) & set(second["good"]) or set(second["good"]) & set(second["poor"])
+    judgement = JUDGEMENT_PREFER
+    reason = ""
+    if best_margin == second_margin and best["good"] == second["good"]:
+        judgement = JUDGEMENT_INDETERMINATE
+        reason = "两个候选的判据强度相同：无法可靠区分，不制造胜者"
+    elif best_margin <= second_margin and conflicts:
+        judgement = JUDGEMENT_INDETERMINATE
+        reason = f"判据冲突（{best_id} 强于 {sorted(set(best['good']))}，"                  f"{second_id} 强于 {sorted(set(second['good']))}）：无法可靠比较"
+    elif best["declared"] == 0 and second["declared"] == 0:
+        judgement = JUDGEMENT_INDETERMINATE
+        reason = "双方都没有可核验的判断理由：结构非空不等于语义正确"
+    preference = best_id if judgement == JUDGEMENT_PREFER else None
+    uncertainty = ""
+    if preference:
+        chosen = next(item for item in legal
+                      if str(item.get("candidate_id") or "") == preference)
+        uncertainty = _text(chosen.get("main_uncertainty")) or (
+            "最大不确定性：" + (str(chosen.get("failure_boundary")[0])
+                                if isinstance(chosen.get("failure_boundary"), list)
+                                and chosen.get("failure_boundary") else "尚未写明失败边界"))
+    hints = []
+    if isinstance(calibration, dict):
+        for item in calibration.get("signals") or []:
+            if isinstance(item, dict) and _text(item.get("hint")):
+                hints.append(str(item["hint"]))
+    return {"judgement": judgement, "preference": preference,
+            "compared": True, "reasons": best["reasons"],
+            "objections": {**best["objections"], **({"against": second["objections"]}
+                                                     if isinstance(second["objections"], dict)
+                                                     else {})}
+            if isinstance(best["objections"], dict) else best["objections"],
+            "complexity": {"chosen": best["complexity"],
+                           "necessary": best["complexity_necessary"],
+                           "justification": _text(
+                               next((item for item in legal
+                                     if str(item.get("candidate_id") or "") == best_id), {})
+                               .get("why_not_simpler"))},
+            "uncertainty": uncertainty or reason,
+            "alternatives": [ident for ident, _ in ranked if ident != best_id],
+            "reconsider_if": "新证据改变任一判据，或未选候选获得决定性实验时重新比较",
+            "calibration_hints": hints,
             "axes": list(TASTE_AXES),
-            "note": "这是偏好理由，不是分数，也不是执行门禁；硬门禁、冻结协议与科学有效性优先。"}
+            "note": "偏好理由，不是分数，也不是执行门禁；硬门禁、冻结协议与科学有效性优先。"}
+
+
+#: Discovery operators grouped by the contribution paradigm they tend to produce.  Used only to
+#: report homogenisation - no quota, no novelty score, no new operator.
+PARADIGM_FAMILIES = {
+    "fusion_or_local": ("mutation", "crossover", "local", "simplification"),
+    "theory_or_mechanism": ("theory_induced", "theory_lens", "reframe", "abstraction"),
+    "counterexample_or_boundary": ("counterexample", "assumption_breaker"),
+    "representation_change": ("reframe", "remote_analogy", "new_niche"),
+}
+
+
+def exploration_balance(state: Dict[str, Any],
+                        candidates: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """Report whether current candidates all come from one contribution paradigm.
+
+    Reuses `hypotheses[].operator` / `niche` / `island` (the existing QD archive fields) plus any
+    candidate-level `operator`.  It flags homogenisation and names the open directions; it sets no
+    quota, forbids nothing and adds no score.
+    """
+    items = [item for item in (candidates if candidates is not None else _items(state, "hypotheses"))
+             if isinstance(item, dict)]
+    counts: Dict[str, int] = {name: 0 for name in PARADIGM_FAMILIES}
+    operators: List[str] = []
+    for item in items:
+        operator = _text(item.get("operator")) or _text(item.get("discovery_operator"))
+        if operator:
+            operators.append(operator)
+        for family, members in PARADIGM_FAMILIES.items():
+            if operator in members:
+                counts[family] += 1
+    populated = {family: count for family, count in counts.items() if count}
+    homogeneous = len(populated) == 1 and len(items) > 1
+    fused_only = homogeneous and "fusion_or_local" in populated
+    return {"candidates": len(items), "operators": sorted(set(operators)),
+            "paradigms": populated,
+            "homogeneous": homogeneous, "fusion_or_local_only": fused_only,
+            "open_directions": [family for family in PARADIGM_FAMILIES if not counts[family]],
+            "assessment": ("当前候选集中在同一贡献范式（多为融合/局部优化）："
+                           "优先检查是否缺少机制、表示、反例或失效边界方向"
+                           if fused_only else
+                           "候选覆盖多个贡献范式" if not homogeneous else
+                           "候选只覆盖一个贡献范式，但该范式本身是实质性方向"),
+            "note": "只用于发现同质化，不设配额、不新增算子、不产生新颖性评分。"}
+
+
+# ---- phase 4: real execution feedback calibrates future judgement -----------------------
+def feedback_path(route_dir: Any, hypothesis_id: str) -> pathlib.Path:
+    return methods_dir(route_dir) / f"feedback-{''.join(ch for ch in hypothesis_id if ch.isalnum() or ch in '-_') or 'route'}.json"
+
+
+def record_outcome_feedback(route_dir: Any, hypothesis_id: str, *,
+                            experiment_id: str, outcome: str,
+                            supported_axes: Sequence[str] = (),
+                            weakened_axes: Sequence[str] = (),
+                            judgement: str = "", source: str = "") -> Dict[str, Any]:
+    """Append what a real result did to a past judgement.  History is never rewritten.
+
+    One experiment is recorded once (by `experiment_id`); re-recording the same id is a no-op.
+    A single failure is a data point about a *method*, not a verdict on an exploration paradigm.
+    """
+    path = feedback_path(route_dir, hypothesis_id)
+    entries: List[Dict[str, Any]] = []
+    if path.is_file():
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(document, dict) and isinstance(document.get("entries"), list):
+                entries = [item for item in document["entries"] if isinstance(item, dict)]
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            entries = []
+    if any(str(item.get("experiment_id")) == str(experiment_id) for item in entries):
+        return {"status": "UNCHANGED", "written": False, "path": str(path),
+                "reason": "该实验的反馈已记录：不重复消费同一结果"}
+    entry = {"experiment_id": str(experiment_id), "outcome": _text(outcome),
+             "judgement": _text(judgement), "source": _text(source),
+             "supported_axes": [axis for axis in supported_axes if axis in TASTE_AXES],
+             "weakened_axes": [axis for axis in weakened_axes if axis in TASTE_AXES],
+             "recorded_at": ""}
+    entries.append(entry)
+    document = {"_schema": "research-idea-pipeline/taste-feedback@1",
+                "hypothesis_id": str(hypothesis_id), "entries": entries}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"status": "WRITTEN", "written": True, "path": str(path), "entries": len(entries)}
+
+
+def taste_calibration(route_dir: Any, hypothesis_id: str, *,
+                      min_evidence: int = 2) -> Dict[str, Any]:
+    """Source-bound, scope-limited calibration hints derived from recorded feedback.
+
+    Returns per-axis support/weaken counts and hints with their `n` and scope.  It is a *hint*
+    for `compare_candidates`, never a weight, and it never re-scores or edits a past judgement.
+    """
+    path = feedback_path(route_dir, hypothesis_id)
+    entries: List[Dict[str, Any]] = []
+    if path.is_file():
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+            entries = [item for item in (document.get("entries") or []) if isinstance(item, dict)]
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            entries = []
+    signals: List[Dict[str, Any]] = []
+    for axis in TASTE_AXES:
+        supported = sum(1 for item in entries if axis in (item.get("supported_axes") or []))
+        weakened = sum(1 for item in entries if axis in (item.get("weakened_axes") or []))
+        if supported + weakened == 0:
+            continue
+        hint = ""
+        if supported + weakened >= min_evidence and supported > weakened:
+            hint = f"{axis} 判据过去 {supported}/{supported + weakened} 次被结果支持：可作为偏好依据之一"
+        elif supported + weakened >= min_evidence and weakened > supported:
+            hint = (f"{axis} 判据过去 {weakened}/{supported + weakened} 次被结果削弱："
+                    "比较时应要求更强的直接理由")
+        signals.append({"axis": axis, "supported": supported, "weakened": weakened,
+                        "n": supported + weakened, "hint": hint,
+                        "scope": f"仅本路线 {hypothesis_id} 的已记录实验结果"})
+    return {"hypothesis_id": str(hypothesis_id), "entries": len(entries), "signals": signals,
+            "min_evidence": min_evidence,
+            "note": "校准信号有来源与适用范围；一次失败不推断整个范式无价值，"
+                    "也不替代科学证据或 Anchor Satisfaction。"}
 
 
 def method_sketch_errors(sketch: Dict[str, Any]) -> List[Diagnostic]:
@@ -2293,6 +2503,13 @@ def _selftest_insight_with(**overrides):
     return payload
 
 
+def i2m_exploration_probe(state):
+    probe = {**state, "hypotheses": [{"id": "H1", "operator": "mutation"},
+                                     {"id": "H2", "operator": "crossover"}]}
+    report = exploration_balance(probe)
+    return report["fusion_or_local_only"] and bool(report["open_directions"])
+
+
 def selected_contract_probe(state: Dict[str, Any]):
     """Two contracts, an abandoned one first: the newest live version must win."""
     old = {"method_digest": "d0", "method_hypothesis_ref": "H1"}
@@ -2492,10 +2709,19 @@ def selftest() -> int:
                    "I2M18" in _rules(synthesis_errors(state, readiness,
                                                       [dict(candidates[0])]))))
     taste_result = synthesize_methods(state, readiness, candidates)["taste"]
-    checks.append(("两候选给出偏好而非评分",
+    checks.append(("两候选判断落在 prefer/indeterminate 且无评分",
                    taste_result["compared"] and "score" not in taste_result
-                   and taste_result["preference"] in ("M1", "M2")))
+                   and taste_result["judgement"] in TASTE_JUDGEMENTS))
+    grounded = [dict(candidates[0], importance_level="high", insight_directness="direct",
+                     decisive_experiment="d", why_not_simpler="w", complexity_necessary=True),
+                dict(candidates[1], importance_level="low")]
+    checks.append(("判据充分时给出偏好",
+                   compare_candidates(grounded)["preference"] == "M1"))
+    checks.append(("无判据时判为 indeterminate",
+                   compare_candidates([{"candidate_id": "A"}, {"candidate_id": "B"}])
+                   ["judgement"] == JUDGEMENT_INDETERMINATE))
     checks.append(("单候选不做比较", not compare_candidates([candidates[0]])["compared"]))
+    checks.append(("同质化可被识别", i2m_exploration_probe(state)))
     checks.append(("方法草案四问校验", not method_sketch_errors(
         {"problem": "p", "insight": "i", "intervention": "a", "falsifier": "f"})))
     checks.append(("缺失草案字段被拒绝", _rules(method_sketch_errors({"problem": "p"}))))
