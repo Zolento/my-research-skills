@@ -315,6 +315,59 @@ B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用�
 
 ---
 
+### 0.4 Insight-to-Method Transition（I2M）
+
+> **核心行为约束（逐字）：** 科研诊断必须服务于一个**可改变的研究决定**。发现可操作的机制后，
+> 应优先设计**具体方法及最小判别干预**，而非继续无限细化解释。**方法贡献必须由实际算法变化
+> 与可信实验支持，不能仅通过叙事声称。**
+
+推进逻辑：`Problem → Insight → Method Synthesis → Minimal Intervention → Method Development
+→ Validation → Contribution`。机制发现对**方法类**研究不是终点，而是提出新算法、新目标、
+新结构或新训练/求解策略的基础；但**不得强行编造方法**。
+
+**五步（不新增 R 阶段、不新增第九类对象、不建平行状态机）：**
+
+| 步骤 | 产物 | 落点（复用既有对象） |
+|---|---|---|
+| **A. Insight Readiness** | 六项判据的就绪结论 + 机制是「已验证/仍是假设/无法形成干预」 | 由 `hypotheses[]`（`statement`/`operator`/`intervention_axis`/`falsifier`/`nearest_prior`/`novelty_source`）与 `uncertainties[].cheapest_discriminating_test` 派生；不自建事实源 |
+| **B. Method Synthesis** | 2—3 种有**实质差异**的干预方案 + 七项对比 | `hypotheses[].method`（R3/R6 已拥有该集合）|
+| **C. Method Design Contract** | 15 个必填字段（`problem_ref`…`evidence_status`） | `experiments[].preregistration.method_contract`（R8 的既有冻结机制）+ 决策记录 |
+| **D. Minimal Intervention Test** | 预注册指标/判据/停止条件 + 公平性核验 | R8 登记 `planned` 实验；PEIG / AALG / 预算 / 人工审批门禁**不变** |
+| **E. Method Development Loop** | 设计→实现→有效性→消融→公平对比→泛化→贡献 | 每轮必须回答「方法真的变了吗 / 哪项新证据支持它 / 是否更接近主锚点 / 继续还是终止」|
+
+**边界与禁止项：**
+
+- readiness **不是科学证实**：可以基于未完全证实的机制提出方法，但必须标为假设并在干预中同时检验。
+- 纯超参数调整**不算**方法合成；候选不得同构凑数；未经核实的创新性不得写成事实。
+- 最小实验失败必须区分**实现错误 / 干预无效 / 机制被削弱 / 实验不可判别**，
+  **不得自动归因，也不得事后修改预注册判据**。
+- **新增解释、文档、实验数量或自评得分都不算方法进展**；进展要求方法指纹变化 **且**有新执行证据。
+  同一证据快照下重复改写解释**不得重置**停滞计数。
+- 生成候选、改写报告、策略自评**不得**作为 RSI 的 L3 能力提升证据（`PE17`）。
+
+**主锚点兼容（不得把方法创新强加给所有项目）：**
+
+- 方法/性能主锚点 → 优先 `METHOD_SYNTHESIS`（可执行算法与干预）；
+- 理论 / 现象 / 基准 / 可行性 / 负结果主锚点 → `ANCHOR_NATIVE`，产出各自可验证的贡献，
+  **不强制转成算法**；
+- **Method Readiness、Anchor Eligibility、Anchor Satisfaction 是三个不同的判断**：
+  主锚点尚未满足**不构成**阻止方法探索的理由；但**局部进展或辅助贡献不得被误判为主锚点达成**。
+- 持续维护 **Anchor Gap**（已满足条件 / 缺失证据 / 被否定的要求 / 可行干预 / 下一步判别实验 /
+  退出条件），优先做能缩小关键缺口的事，而不是反复生成解释。
+- 路线无法直接服务主锚点时：先检查是否存在**可证伪的** `serving`（`serves` + `serves_evidence`
+  + 会改变哪个下游决策及其可测影响）；答不出只能标 `orthogonal` 并保留其独立价值，
+  **不得作为原项目投稿主线**。
+- 证据表明主锚点不可达时，只能通过既有 **R14 与 §0.2** 提请调整；
+  **agent 不得自行替换主锚点、放宽冻结成功标准，或通过修改叙事制造达标**。
+
+**运行时落点：** `scripts/insight_to_method.py`（readiness/synthesis/contract/minimal-test/progress/
+anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_step` 末尾、`stagnation-breaker`），
+因此它**不会**越过完整性、未决攻击、失效传播、PEIG/AALG、预算或人工审批；
+`references/scheduler-policy.md` §3.1 与 §4 给出可执行规则与 `method_synthesis` 动作类型。
+
+**每轮面向用户的汇报形态：** `Problem / Insight / Method / Evidence / Next Decision`（五段），
+而不是长篇归因报告。
+
 ## 1. 全局不变量（所有 R 阶段强制遵守）
 
 以下六条是硬约束，任何 R 阶段都不得违反。执行前先确认，输出时自检。

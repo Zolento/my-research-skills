@@ -85,6 +85,21 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 - 同一结果、同一证据快照下，不重复审计。只有新证据或明确未完成项才触发复核。
 - 资源被占用时，继续候选推导、代码实现或独立低成本测试。不要反复轮询代替研究。
 
+**运行时可执行的 I2M 规则（`scripts/insight_to_method.py`，优先级 4—8 之内生效）：**
+
+- 机制证据足以形成干预时，**方法合成进入可执行动作集合**：动作 `type` 取 `method_synthesis`
+  （首选）、`method_design`、`method_minimal_test`（见 §4 类型表），其产物是方法候选 +
+  设计契约 + 最小干预测试计划，而不是又一份解释。
+- I2M **只在优先级 1—3 与既有门禁之后**被咨询（`preset_router._loop_step` 的末尾）：
+  它不得越过完整性、未决攻击、失效传播、PEIG、AALG、预算或人工审批，也不得解阻 stop rule。
+- 触发条件：`eig_calibration` 连续 ≥2 次 `actual_information_gain == "zero"`，
+  或 `diagnosis_switch` 给出 `CONTINUE_ATTRIBUTION` 以外的结论，或已存在冻结的方法契约。
+  **判据是执行记录，不是叙述**：同一证据快照下反复改写解释不会重置该计数。
+- readiness 不足时，动作是「补做能改变方法决定的判别实验」，**不得**强行包装成新方法。
+- 主锚点不是方法/性能时，I2M 走 `anchor_native` 分支，产出该锚点自己的贡献类型
+  （理论/现象/基准/可行性/负结果），**不把非方法锚点强行转成算法**。
+- 非配对或未核验的对照不得进入方法收益结论；方法进展必须同时有新证据与方法指纹变化。
+
 在对应阶段产物的动作说明中记录依赖、预期改变的决定和重选条件，按 `next_actions[].action` 关联。
 方法检索调用见 [phase-r2-r5-field-mapping-retrieval.md](phase-r2-r5-field-mapping-retrieval.md) §R5.1。
 不增加评分或 state 对象。优先级 4 延后时，说明它为何不再阻塞当前探索。
@@ -112,7 +127,7 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
 | 字段 | 取值 | 说明 |
 |---|---|---|
 | `action` | 字符串 | 动作标识（可引用 `X<n>` / `H<n>` / `P<n>` / `R<n>`） |
-| `type` | `discriminating_experiment` \| `remote_analogy` \| `literature_collision` \| `repair` \| `propagate_invalidation` \| `narrative` | 动作类别 |
+| `type` | `discriminating_experiment` \| `remote_analogy` \| `literature_collision` \| `repair` \| `propagate_invalidation` \| `narrative` \| `method_synthesis` \| `method_design` \| `method_minimal_test` | 动作类别。三个 `method_*` 由 §3.1 的 I2M 规则产生：合成候选、冻结设计契约、执行最小干预测试；它们不提升优先级，只在同层内可选 |
 | `target` | 字符串 | 作用对象（`U`/`C`/`H`/`AS` 的 id 或 `P<n>`） |
 | `eig` | `high` \| `medium` \| `low` \| `unknown` | **LLM 估计**的期望信息增益；**必须按 §6.1 校准**。排序时把它连同 ①改哪条 `U` / ②预期方向 / ③成本口径一起写进 `predicted_information_gain`（**生产者在 R9，消费者在 R11**） |
 | `cost` | `high` \| `medium` \| `low` | 成本档（口径见 `phase-r9-r11-experiment-loop.md` §R9） |

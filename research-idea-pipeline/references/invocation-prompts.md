@@ -102,6 +102,13 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 **先区分意图。**「下一步建议是什么」只要求建议。「接着做」「继续探索方法」授权执行。
 用户明确要求只给建议时，给出建议后停止。不得把执行请求默认改成咨询。
 
+**默认是 Method-Driven，但边界不变。** 诊断服务于一个**可改变的研究决定**；一旦出现可操作
+的机制，优先设计具体方法与最小判别干预，而不是继续细化解释。汇报按
+**Problem / Insight / Method / Evidence / Next Decision** 五段给，不写长篇归因报告。
+主锚点不是方法/性能时，按该锚点自己的贡献类型推进（`insight_to_method.anchor_path`）。
+**只读咨询、明确审计（`audit`）、`explore` 与非方法主锚点各自的权限边界不变**：
+未授权时不推进状态，`orthogonal` 路线仍不得作为投稿主线，改主锚点仍只能由用户授权（§0.2）。
+
 执行请求下，在已授权范围内循环：
 
 1. 核对 state、scheduler 与最新实验产物。记录尚未核实的差异。

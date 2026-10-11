@@ -16,6 +16,11 @@
 用户要求“继续科研、自动运行、持续 Loop”。已初始化项目直接继续，绝不重新 Bootstrap。只在已经授权的范围内持续推进。
 
 - 中文意图：在既有 R0—R14 与硬门禁内，按 Recall→Understand→Discover→Predict→Intervene→Verify→Revise→Consolidate→Loop 持续推进，直到停止条件出现
+- **I2M 分支（默认启用）**：当诊断连续零信息增益或 `diagnosis_switch` 不再返回
+  `CONTINUE_ATTRIBUTION` 时，本轮不是再写一份解释，而是走
+  `Insight 就绪 → 方法合成 → 设计契约（R8 冻结）→ 最小干预测试（PEIG/AALG 不变）→ 方法进展判定`；
+  未能形成可执行干预时，输出「判别实验 / 重定义 / 停止」，不得强行制造方法。
+  主锚点为理论/现象/基准/可行性/负结果时走锚点原生贡献路径，不转算法。
 - English intent: run the CIE scientific loop inside the existing stages and gates
 - 入口 `continue-research`；授权 `execute`；共同约束见 [shared-contract.md](../shared-contract.md)。
 
