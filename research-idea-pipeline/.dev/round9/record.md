@@ -166,3 +166,58 @@ C 的 SUSPECTED 中「变异测试写真实仓库文件导致并发互相破坏�
    未合并（不同域），但因此**没有**互相覆盖。
 4. 任务真实性与「外部确实执行过」仍不可验证；**L3 仍未验证**（无真实科研 A/B）。
 5. 并发仍只在同机多线程/多进程验证。
+
+---
+
+## 附录二：子代理 D（测试质量）——存活变异与处置
+
+`R8-D-test-quality.md`：43 个变异 → 30 杀死 / **13 存活**；子代理把其中 12 个重放到 `dda4fe3`
+确认**仍然存活**（即这些保护被削弱时测试不会报警）。Lead 逐个补测试并验证变异被杀死。
+
+| 变异 | 原缺口 | 处置 | 变异是否已被杀死 |
+|---|---|---|---|
+| D-1 | 只测了显式 `isolation_verified=False`，未测**键缺失** | 新测试：删掉该键 + 有批准 → 拒绝 | **杀死** |
+| D-2 | 晋升重审是否使用冻结规则无测试 | 新测试：冻结 0.5 容差，把间隙改成 0.3 → 拒绝且诊断为 `UNDIFFERENTIATED` | **杀死** |
+| D-3 | 重叠区间收益：原测试是**空转**（fixture `min==max`，且被样本不足拒绝） | 重写该测试（真实重叠）并新增独立用例 | **杀死** |
+| D-4 | `audit_report` 跨臂 case 集合检查无测试（只测了凭证路径） | 新测试经 `evaluate_candidate` 驱动 | **杀死** |
+| D-5 | `audit_report` 的 `cases×runs` 记录数检查无测试 | 新测试：`runs=3` 但只有 8 条记录 | **杀死** |
+| D-6 | 非 SUPPORTED 拒绝：原测试无批准 → 被 `PE15` 掩盖 | 新测试：**先批准**再提交被拒凭证；并断言拒绝来自凭证检查本身 | **杀死** |
+| D-7 | 试运行等级忽略 `budget_expanded`/`hard_gates_unchanged` | 新测试直接断言三种组合的等级 | **杀死** |
+| D-8 | 批准的策略签名/规则绑定无测试 | 新测试断言两种不匹配都必须报 `PE15` | **杀死**（并因此发现**真实代码缺陷**，见下）|
+| D-9 | global 作用域 `evaluation_refs` 为空时跳过背书要求 | 新测试：空 `evaluation_refs` + 零背书项目 → `PE14` | **杀死** |
+| D-10 | 陈旧 `outcome.at_state_version` 被接受 | — | **未处理（仍在案）** |
+| D-11 | 宽迁移作用域 + <2 背书项目被接受 | — | **未处理（仍在案）** |
+| D-12 / D-23 | 冗余分支（被另一道护栏掩盖） | — | **未处理；属纵深防御冗余，非缺陷** |
+
+### 通过 D 的变异信号发现的**真实代码缺陷**（D-8）
+
+`approval_errors()` 逐条累计拒绝理由后**无条件 `return []`**：即「批准针对另一个策略版本」
+「批准针对另一版评价规则」这两条理由被记录后又被丢弃 —— **签名与规则绑定实际上没有生效**
+（`latest_valid_approval()` 一直是正确的，所以只有这条函数不对）。已修（每条事件单独判定，
+全部通过才 `return []`），并由新测试与变异覆盖。
+
+### D-19 / D-20（诚实性与卫生）
+
+- **D-19**：`policy_evolution` / `source_freeze` / `decision_trajectory` / `rsi_ablation` 的
+  `selftest()` 从未被 `unittest discover` 调用（`rsi_ablation` 却把它们的通过当作 L1 证据）。
+  **已修**：`release_check.step_selftest` 现在运行 **6 个**模块 selftest（`state_check` +
+  上述 4 个 + `policy_transfer`），任一不过即闸门 FAIL。当前：`6/6 module selftests OK`。
+- **D-20**：`test_a_store_pointed_into_the_skill_source_is_refused` 在护栏失效时会**把探针文件
+  留在技能源码目录**，污染同树后续测试（子代理的第一批数据即因此失效）。**已修**：`finally`
+  中清理 `_rsi_probe.jsonl(.head/.lock)`。
+
+### 本轮新增测试与最终计数
+
+| 项 | 值 |
+|---|---|
+| 新增 | `test_round9_coverage_gaps.py`（9 项）+ `test_execution_gate.py` 1 项 + `test_round9_findings.py` 19 项 |
+| 全量单元测试 | **1850 OK（skipped=3）** |
+| `release_check.py` | **PASS（18 步，含 6 个模块 selftest）** |
+| 变异验证 | 上表 D-1…D-9 **9/9 已被杀死**（逐条在临时副本中重放确认）|
+| 确定性 | 子代理确认：2 次默认运行 + `PYTHONHASHSEED` 0/1/424242 均 OK |
+
+### 仍未处理（如实记录）
+
+1. **D-10** 陈旧 `outcome.at_state_version` 被接受、**D-11** 宽迁移作用域 + <2 背书项目 —— 仍是覆盖缺口。
+2. D-12/D-23 冗余分支：被另一道护栏掩盖，属纵深防御，不建议为它们单独加测试。
+3. 其余限制同前（人工批准为协议级门、`Ledger` 崩溃窗口、L3 未验证、并发仅同机）。

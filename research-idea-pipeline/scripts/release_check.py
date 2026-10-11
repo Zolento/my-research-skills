@@ -145,12 +145,23 @@ def step_tests() -> Tuple[bool, str]:
     return code == 0, " · ".join(tail) or out.strip()[-160:]
 
 
+#: Modules with a `--selftest`. `unittest discover` never invokes these, so without this step a
+#: regression inside them would be invisible (and the L1 evidence they are cited for ungated).
+SELFTEST_MODULES = ("state_check", "decision_trajectory", "policy_evolution", "policy_transfer",
+                    "source_freeze", "rsi_ablation")
+
+
 def step_selftest() -> Tuple[bool, str]:
-    code, out = _run(["scripts/state_check.py", "--selftest"])
-    lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
-    summary = next((line for line in reversed(lines) if "selftest" in line.lower()),
-                   lines[-1] if lines else "no output")
-    return code == 0, f"{summary}（exit={code}）"
+    passed = []
+    for module in SELFTEST_MODULES:
+        code, out = _run([f"scripts/{module}.py", "--selftest"])
+        lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
+        summary = next((line for line in reversed(lines) if "selftest" in line.lower()),
+                       lines[-1] if lines else "no output")
+        if code != 0 or "selftest OK" not in summary:
+            return False, f"{module}.py --selftest did not pass: {summary[:120]}（exit={code}）"
+        passed.append(module)
+    return True, f"{len(passed)}/{len(SELFTEST_MODULES)} module selftests OK"
 
 
 def step_template() -> Tuple[bool, str]:

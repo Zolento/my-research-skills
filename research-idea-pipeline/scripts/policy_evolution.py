@@ -1751,16 +1751,20 @@ def approval_errors(state_path: Path, *, policy_id: str,
                       "没有匹配该凭证的人工批准记录（批准绑定的是凭证内容摘要）")]
     reasons: List[str] = []
     for event in matches:
+        problems: List[str] = []
         if event.get("attested_by") != "human" or event.get("confirm_human") is not True:
-            reasons.append("批准记录没有人类确认")
+            problems.append("批准记录没有人类确认")
         if signature is not None and event.get("policy_signature") != signature:
-            reasons.append("批准针对另一个策略版本")
+            problems.append("批准针对另一个策略版本")
         if rules_digest is not None and event.get("rules_digest") != rules_digest:
-            reasons.append("批准针对另一版评价规则")
+            problems.append("批准针对另一版评价规则")
         if float(event.get("expires_at") or 0) <= now:
-            reasons.append("人工批准已过期")
-            continue
-        return []
+            problems.append("人工批准已过期")
+        if not problems:
+            return []
+        # The reasons used to be recorded and then discarded by an unconditional `return []`,
+        # so a signature or rule binding mismatch was silently accepted.
+        reasons.extend(problems)
     return [_diag("PE15", path_label, "；".join(sorted(set(reasons))))]
 
 

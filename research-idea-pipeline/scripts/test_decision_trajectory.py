@@ -439,10 +439,21 @@ class TestWriteGuardIsWired(unittest.TestCase):
 
     def test_a_store_pointed_into_the_skill_source_is_refused(self):
         import source_freeze as sf
-        with self.assertRaises(dt.TrajectoryError):
-            dt.append_chained(pathlib.Path(sf.SKILL_ROOT) / "scripts" / "_rsi_probe.jsonl",
-                              {"_schema": "x", "record": "candidate", "policy_id": "P"})
-        self.assertFalse((pathlib.Path(sf.SKILL_ROOT) / "scripts" / "_rsi_probe.jsonl").exists())
+        probe = pathlib.Path(sf.SKILL_ROOT) / "scripts" / "_rsi_probe.jsonl"
+        try:
+            with self.assertRaises(dt.TrajectoryError):
+                dt.append_chained(probe, {"_schema": "x", "record": "candidate",
+                                          "policy_id": "P"})
+            self.assertFalse(probe.exists())
+        finally:
+            # If the guard regresses the write succeeds; leaving the probe behind would then
+            # break unrelated source-freeze tests in every later run in the same tree.
+            for candidate in (probe, dt.head_path(probe),
+                              probe.with_name(probe.name + ".lock")):
+                try:
+                    candidate.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def test_a_route_store_is_still_writable(self):
         with tempfile.TemporaryDirectory() as temp:

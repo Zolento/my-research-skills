@@ -514,6 +514,92 @@ class TestFrozenParameters(CredentialCase):
         self.assertEqual(outcome["verdict"], "REJECTED", outcome)
 
     def test_an_overlapping_benefit_is_not_counted_as_evidence(self):
+        """A mean gap inside overlapping ranges is reported but must not promote.
+
+        The earlier version of this test was vacuous: its fixture declared min == max, so no
+        range ever overlapped and the case was rejected for insufficient sample instead. The
+        proper construction lives in test_round9_coverage_gaps.
+        """
+        dimensions = rr.METRIC_DIMENSIONS
+
+        def arm(mean, low, high):
+            return {"dimensions": {name: {"mean": mean, "min": low, "max": high}
+                                   for name in dimensions},
+                    "results": [{"case_id": f"C{i}", "leak_checked": True,
+                                 "isolation_verified": True,
+                                 "evaluation": {"metrics": {name: {"value": mean}
+                                                            for name in dimensions},
+                                                "evidence_support": {"class": "OBSERVED"}}}
+                                for i in range(3)] * 2,
+                    "evidence_support": {"OBSERVED": 6}}
+
+        document = {"schema": "research-idea-pipeline/replay-ablation@1", "cases": 3,
+                    "runs_per_case": 2, "runner": "test harness", "sufficient_sample": True,
+                    "unobservable_decisions": 0, "delta_vs_baseline": {},
+                    "per_arm": {"rsi_full": arm(0.9, 0.10, 1.00),
+                                "full_cie": arm(0.3, 0.00, 0.90)}}
+        outcome = pe.ablation_verdict(document, rules=pe.frozen_rules(self.state_path))
+        block = outcome["comparison"]["dimensions"][BENEFIT]
+        self.assertTrue(block["overlapping"], block)
+        self.assertFalse(block["confident"], block)
+        self.assertEqual(outcome["uncertain_benefit"], [BENEFIT], outcome)
+        self.assertNotEqual(outcome["verdict"], "SUPPORTED", outcome)
+
+    def test_a_malformed_frozen_rule_set_is_refused_at_freeze_time(self):
+        """A rule set missing the fields the evaluation needs must not be frozen."""
+        pe.rules_path(self.state_path).unlink()
+        for bad in ({"min_runs": 0}, {"min_cases": "many"}, {"dimensions": []},
+                    {"delta_tolerance": -1}, {"dimensions": "search_efficiency"}):
+            payload = dict(pe.DEFAULT_EVALUATION_RULES)
+            payload.update(bad)
+            outcome = pe.freeze_evaluation_rules(self.state_path, payload)
+            self.assertEqual(outcome["status"], "INVALID", (bad, outcome))
+            pe.rules_path(self.state_path).unlink(missing_ok=True)
+
+    def test_a_partial_custom_rule_set_is_completed_then_frozen(self):
+        pe.rules_path(self.state_path).unlink()
+        outcome = pe.freeze_evaluation_rules(self.state_path, {"delta_tolerance": 0.2})
+        self.assertEqual(outcome["status"], "FROZEN", outcome)
+        rules = pe.frozen_rules(self.state_path)
+        self.assertEqual(rules["delta_tolerance"], 0.2)
+        self.assertEqual(rules["min_runs"], pe.DEFAULT_EVALUATION_RULES["min_runs"])
+
+    def test_a_hand_edited_incomplete_rule_file_cannot_reach_the_evaluator(self):
+        """A rules file that predates or bypasses validation must fail closed, not KeyError."""
+        pe.rules_path(self.state_path).write_text(json.dumps(
+            {"_schema": pe.SCHEMA_RULES, "rules": {"delta_tolerance": 0.05},
+             "digest": cg.digest_of({"delta_tolerance": 0.05})}), encoding="utf-8")
+        self.assertIsNone(pe.frozen_rules(self.state_path))
+        errors = pe.evaluation_rules_errors(self.state_path)
+        self.assertTrue(errors)
+        self.assertIn("PE12", [item.rule for item in errors])
+        # Whatever the propose step does, every promotion gate must fail closed.
+        payload = self.candidate("P-1")
+        payload["evaluation_rules_digest"] = cg.digest_of({"delta_tolerance": 0.05})
+        proposed = pe.propose(self.state_path, payload, trajectory_support={"DT-1"})
+        self.assertIn(proposed["status"], ("PROPOSED", "INVALID"), proposed)
+        if proposed["status"] == "PROPOSED":
+            self.assertEqual(pe.transition(self.state_path, "P-1", "SHADOW",
+                                           level="L1")["status"], "SHADOW")
+        result = pe.evaluate_candidate(self.state_path, "P-1", self.good_report())
+        self.assertEqual(result["status"], "INVALID", result)
+        self.assertIn("PE12", result["codes"])
+
+    def test_mechanistic_understanding_is_a_reliability_dimension(self):
+        self.assertIn(SCIENCE, pe.RELIABILITY_DIMENSIONS)
+
+    def test_a_mechanistic_regression_blocks_promotion(self):
+        candidate, control = improving()
+        candidate[BENEFIT], control[BENEFIT] = 0.95, 0.30   # big efficiency gain
+        candidate[SCIENCE], control[SCIENCE] = 0.10, 0.90   # science regresses
+        outcome = pe.ablation_verdict(
+            report(candidate_metrics=candidate, control_metrics=control,
+                   policy_id="P-1", policy_signature="sig",
+                   rules_digest=self.digest),
+            rules=pe.frozen_rules(self.state_path))
+        self.assertEqual(outcome["verdict"], "REJECTED", outcome)
+
+    def test_an_overlapping_benefit_is_not_counted_as_evidence(self):
         """A mean gap inside overlapping ranges is reported but must not promote."""
         outcome = pe.ablation_verdict(
             report(candidate_metrics={**{d: 0.5 for d in DIMENSIONS}, BENEFIT: 0.9},
