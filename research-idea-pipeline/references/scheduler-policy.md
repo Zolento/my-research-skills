@@ -96,7 +96,10 @@ S_t --π(S_t)--> a_t --> S_{t+1}
   `actual_information_gain == "zero"`、`diagnosis_switch` 给出 `CONTINUE_ATTRIBUTION` 以外的结论、
   或已存在冻结的方法契约也会触发。**判据是执行记录，不是叙述**：同一证据快照下反复改写解释
   不会重置该计数。
-- 动作状态必须显式：`advisory` → `planned` → `authorized_in_queue` → `dispatched` → `executed`。
+- 动作状态必须显式：`proposed` → `admissible` → `authorized_in_queue` → `dispatched` →
+  `executed`（`advisory`/`planned` 为其中的建议与计划态）。**授权必须绑定候选身份**：
+  队列条目需携带 `method_candidate`/`method_version`/`method_digest`/`state_version`；
+  仅同类型不足以授权。
   I2M 输出的只是**候选动作**（`method_synthesis` 等）；要真正执行，该动作必须进入本文件的
   `next_actions[]` 合法集合，并通过 PEIG/AALG、预算与授权。
 - `planned` 实验在派遣前核对**当前决策价值**：目标问题已全部解决/否证、或与已结束实验

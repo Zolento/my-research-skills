@@ -389,8 +389,24 @@ anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_st
   Validation（**同一方法版本**获得新的有效支持或反驳）/ Anchor（可信证据缩小主锚点缺口）。
   **指纹变化本身不是验证成功**；无关新证据不加进展；同方法完成独立验证**无须改算法**；
   可信负结果与排除关键假设同样是有效进展。
-- **契约必须绑定版本**：不得取「遇到的第一个契约」；废弃/被取代的契约不自动继承，方法实质
-  变化不得沿用旧版本的确认性结论；结果之后才登记的实验只能算探索性证据。
+- **契约必须绑定版本**：不得取「遇到的第一个契约」，也**不得用摘要字典序判断新旧**（按版本号/
+  登记时间）；废弃/被取代/archived 契约不得主导 Loop，显式引用历史契约仅供审计；方法实质变化
+  不得沿用旧版本的确认性结论；结果之后才登记的实验只能算探索性证据。
+- **授权必须绑定候选身份**：`proposed → admissible → authorized_in_queue → dispatched →
+  executed`；队列里同类型的方法动作**不足以**授权当前候选，条目必须携带
+  `method_candidate`/`method_version`/`method_digest`/`state_version`。新方法通过
+  `register_method_candidate` 生成合法首入条目，不会被永久锁死。
+- **进展必须归属到方法版本**：证据经 `Evidence → Experiment → Method Version → Hypothesis →
+  Anchor` 链条核验；其他方法版本的证据不得计入本方法（misattributed）；**同一证据不得重复消费**
+  来重置停滞；同一版本独立验证仍算 Validation Progress。
+- **关联不得靠文字匹配**：Anchor 关联必须显式（`anchor`/`target_metric`）或由测量目标指标的
+  实验 targeting；自由文本提及只算 `text_only`，不足以证明资格。Project Objective、
+  Research Progress、Defensible Contribution、Anchor Eligibility、Anchor Satisfaction
+  **分别记录**；缺少冻结条件时缺口为 `undetermined`，**不默认满足**；**缺少证据不等于已被证伪**。
+- **独立复现是合法科学**：同设计同目标不等于重复——声明独立性（种子/实验单位）、统计目的、
+  冻结规则与防泄漏措施后可通过；但**同一次执行事件不得重复计数**，改名/改 ID 不得绕过。
+- **机制自述不是审查**：`mechanism_support`/`conclusion` 等自述字段未经 R8/R10 审查
+  （`review_status=PASS` / T3+ / `assurance_ref`）只能记为「观察到预测现象」，不得判定机制已验证。
 
 **每轮面向用户的汇报形态：** `Problem / Insight / Method / Evidence / Next Decision`（五段），
 而不是长篇归因报告。
