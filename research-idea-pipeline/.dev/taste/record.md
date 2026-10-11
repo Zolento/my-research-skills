@@ -71,3 +71,22 @@ planned 决策价值、running 不得中断、诊断决策价值）；`_review_c
 
 **仍未解决（如实保留）**：无人类成对偏好验证；`_taste_rank` 无法判断语义重要性；
 taste 仍是**建议**（设计如此，非门禁）；L3 科研有效性与真实 GPU/外部调度未验证。
+
+---
+
+## 5. 独立复核（309af4d）与 Decision Semantics 收尾
+
+**复核发现**（由用户指出，源码核实）：
+
+| 问题 | 性质 | 处置 |
+|---|---|---|
+| `indeterminate` 被 `transition` 默认取 `candidates[0]` 并生成契约骨架 | **运行时语义缺陷** | 修复：无明确偏好 → `stage="discriminate"`，不生成胜者契约，保留全部候选并给出判别/并行探索动作；`resolve_artifacts` 不再把 `indeterminate` 偏好文件当作"已比较完成" |
+| `record_outcome_feedback` 未核对实验真实性 | **来源可信性缺陷** | 修复：新增 `feedback_source_errors`（**复用既有结果记录**，不加新门禁）：实验必须存在于 canonical state、已完成且有 R9.O/R10 结果凭证、绑定被校准的方法假设、`source` 可追溯、且有与该实验绑定的证据；不满足即 `INVALID`；`--feedback` 必须传 `--state` |
+| 校准只进报告、未影响判断 | **文档过度声明** | 澄清：校准当前为 **advisory**（进入比较报告供 Agent 重新考虑），文档已明确标注，不再声称已影响优选 |
+| 内部用 `len(good)-len(poor)` 排序 | 启发式代理 | 保留并如实标注为启发式；不新增排序规则 |
+| 生产消费者验收缺乏规范 | 流程缺陷 | 已写入根 `AGENTS.md` §22（Producer / Runtime Entry / Consumer / Decision Effect / Persistence-Recovery；纯展示须标注 scope） |
+
+**验证**：2015 OK / 3 SKIP；`release_check.py` PASS；`insight_to_method` selftest 51 项。
+
+**仍未做**：`exploration_balance` 不影响 Scheduler 排序（按约束保持只读）；R10 后自动触发反馈
+**刻意未接**（来源验证之前不接，避免产生不可追溯反馈）；真实科研品味评测与 DSH `/loop` 真实任务未开始。

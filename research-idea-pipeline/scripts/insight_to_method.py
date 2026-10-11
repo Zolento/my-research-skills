@@ -857,7 +857,58 @@ def feedback_path(route_dir: Any, hypothesis_id: str) -> pathlib.Path:
     return methods_dir(route_dir) / f"feedback-{''.join(ch for ch in hypothesis_id if ch.isalnum() or ch in '-_') or 'route'}.json"
 
 
-def record_outcome_feedback(route_dir: Any, hypothesis_id: str, *,
+def feedback_source_errors(state: Dict[str, Any], hypothesis_id: str, *,
+                           experiment_id: str, source: str = "") -> List[Diagnostic]:
+    """Reuse the existing result records instead of trusting command-line arguments.
+
+    A calibration entry must point at an experiment that exists in the canonical state, has
+    finished with a recorded result, belongs to the calibrated method hypothesis, and has a
+    source bound to that experiment.  This is not a new evidence gate: it only checks that the
+    feedback refers to what R9.O/R10 already produced.
+    """
+    problems: List[Diagnostic] = []
+    record = _index(state, "experiments").get(str(experiment_id))
+    if record is None:
+        problems.append(_diag("I2M100", f"experiments[{experiment_id}]",
+                              "该实验不存在于当前 Research State：反馈不得凭空建立证据来源"))
+        return problems
+    if _text(record.get("status")) not in ("done", "failed", "executed"):
+        problems.append(_diag("I2M101", f"experiments[{experiment_id}].status",
+                              f"实验状态 {record.get('status')!r}：未完成的实验不能校准科研判断"))
+    receipt = record.get("outcome_analysis")
+    analysed = isinstance(receipt, dict) and bool(receipt)
+    has_result = record.get("result_at_state_version") is not None
+    if not (analysed or has_result):
+        problems.append(_diag("I2M102", f"experiments[{experiment_id}]",
+                              "尚无 R9.O/R10 结果凭证：不得据此写入校准反馈"))
+    targets = set()
+    for field in ("claim_targeted", "alternative_targeted", "hypothesis_targeted",
+                  "uncertainty_targeted"):
+        value = record.get(field)
+        if isinstance(value, list):
+            targets |= {str(item) for item in value}
+    preregistration = record.get("preregistration") \
+        if isinstance(record.get("preregistration"), dict) else {}
+    contract = preregistration.get("method_contract") \
+        if isinstance(preregistration.get("method_contract"), dict) else {}
+    bound = _text(contract.get("method_hypothesis_ref"))
+    if hypothesis_id not in targets and bound != hypothesis_id:
+        problems.append(_diag("I2M103", f"experiments[{experiment_id}]",
+                              f"该实验未绑定被校准的方法假设 {hypothesis_id!r}："
+                              "不得把别的方法的结果算作本方法的校准"))
+    if source and str(experiment_id) not in source:
+        problems.append(_diag("I2M104", "source",
+                              f"source {source!r} 未关联实验 {experiment_id}：来源必须可追溯"))
+    linked = [str(item.get("id")) for item in _items(state, "evidence")
+              if str(experiment_id) in (_text(item.get("source_ref"))
+                                        + _text(item.get("experiment")))]
+    if not linked:
+        problems.append(_diag("I2M105", f"experiments[{experiment_id}]",
+                              "没有与该实验绑定的证据记录：反馈缺少可追溯的结果来源"))
+    return problems
+
+
+def record_outcome_feedback(state: Dict[str, Any], route_dir: Any, hypothesis_id: str, *,
                             experiment_id: str, outcome: str,
                             supported_axes: Sequence[str] = (),
                             weakened_axes: Sequence[str] = (),
@@ -867,6 +918,13 @@ def record_outcome_feedback(route_dir: Any, hypothesis_id: str, *,
     One experiment is recorded once (by `experiment_id`); re-recording the same id is a no-op.
     A single failure is a data point about a *method*, not a verdict on an exploration paradigm.
     """
+    problems = feedback_source_errors(state, hypothesis_id, experiment_id=experiment_id,
+                                      source=source)
+    if problems:
+        return {"status": "INVALID", "written": False,
+                "diagnostics": [item.as_dict() for item in problems],
+                "reason": "反馈来源未通过既有结果记录核对：先修正实验/来源引用，"
+                          "不要新建独立证据源"}
     path = feedback_path(route_dir, hypothesis_id)
     entries: List[Dict[str, Any]] = []
     if path.is_file():
@@ -1746,8 +1804,14 @@ def resolve_artifacts(state: Dict[str, Any], route_dir: Any, hypothesis_id: str 
         step = "sketch"
         reasons.append("尚无 Sketch：先写四问草案")
     if preference["status"] == "present" and step == "compare":
-        step = "contract"
-        reasons.append("已有偏好记录且候选未变化：直接按已记录偏好完善契约")
+        recorded = (preference.get("payload") or {}).get("preference")
+        if recorded:
+            step = "contract"
+            reasons.append("已有含明确胜者的偏好记录且候选未变化：按已记录偏好完善契约")
+        else:
+            step = "compare"
+            reasons.append("偏好记录为 indeterminate（未选胜者）：不得据此生成单一契约，"
+                           "先做判别或并行探索")
     return {"hypothesis_id": hypothesis_id, "basis_digest": basis, "artifacts": found,
             "next_step": step, "reasons": reasons,
             "note": "下一步仅由真实落盘产物与 canonical state 导出；不保存独立的阶段状态机。"}
@@ -1833,7 +1897,32 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                             "decision": decision}}
         # The preference is not a gate, but it does determine the recommended artifact: the
         # contract skeleton is built from the candidate the comparison preferred.
+        judgement = (outcome.get("taste") or {}).get("judgement")
         preference = (outcome.get("taste") or {}).get("preference")
+        if judgement == JUDGEMENT_INDETERMINATE and not preference:
+            # "Cannot reliably compare" is a real research answer: keep both candidates and ask
+            # for the cheapest discriminating action instead of silently picking the first one.
+            if route_dir is not None and target:
+                write_artifact(route_dir, "candidates", str(target),
+                               {"candidates": outcome["candidates"]},
+                               basis=hypothesis_basis(state, str(target)),
+                               state_version=state.get("state_version"))
+                write_artifact(route_dir, "preference", str(target),
+                               {"judgement": JUDGEMENT_INDETERMINATE, "preference": None,
+                                "alternatives": (outcome.get("taste") or {}).get("alternatives") or [],
+                                "reasons": (outcome.get("taste") or {}).get("reasons") or {},
+                                "uncertainty": (outcome.get("taste") or {}).get("uncertainty", "")},
+                               basis=hypothesis_basis(state, str(target)),
+                               state_version=state.get("state_version"))
+            return {"phase": "I2M", "stage": "discriminate", "step": "Discriminate",
+                    "action": ("候选无法可靠比较：保留全部候选，先做能改变选择的判别实验或廉价并行探索，"
+                               "不生成单一胜者的设计契约"),
+                    "blocked": False, "hold": False,
+                    "i2m": {"readiness": readiness, "path": path, "resolution": resolution,
+                            "synthesis": outcome, "judgement": judgement, "candidate_id": None,
+                            "reason": (outcome.get("taste") or {}).get("uncertainty", ""),
+                            "kept_candidates": [item.get("candidate_id") for item in
+                                                outcome["candidates"]]}}
         chosen = next((item for item in outcome["candidates"]
                        if item.get("candidate_id") == preference), outcome["candidates"][0])
         if route_dir is not None:
@@ -1845,7 +1934,7 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                                basis=hypothesis_basis(state, str(target)),
                                state_version=state.get("state_version"))
                 write_artifact(route_dir, "preference", str(target),
-                               {"preference": preference,
+                               {"judgement": judgement, "preference": preference,
                                 "alternatives": (outcome.get("taste") or {}).get("alternatives") or [],
                                 "reasons": (outcome.get("taste") or {}).get("reasons") or {},
                                 "uncertainty": (outcome.get("taste") or {}).get("uncertainty", "")},
@@ -2731,12 +2820,16 @@ def selftest() -> int:
                    ["judgement"] == JUDGEMENT_INDETERMINATE))
     checks.append(("单候选不做比较", not compare_candidates([candidates[0]])["compared"]))
     checks.append(("同质化可被识别", i2m_exploration_probe(state)))
+    checks.append(("反馈来源必须可追溯", "I2M100" in _rules(feedback_source_errors(
+        state, "H1", experiment_id="X-does-not-exist"))))
     checks.append(("方法草案四问校验", not method_sketch_errors(
         {"problem": "p", "insight": "i", "intervention": "a", "falsifier": "f"})))
     checks.append(("缺失草案字段被拒绝", _rules(method_sketch_errors({"problem": "p"}))))
 
     step = transition(state, insight=insight, candidates=candidates)
-    checks.append(("transition 在可合成时给出综合步骤", step["step"] == "Synthesize"))
+    checks.append(("判据相同则不生成单一胜者契约",
+                   step["stage"] == "discriminate" and step["i2m"]["candidate_id"] is None
+                   and step["i2m"]["judgement"] == JUDGEMENT_INDETERMINATE))
     step2 = transition({**state, "contract": dict(state["contract"], primary_anchor="negative")},
                        insight=insight)
     checks.append(("非方法锚点给出 anchor-native 步骤", step2["stage"] == "anchor_native"))
@@ -2756,6 +2849,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--selftest", action="store_true", help="run the module self-test")
     parser.add_argument("--feedback", action="store_true",
                         help="record what a real experiment did to a past judgement")
+    parser.add_argument("--state", help="canonical research-state.json (for --feedback)")
     parser.add_argument("--route-dir", help="route directory (for --feedback)")
     parser.add_argument("--hypothesis", help="method hypothesis id (for --feedback)")
     parser.add_argument("--experiment", help="experiment id (idempotency key)")
@@ -2768,13 +2862,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.selftest:
         return selftest()
     if args.feedback:
-        if not (args.route_dir and args.hypothesis and args.experiment):
+        if not (args.state and args.route_dir and args.hypothesis and args.experiment):
             print(json.dumps({"status": "INVALID",
-                              "reason": "--feedback 需要 --route-dir --hypothesis --experiment"},
+                              "reason": "--feedback 需要 --state --route-dir --hypothesis "
+                                        "--experiment（来源必须可追溯到 canonical state）"},
                              ensure_ascii=False))
             return 1
         split = lambda value: [item.strip() for item in value.split(",") if item.strip()]
-        result = record_outcome_feedback(args.route_dir, args.hypothesis,
+        try:
+            state = json.loads(pathlib.Path(args.state).read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+            print(json.dumps({"status": "INVALID",
+                              "reason": f"state 不可读（{type(exc).__name__}）"},
+                             ensure_ascii=False))
+            return 1
+        result = record_outcome_feedback(state, args.route_dir, args.hypothesis,
                                          experiment_id=args.experiment, outcome=args.outcome,
                                          supported_axes=split(args.supported_axes),
                                          weakened_axes=split(args.weakened_axes),

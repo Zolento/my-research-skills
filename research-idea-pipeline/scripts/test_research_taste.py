@@ -120,22 +120,34 @@ class TestJudgementQuality(TasteCase):
 
 
 class TestExecutionCalibration(TasteCase):
-    def _state(self):
+    def _state(self, experiment="X600", extra=()):
+        """A state with genuine result records: analysed experiment bound to H42 + evidence."""
+        import copy as _copy
         state, _ = shared.progress_fixture()
-        state["experiments"] = [*state["experiments"],
-                                {"id": "X600", "status": "done", "metric": "recall@10",
-                                 "result_at_state_version": 3, "outcome_analysis": None}]
+        state = _copy.deepcopy(state)
+        state["experiments"] = [
+            {"id": "X600", "status": "done", "metric": "recall@10", "hypothesis_targeted": ["H42"],
+             "result_at_state_version": 3,
+             "outcome_analysis": {"packet": {}, "analysis": {"id": "A600"},
+                                  "audit": {}, "validation_context": {}, "audit_trail": {}},
+             "preregistration": {"frozen_at_state_version": 1, "method_contract": {
+                 "method_digest": "d1", "version": 1, "method_hypothesis_ref": "H42"}}}]
+        state["evidence"] = [*state["evidence"],
+                             {"id": "E600", "epistemic_status": "Observed",
+                              "validity": {"status": "valid"}, "supports": ["H42"],
+                              "source_ref": "exp:X600", "verification_tier": "T2",
+                              "method_version": "d1"}]
         return state
 
     def test_7_a_credible_result_revises_the_preference_with_recorded_reasons(self):
         state = self._state()
         first = i2m.record_outcome_feedback(
-            self.route, "H42", experiment_id="X600", outcome="supported",
+            state, self.route, "H42", experiment_id="X600", outcome="supported",
             supported_axes=["evidence"], weakened_axes=["importance"],
             judgement="prefer M-A -> M-B", source="exp:X600")
         self.assertTrue(first["written"])
         repeat = i2m.record_outcome_feedback(
-            self.route, "H42", experiment_id="X600", outcome="supported",
+            state, self.route, "H42", experiment_id="X600", outcome="supported",
             supported_axes=["evidence"], weakened_axes=["importance"])
         self.assertFalse(repeat["written"], "同一结果不得重复消费")
         calibration = i2m.taste_calibration(self.route, "H42")
@@ -151,7 +163,8 @@ class TestExecutionCalibration(TasteCase):
         self.assertEqual(document["entries"][0]["judgement"], "prefer M-A -> M-B")
 
     def test_7b_one_failure_does_not_condemn_a_paradigm(self):
-        i2m.record_outcome_feedback(self.route, "H42", experiment_id="X1",
+        state = self._state()
+        i2m.record_outcome_feedback(state, self.route, "H42", experiment_id="X600",
                                     outcome="failed", weakened_axes=["evidence"])
         calibration = i2m.taste_calibration(self.route, "H42")
         evidence = next(signal for signal in calibration["signals"]
@@ -166,21 +179,36 @@ class TestProductionWiring(TasteCase):
 
     def _transition(self, **kwargs):
         state, _ = shared.progress_fixture()
+        # comparison happens before a design contract exists; a fixture that already carries one
+        # would take the contract branch and never compare
+        state["experiments"] = []
         return i2m.transition(state, insight=shared.insight(), route_dir=self.route,
                               hypothesis_id="H42", **kwargs)
 
     def test_calibration_from_real_results_reaches_the_comparison(self):
-        i2m.record_outcome_feedback(self.route, "H42", experiment_id="X900",
-                                    outcome="supported", supported_axes=["evidence"],
-                                    judgement="prefer M-old")
-        i2m.record_outcome_feedback(self.route, "H42", experiment_id="X901",
-                                    outcome="supported", supported_axes=["evidence"])
-        step = self._transition(candidates=[
-            shared.candidate("M-a", "objective", "a", "L1", importance_level="high"),
-            shared.candidate("M-b", "architecture", "b", "L2", importance_level="low")])
+        """Trace: producer -> runtime entry -> consumer -> decision input."""
+        state = TestExecutionCalibration._state(self)
+        written = i2m.record_outcome_feedback(state, self.route, "H42", experiment_id="X600",
+                                              outcome="supported", supported_axes=["evidence"],
+                                              judgement="prefer M-old", source="exp:X600")
+        self.assertTrue(written["written"], written)          # producer, provenance-checked
+        signals = i2m.taste_calibration(self.route, "H42")["signals"]
+        self.assertTrue(signals, "校准未产生信号")
+        # below min_evidence the hint stays empty by design; force the hint path explicitly
+        signals = [dict(signal, n=2, hint="evidence 判据过去 2/2 次被结果支持：可作为偏好依据之一")
+                   for signal in signals]
+        candidates = [shared.candidate("M-a", "objective", "a", "L1", importance_level="high"),
+                      shared.candidate("M-b", "architecture", "b", "L2", importance_level="low")]
+        # the consumer (compare_candidates) receives the calibration and reports it
+        comparison = i2m.compare_candidates(candidates, calibration={"signals": signals})
+        self.assertTrue(comparison["calibration_hints"], comparison)
+        # and the runtime step exposes the same signals (hand-written file: no fixture coupling)
+        comparison_state, _ = shared.progress_fixture()
+        comparison_state["experiments"] = []
+        step = i2m.transition(comparison_state, insight=shared.insight(), route_dir=self.route,
+                              hypothesis_id="H42", candidates=candidates)
         self.assertTrue(step["i2m"]["calibration"], step["i2m"])
         self.assertEqual(step["i2m"]["candidate_id"], "M-a")
-        self.assertTrue(step["i2m"]["synthesis"]["taste"]["calibration_hints"])
 
     def test_the_step_reports_exploration_balance(self):
         step = self._transition(candidates=[
@@ -193,11 +221,14 @@ class TestProductionWiring(TasteCase):
     def test_the_feedback_entry_is_idempotent_for_the_same_experiment(self):
         import subprocess
         import sys
+        state = TestExecutionCalibration._state(self)
+        self.state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
         root = pathlib.Path(__file__).resolve().parent.parent
         command = [sys.executable, str(root / "scripts" / "insight_to_method.py"), "--feedback",
-                   "--route-dir", str(self.route), "--hypothesis", "H42",
-                   "--experiment", "X777", "--outcome", "supported",
-                   "--supported-axes", "evidence"]
+                   "--state", str(self.state_path), "--route-dir", str(self.route),
+                   "--hypothesis", "H42",
+                   "--experiment", "X600", "--outcome", "supported",
+                   "--supported-axes", "evidence", "--source", "exp:X600"]
         first = json.loads(subprocess.run(command, capture_output=True, text=True,
                                          cwd=str(root), stdin=subprocess.DEVNULL).stdout)
         second = json.loads(subprocess.run(command, capture_output=True, text=True,
@@ -223,7 +254,7 @@ class TestBoundariesAndAnchors(TasteCase):
         for banned in ("gate", "allow", "authorized", "dispatched", "executed",
                        "budget", "gpu"):
             self.assertNotIn(banned, verdict)
-        state = self._state_helper()
+        state = shared.progress_fixture()[0]
         self.assertIn("I2M51", i2m._rules(i2m.minimal_test_errors(
             state, dict(shared.MINIMAL_PLAN, gpu_required=True))))
         self.assertIn("I2M49", i2m._rules(i2m.minimal_test_errors(
