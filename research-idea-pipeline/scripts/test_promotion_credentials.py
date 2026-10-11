@@ -83,16 +83,17 @@ def report(*, candidate_metrics, control_metrics, cases=3, runs=2, dimensions=DI
            runner="offline CIE runner (no model calls)"):
     def records(metrics):
         rows = []
-        for index in range(cases):
-            row = case_result(f"C{index}", metrics=metrics,
-                              isolation=isolation, leak=leak)
-            if drop_isolation:
-                row.pop("isolation_verified")
-            if drop_leak:
-                row.pop("leak_checked")
-            rows.append(row)
-        # repeat for the declared run count
-        return rows * runs
+        for run_index in range(runs):
+            for index in range(cases):
+                row = case_result(f"C{index}", metrics=metrics,
+                                  isolation=isolation, leak=leak)
+                row["run_id"] = f"run-{run_index + 1}"
+                if drop_isolation:
+                    row.pop("isolation_verified")
+                if drop_leak:
+                    row.pop("leak_checked")
+                rows.append(row)
+        return rows
 
     candidate = arm_block(records(candidate_metrics), dimensions)
     control = arm_block(records(control_metrics), dimensions)
@@ -213,7 +214,7 @@ class TestReplayIsAtMostL2(CredentialCase):
 
     def test_a_replay_artifact_cannot_validate(self):
         self.evaluated()
-        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         result = pe.validate_candidate(self.state_path, "P-1")
         self.assertEqual(result["status"], "INVALID", result)
         self.assertTrue(any("L3" in item or "科研" in item or "validation" in item
@@ -262,17 +263,19 @@ class TestResearchValidationCredential(CredentialCase):
                 "dispatch_ref": self.trial_ref(policy_id),
                 "per_arm": {
                     "policy": {"executor": executor, "results": [
-                        case_result(f"T{i}", metrics={BENEFIT: benefit, SCIENCE: science},
-                                    isolation=isolation, executor=executor)
-                        for i in range(3)] * 2},
+                        dict(case_result(f"T{i}", metrics={BENEFIT: benefit, SCIENCE: science},
+                                         isolation=isolation, executor=executor),
+                             run_id=f"run-{run_index + 1}")
+                        for run_index in range(2) for i in range(3)]},
                     "control": {"executor": control_executor, "results": [
-                        case_result(f"T{i}", metrics={BENEFIT: 0.3, SCIENCE: 0.5},
-                                    isolation=isolation, executor=control_executor)
-                        for i in range(3)] * 2}}}
+                        dict(case_result(f"T{i}", metrics={BENEFIT: 0.3, SCIENCE: 0.5},
+                                         isolation=isolation, executor=control_executor),
+                             run_id=f"run-{run_index + 1}")
+                        for run_index in range(2) for i in range(3)]}}}
 
     def ready_for_validation(self, policy_id="P-1"):
         self.evaluated(policy_id)
-        pe.begin_bounded_trial(self.state_path, policy_id, dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, policy_id)
         return policy_id
 
     def test_a_real_research_validation_reaches_validated_and_active(self):
@@ -622,8 +625,7 @@ class TestGlobalScopeProvenance(CredentialCase):
         self.evaluated("P-GLOBAL",
                        scope={"scope_kind": "global", "problem_structure": "reframe-loop"},
                        evaluation_refs=[{"project": "A"}, {"project": "B"}])
-        pe.begin_bounded_trial(self.state_path, "P-GLOBAL",
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-GLOBAL")
         credential = self._validation("P-GLOBAL")
         support.approve(self.state_path, "P-GLOBAL", credential)
         pe.record_research_validation(self.state_path, "P-GLOBAL", credential)
@@ -649,9 +651,13 @@ class TestGlobalScopeProvenance(CredentialCase):
                 "dispatch_ref": self.trial_ref(policy_id),
                 "per_arm": {
                     "policy": {"executor": "external-1", "results": [
-                        case_result(f"T{i}", metrics={BENEFIT: 0.9}) for i in range(3)] * 2},
+                        dict(case_result(f"T{i}", metrics={BENEFIT: 0.9}),
+                             run_id=f"run-{run_index + 1}")
+                        for run_index in range(2) for i in range(3)]},
                     "control": {"executor": "external-2", "results": [
-                        case_result(f"T{i}", metrics={BENEFIT: 0.3}) for i in range(3)] * 2}}}
+                        dict(case_result(f"T{i}", metrics={BENEFIT: 0.3}),
+                             run_id=f"run-{run_index + 1}")
+                        for run_index in range(2) for i in range(3)]}}}
 
 
 if __name__ == "__main__":
@@ -665,8 +671,7 @@ if __name__ == "__main__":
 class TestCredentialChainGaps(CredentialCase):
     def _validation(self, policy_id="P-1"):
         self.evaluated(policy_id)
-        pe.begin_bounded_trial(self.state_path, policy_id,
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, policy_id)
         return support.research_validation(
             self.state_path, policy_id, pathlib.Path(self.temp.name),
             signature=self.signature(policy_id),
@@ -717,7 +722,9 @@ class TestCredentialChainGaps(CredentialCase):
 
     def test_a_tampered_trajectory_store_does_not_crash_the_attestation(self):
         (self.route / "decision-trajectory.jsonl").write_bytes(b"\xff\xfe\x00bad")
-        self.assertEqual(pe._attested_projects(self.state_path), set())
+        candidate = pe.policy_record(pe.load_records(self.state_path)[0], "P-1") or {}
+        bound = pe._candidate_bound_projects(self.state_path, candidate)
+        self.assertEqual(bound["projects"], {})
 
 
 class TestCredentialCliRobustness(CredentialCase):

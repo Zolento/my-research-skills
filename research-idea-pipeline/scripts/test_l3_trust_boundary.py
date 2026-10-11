@@ -84,8 +84,7 @@ class L3Case(unittest.TestCase):
         report = self._report()
         assert pe.evaluate_candidate(self.state_path, policy_id,
                                      report)["status"] == "REPLAY_EVALUATED"
-        assert pe.begin_bounded_trial(self.state_path, policy_id,
-                                      dispatch_evidence={"dispatched": "R2"})["status"] \
+        assert support.begin_trial(self.state_path, policy_id)["status"] \
             == "BOUNDED_TRIAL"
         return policy_id
 
@@ -449,8 +448,7 @@ class TestAdversarialPaths(L3Case):
                              evidence={"reason": "retry with a new trial"})["status"] == "HOLD"
         assert pe.evaluate_candidate(self.state_path, "P-1",
                                      self._report())["status"] == "REPLAY_EVALUATED"
-        assert pe.begin_bounded_trial(self.state_path, "P-1",
-                                      dispatch_evidence={"dispatched": "R2"})["status"] \
+        assert support.begin_trial(self.state_path, "P-1")["status"] \
             == "BOUNDED_TRIAL"
         credential = self.credential()
         credential["dispatch_ref"] = stale          # resurrect the previous dispatch

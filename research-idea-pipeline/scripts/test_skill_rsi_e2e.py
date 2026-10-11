@@ -38,12 +38,14 @@ def arm(mean, spread=0.05):
     """An arm whose declared summary is derived from its own per-case execution record."""
     base = [round(mean - spread + 2 * spread * index / 4, 4) for index in range(5)]
     # 5 cases x 2 runs, so the declared counts match the execution record exactly.
-    rows = [(f"C{index}", value) for _ in range(2) for index, value in enumerate(base)]
-    results = [{"case_id": case_id, "leak_checked": True, "isolation_verified": True,
+    rows = [(f"C{index}", value, f"run-{run_index + 1}")
+            for run_index in range(2) for index, value in enumerate(base)]
+    results = [{"case_id": case_id, "run_id": run_id,
+                "leak_checked": True, "isolation_verified": True,
                 "evaluation": {"metrics": {name: {"value": value}
                                            for name in rr.METRIC_DIMENSIONS},
                                "evidence_support": {"class": "OBSERVED"}}}
-               for case_id, value in rows]
+               for case_id, value, run_id in rows]
     dimensions = {name: {"mean": round(sum(base) / len(base), 4),
                          "min": min(base), "max": max(base)}
                   for name in rr.METRIC_DIMENSIONS}
@@ -123,9 +125,7 @@ class RsiProject(unittest.TestCase):
                                                  "permissions_ok": True})["status"], "SHADOW")
         self.assertEqual(pe.evaluate_candidate(state_path, policy_id,
                                                replay_report())["status"], "REPLAY_EVALUATED")
-        self.assertEqual(pe.begin_bounded_trial(
-            state_path, policy_id,
-            dispatch_evidence={"dispatched": "R2"})["status"], "BOUNDED_TRIAL")
+        self.assertEqual(support.begin_trial(state_path, policy_id)["status"], "BOUNDED_TRIAL")
         signature = pe.policy_record(pe.load_records(state_path)[0], policy_id)["signature"]
         credential = support.research_validation(
             state_path, policy_id, pathlib.Path(state_path).parent,
@@ -229,6 +229,8 @@ class TestAdversarialDecisionCases(RsiProject):
                                       lower_second=True)
             self.propose_policy(state_path)
             self.activate(state_path)
+            # the trial credential is corroborated; the first real dispatch starts clean
+            support.clear_dispatch(state_path)
             payload = pr.run_preset("research-loop", state_path)[0]
             # The preferred action sits in a worse tier; the adapter may not promote it.
             self.assertEqual(payload["decision"]["dispatched_action"], "R1")

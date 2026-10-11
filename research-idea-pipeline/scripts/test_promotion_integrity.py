@@ -79,6 +79,7 @@ def report(*, candidate=None, control=None, cases=5, runs=2, results=True,
                 for index in range(cases):
                     rows.append({
                         "case_id": f"C{index}", "run": run,
+                        "run_id": f"run-{run + 1}",
                         "leak_checked": True, "isolation_verified": True,
                         "evaluation": {"metrics": {d: {"value": means.get(d, 0.5)}
                                                    for d in DIMENSIONS},
@@ -383,7 +384,7 @@ class TestEvaluationArtifactBinding(PromotionCase):
     def test_a_trial_artifact_cannot_stand_in_for_a_replay_evaluation(self):
         self.ready()
         self.stored_report()
-        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         # Place the dispatch record where an evaluation artifact is expected: the credential
         # class, not merely the location, is what must refuse it.
         trial = pathlib.Path(support.trial_ref(self.state_path, "P-1")["path"])
@@ -398,8 +399,7 @@ class TestEvaluationArtifactBinding(PromotionCase):
     def test_the_full_controlled_lifecycle_still_reaches_active(self):
         self.ready()
         self.assertEqual(self.stored_report()["status"], "REPLAY_EVALUATED")
-        trial = pe.begin_bounded_trial(self.state_path, "P-1",
-                                       dispatch_evidence={"dispatched": "R2"})
+        trial = support.begin_trial(self.state_path, "P-1")
         self.assertEqual(trial["status"], "BOUNDED_TRIAL", trial)
         validated = self.record_l3("P-1")
         self.assertEqual(validated["status"], "VALIDATED", validated)
@@ -564,7 +564,7 @@ class TestFrozenRulesIntegrity(PromotionCase):
     def test_concurrent_promotions_yield_one_active_policy(self):
         self.ready("P-1")
         self.stored_report("P-1")
-        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         self.record_l3("P-1")
         outcomes = []
         barrier = threading.Barrier(4)
@@ -633,8 +633,7 @@ class TestSecondPassReview(PromotionCase):
     def _promote(self, policy_id):
         self.ready(policy_id)
         self.stored_report(policy_id)
-        pe.begin_bounded_trial(self.state_path, policy_id,
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, policy_id)
         self.record_l3(policy_id)
         self.assertEqual(pe.promote_to_active(self.state_path, policy_id,
                                               {"scope_evidence_ok": True})["status"],
@@ -657,8 +656,7 @@ class TestSecondPassReview(PromotionCase):
         """A trial artifact must not claim an evaluation result it never produced."""
         self.ready("P-1")
         self.stored_report("P-1")
-        self.assertEqual(pe.begin_bounded_trial(
-            self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})["status"],
+        self.assertEqual(support.begin_trial(self.state_path, "P-1")["status"],
             "BOUNDED_TRIAL")
         artifacts = list(pe.trials_dir(self.state_path).glob("*.json"))
         self.assertEqual(len(artifacts), 1, artifacts)
@@ -673,7 +671,7 @@ class TestSecondPassReview(PromotionCase):
         """Pointing VALIDATED at a trial artifact must not satisfy the L3 requirement."""
         self.ready("P-1")
         self.stored_report("P-1")
-        pe.begin_bounded_trial(self.state_path, "P-1", dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         trial = json.loads(next(pe.trials_dir(self.state_path).glob("*.json"))
                            .read_text(encoding="utf-8"))
         ref = {"path": str(next(pe.trials_dir(self.state_path).glob("*.json"))),

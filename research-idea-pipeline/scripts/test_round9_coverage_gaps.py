@@ -92,8 +92,7 @@ class CoverageCase(unittest.TestCase):
                              level="L1")["status"] == "SHADOW"
         assert pe.evaluate_candidate(self.state_path, policy_id,
                                      self._report())["status"] == "REPLAY_EVALUATED"
-        assert pe.begin_bounded_trial(self.state_path, policy_id,
-                                      dispatch_evidence={"dispatched": "R2"})["status"] \
+        assert support.begin_trial(self.state_path, policy_id)["status"] \
             == "BOUNDED_TRIAL"
         return policy_id
 

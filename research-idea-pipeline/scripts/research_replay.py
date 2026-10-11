@@ -1220,9 +1220,14 @@ def run_suite(
     per_arm: Dict[str, Any] = {}
     for arm in arms:
         results = []
-        for _ in range(max(1, runs)):
+        for run_index in range(max(1, runs)):
             for case in cases:
-                results.append(run_case(case, arm, runner))
+                result = run_case(case, arm, runner)
+                # A per-run identity: without it a report could repeat one run and still look
+                # like it had the declared number of runs.
+                result["run_id"] = f"run-{run_index + 1}"
+                result["run_index"] = run_index
+                results.append(result)
         violations = [violation for result in results
                       for violation in result["evaluation"]["violations"]]
         support_counts = {name: 0 for name in EVIDENCE_SUPPORT_CLASSES}

@@ -2162,7 +2162,17 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(recorded, dict):
             fresh = recorded.get("state_version") == ctx["state"].get("state_version")
             dispatch = recorded.get("dispatch") or {}
-            if fresh and recorded.get("adopted") and dispatch.get("action"):
+            cached = recorded.get("advice") if isinstance(recorded.get("advice"), dict) else {}
+            active_id = (policy.get("candidate") or {}).get("policy_id")
+            # Freshness is not just the state version: after a rollback (or a supersede) the
+            # state is unchanged while the policy in force is different, and a decision cached
+            # under the old policy must not keep authorising actions.
+            policy_bound = cached.get("policy_id") == active_id
+            legal = {item.get("action") for item in (ctx["scheduler"] or {}).get("next_actions") or []
+                     if isinstance(item, dict)}
+            action_legal = dispatch.get("action") in legal
+            if fresh and recorded.get("adopted") and dispatch.get("action") and policy_bound \
+                    and action_legal:
                 decision = None
                 reason = "consumed_recorded_decision"
                 return {"policy_id": None, "advice": policy.get("advice"),
@@ -2170,6 +2180,26 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
                         "applied": True, "action": dispatch.get("action"), "level": None,
                         "source": "recorded_strategy_decision", "reason": reason,
                         "recorded": recorded}
+            if fresh and recorded.get("adopted") and dispatch.get("action") and not policy_bound:
+                reason = "stale_cached_policy_decision"
+                return {"policy_id": active_id, "advice": policy.get("advice"),
+                        "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
+                        "applied": False, "action": None, "level": None,
+                        "source": "stale_cached_decision", "reason": reason,
+                        "recorded": recorded,
+                        "cached_policy_id": cached.get("policy_id"),
+                        "active_policy_id": active_id}
+            if fresh and recorded.get("adopted") and dispatch.get("action") \
+                    and policy_bound and not action_legal:
+                # The cached action is no longer a legal action for the current scheduler, so
+                # the cache must not authorise it.
+                reason = "cached_action_not_in_legal_set"
+                return {"policy_id": active_id, "advice": policy.get("advice"),
+                        "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
+                        "applied": False, "action": None, "level": None,
+                        "source": "stale_cached_decision", "reason": reason,
+                        "recorded": recorded, "cached_action": dispatch.get("action"),
+                        "legal_actions": sorted(item for item in legal if item)}
     return {"policy_id": (candidate or {}).get("policy_id"), "advice": policy.get("advice"),
             "decision": decision, "conditions_ok": conditions_ok, "unmet": unmet,
             "applied": applied, "tampered": False, "diagnostics": [],

@@ -24,6 +24,18 @@ def trial_ref(state_path: pathlib.Path, policy_id: str) -> Dict[str, Any]:
     raise AssertionError(f"no trial artifact for {policy_id}")
 
 
+def _trial_ref_or_none(state_path, policy_id):
+    """The stored trial reference, or None when no trial was entered.
+
+    Negative tests build credentials without a bounded trial; the gate then refuses them with
+    "缺少 dispatch_ref" instead of the fixture raising.
+    """
+    try:
+        return trial_ref(state_path, policy_id)
+    except AssertionError:
+        return None
+
+
 def real_task(directory: pathlib.Path, *, name: str = "task.json",
               task_id: str = "T1") -> pathlib.Path:
     directory.mkdir(parents=True, exist_ok=True)
@@ -42,14 +54,47 @@ def real_log(directory: pathlib.Path, *, name: str = "run.log") -> pathlib.Path:
 
 def _rows(case_id_prefix, cases, runs, metrics, *, isolation, leak, executor):
     rows = []
-    for _ in range(runs):
+    for run_index in range(runs):
         for index in range(cases):
             rows.append({"case_id": f"{case_id_prefix}{index}",
+                         "run_id": f"run-{run_index + 1}",
                          "evaluation": {"metrics": {name: {"value": value}
                                                     for name, value in metrics.items()}},
                          "isolation_verified": isolation, "leak_checked": leak,
                          "executor": executor})
     return rows
+
+
+def record_dispatch(state_path, *, action="R2", policy_id=None, adopted=True,
+                    state_version=None) -> dict:
+    """Write the scheduler telemetry the Loop itself would write when it dispatches.
+
+    The bounded-trial entry corroborates a dispatch against this record, so a credential can no
+    longer be issued from a caller-invented dict.
+    """
+    import cognition as cg
+    import strategy_memory as sm
+    route = pathlib.Path(state_path).expanduser().parent
+    scheduler_path = route / cg.SCHEDULER_NAME
+    if state_version is None:
+        state_version = json.loads(pathlib.Path(state_path).read_text(
+            encoding="utf-8")).get("state_version")
+    if scheduler_path.is_file():
+        scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+    else:
+        scheduler = {"state_version": state_version, "next_actions": [],
+                     "eig_calibration": {"records": []},
+                     "operator_stats": {"by_operator": {}, "recurring_failure_patterns": []}}
+    decision = {"state_version": state_version,
+                "advice": {"policy_id": policy_id} if policy_id else None,
+                "chosen": action, "adopted": adopted,
+                "strategy_applied": bool(policy_id), "decision_changed": False,
+                "reason_if_not": None, "hard_gates": {}, "dispatch": {"action": action}}
+    updated = sm.record_strategy_decision(scheduler, decision,
+                                          dispatch_result=f"dispatched {action}")
+    scheduler_path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+                              encoding="utf-8")
+    return updated
 
 
 def equivalence(*, policy_arm: str = "policy", control_arm: str = "control",
@@ -122,8 +167,8 @@ def research_validation(state_path: pathlib.Path, policy_id: str, workdir: pathl
         "task_provenance": {"task_id": "T1", "source": str(task),
                             "source_digest": source_digest, "synthetic": synthetic},
         "execution_evidence": {"path": str(log), "digest": pe._file_digest(log)},
-        "dispatch_ref": dispatch_ref if dispatch_ref is not None
-        else trial_ref(state_path, policy_id),
+        "dispatch_ref": (dispatch_ref if dispatch_ref is not None
+                         else _trial_ref_or_none(state_path, policy_id)),
         "cases": cases, "runs_per_case": runs,
         "runner": "external research validation harness",
         "equivalence": (equivalence_record if equivalence_record is not None
@@ -139,3 +184,32 @@ def research_validation(state_path: pathlib.Path, policy_id: str, workdir: pathl
                 isolation=isolation, leak=leak, executor=control_executor)},
         },
     }
+
+
+def begin_trial(state_path, policy_id, *, action="R2", policy_bound=True, **kwargs):
+    """Record a genuine dispatch in the scheduler, then enter BOUNDED_TRIAL.
+
+    The entry corroborates the dispatch against this telemetry, so the helper writes what the
+    Loop would write instead of fabricating a claim.
+    """
+    import policy_evolution as pe
+    record_dispatch(state_path, action=action,
+                    policy_id=policy_id if policy_bound else None)
+    return pe.begin_bounded_trial(state_path, policy_id,
+                                  dispatch_evidence={"action": action}, **kwargs)
+
+
+def clear_dispatch(state_path):
+    """Drop the synthetic dispatch telemetry once the trial credential is corroborated.
+
+    A test that exercises the *first* dispatch at a state version needs a pristine scheduler,
+    otherwise the fixture's own trial dispatch is legitimately consumed as the cached decision.
+    """
+    import cognition as cg
+    scheduler_path = pathlib.Path(state_path).expanduser().parent / cg.SCHEDULER_NAME
+    if not scheduler_path.is_file():
+        return
+    scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+    scheduler.pop("strategy_decisions", None)
+    scheduler_path.write_text(json.dumps(scheduler, ensure_ascii=False, indent=2) + "\n",
+                              encoding="utf-8")

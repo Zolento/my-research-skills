@@ -67,12 +67,14 @@ def arm(mean, spread=0.05):
     """An arm whose declared summary is derived from its own per-case execution record."""
     base = [round(mean - spread + 2 * spread * index / 4, 4) for index in range(5)]
     # 5 cases x 2 runs, so the declared counts match the execution record exactly.
-    rows = [(f"C{index}", value) for _ in range(2) for index, value in enumerate(base)]
-    results = [{"case_id": case_id, "leak_checked": True, "isolation_verified": True,
+    rows = [(f"C{index}", value, f"run-{run_index + 1}")
+            for run_index in range(2) for index, value in enumerate(base)]
+    results = [{"case_id": case_id, "run_id": run_id,
+                "leak_checked": True, "isolation_verified": True,
                 "evaluation": {"metrics": {name: {"value": value}
                                            for name in DIMENSION_NAMES},
                                "evidence_support": {"class": "OBSERVED"}}}
-               for case_id, value in rows]
+               for case_id, value, run_id in rows]
     dimensions = {name: {"mean": round(sum(base) / len(base), 4),
                          "min": min(base), "max": max(base)}
                   for name in DIMENSION_NAMES}
@@ -267,8 +269,7 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        pe.begin_bounded_trial(self.state_path, "P-1",
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         self.record_l3("P-1")
         document = json.loads(pe.rules_path(self.state_path).read_text(encoding="utf-8"))
         document["rules"]["delta_tolerance"] = 0.99
@@ -296,8 +297,7 @@ class TestLifecycleAndPromotion(PolicyStoreCase):
                      evaluation_refs=[{"independent": True, "project": "A"}])
         self.to_shadow("P-WORLD")
         pe.evaluate_candidate(self.state_path, "P-WORLD", report())
-        pe.begin_bounded_trial(self.state_path, "P-WORLD",
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-WORLD")
         self.record_l3("P-WORLD")
         outcome = pe.promote_to_active(self.state_path, "P-WORLD",
                                        {"scope_evidence_ok": True})
@@ -310,8 +310,7 @@ class TestRollbackAndComplexity(PolicyStoreCase):
         self.propose(policy_id=policy_id, **({"scope": scope} if scope else {}))
         self.to_shadow(policy_id)
         pe.evaluate_candidate(self.state_path, policy_id, report())
-        pe.begin_bounded_trial(self.state_path, policy_id,
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, policy_id)
         self.record_l3(policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})
@@ -412,8 +411,7 @@ class TestCrossSessionAndConsumer(PolicyStoreCase):
         self.propose()
         self.to_shadow()
         pe.evaluate_candidate(self.state_path, "P-1", report())
-        pe.begin_bounded_trial(self.state_path, "P-1",
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, "P-1")
         self.record_l3("P-1")
         pe.promote_to_active(self.state_path, "P-1", {"scope_evidence_ok": True})
         state = fixture_state()
@@ -475,8 +473,7 @@ class TestLatentBugRegressions(PolicyStoreCase):
         self.propose(policy_id=policy_id, **(scope or {}))
         self.to_shadow(policy_id)
         pe.evaluate_candidate(self.state_path, policy_id, report(*means))
-        pe.begin_bounded_trial(self.state_path, policy_id,
-                               dispatch_evidence={"dispatched": "R2"})
+        support.begin_trial(self.state_path, policy_id)
         self.record_l3(policy_id)
         return pe.promote_to_active(self.state_path, policy_id,
                                     {"scope_evidence_ok": True})

@@ -1004,13 +1004,80 @@ def _recompute_arm_dimensions(results: Sequence[Dict[str, Any]],
         for row in results:
             metrics = (row.get("evaluation") or {}).get("metrics") if isinstance(row, dict) else None
             metric = metrics.get(name) if isinstance(metrics, dict) else None
-            if isinstance(metric, dict) and metric.get("value") is not None:
+            if isinstance(metric, dict) and metric.get("value") is not None \
+                    and _finite_number(metric["value"]):
+                # A string/list/NaN value used to reach `sum(values)` and raise TypeError out
+                # of the evaluation path; the audit reports it as a structural error instead.
                 values.append(metric["value"])
         summary[name] = {"mean": round(sum(values) / len(values), 4) if values else None,
                          "min": min(values) if values else None,
                          "max": max(values) if values else None,
                          "observable_cases": len(values), "total_cases": len(results)}
     return summary
+
+
+def _finite_number(value: Any) -> bool:
+    """True only for a real, finite number (bool is not a measurement)."""
+    import math as _math
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and _math.isfinite(value))
+
+
+def _run_distribution_errors(arm: str, results: Sequence[Dict[str, Any]],
+                             cases: int, runs: int) -> List[str]:
+    """Per-case run distribution and run identity.
+
+    Checking only `len(results) == cases x runs` let "one case three times and another once"
+    pass as two runs each; a report could also repeat the same run_id and still look complete.
+    """
+    problems: List[str] = []
+    counts: Dict[str, int] = {}
+    for row in results:
+        counts[str(row.get("case_id"))] = counts.get(str(row.get("case_id")), 0) + 1
+    if cases and any(count != runs for count in counts.values()):
+        problems.append(f"{arm} 的每 case 运行次数不一致：{counts}（应各为 {runs} 次）")
+    if runs > 1:
+        if any(row.get("run_id") is None for row in results):
+            problems.append(f"{arm} 缺少 run_id：无法证明每一轮运行的身份")
+        else:
+            pairs = [(str(row.get("case_id")), row.get("run_id")) for row in results]
+            if len(set(pairs)) != len(pairs):
+                problems.append(f"{arm} 存在重复的 (case_id, run_id) 记录")
+            per_case: Dict[str, set] = {}
+            for case_id, run_id in pairs:
+                per_case.setdefault(case_id, set()).add(run_id)
+            all_runs = set().union(*per_case.values()) if per_case else set()
+            if len(all_runs) != runs:
+                problems.append(f"{arm} 的运行轮次标识有 {len(all_runs)} 个 "
+                                f"({sorted(all_runs)})，与声明的 {runs} 不一致")
+            for case_id, run_ids_for_case in sorted(per_case.items()):
+                if run_ids_for_case != all_runs:
+                    problems.append(
+                        f"{arm} 的 case {case_id!r} 运行集合 {sorted(run_ids_for_case)} "
+                        f"与整臂 {sorted(all_runs)} 不一致：缺轮或跨臂错配")
+    return problems
+
+
+def _metric_value_errors(arm: str, results: Sequence[Dict[str, Any]],
+                         dimensions: Sequence[str]) -> List[str]:
+    """Every measured value must be a finite number; report the offending ones."""
+    problems: List[str] = []
+    for row in results:
+        metrics = (row.get("evaluation") or {}).get("metrics") if isinstance(row, dict) else None
+        if not isinstance(metrics, dict):
+            problems.append(f"{arm} 的 case {row.get('case_id')!r} 缺少 evaluation.metrics")
+            continue
+        for name in dimensions:
+            metric = metrics.get(name)
+            if not isinstance(metric, dict):
+                problems.append(f"{arm}.{name} 的指标结构非法（应为对象）")
+                continue
+            value = metric.get("value")
+            if value is None:
+                continue                     # unobservable is legitimate; it is counted as such
+            if not _finite_number(value):
+                problems.append(f"{arm}.{name} 的指标值不是有限数值：{value!r}")
+    return problems
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -1138,6 +1205,8 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
         if cases and runs and len(results) != cases * runs:
             errors.append(f"{arm} 的执行记录数 {len(results)} 与 cases×runs "
                           f"({cases}×{runs}) 不一致")
+        errors.extend(_run_distribution_errors(arm, results, cases, runs))
+        errors.extend(_metric_value_errors(arm, results, dimensions))
         normalized["per_arm"][arm] = {"dimensions": recomputed, "results": results,
                                       "evidence_support": block.get("evidence_support") or {}}
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
@@ -1236,6 +1305,13 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             bad("dispatch_ref 无法解析到试运行派遣记录：" + "；".join(trial_errors))
         elif trial.get("policy_id") != policy_id:
             bad("dispatch_ref 指向另一个策略的派遣记录")
+        elif trial.get("dispatch_state") not in ("dispatched", "executed", "completed"):
+            bad(f"dispatch_ref 指向的是 {trial.get('dispatch_state')!r} 派遣："
+                "模拟/计划中的派遣不能作为 L3 证据")
+        elif not isinstance(trial.get("dispatch_record"), dict) \
+                or not (trial["dispatch_record"].get("action")
+                        and trial["dispatch_record"].get("state_version") is not None):
+            bad("dispatch_ref 缺少真实派遣事件（动作与状态版本）：派遣未被确认")
 
     # Accept both the submitted credential (top-level per_arm) and the stored artifact,
     # whose records live under `report`.
@@ -1316,6 +1392,8 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             if isinstance(runs, int) and runs >= 1 and len(results) != cases * runs:
                 bad(f"{arm} 的执行记录数 {len(results)} 与 cases×runs "
                     f"({cases}×{runs}) 不一致")
+            for message in _run_distribution_errors(arm, results, cases, runs):
+                bad(message)
             case_sets[arm] = ids
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         bad("各臂执行的 case 集合不一致：不存在可配对的对照")
@@ -1343,27 +1421,116 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
     return {"errors": [], "report": normalized, "verdict": verdict}
 
 
-def _attested_projects(state_path: Path) -> set:
-    """Projects with at least one trajectory carrying both a decision and a qualified outcome."""
+def dispatch_corroboration(state_path: Path, candidate: Dict[str, Any],
+                           dispatch_evidence: Any) -> Dict[str, Any]:
+    """Corroborate a bounded-trial dispatch against the route's own scheduler telemetry.
+
+    A caller-supplied dict is a *claim*, not evidence. The claim must agree with the decision
+    the Loop actually recorded in `scheduler.strategy_decisions[]` (adopted, with a dispatched
+    action, for the current state version and for this policy). `simulated: true` records a
+    dry-run credential that is deliberately unusable for L3 promotion.
+    """
+    evidence = dispatch_evidence if isinstance(dispatch_evidence, dict) else {}
+    policy_id = candidate.get("policy_id")
+    path_label = f"policy[{policy_id}]"
+
+    def fail(message: str) -> Dict[str, Any]:
+        return {"dispatch_state": None, "record": None,
+                "errors": [_diag("PE11", path_label, message)]}
+
+    if evidence.get("simulated") is True:
+        return {"dispatch_state": "simulated", "record": None, "errors": [],
+                "note": "模拟派遣凭证：可保留为 dry-run 记录，但不得用于 L3 晋升"}
+    state_path = Path(state_path).expanduser()
+    route = state_path.parent
+    scheduler_path = route / cg.SCHEDULER_NAME
+    if not scheduler_path.is_file():
+        return fail("没有调度器遥测（scheduler.json）：无法证明该策略被实际派遣")
+    try:
+        scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+        return fail(f"调度器遥测不可读（{type(exc).__name__}）：无法证明实际派遣")
+    # The authoritative revision is the telemetry's own; when the state file is present it
+    # must agree too. (Some callers hold the state in memory only.)
+    current_version = scheduler.get("state_version")
+    if state_path.is_file():
+        try:
+            current_version = json.loads(state_path.read_text(encoding="utf-8")) \
+                .get("state_version")
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+            return fail(f"研究状态不可读（{type(exc).__name__}）：无法证明实际派遣")
+    import strategy_memory as sm
+    recorded = sm.latest_strategy_decision(scheduler)
+    if not isinstance(recorded, dict):
+        return fail("调度器没有记录任何策略决策：派遣未经真实事件确认")
+    if recorded.get("adopted") is not True:
+        return fail("最近一次策略决策未被采纳：不构成派遣")
+    dispatch = recorded.get("dispatch") if isinstance(recorded.get("dispatch"), dict) else {}
+    action = dispatch.get("action")
+    if not isinstance(action, str) or not action.strip():
+        return fail("最近一次策略决策没有派遣动作：派遣未发生")
+    if recorded.get("state_version") != current_version \
+            or scheduler.get("state_version") != current_version:
+        return fail("派遣记录与当前状态版本不一致：陈旧或重复消费的派遣")
+    advice = recorded.get("advice") if isinstance(recorded.get("advice"), dict) else {}
+    advice_policy = advice.get("policy_id")
+    if advice_policy is not None and advice_policy != policy_id:
+        return fail(f"派遣记录来自另一个策略（{advice_policy!r}，当前 {policy_id!r}）")
+    claimed = evidence.get("action") or evidence.get("dispatched")
+    if isinstance(claimed, str) and claimed.strip() and claimed != action:
+        return fail(f"声明的派遣动作 {claimed!r} 与调度器记录 {action!r} 不一致")
+    history = scheduler.get("strategy_decisions")
+    return {"dispatch_state": "dispatched",
+            "record": {"action": action, "adopted": True,
+                       "state_version": recorded.get("state_version"),
+                       "policy_id": policy_id,
+                       "decision_index": (len(history) - 1) if isinstance(history, list) else None,
+                       "scheduler_digest": cg.digest_of(scheduler),
+                       "corroborated_from": "scheduler.strategy_decisions[]",
+                       "claim_accepted": bool(claimed)},
+            "errors": []}
+
+
+def _candidate_bound_projects(state_path: Path, candidate: Dict[str, Any]) -> Dict[str, Any]:
+    """Cross-project endorsement that is actually bound to THIS candidate policy.
+
+    Counting any project with a decision+qualified-outcome trajectory let unrelated history in
+    the same route satisfy the ">= 2 projects" requirement for a brand-new policy.
+    """
+    policy_id = candidate.get("policy_id")
     trail = Path(state_path).expanduser().parent / dt.TRAJECTORY_NAME
+    result: Dict[str, Any] = {"projects": {}, "unbound_trajectories": [], "ignored": []}
     if not trail.is_file():
-        return set()
+        return result
     records, _ = dt.load_records(trail, tolerant=True)
-    decided = {str(item.get("trajectory_id")) for item in records
-               if item.get("record") == "decision" and item.get("trajectory_id")}
-    qualified = {str(item.get("trajectory_id")) for item in records
-                 if item.get("record") == "outcome" and item.get("trajectory_id")
-                 and item.get("evidence_qualification") == "qualified"}
-    attested = set()
+    by_id: Dict[str, Dict[str, Any]] = {}
     for item in records:
-        if item.get("record") != "outcome":
+        if not isinstance(item, dict):
             continue
-        ident = str(item.get("trajectory_id"))
-        if ident in decided and ident in qualified:
-            project = item.get("project") or item.get("route")
-            if isinstance(project, str) and project.strip():
-                attested.add(project.strip())
-    return attested
+        ident = str(item.get("trajectory_id") or "")
+        if not ident:
+            continue
+        by_id.setdefault(ident, {})[str(item.get("record"))] = item
+    for ident, pair in by_id.items():
+        decision, outcome = pair.get("decision"), pair.get("outcome")
+        if not isinstance(decision, dict) or not isinstance(outcome, dict):
+            continue
+        if outcome.get("evidence_qualification") != "qualified":
+            continue
+        version = decision.get("policy_version") or decision.get("policy_id")
+        signature = decision.get("policy_signature")
+        if version != policy_id:
+            result["unbound_trajectories"].append(ident)
+            continue
+        if signature is not None and signature != candidate.get("signature"):
+            result["unbound_trajectories"].append(ident)
+            continue
+        project = str(outcome.get("project") or outcome.get("route") or "").strip()
+        if not project:
+            result["ignored"].append(ident)
+            continue
+        result["projects"].setdefault(project, []).append(ident)
+    return result
 
 
 def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any], *,
@@ -1380,6 +1547,8 @@ def _recomputed_level(gates: Dict[str, Any], verdict: Dict[str, Any], *,
         # when it records the dispatch and keeps the budget and the hard gates unchanged.
         gates = gates or {}
         safe = (bool(gates.get("dispatch_record"))
+                and gates.get("dispatch_state", "dispatched") in ("dispatched", "executed",
+                                                                 "completed")
                 and not gates.get("budget_expanded")
                 and bool(gates.get("hard_gates_unchanged")))
         return "L2" if safe else "L1"
@@ -1517,6 +1686,10 @@ def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
                                  f"产物自报等级 {payload.get('level')!r} 与其证据不符"
                                  f"（应为 {recomputed!r}）"))
     required = TARGET_LEVEL.get(target, "L1")
+    if target == "BOUNDED_TRIAL" and gates.get("dispatch_state") == "simulated":
+        # An explicit dry-run may enter the trial as an L1 operational record; the L3 gate
+        # refuses simulated credentials separately, so this cannot be promoted.
+        required = "L1"
     if LEVEL_RANK.get(recomputed, 0) < LEVEL_RANK.get(required, 1):
         diagnostics.append(_diag("PE11", path,
                                  f"{target} 需要 {required} 级证据，产物只达到 {recomputed}"))
@@ -1947,12 +2120,14 @@ def transition_errors(state_path: Path, records: Sequence[Dict[str, Any]], polic
         refs = candidate.get("evaluation_refs") or []
         named = {str(item.get("project")) for item in refs
                  if isinstance(item, dict) and item.get("project")}
-        attested = _attested_projects(state_path)
+        bound = _candidate_bound_projects(state_path, candidate)
+        attested = set(bound["projects"])
         if len(attested) < 2:
             diagnostics.append(_diag(
                 "PE14", path,
-                "global 作用域需要 ≥2 个有「决策 + 合格 outcome」轨迹的背书项目；"
-                f"当前背书项目 {sorted(attested)}：项目名不能替代独立来源"))
+                "global 作用域需要 ≥2 个与该候选策略绑定、且有「决策 + 合格 outcome」轨迹的"
+                f"背书项目；当前背书项目 {sorted(attested)}"
+                f"（未绑定到本候选的历史轨迹 {len(bound['unbound_trajectories'])} 条不计入）"))
         else:
             unbacked = sorted(named - attested)
             if unbacked:
@@ -1965,7 +2140,8 @@ def transition_errors(state_path: Path, records: Sequence[Dict[str, Any]], polic
 
 def _achieved_level(state_path: Path, records: Sequence[Dict[str, Any]],
                     candidate: Dict[str, Any], target: str,
-                    evidence: Dict[str, Any]) -> str:
+                    evidence: Dict[str, Any], *,
+                    rules: Optional[Dict[str, Any]] = None) -> str:
     """The level actually achieved, derived from the verified artifact.
 
     When there is no new artifact (the rollback restore of an already-promoted policy), the
@@ -1979,8 +2155,13 @@ def _achieved_level(state_path: Path, records: Sequence[Dict[str, Any]],
     directory = trials_dir(state_path) if using_trial else evaluations_dir(state_path)
     payload, errors = _read_artifact(directory, ref)
     if payload is not None and not errors:
+        # Use the frozen rule snapshot. Falling back to the compiled defaults made the level
+        # recorded in the transition disagree with the gate whenever min_cases/min_runs were
+        # customised.
         return _recomputed_level(payload.get("gates") or {}, payload.get("verdict") or {},
-                                 schema=payload.get("_schema"))
+                                 schema=payload.get("_schema"),
+                                 rules=rules or frozen_rules(state_path)
+                                 or DEFAULT_EVALUATION_RULES)
     prior = [record.get("level") for record in records
              if record.get("record") == "transition"
              and record.get("policy_id") == candidate.get("policy_id")
@@ -2000,7 +2181,8 @@ def _transition_locked(state_path: Path, records: Sequence[Dict[str, Any]], poli
                 "codes": sorted({item.rule for item in diagnostics})}
     candidate = policy_record(records, policy_id) or {}
     previous_active = rebuild_state(records).get("active_policy_id")
-    level = _achieved_level(state_path, records, candidate, target, evidence)
+    level = _achieved_level(state_path, records, candidate, target, evidence,
+                            rules=frozen_rules(state_path) or DEFAULT_EVALUATION_RULES)
     record = {"_schema": SCHEMA_TRANSITION, "record": "transition", "policy_id": policy_id,
               "from": latest_status(records).get(policy_id), "to": target,
               "at": _now(), "level": level, "evidence": evidence, "reason": reason,
@@ -2346,15 +2528,18 @@ def recorded_evaluation(records: Sequence[Dict[str, Any]], policy_id: str) -> Di
 
 
 def begin_bounded_trial(state_path: Path, policy_id: str, *,
-                        dispatch_evidence: Dict[str, Any],
+                        dispatch_evidence: Optional[Dict[str, Any]] = None,
                         budget_expanded: bool = False,
                         hard_gates_unchanged: bool = True) -> Dict[str, Any]:
-    """Enter BOUNDED_TRIAL with a stored trial artifact (the trusted dispatch record)."""
+    """Enter BOUNDED_TRIAL with a dispatch record corroborated by the route's telemetry.
+
+    `dispatch_evidence` is a *claim*: the entry corroborates it against the decision the Loop
+    recorded in `scheduler.strategy_decisions[]` (adopted, dispatched, matching state version
+    and policy). Pass `{"simulated": true}` for an explicit dry-run credential, which can never
+    be promoted to L3.
+    """
     diagnostics: List[str] = []
     codes: List[str] = []
-    if not isinstance(dispatch_evidence, dict) or not dispatch_evidence:
-        diagnostics.append("试运行需要非空的 dispatch_evidence")
-        codes.append("PE11")
     if budget_expanded:
         diagnostics.append("试运行不得扩大原有资源预算")
         codes.append("PE11")
@@ -2370,6 +2555,11 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
         if candidate is None:
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
+        corroboration = dispatch_corroboration(state_path, candidate, dispatch_evidence)
+        if corroboration["errors"]:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": [item.render() for item in corroboration["errors"]],
+                    "codes": sorted({item.rule for item in corroboration["errors"]})}
         current_rules = evaluation_rules_digest(state_path)
         # A trial attempt identity keeps two attempts distinct. Content addressing alone
         # collapsed same-second retries into one artifact, so an old dispatch record could
@@ -2384,7 +2574,9 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
             "attempt": attempt,
             "policy_signature": candidate.get("signature"),
             "rules_digest": current_rules,
-            "dispatch_evidence": copy.deepcopy(dispatch_evidence),
+            "dispatch_state": corroboration["dispatch_state"],
+            "dispatch_record": copy.deepcopy(corroboration["record"]),
+            "dispatch_evidence": copy.deepcopy(dispatch_evidence or {}),
             "budget_expanded": bool(budget_expanded),
             "hard_gates_unchanged": bool(hard_gates_unchanged),
             "produced_by": "policy_evolution.begin_bounded_trial",
@@ -2396,6 +2588,7 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
                       "hard_gates_unchanged": bool(hard_gates_unchanged),
                       "runner": "bounded-trial"},
         }
+        payload["gates"]["dispatch_state"] = corroboration["dispatch_state"]
         payload["level"] = _recomputed_level(payload["gates"], payload["verdict"],
                                              schema=SCHEMA_TRIAL)
         ref = _store_artifact(state_path, trials_dir(state_path), payload)
@@ -2759,7 +2952,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reason", default="")
     parser.add_argument("--level", default="L1")
     parser.add_argument("--report", help="path to a replay ablation report JSON")
-    parser.add_argument("--dispatch", help="trial: dispatch evidence as JSON")
+    parser.add_argument("--dispatch", help="trial: corroborated dispatch claim (JSON or file)")
+    parser.add_argument("--simulated", action="store_true",
+                        help="trial: record an explicit dry-run credential (never L3-eligible)")
     parser.add_argument("--validation", help="validate-research: L3 validation credential JSON")
     parser.add_argument("--approver", help="approve-l3: the approving human's identity")
     parser.add_argument("--scope-note", default="", help="approve-l3: what is being approved")
@@ -2883,7 +3078,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return _emit({"status": "INVALID", "errors": ["需要 --policy-id"]}, EXIT_ERROR)
         options = json.loads(args.reason) if args.reason.startswith("{") else {}
         if args.command == "trial":
-            dispatch = json.loads(args.dispatch) if args.dispatch else {"dispatched": True}
+            # No default claim: the entry corroborates against the scheduler telemetry.
+            if args.dispatch:
+                dispatch, failure = _read_json_input(args.dispatch, "dispatch") \
+                    if not args.dispatch.strip().startswith("{") \
+                    else (json.loads(args.dispatch), None)
+                if failure:
+                    return _emit({"status": "INVALID", "policy_id": args.policy_id,
+                                  "diagnostics": [failure], "codes": ["PE11"]}, EXIT_HARD)
+            else:
+                dispatch = {"simulated": True} if args.simulated else {}
             result = begin_bounded_trial(state_path, args.policy_id,
                                          dispatch_evidence=dispatch,
                                          budget_expanded=bool(options.get("budget_expanded")),
@@ -2954,10 +3158,10 @@ def _arm_block(values):
     series = {name: [round(values[name] - 0.02 + 0.04 * index / 4, 4) for index in range(5)]
               for name in _SELFTEST_DIMS}
     results = []
-    for _run in range(2):
+    for run_index in range(2):
         for index in range(5):
-            results.append({"case_id": f"C{index}", "leak_checked": True,
-                            "isolation_verified": True,
+            results.append({"case_id": f"C{index}", "run_id": f"run-{run_index + 1}",
+                            "leak_checked": True, "isolation_verified": True,
                             "evaluation": {"metrics": {name: {"value": series[name][index]}
                                                        for name in _SELFTEST_DIMS},
                                            "evidence_support": {"class": "OBSERVED"}}})
@@ -3002,11 +3206,11 @@ def _selftest_validation(state_path: Path, policy_id: str, workdir: Path,
         if payload.get("policy_id") == policy_id:
             trial = {"path": str(path), "digest": payload["digest"]}
     def rows(executor, sci, ben):
-        return [{"case_id": f"T{index}", "isolation_verified": True, "leak_checked": True,
-                 "executor": executor,
+        return [{"case_id": f"T{index}", "run_id": f"run-{run_index + 1}",
+                 "isolation_verified": True, "leak_checked": True, "executor": executor,
                  "evaluation": {"metrics": {"mechanistic_understanding": {"value": sci},
                                             "search_efficiency": {"value": ben}}}}
-                for _ in range(2) for index in range(3)]
+                for run_index in range(2) for index in range(3)]
     def env(instance, strategy):
         return {"instance": instance, "environment": {
             "model": "selftest-model", "harness": "selftest-harness",
@@ -3033,6 +3237,27 @@ def _selftest_validation(state_path: Path, policy_id: str, workdir: Path,
                                    "results": rows("external-1", science[0], benefit[0])},
                         "control": {"executor": "external-2",
                                     "results": rows("external-2", science[1], benefit[1])}}}
+
+
+def _selftest_record_dispatch(route: Path, state: Dict[str, Any], policy_id: str,
+                              action: str = "R2") -> None:
+    """Write the scheduler telemetry a real loop would write before a bounded trial."""
+    import strategy_memory as _sm
+    scheduler_path = route / cg.SCHEDULER_NAME
+    if scheduler_path.is_file():
+        scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+    else:
+        scheduler = {"state_version": state.get("state_version"), "next_actions": [],
+                     "eig_calibration": {"records": []},
+                     "operator_stats": {"by_operator": {},
+                                        "recurring_failure_patterns": []}}
+    updated = _sm.record_strategy_decision(scheduler, {
+        "state_version": state.get("state_version"), "advice": {"policy_id": policy_id},
+        "chosen": action, "adopted": True, "strategy_applied": True, "decision_changed": False,
+        "reason_if_not": None, "hard_gates": {}, "dispatch": {"action": action}},
+        dispatch_result=f"dispatched {action}")
+    scheduler_path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+                              encoding="utf-8")
 
 
 def selftest() -> int:
@@ -3125,12 +3350,13 @@ def selftest() -> int:
               undifferentiated["status"] == "HOLD")
 
         expanded = begin_bounded_trial(state_path, "P-1",
-                                       dispatch_evidence={"dispatched": "R2"},
+                                       dispatch_evidence={"action": "R2"},
                                        budget_expanded=True)
         check("expanding the budget during a trial is refused",
               expanded["status"] == "INVALID" and "PE11" in expanded["codes"])
+        _selftest_record_dispatch(route, state, "P-1")
         trial = begin_bounded_trial(state_path, "P-1",
-                                    dispatch_evidence={"dispatched": "R2"})
+                                    dispatch_evidence={"action": "R2"})
         check("bounded trial does not expand the budget", trial["status"] == "BOUNDED_TRIAL")
         bypass = transition(state_path, "P-1", "VALIDATED", level="L3",
                             evidence={"independent": True, "distinguishable": True,
@@ -3187,8 +3413,8 @@ def selftest() -> int:
         transition(state_path, "P-2", "SHADOW", level="L1",
                    evidence={"format_ok": True, "invariants_ok": True, "permissions_ok": True})
         evaluate_candidate(state_path, "P-2", _report())
-        begin_bounded_trial(state_path, "P-2",
-                                     dispatch_evidence={"dispatched": "R2"})
+        _selftest_record_dispatch(route, state, "P-2")
+        begin_bounded_trial(state_path, "P-2", dispatch_evidence={"action": "R2"})
         pending_2 = _selftest_validation(state_path, "P-2", Path(temp) / "l3b")
         approve_l3(state_path, policy_id="P-2", credential=pending_2,
                    approver="selftest-human", confirm_human=True, scope_note="selftest")

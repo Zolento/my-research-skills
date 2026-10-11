@@ -94,8 +94,7 @@ class Round9Case(unittest.TestCase):
                              level="L1")["status"] == "SHADOW"
         assert pe.evaluate_candidate(self.state_path, policy_id,
                                      self._report())["status"] == "REPLAY_EVALUATED"
-        assert pe.begin_bounded_trial(self.state_path, policy_id,
-                                      dispatch_evidence={"dispatched": "R2"})["status"] \
+        assert support.begin_trial(self.state_path, policy_id)["status"] \
             == "BOUNDED_TRIAL"
         return policy_id
 
@@ -301,8 +300,7 @@ class TestStoreAndLedgerIntegrity(Round9Case):
     def test_a_refused_trial_leaves_no_artifact(self):
         self.ready("P-2")          # P-2 is BOUNDED_TRIAL, not REPLAY_EVALUATED
         before = sorted(path.name for path in pe.trials_dir(self.state_path).glob("*.json"))
-        refused = pe.begin_bounded_trial(self.state_path, "P-2",
-                                         dispatch_evidence={"dispatched": "R2"})
+        refused = support.begin_trial(self.state_path, "P-2")
         self.assertEqual(refused["status"], "INVALID", refused)
         after = sorted(path.name for path in pe.trials_dir(self.state_path).glob("*.json"))
         self.assertEqual(before, after, "a refused trial still wrote an artifact")
