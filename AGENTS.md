@@ -627,6 +627,11 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 - 只认扫描根**顶层**的 `<name>/SKILL.md`（或扁平 `<name>.md`），**不递归** `**/SKILL.md`；
 - catalog 名取自 `SKILL.md` frontmatter 的 `name:`，**不是目录名**；
+- **`name:` 必须是 kebab-case**：provider 用 `/^[a-z0-9]+(?:-[a-z0-9]+)*$/` 校验，
+  **含大写、下划线、首尾连字符或连续连字符的名字会被整个 skill 丢弃**
+  （provider 只写一条 warning，catalog 里看不到，极易误判为「安装失败」）；
+- `npx skills add` 会把**目录名**规范化为小写（例如 frontmatter 写 `RSI-pipeline` 时目录是
+  `rsi-pipeline`），但 catalog 名仍取自 frontmatter —— 两者不一致时以 frontmatter 为准；
 - 根目录被 watch：新增、改名、删除的 skill 无需重启即可进入下一轮 catalog；
 - 多个根按上表 rank 顺序扫描；**不要依赖「同名后来者覆盖」这种未文档化的行为**——
   安装变体一律使用不同的 `name:`（见 §21.3）。
@@ -651,11 +656,15 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 3. **只在这个安装副本里**修改 `SKILL.md` 的 frontmatter：
 
-   - 把 `name:` 改为带后缀的名字（例如 `research-idea-pipeline-rsi`）；
+   - 把 `name:` 改为带后缀的**合法 kebab-case** 名字（例如 `research-idea-pipeline-rsi`、
+     `rsi-pipeline`）；**不要用大写**（`RSI-pipeline` 会被 provider 静默丢弃）；
    - 建议在 `description:` 前加一行可区分的说明（例如「[RSI 开发版] 来自分支 X」），
      否则模型难以在稳定版与变体之间正确选择。
 
    **仓库里的 `SKILL.md` 不得为此改名**：`name:` 是组件身份，改名属于安装副本的本地适配。
+
+   > 安装后若 catalog 里看不到：先核对 `name:` 是否满足上面的 kebab-case 语法
+   > （这是最常见的「装上了但看不见」原因），再核对扫描根与 `SKILL.md` 是否在根目录顶层。
 
 4. 安装：
 
