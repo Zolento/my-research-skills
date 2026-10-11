@@ -104,6 +104,7 @@ S_t --π(S_t)--> a_t --> S_{t+1}
   `next_actions[]` 合法集合，并通过 PEIG/AALG、预算与授权。
 - `planned` 实验在派遣前核对**当前决策价值**：目标问题已全部解决/否证、或与已结束实验
   （同设计**且**同目标）重复者不得继续占据队列（保留冻结预注册与历史）。**running 不得被终止。**
+- I2M 建议不得取代 1—3 级必要动作：队列中有 `repair`/`propagate_invalidation` 时 I2M 仅作建议。
 - 诊断动作（`type=discriminating_experiment`）必须声明它会改变哪个研究决定
   （`changes_decision` 或 `decision_targets`）；没有决策价值的诊断不得仅凭便宜反复优先。
 - readiness 不足时，动作是「补做能改变方法决定的判别实验」，**不得**强行包装成新方法。

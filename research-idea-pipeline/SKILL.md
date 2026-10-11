@@ -405,6 +405,23 @@ anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_st
   **分别记录**；缺少冻结条件时缺口为 `undetermined`，**不默认满足**；**缺少证据不等于已被证伪**。
 - **独立复现是合法科学**：同设计同目标不等于重复——声明独立性（种子/实验单位）、统计目的、
   冻结规则与防泄漏措施后可通过；但**同一次执行事件不得重复计数**，改名/改 ID 不得绕过。
+- **claim 的 supported 必须有支持证据**：`status: supported` 只是声明；必须由合格证据
+  （`supporting_evidence` 或证据 `supports` 该 claim）支撑，否则记入 `unbacked_claims`，
+  **不能**使 Anchor 资格成立。
+- **冻结要求逐项判定**：每项要求分别标 `satisfied / unsatisfied / refuted / undetermined` 并附
+  证据引用；**自然语言要求无法机械核验时为 `undetermined`**，不默认满足也不视为已被否证；
+  调用方传入的 `satisfied` 只作参考（`provided_satisfied_ignored`），**不得改变机械判定**。
+- **泛化实验不等于锚点验证**：实验必须**显式测量目标指标**（`metric` == `contract.target_metric`）
+  才能构成 targeting 关联；无指标约束的实验 targeting 不构成 Anchor Eligibility。
+- **进展必须可归属**：证据须解析到真实 Experiment 且与该**方法版本/契约摘要**匹配；引用不可解析、
+  无版本绑定或版本冲突 → `unattributed/misattributed`，**不获得验证进展**；
+  **Design Progress 要求冻结 `definition_digest` 真的变化**（仅改字段不算新设计）。
+- **去重跨重启有效**：消费水位由持久化产物（已做 outcome analysis 的实验）推导，
+  同一次结果不会在 Loop 重启/重复执行后被再次计入；证据去重不依赖单次调用参数。
+- **I2M 建议不得取代硬优先级动作**：队列中存在 `repair`/`propagate_invalidation`（1—3 级）时，
+  I2M 保持建议态，不成为 Loop 的下一步。
+- **契约版本不可排序时返回歧义**：整数与不可解析版本并存、或缺版本且无登记时间 →
+  `ambiguous` + 候选列表，**不猜「最新」**；不同候选的契约不得互相抢占。
 - **机制自述不是审查**：`mechanism_support`/`conclusion` 等自述字段未经 R8/R10 审查
   （`review_status=PASS` / T3+ / `assurance_ref`）只能记为「观察到预测现象」，不得判定机制已验证。
 
