@@ -1,0 +1,376 @@
+.F.FFFFFFFFF...FFFFFFEFFFFFFFF
+======================================================================
+ERROR: test_a_string_and_an_integer_run_id_never_collide (test_rsi_round11.TestRunIdTypes.test_a_string_and_an_integer_run_id_never_collide)
+Coercing to string would merge `1` and `"1"`; the contract refuses the mix.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 429, in test_a_string_and_an_integer_run_id_never_collide
+    result = pe.evaluate_candidate(self.state_path, "P-1", self.report(mutate=collide))
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 2464, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 1208, in audit_report
+    errors.extend(_run_distribution_errors(arm, results, cases, runs))
+                  ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 1052, in _run_distribution_errors
+    f"({sorted(all_runs)})，与声明的 {runs} 不一致")
+        ~~~~~~^^^^^^^^^^
+TypeError: '<' not supported between instances of 'str' and 'int'
+
+======================================================================
+FAIL: test_a_mismatched_pairing_key_is_refused (test_rsi_round11.TestCrossArmPairing.test_a_mismatched_pairing_key_is_refused)
+Different pairing keys across arms means the arms are not paired.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 184, in test_a_mismatched_pairing_key_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_an_explicit_independent_pairing_key_is_honoured (test_rsi_round11.TestCrossArmPairing.test_an_explicit_independent_pairing_key_is_honoured)
+Arm-local execution ids plus an explicit pairing_key must be accepted.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 169, in test_an_explicit_independent_pairing_key_is_honoured
+    self.assertEqual(result["status"], "REPLAY_EVALUATED", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVALID' != 'REPLAY_EVALUATED'
+- INVALID
++ REPLAY_EVALUATED
+ : {'status': 'INVALID', 'written': False, 'policy_id': 'P-1', 'diagnostics': ["rsi_full 的运行轮次标识有 6 个 (['a-0', 'a-1', 'a-2', 'a-3', 'a-4', 'a-5'])，与声明的 2 不一致", "rsi_full 的 case 'ADV1' 运行集合 ['a-0', 'a-3'] 与整臂 ['a-0', 'a-1', 'a-2', 'a-3', 'a-4', 'a-5'] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV2' 运行集合 ['a-1', 'a-4'] 与整臂 ['a-0', 'a-1', 'a-2', 'a-3', 'a-4', 'a-5'] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV3' 运行集合 ['a-2', 'a-5'] 与整臂 ['a-0', 'a-1', 'a-2', 'a-3', 'a-4', 'a-5'] 不一致：缺轮或跨臂错配", "full_cie 的运行轮次标识有 6 个 (['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5'])，与声明的 2 不一致", "full_cie 的 case 'ADV1' 运行集合 ['b-0', 'b-3'] 与整臂 ['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5'] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV2' 运行集合 ['b-1', 'b-4'] 与整臂 ['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5'] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV3' 运行集合 ['b-2', 'b-5'] 与整臂 ['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5'] 不一致：缺轮或跨臂错配"], 'codes': ['PE11']}
+
+======================================================================
+FAIL: test_an_explicitly_unpaired_design_is_not_promotion_evidence (test_rsi_round11.TestCrossArmPairing.test_an_explicitly_unpaired_design_is_not_promotion_evidence)
+We must not silently switch statistical protocol for a non-paired design.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 196, in test_an_explicitly_unpaired_design_is_not_promotion_evidence
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_cross_arm_pairing_mismatch_is_refused (test_rsi_round11.TestCrossArmPairing.test_cross_arm_pairing_mismatch_is_refused)
+Each arm is internally consistent, but the arms are not paired.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 141, in test_cross_arm_pairing_mismatch_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'REPLAY_EVALUATED' != 'INVALID'
+- REPLAY_EVALUATED
++ INVALID
+ : {'status': 'REPLAY_EVALUATED', 'written': True, 'policy_id': 'P-1', 'seq': 3, 'reason': '至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_l3_uses_the_same_pairing_rule (test_rsi_round11.TestCrossArmPairing.test_l3_uses_the_same_pairing_rule)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 206, in test_l3_uses_the_same_pairing_rule
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_dispatch_without_any_identity_is_refused (test_rsi_round11.TestDispatchOwnership.test_a_dispatch_without_any_identity_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 235, in test_a_dispatch_without_any_identity_is_refused
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_a_legitimate_policy_dispatch_is_accepted_and_bound (test_rsi_round11.TestDispatchOwnership.test_a_legitimate_policy_dispatch_is_accepted_and_bound)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 248, in test_a_legitimate_policy_dispatch_is_accepted_and_bound
+    self.assertTrue(record.get("event_id"), "the dispatch event needs a stable identity")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: None is not true : the dispatch event needs a stable identity
+
+======================================================================
+FAIL: test_an_event_cannot_be_replayed_for_a_second_trial (test_rsi_round11.TestDispatchOwnership.test_an_event_cannot_be_replayed_for_a_second_trial)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 270, in test_an_event_cannot_be_replayed_for_a_second_trial
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 7, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_an_ordinary_scheduler_dispatch_is_not_a_policy_credential (test_rsi_round11.TestDispatchOwnership.test_an_ordinary_scheduler_dispatch_is_not_a_policy_credential)
+A plain scheduler decision (no policy identity) proves nothing about a policy.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 221, in test_an_ordinary_scheduler_dispatch_is_not_a_policy_credential
+    self.assertEqual(result["status"], "INVALID", result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'BOUNDED_TRIAL' != 'INVALID'
+- BOUNDED_TRIAL
++ INVALID
+ : {'status': 'BOUNDED_TRIAL', 'written': True, 'policy_id': 'P-1', 'seq': 4, 'reason': 'bounded trial', 'level': 'L2', 'diagnostics': []}
+
+======================================================================
+FAIL: test_the_trial_entry_never_writes_an_identity_into_the_scheduler (test_rsi_round11.TestDispatchOwnership.test_the_trial_entry_never_writes_an_identity_into_the_scheduler)
+Attribution must be read, never injected at validation time.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 256, in test_the_trial_entry_never_writes_an_identity_into_the_scheduler
+    self.assertEqual(self.scheduler_path.read_bytes(), before,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     "the trial entry modified the telemetry it relies on")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: b'{\n[812 chars]    },\n    {\n      "state_version": 3,\n    [399 chars]n}\n' != b'{\n[812 chars]    }\n  ]\n}\n' : the trial entry modified the telemetry it relies on
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='string')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('string', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='bool')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('bool', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='list')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('list', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='object')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('object', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='nan')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('nan', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_l3_rejects_every_illegal_metric_value (test_rsi_round11.TestMetricValidityConsistency.test_l3_rejects_every_illegal_metric_value) (label='inf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 298, in test_l3_rejects_every_illegal_metric_value
+    self.assertEqual(result["status"], "INVALID", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'VALIDATED' != 'INVALID'
+- VALIDATED
++ INVALID
+ : ('inf', {'status': 'VALIDATED', 'written': True, 'policy_id': 'P-1', 'seq': 5, 'reason': 'L3 科研验证：至少一个收益维度正向改善，且科学可靠性未退化', 'level': 'L3', 'diagnostics': []})
+
+======================================================================
+FAIL: test_illegal_run_id_types_are_diagnosable_refusals (test_rsi_round11.TestRunIdTypes.test_illegal_run_id_types_are_diagnosable_refusals) (label='list')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in test_illegal_run_id_types_are_diagnosable_refusals
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 79, in report
+    report = mutate(report)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in <lambda>
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+                                          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 379, in test_illegal_run_id_types_are_diagnosable_refusals
+    self.fail(f"{label}: raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: list: raised AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+======================================================================
+FAIL: test_illegal_run_id_types_are_diagnosable_refusals (test_rsi_round11.TestRunIdTypes.test_illegal_run_id_types_are_diagnosable_refusals) (label='dict')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in test_illegal_run_id_types_are_diagnosable_refusals
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 79, in report
+    report = mutate(report)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in <lambda>
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+                                          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 379, in test_illegal_run_id_types_are_diagnosable_refusals
+    self.fail(f"{label}: raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: dict: raised AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+======================================================================
+FAIL: test_illegal_run_id_types_are_diagnosable_refusals (test_rsi_round11.TestRunIdTypes.test_illegal_run_id_types_are_diagnosable_refusals) (label='bool')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in test_illegal_run_id_types_are_diagnosable_refusals
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 79, in report
+    report = mutate(report)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in <lambda>
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+                                          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 379, in test_illegal_run_id_types_are_diagnosable_refusals
+    self.fail(f"{label}: raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: bool: raised AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+======================================================================
+FAIL: test_illegal_run_id_types_are_diagnosable_refusals (test_rsi_round11.TestRunIdTypes.test_illegal_run_id_types_are_diagnosable_refusals) (label='float')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in test_illegal_run_id_types_are_diagnosable_refusals
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 79, in report
+    report = mutate(report)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in <lambda>
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+                                          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 379, in test_illegal_run_id_types_are_diagnosable_refusals
+    self.fail(f"{label}: raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: float: raised AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+======================================================================
+FAIL: test_illegal_run_id_types_are_diagnosable_refusals (test_rsi_round11.TestRunIdTypes.test_illegal_run_id_types_are_diagnosable_refusals) (label='empty')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in test_illegal_run_id_types_are_diagnosable_refusals
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 79, in report
+    report = mutate(report)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 375, in <lambda>
+    case.report(mutate=lambda r, v=value: case._mutate_first(r, v)))
+                                          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 379, in test_illegal_run_id_types_are_diagnosable_refusals
+    self.fail(f"{label}: raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: empty: raised AttributeError: 'Round11Case' object has no attribute '_mutate_first'
+
+======================================================================
+FAIL: test_mixed_run_id_types_are_refused_without_raising (test_rsi_round11.TestRunIdTypes.test_mixed_run_id_types_are_refused_without_raising)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 393, in test_mixed_run_id_types_are_refused_without_raising
+    result = pe.evaluate_candidate(self.state_path, "P-1", self.report(mutate=mixed))
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 2464, in evaluate_candidate
+    audit = audit_report(report, candidate=candidate, rules=rules,
+                         current_rules_digest=current_rules)
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 1208, in audit_report
+    errors.extend(_run_distribution_errors(arm, results, cases, runs))
+                  ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/policy_evolution.py", line 1052, in _run_distribution_errors
+    f"({sorted(all_runs)})，与声明的 {runs} 不一致")
+        ~~~~~~^^^^^^^^^^
+TypeError: '<' not supported between instances of 'str' and 'int'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 395, in test_mixed_run_id_types_are_refused_without_raising
+    self.fail(f"mixed run_id types raised {type(exc).__name__}: {exc}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: mixed run_id types raised TypeError: '<' not supported between instances of 'str' and 'int'
+
+======================================================================
+FAIL: test_valid_string_and_integer_run_ids_are_accepted (test_rsi_round11.TestRunIdTypes.test_valid_string_and_integer_run_ids_are_accepted) (label='string')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 415, in test_valid_string_and_integer_run_ids_are_accepted
+    self.assertEqual(result["status"], "REPLAY_EVALUATED", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVALID' != 'REPLAY_EVALUATED'
+- INVALID
++ REPLAY_EVALUATED
+ : ('string', {'status': 'INVALID', 'written': False, 'policy_id': 'P-1', 'diagnostics': ["rsi_full 的运行轮次标识有 6 个 (['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'])，与声明的 2 不一致", "rsi_full 的 case 'ADV1' 运行集合 ['run-1', 'run-4'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV2' 运行集合 ['run-2', 'run-5'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV3' 运行集合 ['run-3', 'run-6'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配", "full_cie 的运行轮次标识有 6 个 (['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'])，与声明的 2 不一致", "full_cie 的 case 'ADV1' 运行集合 ['run-1', 'run-4'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV2' 运行集合 ['run-2', 'run-5'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV3' 运行集合 ['run-3', 'run-6'] 与整臂 ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6'] 不一致：缺轮或跨臂错配"], 'codes': ['PE11']})
+
+======================================================================
+FAIL: test_valid_string_and_integer_run_ids_are_accepted (test_rsi_round11.TestRunIdTypes.test_valid_string_and_integer_run_ids_are_accepted) (label='integer')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lenovo/code/myproj/skills-dev/research-idea-pipeline/skill-rsi-dev/research-idea-pipeline/scripts/test_rsi_round11.py", line 415, in test_valid_string_and_integer_run_ids_are_accepted
+    self.assertEqual(result["status"], "REPLAY_EVALUATED", (label, result))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVALID' != 'REPLAY_EVALUATED'
+- INVALID
++ REPLAY_EVALUATED
+ : ('integer', {'status': 'INVALID', 'written': False, 'policy_id': 'P-1', 'diagnostics': ['rsi_full 的运行轮次标识有 6 个 ([1, 2, 3, 4, 5, 6])，与声明的 2 不一致', "rsi_full 的 case 'ADV1' 运行集合 [1, 4] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV2' 运行集合 [2, 5] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配", "rsi_full 的 case 'ADV3' 运行集合 [3, 6] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配", 'full_cie 的运行轮次标识有 6 个 ([1, 2, 3, 4, 5, 6])，与声明的 2 不一致', "full_cie 的 case 'ADV1' 运行集合 [1, 4] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV2' 运行集合 [2, 5] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配", "full_cie 的 case 'ADV3' 运行集合 [3, 6] 与整臂 [1, 2, 3, 4, 5, 6] 不一致：缺轮或跨臂错配"], 'codes': ['PE11']})
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.411s
+
+FAILED (failures=24, errors=1)
