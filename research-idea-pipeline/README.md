@@ -375,6 +375,31 @@ is scoped to the problem structure where they happened, and always carries react
 conditions. `scheduler.json` stays read-only. See the
 [value and strategy contract](references/scientific-value-adaptive-discovery.md).
 
+## Insight-to-Method transition and research taste
+
+A mechanism finding is not a contribution by itself. The I2M layer turns an actionable
+insight into a designed intervention, in two stages: exploration writes a lightweight
+**method sketch** (what problem, which insight, what changes, what would falsify it), and the
+full **design contract** is only required before an experiment is frozen. One candidate is
+legitimate when it states why no design divergence exists — candidate counts are not a proxy
+for rigour.
+
+Between executable candidates, the pipeline gives a short reasoned preference over four axes
+— **Importance, Insight, Elegance, Evidence** — plus its biggest uncertainty, and keeps the
+alternatives. The preference decides which contract is recommended, but it is advice, not a
+gate: hard precedence, execution eligibility, budget and approval still decide what may run.
+No aggregate taste score exists by design. Evidence attribution, anchor-requirement judgement
+and version selection live in one runtime authority (`scripts/insight_to_method.py`).
+
+```sh
+python3 scripts/insight_to_method.py --selftest
+```
+
+**Taste is not validated by humans yet.** The pairwise acceptance set is expert-authored
+scenarios, not a labelled human preference study, and the heuristic cannot judge which prose
+motivation matters more. See the
+[value and strategy contract](references/scientific-value-adaptive-discovery.md).
+
 ## Replay and verification
 
 Claims about better discovery are easy to make, so the repository ships the means to check
@@ -485,6 +510,10 @@ RHETORICALLY_FRAGILE diagnostics remain visible. D5 and G1–G5 still apply.
 Retrieval coverage depends on the enabled sources, service availability and metadata
 quality. Venue-specific judgments need verified standards. No offline release result
 certifies an experiment, proof, novelty claim or future submission.
+
+Research taste is compared, not scored: the preference reasons are heuristics, the pairwise
+scenarios are not human-labelled, and no result here shows that the agent ranks research
+directions as an experienced researcher would.
 
 ## Recommended next evaluation
 

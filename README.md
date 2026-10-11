@@ -7,7 +7,7 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复。 |
+| [`research-idea-pipeline/`](research-idea-pipeline/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复；I2M 把机制洞见转成方法草案/设计契约，科研品味以四轴偏好（无评分）参与候选选择。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改：提供 Coherence Audit、Compact/Full Blueprint、suggestion bank 与风格门禁；可独立安装。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图字符草稿：读代码/论文/配置产出多份 Markdown 字符示意图，供 SVG/TikZ/Figma 绘制；强制四级证据与 train/inference/frozen 区分，不补造模块。 |
 
