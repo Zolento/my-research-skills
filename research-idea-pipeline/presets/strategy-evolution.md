@@ -68,7 +68,7 @@
 | R4 | 独立回放评价 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2` |
 | R5 | 记录评价结论 | `python3 scripts/policy_evolution.py evaluate --state <state> --policy-id <P> --report <report.json>` |
 | R6 | 有限试运行 | `python3 scripts/policy_evolution.py trial --state <state> --policy-id <P> --dispatch '{"dispatched":"R2"}'` |
-| R7 | L3 真实科研验证 | `python3 scripts/policy_evolution.py validate-research --state <state> --policy-id <P> --validation <credential.json>` |
+| R7 | L3 真实科研验证（需人工批准） | `python3 scripts/policy_evolution.py approve-l3 --state <state> --policy-id <P> --validation <credential.json> --approver <human> --confirm-human` 然后 `... validate-research --state <state> --policy-id <P> --validation <credential.json>` |
 | R8 | 晋升 ACTIVE | `python3 scripts/policy_evolution.py promote --state <state> --policy-id <P> --reason '{"scope_evidence_ok":true}'` |
 | R9 | 回滚 | `python3 scripts/policy_evolution.py rollback --state <state> --policy-id <P> --to-policy-id <prev> --reason <why>` |
 | R10 | 真实消费 | `python3 scripts/strategy_memory.py decide --state <state> --scheduler <scheduler> --record` |

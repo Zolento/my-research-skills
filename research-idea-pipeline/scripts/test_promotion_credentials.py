@@ -258,6 +258,7 @@ class TestResearchValidationCredential(CredentialCase):
                 "cases": 3, "runs_per_case": 2,
                 "candidate_arm": "policy", "control_arm": "control",
                 "runner": "external research validation harness",
+                "equivalence": support.equivalence(task_ids=["T0", "T1", "T2"]),
                 "dispatch_ref": self.trial_ref(policy_id),
                 "per_arm": {
                     "policy": {"executor": executor, "results": [
@@ -276,7 +277,9 @@ class TestResearchValidationCredential(CredentialCase):
 
     def test_a_real_research_validation_reaches_validated_and_active(self):
         self.ready_for_validation()
-        result = pe.record_research_validation(self.state_path, "P-1", self.validation())
+        credential = self.validation()
+        support.approve(self.state_path, "P-1", credential)
+        result = pe.record_research_validation(self.state_path, "P-1", credential)
         self.assertEqual(result["status"], "VALIDATED", result)
         active = pe.promote_to_active(self.state_path, "P-1", {"scope_evidence_ok": True})
         self.assertEqual(active["status"], "ACTIVE", active)
@@ -495,8 +498,9 @@ class TestGlobalScopeProvenance(CredentialCase):
                        evaluation_refs=[{"project": "A"}, {"project": "B"}])
         pe.begin_bounded_trial(self.state_path, "P-GLOBAL",
                                dispatch_evidence={"dispatched": "R2"})
-        pe.record_research_validation(self.state_path, "P-GLOBAL",
-                                      self._validation("P-GLOBAL"))
+        credential = self._validation("P-GLOBAL")
+        support.approve(self.state_path, "P-GLOBAL", credential)
+        pe.record_research_validation(self.state_path, "P-GLOBAL", credential)
         result = pe.promote_to_active(self.state_path, "P-GLOBAL", {"scope_evidence_ok": True})
         self.assertEqual(result["status"], "INVALID", result)
         self.assertIn("PE14", result["codes"])
@@ -515,6 +519,7 @@ class TestGlobalScopeProvenance(CredentialCase):
                 "cases": 3, "runs_per_case": 2,
                 "candidate_arm": "policy", "control_arm": "control",
                 "runner": "external research validation harness",
+                "equivalence": support.equivalence(task_ids=["T0", "T1", "T2"]),
                 "dispatch_ref": self.trial_ref(policy_id),
                 "per_arm": {
                     "policy": {"executor": "external-1", "results": [

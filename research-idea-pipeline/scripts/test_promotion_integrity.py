@@ -167,6 +167,7 @@ class PromotionCase(unittest.TestCase):
             self.state_path, policy_id, pathlib.Path(self.temp.name),
             signature=signature, rules_digest=pe.evaluation_rules_digest(self.state_path),
             **overrides)
+        support.approve(self.state_path, policy_id, credential)
         result = pe.record_research_validation(self.state_path, policy_id, credential)
         assert result["status"] == "VALIDATED", result
         return result

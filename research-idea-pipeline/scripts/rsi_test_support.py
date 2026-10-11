@@ -52,6 +52,46 @@ def _rows(case_id_prefix, cases, runs, metrics, *, isolation, leak, executor):
     return rows
 
 
+def equivalence(*, policy_arm: str = "policy", control_arm: str = "control",
+                task_ids=None, model: str = "model-a", harness: str = "harness-1",
+                tools=("runner",), visible_data: str = "sha256:data",
+                budget=None, policy_instance: str = "run-policy-1",
+                control_instance: str = "run-control-1",
+                contrast_axes=("strategy",), axis_overrides=None,
+                policy_environment=None, control_environment=None):
+    """A reviewable paired-task / budget / environment record for the two arms."""
+    task_ids = list(task_ids or [f"T{i}" for i in range(3)])
+    budget = budget or {"hours": 4, "runs": 2}
+    base = {"model": model, "harness": harness, "tools": list(tools),
+            "visible_data": visible_data, "budget": dict(budget),
+            "task_ids": list(task_ids)}
+    policy_env = dict(base, **(policy_environment or {}))
+    control_env = dict(base, **(control_environment or {}))
+    if axis_overrides:
+        for arm, values in axis_overrides.items():
+            target = policy_env if arm == policy_arm else control_env
+            target.update(values)
+    # the declared contrast must actually differ between the arms
+    if "strategy" in contrast_axes:
+        policy_env["strategy"] = "policy-intervention"
+        control_env["strategy"] = "control-condition"
+    return {"controlled_axes": ["model", "harness", "tools", "visible_data", "budget"],
+            "contrast_axes": list(contrast_axes),
+            "paired_task_ids": list(task_ids),
+            "arms": {policy_arm: {"instance": policy_instance, "environment": policy_env},
+                     control_arm: {"instance": control_instance, "environment": control_env}}}
+
+
+def approve(state_path: pathlib.Path, policy_id: str, credential, *,
+            approver: str = "external-human-reviewer", confirm_human: bool = True,
+            expires_in_seconds: int = 86400, scope_note: str = "round 8 test") -> dict:
+    """Append a human approval for this exact credential (the production gate)."""
+    import policy_evolution as pe
+    return pe.approve_l3(state_path, policy_id=policy_id, credential=credential,
+                         approver=approver, confirm_human=confirm_human,
+                         scope_note=scope_note, expires_in_seconds=expires_in_seconds)
+
+
 def research_validation(state_path: pathlib.Path, policy_id: str, workdir: pathlib.Path, *,
                         signature: Optional[str] = None,
                         rules_digest: Optional[str] = None,
@@ -64,7 +104,9 @@ def research_validation(state_path: pathlib.Path, policy_id: str, workdir: pathl
                         synthetic: bool = False, isolation: bool = True, leak: bool = True,
                         source: Optional[pathlib.Path] = None,
                         dispatch_ref: Optional[Dict[str, Any]] = None,
-                        candidate_arm: str = "policy", control_arm: str = "control") -> Dict[str, Any]:
+                        candidate_arm: str = "policy", control_arm: str = "control",
+                        equivalence_record: Optional[Dict[str, Any]] = None,
+                        equivalence_off: bool = False) -> Dict[str, Any]:
     """A valid L3 research-validation credential (unless overridden into an invalid one)."""
     benefit, science = dimensions[0], dimensions[-1]
     task = source if source is not None else real_task(workdir)
@@ -84,6 +126,10 @@ def research_validation(state_path: pathlib.Path, policy_id: str, workdir: pathl
         else trial_ref(state_path, policy_id),
         "cases": cases, "runs_per_case": runs,
         "runner": "external research validation harness",
+        "equivalence": (equivalence_record if equivalence_record is not None
+                        else (None if equivalence_off else equivalence(
+                            policy_arm=candidate_arm, control_arm=control_arm,
+                            task_ids=[f"T{i}" for i in range(cases)]))),
         "per_arm": {
             candidate_arm: {"executor": executor, "results": _rows(
                 "T", cases, runs, {benefit: benefit_policy, science: science_policy},

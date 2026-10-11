@@ -121,6 +121,7 @@ class PolicyStoreCase(unittest.TestCase):
         credential = support.research_validation(
             self.state_path, policy_id, self.route, signature=signature,
             rules_digest=self.digest, **overrides)
+        support.approve(self.state_path, policy_id, credential)
         result = pe.record_research_validation(self.state_path, policy_id, credential)
         assert result["status"] == "VALIDATED", result
         return result

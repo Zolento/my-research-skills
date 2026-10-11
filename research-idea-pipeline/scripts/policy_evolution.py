@@ -45,6 +45,7 @@ import argparse
 import copy
 import fcntl
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -64,6 +65,7 @@ SCHEMA_EVALUATION = "research-idea-pipeline/policy-evaluation@1"
 SCHEMA_TRIAL = "research-idea-pipeline/policy-trial@1"
 SCHEMA_ABLATION_REPORT = "research-idea-pipeline/replay-ablation@1"
 SCHEMA_RESEARCH_VALIDATION = "research-idea-pipeline/policy-research-validation@1"
+SCHEMA_APPROVAL = "research-idea-pipeline/l3-approval@1"
 POLICY_SCHEMA_VERSION = "1"
 
 EXIT_OK = cg.EXIT_OK
@@ -771,6 +773,14 @@ def evaluation_rules_errors(state_path: Path) -> List[cg.Diagnostic]:
 POLICY_LOCK_NAME = ".policy.lock"
 EVALUATIONS_DIRNAME = "evaluations"
 TRIALS_DIRNAME = "trials"
+APPROVALS_DIRNAME = "approvals"
+
+#: Axes the two arms must agree on (the intervention is declared in `contrast_axes`).
+_REQUIRED_EQUIVALENCE_AXES = ("model", "harness", "tools", "visible_data", "budget", "task_ids")
+
+#: Identities that must never appear as an "independent" executor.
+_SELF_IDENTITIES = ("policy_evolution", "research-agent", "research_agent", "self",
+                    "agent", "system", "skill")
 
 #: Pre-registered dimensions. A promotion needs a *positive* improvement on a benefit
 #: dimension; a reliability dimension may never regress. Both sets are frozen here so a
@@ -1043,7 +1053,8 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
 
 def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
                        candidate: Dict[str, Any], rules: Dict[str, Any],
-                       current_rules_digest: Optional[str]) -> Dict[str, Any]:
+                       current_rules_digest: Optional[str],
+                       artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """Verify an L3 research-validation credential: provenance, independence, dispatch.
 
     Synthetic sources, self-executed results and missing isolation proofs are refused. The
@@ -1059,6 +1070,9 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
 
     def bad(message: str) -> None:
         diagnostics.append(_diag("PE11", path, message))
+
+    def unfair(message: str) -> None:
+        diagnostics.append(_diag("PE16", path, message))
 
     if payload.get("_schema") != SCHEMA_RESEARCH_VALIDATION:
         bad(f"凭证 schema 不是 {SCHEMA_RESEARCH_VALIDATION!r}")
@@ -1138,6 +1152,17 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
         bad("每个臂都必须记录 executor")
     elif len(set(executors)) < 2:
         bad("候选臂与对照臂必须由不同的 executor 独立执行（不得自评）")
+    # A name is not an identity, but the policy's own route/agent must never be its evaluator.
+    self_names = set(_SELF_IDENTITIES)
+    self_names.add(Path(state_path).expanduser().parent.name.strip().lower())
+    self_names.add(str(cg.route_of(Path(state_path))).strip().lower())
+    declared_route = str(candidate.get("source_route") or "").strip().lower()
+    if declared_route:
+        self_names.add(declared_route)
+    for arm, block in per_arm.items():
+        executor = str((block or {}).get("executor") or "").strip().lower()
+        if executor and executor in self_names:
+            bad(f"{arm} 的 executor {executor!r} 就是策略自身：不构成独立评价")
 
     if not isinstance(cases, int) or cases < 1:
         bad(f"cases 非法：{cases!r}")
@@ -1183,6 +1208,13 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             case_sets[arm] = ids
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         bad("各臂执行的 case 集合不一致：不存在可配对的对照")
+    equivalence = payload.get("equivalence")
+    if equivalence is None and isinstance(payload.get("report"), dict):
+        equivalence = payload["report"].get("equivalence")
+    for message in _equivalence_errors(equivalence, list(per_arm), case_sets):
+        unfair(message)
+    diagnostics.extend(_dispatch_reuse_errors(state_path, payload.get("dispatch_ref"),
+                                              str(policy_id), exclude_path=artifact_path))
     if diagnostics:
         return {"errors": diagnostics, "report": None, "verdict": None}
     verdict = ablation_verdict(normalized, candidate_arm=candidate_arm,
@@ -1333,9 +1365,15 @@ def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
         verdict = audit.get("verdict") or verdict
     elif schema == SCHEMA_RESEARCH_VALIDATION:
         check = _validation_errors(state_path, payload, candidate=candidate, rules=rules,
-                                   current_rules_digest=current)
+                                   current_rules_digest=current,
+                                   artifact_path=ref.get("path"))
         diagnostics.extend(check["errors"])
         verdict = check.get("verdict") or verdict
+        approval = payload.get("approval") if isinstance(payload.get("approval"), dict) else {}
+        diagnostics.extend(approval_errors(
+            state_path, policy_id=policy_id, approval_digest=approval.get("digest"),
+            credential_digest=approval.get("credential_digest"),
+            signature=candidate.get("signature"), rules_digest=current))
 
     recomputed = _recomputed_level(gates, verdict, schema=payload.get("_schema"), rules=rules)
     if payload.get("level") != recomputed:
@@ -1349,6 +1387,266 @@ def _artifact_gate_errors(state_path: Path, records: Sequence[Dict[str, Any]],
     if not using_trial and verdict.get("verdict") != "SUPPORTED":
         diagnostics.append(_diag("PE11", path,
                                  f"评价产物结论是 {verdict.get('verdict')!r}，不是 SUPPORTED"))
+    return diagnostics
+
+
+def approvals_dir(state_path: Path) -> Path:
+    """The sealed human-approval ledger for this route (never written by an automated entry)."""
+    return policy_dir(state_path) / APPROVALS_DIRNAME
+
+
+def _approval_seal(key: bytes, event: Dict[str, Any]) -> str:
+    import evidence_outcome as eo
+    return hmac.new(key, eo.digest(event).encode("ascii"), hashlib.sha256).hexdigest()
+
+
+def _approval_event_digest(event: Dict[str, Any]) -> str:
+    import evidence_outcome as eo
+    return eo.digest({key: value for key, value in event.items() if key != "seal"})
+
+
+def _read_approvals(state_path: Path) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """Verify the sealed approval chain without creating anything.
+
+    Uses the existing `experiment_execute.Ledger` seal construction; a broken chain, a bad
+    seal or a rewritten event is reported as tampering rather than as an empty ledger.
+    """
+    import evidence_outcome as eo
+    directory = approvals_dir(state_path)
+    key_path, events_path = directory / "key", directory / "events.jsonl"
+    if not key_path.is_file() or not events_path.is_file():
+        return [], None
+    try:
+        key = key_path.read_bytes()
+        events: List[Dict[str, Any]] = []
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            seal = event.pop("seal", "")
+            expected = _approval_seal(key, event)
+            previous = eo.digest(events[-1]) if events else None
+            if not isinstance(seal, str) or not hmac.compare_digest(seal, expected) \
+                    or event.get("previous") != previous:
+                return [], "批准账本被篡改：拒绝沿用"
+            event["seal"] = seal
+            events.append(event)
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+        return [], f"批准账本不可读（{type(exc).__name__}）：拒绝沿用"
+    return events, None
+
+
+def approval_events(state_path: Path) -> List[Dict[str, Any]]:
+    """The verified approval events, or an empty list when there is no usable ledger."""
+    events, problem = _read_approvals(state_path)
+    return [] if problem else events
+
+
+def approve_l3(state_path: Path, *, policy_id: str, credential: Dict[str, Any],
+               approver: str, confirm_human: bool = False, scope_note: str = "",
+               expires_in_seconds: int = 86400, now: Optional[float] = None) -> Dict[str, Any]:
+    """Record a human authorisation for one exact L3 credential.
+
+    This is the only way to produce the approval the VALIDATED/ACTIVE gates require. No
+    automated entry calls it: the control plane cannot authorise itself. The approval binds
+    the credential's content digest, the policy signature and the frozen rules digest, and it
+    expires.
+    """
+    import experiment_execute as ex
+    import time as _time
+    diagnostics: List[cg.Diagnostic] = []
+    path_label = f"policy[{policy_id}]"
+    if confirm_human is not True:
+        diagnostics.append(_diag("PE15", path_label,
+                                 "人工批准必须由批准者显式确认（confirm_human）"))
+    if not isinstance(approver, str) or not approver.strip():
+        diagnostics.append(_diag("PE15", path_label, "必须记录批准者身份（approver）"))
+    if not isinstance(credential, dict) or credential.get("policy_id") != policy_id:
+        diagnostics.append(_diag("PE15", path_label, "批准对象必须是该策略的 L3 凭证"))
+    if approvals_dir(state_path).is_symlink():
+        diagnostics.append(_diag("PE15", path_label,
+                                 "批准账本目录是符号链接：批准必须留在路由内，拒绝外移"))
+    with policy_lock(state_path):
+        existing = policy_record(load_records(state_path)[0], policy_id)
+    if existing is None:
+        diagnostics.append(_diag("PE1", path_label, "未知 policy_id：不能为一个不存在的策略记录批准"))
+    if diagnostics:
+        return {"status": "INVALID", "written": False,
+                "diagnostics": [item.render() for item in diagnostics],
+                "codes": sorted({item.rule for item in diagnostics})}
+    now = _time.time() if now is None else now
+    with policy_lock(state_path):
+        records, _ = load_records(state_path)
+        candidate = policy_record(records, policy_id) or {}
+        event = {"_schema": SCHEMA_APPROVAL, "kind": "l3-approval", "policy_id": policy_id,
+                 "policy_signature": candidate.get("signature"),
+                 "rules_digest": evaluation_rules_digest(state_path),
+                 "credential_digest": cg.digest_of(credential),
+                 "approver": approver.strip(), "attested_by": "human", "confirm_human": True,
+                 "scope_note": scope_note, "issued_at": now,
+                 "expires_at": now + float(expires_in_seconds),
+                 "verification_limit": ("Skill 无法独立验证批准者身份；此记录是协议级人工门，"
+                                        "不是密码学证明，也不是自动可信晋升")}
+        try:
+            with ex.Ledger(approvals_dir(state_path)).locked() as ledger:
+                stored = ledger.append(event)
+        except (ValueError, OSError) as exc:
+            return {"status": "INVALID", "written": False,
+                    "diagnostics": [f"批准账本不可用：{type(exc).__name__}: {exc}"],
+                    "codes": ["PE15"]}
+    return {"status": "APPROVED", "written": True, "policy_id": policy_id,
+            "approval_digest": _approval_event_digest(stored), "approver": stored["approver"],
+            "expires_at": stored["expires_at"],
+            "note": "人工批准已记录；晋升时仍会重新校验该记录是否有效"}
+
+
+def approval_errors(state_path: Path, *, policy_id: str,
+                    credential_digest: Optional[str] = None,
+                    approval_digest: Optional[str] = None,
+                    signature: Optional[str] = None,
+                    rules_digest: Optional[str] = None,
+                    now: Optional[float] = None) -> List[cg.Diagnostic]:
+    """PE15 diagnostics for the human approval a VALIDATED/ACTIVE transition requires."""
+    import time as _time
+    path_label = f"policy[{policy_id}]"
+    now = _time.time() if now is None else now
+    events, problem = _read_approvals(state_path)
+    if problem:
+        return [_diag("PE15", path_label, problem)]
+    if not events:
+        return [_diag("PE15", path_label,
+                      "没有人工批准记录：L3 晋升必须先由人类批准者批准该凭证"
+                      "（approve-l3）。Skill 无法独立区分验证者，因此不提供自动可信晋升")]
+    matches = [event for event in events
+               if event.get("kind") == "l3-approval"
+               and event.get("policy_id") == policy_id
+               and (credential_digest is None
+                    or event.get("credential_digest") == credential_digest)
+               and (approval_digest is None
+                    or _approval_event_digest(event) == approval_digest)]
+    if not matches:
+        return [_diag("PE15", path_label,
+                      "没有匹配该凭证的人工批准记录（批准绑定的是凭证内容摘要）")]
+    reasons: List[str] = []
+    for event in matches:
+        if event.get("attested_by") != "human" or event.get("confirm_human") is not True:
+            reasons.append("批准记录没有人类确认")
+        if signature is not None and event.get("policy_signature") != signature:
+            reasons.append("批准针对另一个策略版本")
+        if rules_digest is not None and event.get("rules_digest") != rules_digest:
+            reasons.append("批准针对另一版评价规则")
+        if float(event.get("expires_at") or 0) <= now:
+            reasons.append("人工批准已过期")
+            continue
+        return []
+    return [_diag("PE15", path_label, "；".join(sorted(set(reasons))))]
+
+
+def _equivalence_errors(record: Any, arm_names: Sequence[str],
+                        case_sets: Dict[str, set]) -> List[str]:
+    """The A/B fairness check: equal controlled axes, a real contrast, distinct instances.
+
+    Mirrors the existing `execution_gate` comparison semantics: a controlled variable that
+    differs, a contrast that does not differ, or an undeclared changed variable is a defect.
+    """
+    if not isinstance(record, dict):
+        return ["缺少 equivalence 记录：无法证明两臂在模型/Harness/工具/任务/可见数据/预算上等价"]
+    arms = record.get("arms")
+    if not isinstance(arms, dict):
+        return ["equivalence.arms 缺失"]
+    problems: List[str] = []
+    for arm in arm_names:
+        if arm not in arms:
+            problems.append(f"equivalence 缺少臂 {arm!r}")
+    if problems:
+        return problems
+    instances = {}
+    for arm in arm_names:
+        block = arms.get(arm)
+        if not isinstance(block, dict):
+            problems.append(f"equivalence.arms[{arm}] 不是对象")
+            continue
+        instance = block.get("instance")
+        if not isinstance(instance, str) or not instance.strip():
+            problems.append(f"equivalence.arms[{arm}] 缺少执行实例 identity（instance）")
+        else:
+            instances[arm] = instance.strip()
+        if not isinstance(block.get("environment"), dict):
+            problems.append(f"equivalence.arms[{arm}] 缺少执行环境（environment）")
+    if len(set(instances.values())) != len(instances):
+        problems.append("两臂的执行实例 identity 相同：无法区分是两次独立执行")
+    contrast = record.get("contrast_axes")
+    if not isinstance(contrast, list) or not contrast:
+        problems.append("equivalence.contrast_axes 必须显式声明干预轴")
+        contrast = []
+    envs = {arm: (arms.get(arm) or {}).get("environment") or {} for arm in arm_names}
+    left, right = envs[arm_names[0]], envs[arm_names[1]]
+    for axis in _REQUIRED_EQUIVALENCE_AXES:
+        missing = [arm for arm in arm_names if axis not in envs[arm]]
+        if missing:
+            problems.append(f"equivalence 缺少受控轴 {axis!r}（臂 {missing}）")
+    for axis in contrast:
+        if axis not in left or axis not in right:
+            problems.append(f"对照轴 {axis!r} 未在两个臂中声明")
+        elif left[axis] == right[axis]:
+            problems.append(f"对照轴 {axis!r} 在两臂间没有差异：不构成对照")
+    # Mirror the existing execution_gate rule: every changed variable must be declared as a
+    # contrast. Comparing only the required axes left an undeclared extra difference (a
+    # different model under a made-up key) undetected.
+    for axis in sorted(set(left) | set(right)):
+        if axis in contrast:
+            continue
+        if left.get(axis) != right.get(axis):
+            problems.append(f"环境轴 {axis!r} 在两臂间不一致（未声明为对照轴）")
+    paired = record.get("paired_task_ids")
+    if not isinstance(paired, list) or not paired:
+        problems.append("equivalence.paired_task_ids 缺失：无法复核配对任务")
+    elif len(case_sets) > 1:
+        executed = sorted(set().union(*case_sets.values()))
+        if sorted({str(item) for item in paired}) != executed:
+            problems.append(f"配对任务与执行记录不一致（声明 {sorted(map(str, paired))[:4]}，"
+                            f"执行 {executed[:4]}）")
+    return problems
+
+
+def _dispatch_reuse_errors(state_path: Path, dispatch_ref: Any, policy_id: str,
+                           *, exclude_path: Optional[str] = None) -> List[cg.Diagnostic]:
+    """A bounded-trial dispatch record is single-use and must be the latest one."""
+    path_label = f"policy[{policy_id}]"
+    diagnostics: List[cg.Diagnostic] = []
+    digest = (dispatch_ref or {}).get("digest") if isinstance(dispatch_ref, dict) else None
+    records, _ = load_records(state_path)
+    latest = None
+    for record in records:
+        if record.get("record") != "transition" or record.get("policy_id") != policy_id:
+            continue
+        ref = (record.get("evidence") or {}).get("trial_ref")
+        if isinstance(ref, dict):
+            latest = ref
+    if latest is not None and latest.get("digest") != digest:
+        diagnostics.append(_diag("PE11", path_label,
+                                 "派遣记录不是该策略最近一次有限试运行：不得用旧派遣记录充当"
+                                 "本次 L3 的绑定"))
+    directory = evaluations_dir(state_path)
+    excluded = None
+    if exclude_path:
+        try:
+            excluded = Path(exclude_path).resolve()
+        except OSError:
+            excluded = None
+    for candidate_path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+        if excluded is not None and candidate_path.resolve() == excluded:
+            continue          # the artifact under verification is not "another credential"
+        try:
+            payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            continue
+        if payload.get("_schema") != SCHEMA_RESEARCH_VALIDATION:
+            continue
+        if (payload.get("dispatch_ref") or {}).get("digest") == digest:
+            diagnostics.append(_diag("PE11", path_label,
+                                     "该派遣记录已被另一份 L3 凭证使用：派遣记录不可重复使用"))
+            break
     return diagnostics
 
 
@@ -1816,9 +2114,17 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
         current_rules = evaluation_rules_digest(state_path)
+        # A trial attempt identity keeps two attempts distinct. Content addressing alone
+        # collapsed same-second retries into one artifact, so an old dispatch record could
+        # silently count as the newest one.
+        attempt = 1 + sum(1 for record in records
+                          if record.get("record") == "transition"
+                          and record.get("policy_id") == policy_id
+                          and record.get("to") == "BOUNDED_TRIAL")
         payload = {
             "_schema": SCHEMA_TRIAL,
             "policy_id": policy_id,
+            "attempt": attempt,
             "policy_signature": candidate.get("signature"),
             "rules_digest": current_rules,
             "dispatch_evidence": copy.deepcopy(dispatch_evidence),
@@ -1875,6 +2181,18 @@ def record_research_validation(state_path: Path, policy_id: str,
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": [item.render() for item in check["errors"]],
                     "codes": sorted({item.rule for item in check["errors"]})}
+        # The human gate: the Skill cannot distinguish an independent verifier, so the
+        # production path requires an approval bound to this exact credential.
+        approval_diagnostics = approval_errors(
+            state_path, policy_id=policy_id, credential_digest=cg.digest_of(validation),
+            signature=candidate.get("signature"), rules_digest=current_rules)
+        if approval_diagnostics:
+            return {"status": "INVALID", "written": False, "policy_id": policy_id,
+                    "diagnostics": [item.render() for item in approval_diagnostics],
+                    "codes": sorted({item.rule for item in approval_diagnostics})}
+        approval = [event for event in approval_events(state_path)
+                    if event.get("kind") == "l3-approval"
+                    and event.get("credential_digest") == cg.digest_of(validation)][-1]
         verdict = check["verdict"]
         gates = {"provenance_ok": True,
                  "independent_ok": True,
@@ -1894,6 +2212,13 @@ def record_research_validation(state_path: Path, policy_id: str,
             "task_provenance": validation.get("task_provenance"),
             "execution_evidence": validation.get("execution_evidence"),
             "dispatch_ref": validation.get("dispatch_ref"),
+            "equivalence": validation.get("equivalence"),
+            "approval": {"digest": _approval_event_digest(approval),
+                         "credential_digest": cg.digest_of(validation),
+                         "approver": approval.get("approver"),
+                         "issued_at": approval.get("issued_at"),
+                         "expires_at": approval.get("expires_at"),
+                         "attested_by": approval.get("attested_by")},
             "runner": check["report"].get("runner"),
             "credential_class": "research_validation",
             "produced_by": "policy_evolution.record_research_validation",
@@ -2152,7 +2477,8 @@ def build_parser() -> argparse.ArgumentParser:
                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", nargs="?", choices=(
         "freeze-rules", "propose", "list", "show", "transition", "evaluate", "trial",
-        "validate", "validate-research", "promote", "rollback", "state", "advice"))
+        "validate", "validate-research", "approve-l3", "promote", "rollback", "state",
+        "advice"))
     parser.add_argument("--state", help="path to research-state.json")
     parser.add_argument("--policy", help="path to a candidate JSON file (or - for stdin)")
     parser.add_argument("--policy-id")
@@ -2163,6 +2489,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--report", help="path to a replay ablation report JSON")
     parser.add_argument("--dispatch", help="trial: dispatch evidence as JSON")
     parser.add_argument("--validation", help="validate-research: L3 validation credential JSON")
+    parser.add_argument("--approver", help="approve-l3: the approving human's identity")
+    parser.add_argument("--scope-note", default="", help="approve-l3: what is being approved")
+    parser.add_argument("--confirm-human", action="store_true",
+                        help="approve-l3: confirm that a human is authorising this")
+    parser.add_argument("--expires-in", type=float, default=86400,
+                        help="approve-l3: approval lifetime in seconds")
     parser.add_argument("--trajectory", help="path to decision-trajectory.jsonl")
     parser.add_argument("--selftest", action="store_true")
     return parser
@@ -2250,6 +2582,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         result = transition(state_path, args.policy_id, args.to, level=args.level,
                             evidence=evidence, reason="" if evidence else args.reason)
         return _emit(result, EXIT_OK if result["written"] else EXIT_HARD)
+    if args.command == "approve-l3":
+        if not args.policy_id or not args.validation or not args.approver:
+            return _emit({"status": "INVALID",
+                          "errors": ["需要 --policy-id --validation <file> --approver <name>"]},
+                         EXIT_ERROR)
+        credential, failure = _read_json_input(args.validation, "validation")
+        if failure:
+            return _emit({"status": "INVALID", "policy_id": args.policy_id,
+                          "diagnostics": [failure], "codes": ["PE15"]}, EXIT_HARD)
+        result = approve_l3(state_path, policy_id=args.policy_id, credential=credential,
+                            approver=args.approver, confirm_human=args.confirm_human,
+                            scope_note=args.scope_note,
+                            expires_in_seconds=args.expires_in)
+        return _emit(result, EXIT_OK if result.get("written") else EXIT_HARD)
     if args.command == "validate-research":
         if not args.policy_id or not args.validation:
             return _emit({"status": "INVALID",
@@ -2389,9 +2735,20 @@ def _selftest_validation(state_path: Path, policy_id: str, workdir: Path,
                  "evaluation": {"metrics": {"mechanistic_understanding": {"value": sci},
                                             "search_efficiency": {"value": ben}}}}
                 for _ in range(2) for index in range(3)]
+    def env(instance, strategy):
+        return {"instance": instance, "environment": {
+            "model": "selftest-model", "harness": "selftest-harness",
+            "tools": ["runner"], "visible_data": "sha256:selftest",
+            "budget": {"hours": 1}, "task_ids": ["T0", "T1", "T2"],
+            "strategy": strategy}}
     return {"_schema": SCHEMA_RESEARCH_VALIDATION, "policy_id": policy_id,
             "policy_signature": (policy_record(load_records(state_path)[0], policy_id)
                                  or {}).get("signature"),
+            "equivalence": {"controlled_axes": list(_REQUIRED_EQUIVALENCE_AXES),
+                            "contrast_axes": ["strategy"],
+                            "paired_task_ids": ["T0", "T1", "T2"],
+                            "arms": {"policy": env("selftest-policy-run", "policy"),
+                                     "control": env("selftest-control-run", "control")}},
             "rules_digest": evaluation_rules_digest(state_path),
             "candidate_arm": "policy", "control_arm": "control",
             "task_provenance": {"task_id": "T1", "source": str(task),
@@ -2512,8 +2869,15 @@ def selftest() -> int:
         check("a replay credential cannot be L3 validation",
               replay["status"] == "INVALID" and "PE11" in replay["codes"])
 
-        validated = record_research_validation(
-            state_path, "P-1", _selftest_validation(state_path, "P-1", Path(temp) / "l3"))
+        pending = _selftest_validation(state_path, "P-1", Path(temp) / "l3")
+        unapproved = record_research_validation(state_path, "P-1", pending)
+        check("L3 without human approval is refused",
+              unapproved["status"] == "INVALID" and "PE15" in unapproved["codes"])
+        approved = approve_l3(state_path, policy_id="P-1", credential=pending,
+                              approver="selftest-human", confirm_human=True,
+                              scope_note="selftest")
+        check("human approval records", approved["status"] == "APPROVED")
+        validated = record_research_validation(state_path, "P-1", pending)
         check("L3 validates", validated["status"] == "VALIDATED")
 
         # Frozen-rule drift after validation must invalidate promotion.
@@ -2553,8 +2917,10 @@ def selftest() -> int:
         evaluate_candidate(state_path, "P-2", _report())
         begin_bounded_trial(state_path, "P-2",
                                      dispatch_evidence={"dispatched": "R2"})
-        record_research_validation(
-            state_path, "P-2", _selftest_validation(state_path, "P-2", Path(temp) / "l3b"))
+        pending_2 = _selftest_validation(state_path, "P-2", Path(temp) / "l3b")
+        approve_l3(state_path, policy_id="P-2", credential=pending_2,
+                   approver="selftest-human", confirm_human=True, scope_note="selftest")
+        record_research_validation(state_path, "P-2", pending_2)
         check("successor becomes ACTIVE",
               promote_to_active(state_path, "P-2", {"scope_evidence_ok": True})["status"]
               == "ACTIVE")

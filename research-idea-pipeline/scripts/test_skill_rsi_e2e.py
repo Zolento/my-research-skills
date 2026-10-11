@@ -130,6 +130,7 @@ class RsiProject(unittest.TestCase):
         credential = support.research_validation(
             state_path, policy_id, pathlib.Path(state_path).parent,
             signature=signature, rules_digest=pe.evaluation_rules_digest(state_path))
+        support.approve(state_path, policy_id, credential)
         self.assertEqual(pe.record_research_validation(
             state_path, policy_id, credential)["status"], "VALIDATED")
         self.assertEqual(pe.promote_to_active(state_path, policy_id,
