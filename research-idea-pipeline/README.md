@@ -395,6 +395,11 @@ and version selection live in one runtime authority (`scripts/insight_to_method.
 python3 scripts/insight_to_method.py --selftest
 ```
 
+Method artifacts persist under `<route>/methods/` (sketch, candidates, preference) and are
+resolved from disk each iteration, so a restarted session continues from what was actually
+written instead of re-deriving a stage. A canonical `research-state.json` means *Research
+Resume*, not a full Legacy Handoff; the entry classifier is `legacy_handoff.resume_decision`.
+
 **Taste is not validated by humans yet.** The pairwise acceptance set is expert-authored
 scenarios, not a labelled human preference study, and the heuristic cannot judge which prose
 motivation matters more. See the
@@ -494,6 +499,12 @@ Use the [state template](templates/research-state.template.json),
 [route index](templates/INDEX.md),
 [root index](templates/INDEX.root.md) and
 [status template](templates/STATUS.md) as the corresponding artifact skeletons.
+
+### Loop prompts
+
+`examples/dsh-loop.md` is a ready-to-copy prompt for a persistent `/loop` wake-up: it asks for
+Research Resume, artifact resolution from disk, a scheduler decision and one scientific action,
+and states that a single method stage does not end the loop.
 
 ## Known limits
 

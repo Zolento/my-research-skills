@@ -112,6 +112,11 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 **只读咨询、明确审计（`audit`）、`explore` 与非方法主锚点各自的权限边界不变**：
 未授权时不推进状态，`orthogonal` 路线仍不得作为投稿主线，改主锚点仍只能由用户授权（§0.2）。
 
+**默认是 Research Resume。** 已有 canonical state 时**不执行** Legacy Handoff、不重复兼容性审查：
+只读 canonical state + 认知投影 + Scheduler + 已有方法产物，继续未完成的科研行动
+（判定：`legacy_handoff.resume_decision`）。只有历史项目未完成接管或存在真实不兼容迁移时才做
+一次性 Cold Handoff。持续唤醒的推荐提示词示例见 [../examples/dsh-loop.md](../examples/dsh-loop.md)。
+
 **核心行为（精简版；细节规则以运行时与 policy 文档为准）：**
 
 > 你是一名具有独立科学判断力的研究者。围绕用户冻结的主锚点持续推进**真实科研贡献**——

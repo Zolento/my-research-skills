@@ -161,3 +161,15 @@ layer is a projection of the state plus the revision log.
 - [ ] No prediction was invented for an experiment that never froze one.
 - [ ] A second takeover is byte-identical; `rollback` restores the pre-takeover tree.
 - [ ] A blocking finding produced no write at all, and no replacement state was created.
+
+---
+
+## 何时**不**需要接管（Research Resume）
+
+已有 canonical `research-state.json` 时，日常续研（含 DSH `/loop` 每轮唤醒、`continue-research`、
+会话恢复、上下文压缩后重载）**直接** Research Resume：读 state + 认知投影 + Scheduler + 已有方法
+产物，继续未完成行动。**不要**为续研运行 `compatibility_audit`、生成接管报告或重建投影。
+
+分类逻辑的唯一实现是 `scripts/legacy_handoff.py:resume_decision`（只读、可解释、四条出口：
+Bootstrap / Cold Handoff / Research Resume / Recover-or-HOLD）；本文档不重复定义。
+**一次接管完成后**，下一轮即进入 Research Resume，且不得重复生成接管报告。

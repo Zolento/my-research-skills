@@ -1406,6 +1406,142 @@ def anchor_path(state: Dict[str, Any], *, readiness: Optional[Dict[str, Any]] = 
 
 
 # ---------------------------------------------------------------------------
+# Method artifact handoff: persistence and resolution
+# ---------------------------------------------------------------------------
+#
+# Owner / write / read / invalidation rules (the single authority; docs point here):
+#
+# * Owner: I2M writes **only** `<route>/methods/*.json` (sketch, candidates, preference).
+#   These are *derived* method artifacts, not canonical scientific facts: the canonical
+#   record stays in Research State (`hypotheses[]`, `experiments[].preregistration`) and the
+#   control plane (`scheduler.strategy_decisions[]`).  No Research State field is added.
+# * Write: once per real change; rewriting identical content is a no-op (`written: False`).
+# * Read: by `hypothesis_id` + schema; unknown schema reports `unsupported`, never guessed.
+# * Invalidation: each artifact carries the hypothesis basis digest it was derived from.  If
+#   the hypothesis changes (or is refuted), the artifact reports `stale` and must be redone.
+# * Recovery: missing files are `missing` (not corruption); a stale artifact is kept for audit
+#   and never silently reused.
+
+METHODS_DIRNAME = "methods"
+SCHEMA_SKETCH = "research-idea-pipeline/method-sketch@1"
+SCHEMA_CANDIDATES = "research-idea-pipeline/method-candidates@1"
+SCHEMA_PREFERENCE = "research-idea-pipeline/method-preference@1"
+ARTIFACT_KINDS = ("sketch", "candidates", "preference")
+_ARTIFACT_SCHEMAS = {"sketch": SCHEMA_SKETCH, "candidates": SCHEMA_CANDIDATES,
+                     "preference": SCHEMA_PREFERENCE}
+
+
+def methods_dir(route_dir: Any) -> pathlib.Path:
+    return pathlib.Path(route_dir).expanduser() / METHODS_DIRNAME
+
+
+def hypothesis_basis(state: Dict[str, Any], hypothesis_id: str) -> str:
+    """What an artifact is derived from: the hypothesis and its inspection-relevant fields."""
+    hypothesis = _index(state, "hypotheses").get(hypothesis_id) or {}
+    return cg.digest_of({
+        "hypothesis": {key: hypothesis.get(key) for key in
+                       ("id", "statement", "status", "falsifier", "operator",
+                        "intervention_axis", "nearest_prior", "novelty_source")},
+        "state_version": (state or {}).get("state_version")})
+
+
+def _artifact_path(route_dir: Any, hypothesis_id: str, kind: str) -> pathlib.Path:
+    safe = "".join(ch for ch in str(hypothesis_id) if ch.isalnum() or ch in "-_") or "route"
+    return methods_dir(route_dir) / f"{kind}-{safe}.json"
+
+
+def write_artifact(route_dir: Any, kind: str, hypothesis_id: str, payload: Dict[str, Any], *,
+                   basis: str = "", state_version: Any = None) -> Dict[str, Any]:
+    """Persist a derived method artifact.  Idempotent: identical content writes nothing."""
+    if kind not in ARTIFACT_KINDS:
+        return {"status": "INVALID", "written": False,
+                "reason": f"未知产物类型 {kind!r}（合法：{ARTIFACT_KINDS}）"}
+    document = {"_schema": _ARTIFACT_SCHEMAS[kind], "kind": kind,
+                "hypothesis_id": str(hypothesis_id), "basis_digest": basis,
+                "state_version": state_version, "payload": payload}
+    document["content_digest"] = cg.digest_of(document["payload"])
+    path = _artifact_path(route_dir, hypothesis_id, kind)
+    if path.is_file():
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            current = None
+        if isinstance(current, dict) and current.get("content_digest") == document["content_digest"] \
+                and current.get("basis_digest") == basis:
+            return {"status": "UNCHANGED", "written": False, "path": str(path),
+                    "digest": document["content_digest"]}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"status": "WRITTEN", "written": True, "path": str(path),
+            "digest": document["content_digest"]}
+
+
+def read_artifact(route_dir: Any, hypothesis_id: str, kind: str, *,
+                  basis: str = "") -> Dict[str, Any]:
+    """Read one artifact, reporting missing / unsupported / stale explicitly."""
+    path = _artifact_path(route_dir, hypothesis_id, kind)
+    if not path.is_file():
+        return {"status": "missing", "path": str(path)}
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
+        return {"status": "unreadable", "path": str(path), "reason": type(exc).__name__}
+    if not isinstance(document, dict) or document.get("_schema") != _ARTIFACT_SCHEMAS[kind]:
+        return {"status": "unsupported", "path": str(path),
+                "reason": f"schema {document.get('_schema') if isinstance(document, dict) else None!r}"}
+    if basis and document.get("basis_digest") and document["basis_digest"] != basis:
+        return {"status": "stale", "path": str(path), "document": document,
+                "reason": "依赖的假设已变化：产物保留供审计，但不得自动沿用"}
+    return {"status": "present", "path": str(path), "document": document,
+            "payload": document.get("payload") or {}}
+
+
+def resolve_artifacts(state: Dict[str, Any], route_dir: Any, hypothesis_id: str = "",
+                      *, contract: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Derive the next step from **persisted artifacts**, not from what an agent claimed.
+
+    Returns per-artifact status plus a single `next_step`; it stores no stage machine of its own.
+    """
+    hypothesis_id = hypothesis_id or str((_primary_hypothesis(state) or {}).get("id") or "")
+    basis = hypothesis_basis(state, hypothesis_id) if hypothesis_id else ""
+    found = {kind: read_artifact(route_dir, hypothesis_id, kind, basis=basis)
+             for kind in ARTIFACT_KINDS}
+    sketch, candidates, preference = (found["sketch"], found["candidates"], found["preference"])
+    contract = contract if isinstance(contract, dict) else _method_contract_in_state(state)
+    reasons: List[str] = []
+    if not hypothesis_id:
+        step = "sketch"
+        reasons.append("没有可用候选假设：先形成机制假设")
+    elif contract is not None:
+        step = "minimal_test"
+        reasons.append("已有有效设计契约：完善最小实现与预注册（不再重复 Sketch/Candidate）")
+    elif sketch["status"] == "present" and candidates["status"] in ("present", "missing"):
+        payload = candidates.get("payload") or {}
+        existing = payload.get("candidates") or []
+        if existing:
+            distinct = len({str(item.get("distinctive_mechanism")) for item in existing
+                            if isinstance(item, dict)})
+            step = "compare" if distinct > 1 else "contract"
+            reasons.append(f"已有 {len(existing)} 个持久化候选："
+                           + ("存在真实设计分歧，先比较" if step == "compare" else "直接完善契约"))
+        else:
+            step = "synthesis"
+            reasons.append("Sketch 已存在：进入方法合成（不得重复生成 Sketch）")
+    elif sketch["status"] in ("stale", "unreadable", "unsupported"):
+        step = "sketch"
+        reasons.append(f"Sketch {sketch['status']}：需要重新设计（旧产物保留供审计）")
+    else:
+        step = "sketch"
+        reasons.append("尚无 Sketch：先写四问草案")
+    if preference["status"] == "present" and step == "compare":
+        step = "contract"
+        reasons.append("已有偏好记录且候选未变化：直接按已记录偏好完善契约")
+    return {"hypothesis_id": hypothesis_id, "basis_digest": basis, "artifacts": found,
+            "next_step": step, "reasons": reasons,
+            "note": "下一步仅由真实落盘产物与 canonical state 导出；不保存独立的阶段状态机。"}
+
+
+# ---------------------------------------------------------------------------
 # Loop-facing transition
 # ---------------------------------------------------------------------------
 
@@ -1415,7 +1551,9 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                minimal_test: Optional[Dict[str, Any]] = None,
                candidates: Optional[Sequence[Dict[str, Any]]] = None,
                gap: Optional[Dict[str, Any]] = None,
-               zero_streak: int = 0) -> Dict[str, Any]:
+               zero_streak: int = 0,
+               route_dir: Any = None,
+               hypothesis_id: str = "") -> Dict[str, Any]:
     """One inspectable I2M step for the Loop: readiness → synthesis → contract → test.
 
     Returns a step dict shaped like `preset_router._loop_step` so the Loop can use it
@@ -1423,7 +1561,15 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
     the caller's hard gates (integrity/critical attack/invalidation/assurance/budget)
     are decided before this step is consulted.
     """
-    readiness = insight_readiness(state, insight or {})
+    insight = insight if isinstance(insight, dict) else {}
+    # Artifact handoff: recover what the previous iteration actually persisted on disk.
+    resolution = (resolve_artifacts(state, route_dir, hypothesis_id, contract=contract)
+                  if route_dir is not None else None)
+    if resolution is not None and candidates is None:
+        stored = (resolution["artifacts"]["candidates"].get("payload") or {}).get("candidates")
+        if stored:
+            candidates = [item for item in stored if isinstance(item, dict)]
+    readiness = insight_readiness(state, insight)
     path = anchor_path(state, readiness=readiness, gap=gap)
     stage = "readiness"
     decision = advance(state, readiness=readiness, contract=contract,
@@ -1440,6 +1586,16 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                 "action": "先做能改变方法决定的判别实验：" + "、".join(readiness["missing"]),
                 "blocked": False, "hold": False,
                 "i2m": {"readiness": readiness, "path": path, "decision": decision}}
+    if contract is None and not candidates and resolution is not None \
+            and resolution["next_step"] == "synthesis":
+        # A valid Sketch is already persisted: go to synthesis instead of asking for it again.
+        return {"phase": "I2M", "stage": "synthesis", "step": "Synthesize",
+                "action": "Sketch 已持久化：据此提交一个（有理由的）或 2—3 个有真实分歧的方法候选",
+                "blocked": False, "hold": False,
+                "i2m": {"readiness": readiness, "path": path, "resolution": resolution,
+                        "decision": decision,
+                        "artifacts": {kind: item["status"] for kind, item in
+                                      resolution["artifacts"].items()}}}
     if contract is None and not candidates:
         # Exploration stage: the lightweight sketch is the artifact, not a full contract.
         problems = method_sketch_errors(insight.get("sketch") or {})
@@ -1463,6 +1619,21 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
         preference = (outcome.get("taste") or {}).get("preference")
         chosen = next((item for item in outcome["candidates"]
                        if item.get("candidate_id") == preference), outcome["candidates"][0])
+        if route_dir is not None:
+            target = (hypothesis_id
+                      or (_primary_hypothesis(state) or {}).get("id") or "")
+            if target:
+                write_artifact(route_dir, "candidates", str(target),
+                               {"candidates": outcome["candidates"]},
+                               basis=hypothesis_basis(state, str(target)),
+                               state_version=state.get("state_version"))
+                write_artifact(route_dir, "preference", str(target),
+                               {"preference": preference,
+                                "alternatives": (outcome.get("taste") or {}).get("alternatives") or [],
+                                "reasons": (outcome.get("taste") or {}).get("reasons") or {},
+                                "uncertainty": (outcome.get("taste") or {}).get("uncertainty", "")},
+                               basis=hypothesis_basis(state, str(target)),
+                               state_version=state.get("state_version"))
         skeleton = contract_from_candidate(chosen, insight=insight,
                                            rules_digest=_text(insight.get("rules_digest")))
         return {"phase": "I2M", "stage": "contract", "step": "Synthesize",
@@ -1470,6 +1641,10 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                           "（其余候选保留为备选，不删除）",
                 "blocked": False, "hold": False,
                 "i2m": {"readiness": readiness, "path": path, "synthesis": outcome,
+                        "resolution": resolution,
+                        "artifacts": ({kind: item["status"] for kind, item in
+                                       resolution["artifacts"].items()}
+                                      if resolution else {}),
                         "candidate_id": chosen.get("candidate_id"),
                         "preferred_over": (outcome.get("taste") or {}).get("alternatives") or [],
                         "contract_skeleton": skeleton, "decision": decision}}
@@ -2005,7 +2180,8 @@ def signal_snapshot(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] =
 
 def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
               insight: Optional[Dict[str, Any]] = None,
-              gap: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+              gap: Optional[Dict[str, Any]] = None,
+              route_dir: Any = None) -> Optional[Dict[str, Any]]:
     """The I2M step the Loop should take, or `None` when method work is not indicated.
 
     Called by `preset_router._loop_step` *after* every hard gate (integrity, critical attack,
@@ -2045,7 +2221,8 @@ def loop_step(state: Dict[str, Any], scheduler: Optional[Dict[str, Any]] = None,
         return None
     step = transition(state, scheduler=scheduler,
                       insight=insight if insight is not None else insight_from_state(state),
-                      contract=contract, minimal_test=None, gap=gap, zero_streak=streak)
+                      contract=contract, minimal_test=None, gap=gap, zero_streak=streak,
+                      route_dir=route_dir)
     if contract is not None:
         trigger = "method_contract_present"
     elif actionable:

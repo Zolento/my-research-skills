@@ -855,6 +855,78 @@ def _legacy_state() -> Dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Entry classification: Cold Handoff vs Research Resume
+# ---------------------------------------------------------------------------
+#
+# Two different operations, kept apart on purpose:
+#   * Cold Handoff (`take`)  - one-off takeover of a legacy project: compatibility audit,
+#     projection rebuild, report, rollback.  Canonical state is preserved and pre-registration
+#     is never fabricated after the fact.
+#   * Research Resume        - ordinary continuation: read the canonical state, the existing
+#     cognitive projection and the scheduler, then pick up the unfinished research action.
+#     This is what every DSH `/loop` wake-up and every normal `continue-research` does.
+#
+# A canonical `research-state.json` never implies "needs a full handoff": only an unfinished
+# takeover or a real incompatibility does.  A higher `state_version` is not a reason, and a
+# missing derived report is not a damaged canonical state.
+
+COLD_HANDOFF_ROUTE = "Cold Handoff（一次性接管/兼容性迁移）"
+RESEARCH_RESUME_ROUTE = "Research Resume（日常续研）"
+BOOTSTRAP_ROUTE = "Bootstrap（无 canonical state）"
+RECOVER_OR_HOLD_ROUTE = "Recover/HOLD（状态不可读或真实证据异常）"
+
+
+def _cognition_dir(state_path: Path) -> Path:
+    return Path(state_path).expanduser().parent / cg.COGNITION_DIRNAME
+
+
+def resume_decision(state_path: Path) -> Dict[str, Any]:
+    """Classify the entry: Bootstrap / Cold Handoff / Research Resume / Recover-or-HOLD.
+
+    Read-only and explainable; reuses the persisted handoff artifact, the schema and the
+    existing history.  It never rebuilds state and adds no stage machine.
+    """
+    state_path = Path(state_path).expanduser()
+    route_dir = state_path.parent
+    decision: Dict[str, Any] = {"state_path": str(state_path), "route": route_dir.name}
+    detection = detect(state_path)
+    if not state_path.is_file():
+        decision.update(route=BOOTSTRAP_ROUTE, initialized=False, reasons=[detection["reason"]])
+        return decision
+    if detection.get("unreadable"):
+        decision.update(route=RECOVER_OR_HOLD_ROUTE, initialized=True,
+                        reasons=["canonical state 存在但不可读：走既有恢复/修复，"
+                                 "不得通过重建 state 绕过"])
+        return decision
+    handoff_path = _cognition_dir(state_path) / HANDOFF_NAME
+    record: Optional[Dict[str, Any]] = None
+    if handoff_path.is_file():
+        try:
+            loaded = json.loads(handoff_path.read_text(encoding="utf-8"))
+            record = loaded if isinstance(loaded, dict) else None
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            record = None
+    schema_ok = bool(record) and record.get("_schema") == SCHEMA_HANDOFF
+    reasons: List[str] = []
+    incompatible = False
+    if not schema_ok and _history_versions(route_dir):
+        incompatible = True
+        reasons.append("该路线有历史版本但尚未完成接管（缺少或不兼容的 handoff 记录）："
+                       "需要一次性 Cold Handoff")
+    if schema_ok:
+        reasons.append("接管记录有效：已初始化项目，直接 Research Resume")
+    if not reasons:
+        reasons.append("canonical state 有效且没有未完成接管：直接 Research Resume"
+                       "（缺失派生报告不等于状态损坏）")
+    decision.update(route=COLD_HANDOFF_ROUTE if incompatible else RESEARCH_RESUME_ROUTE,
+                    initialized=True, handoff_record=str(handoff_path) if schema_ok else None,
+                    state_version=detection.get("state_version"), reasons=reasons,
+                    bootstrap_forbidden=True,
+                    note="state_version 增加或缺少派生报告都不构成重新接管的理由。")
+    return decision
+
+
 def selftest() -> int:
     import tempfile
 
@@ -947,7 +1019,7 @@ def selftest() -> int:
         check("forbidden repeats are recovered from failure memory",
               any(item["kind"] == "failed_repeat" for item in handoff["forbidden_repeats"]))
 
-    print(f"selftest: {'PASS' if failures == 0 else 'FAIL'} ({failures} failures)")
+    print(f"selftest {'OK' if failures == 0 else 'FAILED'} ({failures} failures)")
     return EXIT_OK if failures == 0 else EXIT_ERROR
 
 
@@ -970,6 +1042,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project", help="project root (inferred when omitted)")
     parser.add_argument("--selftest", action="store_true")
     return parser
+
+
+    # Entry classification: a canonical state is Research Resume, not a repeated takeover.
+    with tempfile.TemporaryDirectory() as temp:
+        route = Path(temp) / "A"
+        route.mkdir(parents=True)
+        check("无 canonical state 判为 Bootstrap",
+              "Bootstrap" in resume_decision(route / cg.STATE_NAME)["route"])
+        (route / cg.STATE_NAME).write_text(json.dumps({"state_version": 3}))
+        check("有效 state 直接 Research Resume",
+              "Research Resume" in resume_decision(route / cg.STATE_NAME)["route"])
+        history = route / "history"
+        history.mkdir()
+        (history / "0001.json").write_text(json.dumps({"state_version": 1}))
+        check("历史未接管才需要 Cold Handoff",
+              "Cold Handoff" in resume_decision(route / cg.STATE_NAME)["route"])
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

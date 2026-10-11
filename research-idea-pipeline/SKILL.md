@@ -315,6 +315,21 @@ B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用�
 
 ---
 
+### 0.31 Cold Handoff vs Research Resume（入口分类）
+
+两个**完全不同**的操作，不要混用（判定见 `scripts/legacy_handoff.py:resume_decision`）：
+
+| 场景 | 操作 | 说明 |
+|---|---|---|
+| 无 canonical state | Bootstrap | 按 §0.3 执行 |
+| 有历史但未完成接管 / 真实不兼容迁移 | **Cold Handoff**（`legacy_handoff.py take`）| 一次性：兼容性审计、投影重建、接管报告、可回滚；**不伪造预注册**，canonical state 无损 |
+| 已有有效 state（含 `/loop` 每轮唤醒、`continue-research`、会话恢复、上下文压缩后重载）| **Research Resume** | 直接读 canonical state + 认知投影 + Scheduler + 已有方法产物，继续未完成的科研行动 |
+| state 不可读 / 真实证据异常 | Recover / HOLD | 走既有恢复链，**不得**通过重建 state 绕过 |
+
+**已有 `research-state.json` ≠ 需要完整接管**；`state_version` 增长、缺少派生报告都**不**构成重新
+接管的理由。职责边界：Legacy Handoff 只做一次性接管；Research Recovery 恢复当前科研状态；
+Context Drift Recovery 处理投影漂移；Cognition 维护可重建记忆；Scheduler/I2M 决定下一步行动。
+
 ### 0.4 Insight-to-Method Transition（I2M）
 
 > **核心行为约束（逐字）：** 科研诊断必须服务于一个**可改变的研究决定**。发现可操作的机制后，
