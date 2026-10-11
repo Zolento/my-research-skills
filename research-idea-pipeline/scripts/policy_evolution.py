@@ -1023,39 +1023,95 @@ def _finite_number(value: Any) -> bool:
             and _math.isfinite(value))
 
 
-def _run_distribution_errors(arm: str, results: Sequence[Dict[str, Any]],
-                             cases: int, runs: int) -> List[str]:
-    """Per-case run distribution and run identity.
+_RUN_ID_MAX_LENGTH = 64
 
-    Checking only `len(results) == cases x runs` let "one case three times and another once"
-    pass as two runs each; a report could also repeat the same run_id and still look complete.
+
+def _run_identity_value_errors(arm: str, row: Dict[str, Any], field: str) -> List[str]:
+    """Type and format contract for a run/pairing identity.
+
+    The value comes from external JSON, so it may be a list/dict/bool/float. `set()` and
+    `sorted()` on those raise TypeError out of the audit. The contract is: a non-empty string
+    (bounded, no control characters) or a non-negative integer. Values are never coerced to
+    strings, because `1` and `"1"` would then collide.
+    """
+    value = row.get(field)
+    if value is None:
+        return [f"{arm} 缺少 {field}：无法证明每一轮运行/配对的身份"]
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        return [f"{arm} 的 {field} 类型非法：{value!r}（必须是字符串或整数）"]
+    if isinstance(value, int):
+        return [] if value >= 0 else [f"{arm} 的 {field} 非法：{value!r}（不得为负）"]
+    if not value.strip() or len(value) > _RUN_ID_MAX_LENGTH \
+            or any(ord(character) < 32 for character in value):
+        return [f"{arm} 的 {field} 格式非法：{value!r}"]
+    return []
+
+
+def _pairing_errors(results_by_arm: Dict[str, Sequence[Dict[str, Any]]],
+                    cases: int, runs: int) -> List[str]:
+    """Per-arm run structure plus cross-arm pairing completeness.
+
+    The replay design is paired: every case is executed in every arm and run k of one arm is
+    compared with run k of the other. Two arms that are each internally consistent but whose
+    (case, run) sets differ used to pass, so unpaired data entered the paired statistics.
+
+    `pairing_key` overrides the pairing identity when an executor's `run_id` is only arm-local
+    (e.g. `a-3` vs `b-7`); it defaults to `run_id`. An explicitly unpaired design is refused
+    rather than silently changing the statistical protocol.
     """
     problems: List[str] = []
-    counts: Dict[str, int] = {}
-    for row in results:
-        counts[str(row.get("case_id"))] = counts.get(str(row.get("case_id")), 0) + 1
-    if cases and any(count != runs for count in counts.values()):
-        problems.append(f"{arm} 的每 case 运行次数不一致：{counts}（应各为 {runs} 次）")
-    if runs > 1:
-        if any(row.get("run_id") is None for row in results):
-            problems.append(f"{arm} 缺少 run_id：无法证明每一轮运行的身份")
-        else:
-            pairs = [(str(row.get("case_id")), row.get("run_id")) for row in results]
-            if len(set(pairs)) != len(pairs):
-                problems.append(f"{arm} 存在重复的 (case_id, run_id) 记录")
-            per_case: Dict[str, set] = {}
-            for case_id, run_id in pairs:
-                per_case.setdefault(case_id, set()).add(run_id)
-            all_runs = set().union(*per_case.values()) if per_case else set()
-            if len(all_runs) != runs:
-                problems.append(f"{arm} 的运行轮次标识有 {len(all_runs)} 个 "
-                                f"({sorted(all_runs)})，与声明的 {runs} 不一致")
-            for case_id, run_ids_for_case in sorted(per_case.items()):
-                if run_ids_for_case != all_runs:
-                    problems.append(
-                        f"{arm} 的 case {case_id!r} 运行集合 {sorted(run_ids_for_case)} "
-                        f"与整臂 {sorted(all_runs)} 不一致：缺轮或跨臂错配")
+    pairing: Dict[str, set] = {}
+    shapes: Dict[str, Any] = {}
+    for arm, results in results_by_arm.items():
+        counts: Dict[str, int] = {}
+        per_case: Dict[str, set] = {}
+        types: set = set()
+        for row in results:
+            case_id = str(row.get("case_id"))
+            counts[case_id] = counts.get(case_id, 0) + 1
+            problems.extend(_run_identity_value_errors(arm, row, "run_id"))
+            if "pairing_key" in row:
+                problems.extend(_run_identity_value_errors(arm, row, "pairing_key"))
+            key = row.get("pairing_key", row.get("run_id"))
+            if isinstance(key, bool) or not isinstance(key, (str, int)):
+                continue
+            types.add(type(key).__name__)
+            per_case.setdefault(case_id, set()).add(key)
+        if cases and any(count != runs for count in counts.values()):
+            problems.append(f"{arm} 的每 case 运行次数不一致：{counts}（应各为 {runs} 次）")
+        if len(types) > 1:
+            problems.append(f"{arm} 的 run_id/pairing_key 混用多种类型：{sorted(types)}")
+            continue
+        all_keys = set().union(*per_case.values()) if per_case else set()
+        if runs > 1 and len(all_keys) != runs:
+            problems.append(f"{arm} 的运行/配对标识有 {len(all_keys)} 个，"
+                            f"与声明的 {runs} 不一致")
+        for case_id, keys in per_case.items():
+            if keys != all_keys:
+                problems.append(f"{arm} 的 case {case_id!r} 配对集合 {sorted(keys, key=repr)} "
+                                f"与整臂 {sorted(all_keys, key=repr)} 不一致：缺轮或错配")
+        pairs = sorted((str(row.get("case_id")),
+                        repr(row.get("pairing_key", row.get("run_id"))))
+                       for row in results
+                       if not isinstance(row.get("pairing_key", row.get("run_id")), bool)
+                       and isinstance(row.get("pairing_key", row.get("run_id")), (str, int)))
+        if len(set(pairs)) != len(pairs):
+            problems.append(f"{arm} 存在重复的 (case_id, 配对标识) 记录")
+        pairing[arm] = set(pairs)
+        shapes[arm] = sorted(pairs)
+    if len(shapes) > 1 and len({tuple(shape) for shape in shapes.values()}) > 1:
+        detail = {arm: shape[:3] for arm, shape in shapes.items()}
+        problems.append("各臂的 (case_id, 配对标识) 集合不一致：不是配对实验，" + str(detail))
     return problems
+
+
+def _report_design_errors(report: Dict[str, Any]) -> List[str]:
+    """Only a paired comparison is accepted as promotion evidence."""
+    design = report.get("design", "paired")
+    if design != "paired":
+        return [f"不支持的实验设计 {design!r}：本评价协议只接受配对实验，"
+                "不会静默切换统计协议"]
+    return []
 
 
 def _metric_value_errors(arm: str, results: Sequence[Dict[str, Any]],
@@ -1068,6 +1124,11 @@ def _metric_value_errors(arm: str, results: Sequence[Dict[str, Any]],
             problems.append(f"{arm} 的 case {row.get('case_id')!r} 缺少 evaluation.metrics")
             continue
         for name in dimensions:
+            if name not in metrics:
+                # A missing key is a structural defect, not "unobservable": the latter is an
+                # explicit `value: null`, which is what keeps the effective sample honest.
+                problems.append(f"{arm} 的 case {row.get('case_id')!r} 缺少必需指标 {name!r}")
+                continue
             metric = metrics.get(name)
             if not isinstance(metric, dict):
                 problems.append(f"{arm}.{name} 的指标结构非法（应为对象）")
@@ -1162,6 +1223,7 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
                 and declared_rules != current_rules_digest:
             errors.append("报告声明的 rules_digest 与冻结评价规则不一致")
 
+    errors.extend(_report_design_errors(report))
     normalized: Dict[str, Any] = {"schema": SCHEMA_ABLATION_REPORT, "cases": cases,
                                   "runs_per_case": runs, "runner": report.get("runner"),
                                   "policy_id": report.get("policy_id"),
@@ -1169,7 +1231,8 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
                                   "rules_digest": report.get("rules_digest"),
                                   "unobservable_decisions": _safe_int(
                                       report.get("unobservable_decisions")),
-                                  "delta_vs_baseline": {}, "per_arm": {}}
+                                  "delta_vs_baseline": {}, "per_arm": {},
+                                  "design": report.get("design", "paired")}
     case_sets: Dict[str, set] = {}
     for arm, block in per_arm.items():
         if not isinstance(block, dict):
@@ -1205,12 +1268,15 @@ def audit_report(report: Dict[str, Any], *, candidate: Optional[Dict[str, Any]] 
         if cases and runs and len(results) != cases * runs:
             errors.append(f"{arm} 的执行记录数 {len(results)} 与 cases×runs "
                           f"({cases}×{runs}) 不一致")
-        errors.extend(_run_distribution_errors(arm, results, cases, runs))
         errors.extend(_metric_value_errors(arm, results, dimensions))
         normalized["per_arm"][arm] = {"dimensions": recomputed, "results": results,
                                       "evidence_support": block.get("evidence_support") or {}}
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         errors.append("各臂执行的 case 集合不一致：无法配对比较")
+    errors.extend(_pairing_errors({arm: (block.get("results") or [])
+                                   for arm, block in per_arm.items()
+                                   if isinstance(block, dict)},
+                                  cases, runs))
     # The unobserved count is recomputed from the execution records; a report could otherwise
     # claim full coverage while every record said NO_SUPPORT.
     recomputed_unobservable = 0
@@ -1312,6 +1378,13 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
                 or not (trial["dispatch_record"].get("action")
                         and trial["dispatch_record"].get("state_version") is not None):
             bad("dispatch_ref 缺少真实派遣事件（动作与状态版本）：派遣未被确认")
+        elif not trial["dispatch_record"].get("event_id"):
+            bad("dispatch_ref 缺少派遣事件标识：无法防重放，拒绝作为 L3 证据")
+        elif trial["dispatch_record"].get("policy_id") != policy_id:
+            bad("派遣记录的策略身份与候选不一致")
+        elif trial["dispatch_record"].get("policy_signature") not in (None,
+                                                                     candidate.get("signature")):
+            bad("派遣事件绑定的策略版本与候选不一致")
 
     # Accept both the submitted credential (top-level per_arm) and the stored artifact,
     # whose records live under `report`.
@@ -1392,11 +1465,19 @@ def _validation_errors(state_path: Path, payload: Dict[str, Any], *,
             if isinstance(runs, int) and runs >= 1 and len(results) != cases * runs:
                 bad(f"{arm} 的执行记录数 {len(results)} 与 cases×runs "
                     f"({cases}×{runs}) 不一致")
-            for message in _run_distribution_errors(arm, results, cases, runs):
+            for message in _metric_value_errors(arm, results, dimensions):
                 bad(message)
             case_sets[arm] = ids
     if len(case_sets) > 1 and len(set(map(frozenset, case_sets.values()))) > 1:
         bad("各臂执行的 case 集合不一致：不存在可配对的对照")
+    for message in _report_design_errors(payload):
+        bad(message)
+    for message in _pairing_errors({arm: (block.get("results") or [])
+                                    for arm, block in per_arm.items()
+                                    if isinstance(block, dict)},
+                                   cases if isinstance(cases, int) else 0,
+                                   runs if isinstance(runs, int) else 1):
+        bad(message)
     equivalence = payload.get("equivalence")
     if equivalence is None and isinstance(payload.get("report"), dict):
         equivalence = payload["report"].get("equivalence")
@@ -1474,21 +1555,54 @@ def dispatch_corroboration(state_path: Path, candidate: Dict[str, Any],
         return fail("派遣记录与当前状态版本不一致：陈旧或重复消费的派遣")
     advice = recorded.get("advice") if isinstance(recorded.get("advice"), dict) else {}
     advice_policy = advice.get("policy_id")
-    if advice_policy is not None and advice_policy != policy_id:
+    if not isinstance(advice_policy, str) or not advice_policy.strip():
+        # An ordinary scheduler dispatch (no policy identity) is legitimate, but it can never
+        # attest that *this* candidate policy drove an execution. Identity is read here, never
+        # written at validation time, so attribution cannot be created after the fact.
+        return fail("派遣记录没有候选策略身份（普通 Scheduler 派遣不能作为策略晋升的"
+                    "L3 派遣凭证）")
+    if advice_policy != policy_id:
         return fail(f"派遣记录来自另一个策略（{advice_policy!r}，当前 {policy_id!r}）")
+    recorded_signature = recorded.get("policy_signature") or advice.get("policy_signature")
+    if recorded_signature is not None and recorded_signature != candidate.get("signature"):
+        return fail("派遣记录绑定的是另一个策略版本（签名不一致）")
     claimed = evidence.get("action") or evidence.get("dispatched")
     if isinstance(claimed, str) and claimed.strip() and claimed != action:
         return fail(f"声明的派遣动作 {claimed!r} 与调度器记录 {action!r} 不一致")
     history = scheduler.get("strategy_decisions")
-    return {"dispatch_state": "dispatched",
-            "record": {"action": action, "adopted": True,
-                       "state_version": recorded.get("state_version"),
-                       "policy_id": policy_id,
-                       "decision_index": (len(history) - 1) if isinstance(history, list) else None,
-                       "scheduler_digest": cg.digest_of(scheduler),
-                       "corroborated_from": "scheduler.strategy_decisions[]",
-                       "claim_accepted": bool(claimed)},
-            "errors": []}
+    decision_index = (len(history) - 1) if isinstance(history, list) else None
+    scheduler_digest = cg.digest_of(scheduler)
+    event_identity = {"policy_id": policy_id,
+                      "policy_signature": candidate.get("signature"),
+                      "action": action,
+                      "state_version": recorded.get("state_version"),
+                      "decision_index": decision_index,
+                      "scheduler_digest": scheduler_digest}
+    record = dict(event_identity, adopted=True,
+                  event_id=cg.digest_of(event_identity),
+                  scheduler_digest=scheduler_digest,
+                  corroborated_from="scheduler.strategy_decisions[]",
+                  claim_accepted=bool(claimed))
+    return {"dispatch_state": "dispatched", "record": record, "errors": []}
+
+
+def _dispatch_event_reuse_errors(state_path: Path, event_id: Optional[str]) -> List[cg.Diagnostic]:
+    """A dispatch event may support exactly one bounded trial (no replay of the same event)."""
+    if not event_id:
+        return []
+    directory = trials_dir(state_path)
+    if not directory.is_dir():
+        return []
+    for candidate_path in sorted(directory.glob("*.json")):
+        try:
+            payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, OSError, json.JSONDecodeError):
+            continue
+        record = payload.get("dispatch_record")
+        if isinstance(record, dict) and record.get("event_id") == event_id:
+            return [_diag("PE11", "policy",
+                          "该派遣事件已被另一次试运行使用：同一派遣事件不可重复消费")]
+    return []
 
 
 def _candidate_bound_projects(state_path: Path, candidate: Dict[str, Any]) -> Dict[str, Any]:
@@ -2556,6 +2670,11 @@ def begin_bounded_trial(state_path: Path, policy_id: str, *,
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": ["未知 policy_id"], "codes": ["PE1"]}
         corroboration = dispatch_corroboration(state_path, candidate, dispatch_evidence)
+        if not corroboration["errors"]:
+            reuse = _dispatch_event_reuse_errors(
+                state_path, (corroboration.get("record") or {}).get("event_id"))
+            if reuse:
+                corroboration = {"dispatch_state": None, "record": None, "errors": reuse}
         if corroboration["errors"]:
             return {"status": "INVALID", "written": False, "policy_id": policy_id,
                     "diagnostics": [item.render() for item in corroboration["errors"]],
@@ -3206,10 +3325,14 @@ def _selftest_validation(state_path: Path, policy_id: str, workdir: Path,
         if payload.get("policy_id") == policy_id:
             trial = {"path": str(path), "digest": payload["digest"]}
     def rows(executor, sci, ben):
+        # every metric dimension is reported: unmeasured ones are explicit neutral values,
+        # while `None` stays the "legitimate unobservable" marker
+        metrics = {name: {"value": 0.5} for name in _SELFTEST_DIMS}
+        metrics["mechanistic_understanding"] = {"value": sci}
+        metrics["search_efficiency"] = {"value": ben}
         return [{"case_id": f"T{index}", "run_id": f"run-{run_index + 1}",
                  "isolation_verified": True, "leak_checked": True, "executor": executor,
-                 "evaluation": {"metrics": {"mechanistic_understanding": {"value": sci},
-                                            "search_efficiency": {"value": ben}}}}
+                 "evaluation": {"metrics": copy.deepcopy(metrics)}}
                 for run_index in range(2) for index in range(3)]
     def env(instance, strategy):
         return {"instance": instance, "environment": {

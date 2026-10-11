@@ -53,13 +53,18 @@ def real_log(directory: pathlib.Path, *, name: str = "run.log") -> pathlib.Path:
 
 
 def _rows(case_id_prefix, cases, runs, metrics, *, isolation, leak, executor):
+    import research_replay as rr
+    # every metric dimension is reported; unmeasured ones are explicit 0.5 neutral values, and
+    # a legitimate "unobservable" is an explicit `{"value": None}` rather than a missing key
+    complete = {name: 0.5 for name in rr.METRIC_DIMENSIONS}
+    complete.update(metrics)
     rows = []
     for run_index in range(runs):
         for index in range(cases):
             rows.append({"case_id": f"{case_id_prefix}{index}",
                          "run_id": f"run-{run_index + 1}",
                          "evaluation": {"metrics": {name: {"value": value}
-                                                    for name, value in metrics.items()}},
+                                                    for name, value in complete.items()}},
                          "isolation_verified": isolation, "leak_checked": leak,
                          "executor": executor})
     return rows

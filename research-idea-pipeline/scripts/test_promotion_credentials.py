@@ -52,10 +52,16 @@ def fixture_state(version=3):
 
 
 def case_result(case_id, *, metrics, isolation=True, leak=True, executor=None):
-    """One execution record: the per-case measurements are the recomputable source."""
+    """One execution record: the per-case measurements are the recomputable source.
+
+    Every metric dimension is reported; unmeasured ones are explicit neutral 0.5 values, so a
+    missing key can stay a structural error while `None` remains the "unobservable" marker.
+    """
+    complete = {name: 0.5 for name in rr.METRIC_DIMENSIONS}
+    complete.update(metrics)
     record = {"case_id": case_id,
               "evaluation": {"metrics": {name: {"value": value}
-                                         for name, value in metrics.items()}},
+                                         for name, value in complete.items()}},
               "isolation_verified": isolation, "leak_checked": leak}
     if executor is not None:
         record["executor"] = executor
