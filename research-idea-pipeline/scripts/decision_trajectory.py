@@ -647,7 +647,7 @@ def _decision_errors(record: Dict[str, Any], *, state: Optional[Dict[str, Any]],
                                      "同一 trajectory_id 已存在且决策内容不同：旧决策不可被结果改写"))
         outcomes = _prior(records, ident, "outcome")
         if outcomes and context.get("decided_at") and \
-                _text_le(context["decided_at"], outcomes[-1].get("observed_at")):
+                _text_lt(outcomes[-1].get("observed_at"), context["decided_at"]):
             diagnostics.append(_diag("DT4", path, "决策时间晚于其结果观测时间（时间顺序倒挂）"))
     return diagnostics
 
@@ -989,11 +989,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.command == "validate":
         records, diagnostics = load_records(path, tolerant=True)
         errors: List[str] = [item.render() for item in diagnostics]
-        for record in records:
-            errors += [item.render() for item in record_errors(record, state=state,
-                                                               records=records)]
+        unverified: List[str] = []
+        route = cg.route_of(Path(args.state)) if args.state else None
+        for position, record in enumerate(records):
+            context = record.get("context")
+            version = context.get("state_version") if isinstance(context, dict) else None
+            live_version = state.get("state_version") if state is not None else None
+            historical = (record.get("record") == "decision"
+                          and type(version) is int and type(live_version) is int
+                          and 0 <= version < live_version)
+            errors += [item.render() for item in record_errors(
+                record, state=None if historical else state,
+                records=records[:position], route=route)]
+            if historical:
+                identifier = record.get("trajectory_id")
+                if isinstance(identifier, str):
+                    unverified.append(identifier)
+                errors += [item.render() for item in _ref_errors(
+                    state, f"trajectory[{identifier or '?'}]",
+                    {"hypotheses": context.get("active_hypotheses") or [],
+                     "uncertainties": context.get("key_uncertainties") or [],
+                     "evidence": context.get("visible_evidence") or []})]
         verdict = "PASS" if not errors else "FAIL"
-        return _emit({"status": verdict, "records": len(records), "errors": errors},
+        return _emit({"status": verdict, "records": len(records), "errors": errors,
+                      "state_binding_scope": "matching_live_version" if state is not None
+                      else "not_checked",
+                      "historical_state_bindings_unverified": sorted(set(unverified))},
                      EXIT_OK if not errors else EXIT_HARD)
 
     # open / outcome / learning all append a caller-supplied record

@@ -61,6 +61,13 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 
 命令：`open` / `outcome` / `learning` / `show` / `list` / `validate` / `--selftest`。
 
+[AI-gen] `validate` 按写入顺序检查历史记录。每条记录只读取此前的账本前缀。
+当前记录及后续记录不计入此前记录。`open` 仍严格拒绝过期状态。
+提供 `--state` 时，同版本决策核对当前摘要；旧版本只核对现存来源引用。
+旧版本不会与当前摘要混比，也不因此获得历史快照认证。
+输出 `historical_state_bindings_unverified` 列明未认证的旧版本决策。
+未提供 `--state` 时，`state_binding_scope` 为 `not_checked`，不认证状态绑定。
+
 ## 4. Counterfactual-Aware Replay（`scripts/research_replay.py`）
 
 ### 4.1 三类历史决策

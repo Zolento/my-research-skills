@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from typing import Any, Dict, List, Optional, Tuple
 
 import cognition as cg
 import decision_trajectory as dt
@@ -467,3 +468,136 @@ class TestWriteGuardIsWired(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = pathlib.Path(temp) / "A" / "SKILL.md.jsonl"
             self.assertEqual(dt.append_chained(path, {"_schema": "x"})["seq"], 1)
+
+
+class TestHistoricalValidation(unittest.TestCase):
+    """[AI-gen] 经真实 CLI 验证历史顺序，保留追加时的硬门禁。"""
+
+    def _result_record(self, decision: Dict[str, Any], version: int = 3,
+                 observed_at: str = "2026-01-02T00:00:00Z") -> Dict[str, Any]:
+        """生成尚未写入账本的正常结果记录。"""
+        return dt.build_outcome_record(
+            decision["trajectory_id"], at_state_version=version,
+            result={"summary": "independent observed result for this trajectory"},
+            evidence_refs=[{"evidence": "E1"}], observed_at=observed_at)
+
+    def _validate(self, records: List[Dict[str, Any]],
+                  state: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+        """写入带真实哈希链的隔离 fixture，调用生产 validate 并核验只读。"""
+        with tempfile.TemporaryDirectory() as temp:
+            route = pathlib.Path(temp) / "A"
+            path = route / dt.TRAJECTORY_NAME
+            for record in records:
+                dt.append_chained(path, record)
+            command = [sys.executable, str(SCRIPT), "validate", "--trajectory", str(path)]
+            if state is not None:
+                state_path = route / cg.STATE_NAME
+                state_path.write_text(json.dumps(state), encoding="utf-8")
+                command.extend(["--state", str(state_path)])
+            before = {candidate: candidate.read_bytes()
+                      for candidate in (path, dt.head_path(path))}
+            result = subprocess.run(command, capture_output=True, text=True)
+            for candidate, content in before.items():
+                self.assertEqual(candidate.read_bytes(), content)
+            self.assertTrue(result.stdout, result.stderr)
+            return result.returncode, json.loads(result.stdout)
+
+    def test_cli_accepts_completed_trajectory_and_learning(self) -> None:
+        """正常 decision/outcome/learning 不得将自身误认成重复记录。"""
+        state = fixture_state()
+        decision = decision_record(state)
+        prediction = {"_schema": dt.SCHEMA_TRAJECTORY, "record": "prediction",
+                      "trajectory_id": decision["trajectory_id"],
+                      "recorded_at": "2026-01-01T12:00:00Z",
+                      "question": "q", "distinguishable_predictions": ["p"]}
+        learning = dt.build_learning_record(
+            decision["trajectory_id"], learning_value=False,
+            recorded_at="2026-01-03T00:00:00Z")
+        for live_state in (None, state):
+            with self.subTest(with_state=live_state is not None):
+                code, result = self._validate(
+                    [decision, prediction, self._result_record(decision), learning], live_state)
+                self.assertEqual(code, 0, result)
+                self.assertEqual(result["status"], "PASS")
+
+    def test_cli_preserves_old_context_without_certifying_its_snapshot(self) -> None:
+        """旧版本不与当前版本混比，且明确未认证其历史快照。"""
+        old = decision_record(fixture_state(version=2))
+        live = fixture_state(version=3)
+        current = decision_record(live, at="2026-01-03T00:00:00Z")
+        code, result = self._validate([old, self._result_record(old, version=2), current], live)
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["historical_state_bindings_unverified"], [old["trajectory_id"]])
+
+    def test_cli_rejects_real_ordering_and_duplicate_violations(self) -> None:
+        """带有效哈希链的真实违规仍必须拒绝，不能靠前缀修复放行。"""
+        decision = decision_record(fixture_state())
+        outcome = self._result_record(decision)
+        prediction = {"_schema": dt.SCHEMA_TRAJECTORY, "record": "prediction",
+                      "trajectory_id": decision["trajectory_id"],
+                      "recorded_at": "2026-01-03T00:00:00Z",
+                      "question": "q", "distinguishable_predictions": ["p"]}
+        learning = dt.build_learning_record(decision["trajectory_id"], learning_value=False)
+        cases = [
+            ([decision, outcome, clone(outcome)], "DT1"),
+            ([outcome, decision], "DT1"),
+            ([decision, outcome, prediction], "DT5"),
+            ([decision, learning, outcome], "DT1"),
+            ([decision, outcome, learning, clone(learning)], "DT1"),
+            ([decision, self._result_record(decision, version=2)], "DT4"),
+            ([decision, self._result_record(decision, observed_at="2025-12-31T00:00:00Z")], "DT4"),
+        ]
+        for records, expected_rule in cases:
+            with self.subTest(expected_rule=expected_rule, kinds=[r["record"] for r in records]):
+                code, result = self._validate(records)
+                self.assertNotEqual(code, 0, result)
+                self.assertTrue(any(error.startswith(expected_rule) for error in result["errors"]),
+                                result)
+
+    def test_cli_rejects_frozen_context_leakage(self) -> None:
+        """顺序验证仍由 outcome 检测冻结上下文中的未来答案。"""
+        decision = decision_record(fixture_state())
+        outcome = self._result_record(decision)
+        decision["context"]["extra_note"] = outcome["result"]["summary"]
+        code, result = self._validate([decision, outcome])
+        self.assertNotEqual(code, 0, result)
+        self.assertTrue(any(error.startswith("DT6") for error in result["errors"]), result)
+
+    def test_cli_keeps_current_binding_and_reference_checks(self) -> None:
+        """当前摘要、未来版本和历史悬空引用仍拒绝。"""
+        state = fixture_state()
+        wrong_digest = decision_record(state)
+        wrong_digest["context"]["state_digest"] = "sha256:wrong"
+        unknown_reference = decision_record(fixture_state(version=2))
+        unknown_reference["context"]["visible_evidence"] = ["E99"]
+        cases = [(wrong_digest, "DT4"),
+                 (decision_record(fixture_state(version=4)), "DT4"),
+                 (decision_record(fixture_state(version=-1)), "DT4"),
+                 (decision_record(fixture_state(version=True)), "DT4"),
+                 (unknown_reference, "DT3")]
+        for record, expected_rule in cases:
+            with self.subTest(expected_rule=expected_rule):
+                code, result = self._validate([record], state)
+                self.assertNotEqual(code, 0, result)
+                self.assertTrue(any(error.startswith(expected_rule) for error in result["errors"]),
+                                result)
+
+    def test_cli_reports_malformed_history_without_crashing(self) -> None:
+        """旧记录缺少标识仍返回结构错误，而非验证器异常。"""
+        decision = decision_record(fixture_state(version=2))
+        decision.pop("trajectory_id")
+        code, result = self._validate([decision], fixture_state())
+        self.assertNotEqual(code, 0, result)
+        self.assertTrue(any(error.startswith("DT1") for error in result["errors"]), result)
+
+    def test_record_checks_reject_only_actually_late_decisions(self) -> None:
+        """修正时间比较方向，不改变结构、语义及来源校验。"""
+        state = fixture_state()
+        decision = decision_record(state)
+        outcome = self._result_record(decision)
+        diagnostics = dt.record_errors(decision, state=state, records=[decision, outcome])
+        self.assertFalse(any(item.rule == "DT4" for item in diagnostics), diagnostics)
+        late = clone(decision)
+        late["context"]["decided_at"] = "2026-01-03T00:00:00Z"
+        diagnostics = dt.record_errors(late, state=state, records=[decision, outcome])
+        self.assertTrue(any(item.rule == "DT4" for item in diagnostics), diagnostics)
