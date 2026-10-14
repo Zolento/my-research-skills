@@ -112,6 +112,10 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 **只读咨询、明确审计（`audit`）、`explore` 与非方法主锚点各自的权限边界不变**：
 未授权时不推进状态，`orthogonal` 路线仍不得作为投稿主线，改主锚点仍只能由用户授权（§0.2）。
 
+**总结请求**：以 `continue-research` + `research-review`（只读）执行；要求"深度总结"时按
+[deep-research-summary.md](deep-research-summary.md) 的 11 节结构与统一回报契约输出。
+工具：`python3 scripts/research_summary.py --state <state.json>`（只读、幂等、缺失标 `[待补]`）。
+
 **默认是 Research Resume。** 已有 canonical state 时**不执行** Legacy Handoff、不重复兼容性审查：
 只读 canonical state + 认知投影 + Scheduler + 已有方法产物，继续未完成的科研行动
 （判定：`legacy_handoff.resume_decision`）。只有历史项目未完成接管或存在真实不兼容迁移时才做

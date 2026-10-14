@@ -99,6 +99,7 @@ EXPECTED_TEST_SUITES = (
     "test_insight_to_method.py",
     "test_research_continuity.py",
     "test_research_taste.py",
+    "test_research_summary.py",
     "test_l3_trust_boundary.py",
     "test_legacy_handoff.py",
     "test_literature_search.py",
@@ -152,7 +153,7 @@ def step_tests() -> Tuple[bool, str]:
 #: regression inside them would be invisible (and the L1 evidence they are cited for ungated).
 SELFTEST_MODULES = ("state_check", "decision_trajectory", "policy_evolution", "policy_transfer",
                     "source_freeze", "rsi_ablation", "insight_to_method",
-                    "legacy_handoff")
+                    "legacy_handoff", "research_summary")
 
 
 def step_selftest() -> Tuple[bool, str]:
