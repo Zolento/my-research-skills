@@ -100,6 +100,7 @@ EXPECTED_TEST_SUITES = (
     "test_research_continuity.py",
     "test_research_taste.py",
     "test_research_summary.py",
+    "test_launchability.py",
     "test_l3_trust_boundary.py",
     "test_legacy_handoff.py",
     "test_literature_search.py",
