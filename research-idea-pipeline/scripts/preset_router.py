@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import cognition as cg
+import insight_to_method as i2m
 import evidence_outcome as eo
 import prediction_compare as pc
 import state_check as sc
@@ -1336,6 +1337,8 @@ def signal_snapshot(
         "records": len(records),
     }
 
+    # Observable I2M state: what the Loop would do about turning insight into a method.
+    signals["i2m"] = i2m.signal_snapshot(state, scheduler=scheduler)
     concentration = _portfolio_concentration(state)
     signals["portfolio_convergence"] = concentration
 
@@ -1937,7 +1940,8 @@ def _assurance_dependencies(state: Dict[str, Any], pending: Sequence[str]) -> Li
     return sorted(dependent)
 
 
-def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def _loop_step(ctx: Dict[str, Any], *,
+               strategy_choice: Optional[str] = None) -> Dict[str, Any]:
     """Choose the next loop step from **per-experiment** todo and Assurance state.
 
     Ordering: contract → candidates → damaged receipts (hold) → missing analyses (R9.O) →
@@ -1945,8 +1949,31 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
     consolidate a stale projection → pending Assurance → the Scheduler's next legal action.
     A completed outcome transaction never authorizes new dependent work by itself, and a review
     that is merely missing is a todo, not a failure.
+
+    `strategy_choice` is the action the Strategy Decision Adapter selected inside the same
+    `EIG ÷ cost` tier and the same hard-gated legal set (`Skill-RSI` §4.2). It only replaces
+    `next_actions[0]` when it is one of the scheduler's own next actions, so it can never
+    promote a lower tier, unblock a stop rule or invent an action.
     """
     state = ctx["state"]
+    # Entry classification (single implementation: legacy_handoff.resume_decision).  A normal
+    # canonical state is Research Resume and costs nothing; a genuinely unfinished takeover or an
+    # unreadable state must not be papered over by simply running the loop.
+    resume = None
+    state_path = ctx.get("state_path")
+    if state_path is not None:
+        import legacy_handoff as legacy
+        resume = legacy.resume_decision(Path(str(state_path)))
+        if resume["route"] in (legacy.COLD_HANDOFF_ROUTE, legacy.RECOVER_OR_HOLD_ROUTE):
+            cold = resume["route"] == legacy.COLD_HANDOFF_ROUTE
+            return {"phase": "Handoff", "step": "HOLD",
+                    "action": ("该路线尚未完成接管：先执行一次性 Cold Handoff"
+                               "（legacy_handoff.py take），不得直接推进科研"
+                               if cold else
+                               "canonical state 不可读：走既有恢复/修复，不得重建 state 绕过"),
+                    "blocked": True, "hold": True,
+                    "hold_reason": "cold_handoff_required" if cold else "state_recover_required",
+                    "resume_decision": resume, "pending_r10": []}
     contract = state.get("contract") or {}
     experiments = [item for item in state.get("experiments") or [] if isinstance(item, dict)]
     if not contract:
@@ -1989,7 +2016,24 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
                        "reviewer": item.get("reviewer"),
                        "re_review_conditions": item.get("re_review_conditions")}
                  for xid, item in sorted(assurance.items())}
-    planned = [item for item in experiments if item.get("status") in ("planned", "running")]
+    running_experiments = [item for item in experiments if item.get("status") == "running"]
+    planned_raw = [item for item in experiments if item.get("status") == "planned"]
+    stale_planned: Dict[str, List[str]] = {}
+    planned = list(running_experiments)          # running work is never interrupted
+    # Only a *hard* defect removes an experiment from the queue: no decision value left, or a
+    # duplicate of finished work.  A missing frozen pre-registration is reported (PEIG owns that
+    # gate) but must not silently drop legitimate planned work.
+    hard = {"I2M80", "I2M82"}
+    for item in planned_raw:
+        findings = i2m.planned_validity_errors(state, item)
+        blocking = [item_ for item_ in findings if item_.rule in hard]
+        if blocking:
+            stale_planned[str(item.get("id"))] = [item_.message for item_ in findings]
+        else:
+            planned.append(item)
+            if findings:
+                stale_planned.setdefault(str(item.get("id")),
+                                         [item_.message for item_ in findings])
     dependent = _assurance_dependencies(state, pending)
     if dependent:
         return {"phase": "Assurance", "step": "HOLD",
@@ -2002,7 +2046,11 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
         return {"phase": "R8/R9", "step": "Intervene",
                 "action": f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行",
                 "blocked": False, "hold": False, "pending_r10": [],
+                "stale_planned": stale_planned,
                 "assurance_pending": pending, "assurance": guarantee}
+    if stale_planned:
+        # They keep their frozen pre-registration and history, but they no longer hold the queue.
+        pass
     if ctx.get("index_missing") or (ctx.get("index") or {}).get("state_version") != \
             state.get("state_version"):
         return {"phase": "R11+", "step": "Consolidate",
@@ -2039,30 +2087,213 @@ def _loop_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
                                for xid in unknown)),
                 "blocked": False, "hold": True, "hold_reason": "assurance_unknown",
                 "assurance_unknown": details, "assurance": guarantee, "pending_r10": []}
+    # Insight-to-Method Transition. Consulted only here, after integrity, critical attack,
+    # invalidation propagation, Assurance, planned work and every gate above has had its say,
+    # so method synthesis can never outrank them or unblock a stop rule.
+    method_step = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                route_dir=ctx.get("route_dir"))
+    if method_step:
+        if resume is not None:
+            method_step["resume_decision"] = resume
+        method_step.setdefault("pending_r10", [])
+        method_step["assurance"] = guarantee
+        method_step["assurance_pending"] = pending
+        method_step["dispatched_action"] = None
+        return method_step
     actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
                if isinstance(item, dict) and item.get("action")]
     if actions:
+        scheduler_first = actions[0].get("action")
+        # A diagnosis that cannot name the decision it would change may not keep re-occupying
+        # the queue ahead of ready method work.  This is the same-tier reordering the Strategy
+        # Decision Adapter already performs; the hard priorities and gates are untouched.
+        impact = i2m.diagnosis_decision_impact(state, actions[0])
+        if impact:
+            override = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                     route_dir=ctx.get("route_dir"))
+            if override and override.get("stage") == "synthesis":
+                override.setdefault("pending_r10", [])
+                override["assurance"] = guarantee
+                override["assurance_pending"] = pending
+                override["dispatched_action"] = None
+                override["preempted_diagnosis"] = scheduler_first
+                override["preempt_reason"] = impact[0].message
+                return override
+        dispatched = scheduler_first
+        overrode = False
+        if strategy_choice and any(item.get("action") == strategy_choice for item in actions):
+            dispatched = strategy_choice
+            overrode = dispatched != scheduler_first
         return {"phase": "R3—R6/R8", "step": "Discover",
-                "action": f"按 Scheduler 选择下一项合法动作：{actions[0].get('action')}",
+                "action": f"按 Scheduler 选择下一项合法动作：{dispatched}",
                 "blocked": False, "hold": False, "pending_r10": [],
                 "assurance": guarantee, "assurance_pending": pending,
+                "dispatched_action": dispatched,
+                "scheduler_first_action": scheduler_first,
+                "strategy_overrode_scheduler": overrode,
                 "next_actions": [item.get("action") for item in actions[:5]]}
     return {"phase": "HOLD", "step": "HOLD",
             "action": "无新状态、无待分析结果、无合法下一动作：停下交人裁决",
             "blocked": False, "hold": True, "hold_reason": "no_legal_action",
             "assurance": guarantee, "pending_r10": []}
 
+def _atomic_write_json(path: Path, value: Any) -> None:
+    """Write JSON through a pending file plus `os.replace`, so a reader never sees a partial
+    scheduler telemetry file."""
+    import os
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pending = path.with_name(path.name + ".pending")
+    pending.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+                       encoding="utf-8")
+    os.replace(pending, path)
+
+
+def _route_name(state_path: Path) -> str:
+    """The route directory name, never the empty string.
+
+    `cg.route_of` returns `state_path.parent.name`, which is "" for a bare relative path such
+    as `research-state.json` in the current directory. An empty route silently produced
+    trajectory records with `route: ""` and skipped the cross-project gate.
+    """
+    resolved = Path(state_path).expanduser()
+    if not resolved.is_absolute():
+        resolved = Path.cwd() / resolved
+    return resolved.parent.name
+
+
+def scoped_policy_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """The ACTIVE Skill-RSI scoped policy (if any) and the adapter advice it produces.
+
+    Read-only: it never proposes, promotes or writes a policy. The policy log lives in the
+    route control plane, so its absence simply means "no scoped policy".
+
+    A broken hash chain is NOT tolerate-and-continue: a tampered policy log is exactly the
+    threat the chain exists for, so the state is reported as tampered and no policy is
+    loaded from it.
+    """
+    import policy_evolution as pe
+    path = pe.candidates_path(ctx["state_path"])
+    if not path.is_file():
+        return {"candidate": None, "advice": None, "records": [], "tampered": False,
+                "diagnostics": []}
+    records, diagnostics = pe.load_records(ctx["state_path"], tolerant=True)
+    if diagnostics:
+        return {"candidate": None, "advice": None, "records": records, "tampered": True,
+                "diagnostics": [item.render() for item in diagnostics]}
+    candidate = pe.active_policy(records)
+    advice = pe.advice_from_active_policy(records, ctx["state"], ctx["index"]) \
+        if candidate else None
+    standing = pe.active_policy_standing(ctx["state_path"], records)
+    return {"candidate": candidate, "advice": advice, "records": records, "tampered": False,
+            "diagnostics": [], "level": standing["level"], "approved": standing["approved"],
+            "approver": standing.get("approver")}
+
+
+def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve the action the loop should dispatch, through the existing adapter.
+
+    Precedence: an ACTIVE scoped policy evaluated right now on this state → the recorded
+    scheduler decision while it is still fresh → the scheduler's own first action. A scoped
+    policy whose applicability conditions do not hold is reported as such and ignored. A
+    tampered policy store stops policy consumption entirely.
+    """
+    import policy_evolution as pe
+    policy = scoped_policy_state(ctx)
+    candidate = policy["candidate"]
+    applied = False
+    decision = None
+    conditions_ok = None
+    unmet: List[str] = []
+    reason = None
+    if policy["tampered"]:
+        return {"policy_id": None, "advice": None, "decision": None, "conditions_ok": False,
+                "unmet": [], "applied": False, "action": None, "level": None,
+                "source": "policy_store_tampered", "reason": "policy_store_tampered",
+                "recorded": None, "tampered": True,
+                "diagnostics": policy["diagnostics"]}
+    if candidate and policy["advice"]:
+        conditions_ok, unmet = pe.scope_conditions_hold(candidate, ctx["state"])
+        transfer = pe.cross_project_transfer_allowed(
+            candidate, ctx["state"], current_route=_route_name(ctx["state_path"]))
+        if conditions_ok and transfer["status"] != "BLOCK":
+            decision = sm.strategy_decision(ctx["state"], ctx["index"], ctx["scheduler"],
+                                            ctx["revisions"], advice=policy["advice"])
+            applied = bool(decision.get("strategy_applied"))
+            reason = decision.get("reason_if_not")
+        elif transfer["status"] == "BLOCK":
+            conditions_ok = False
+            unmet = list(unmet) + [f"cross_project_transfer: {item}"
+                                   for item in (transfer.get("reasons") or [])]
+            reason = "cross_project_transfer_blocked"
+        else:
+            reason = "scope_conditions_unmet"
+    if not applied:
+        recorded = sm.latest_strategy_decision(ctx["scheduler"])
+        if isinstance(recorded, dict):
+            fresh = recorded.get("state_version") == ctx["state"].get("state_version")
+            dispatch = recorded.get("dispatch") or {}
+            cached = recorded.get("advice") if isinstance(recorded.get("advice"), dict) else {}
+            active_id = (policy.get("candidate") or {}).get("policy_id")
+            # Freshness is not just the state version: after a rollback (or a supersede) the
+            # state is unchanged while the policy in force is different, and a decision cached
+            # under the old policy must not keep authorising actions.
+            policy_bound = cached.get("policy_id") == active_id
+            legal = {item.get("action") for item in (ctx["scheduler"] or {}).get("next_actions") or []
+                     if isinstance(item, dict)}
+            action_legal = dispatch.get("action") in legal
+            if fresh and recorded.get("adopted") and dispatch.get("action") and policy_bound \
+                    and action_legal:
+                decision = None
+                reason = "consumed_recorded_decision"
+                return {"policy_id": None, "advice": policy.get("advice"),
+                        "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
+                        "applied": True, "action": dispatch.get("action"), "level": None,
+                        "source": "recorded_strategy_decision", "reason": reason,
+                        "recorded": recorded}
+            if fresh and recorded.get("adopted") and dispatch.get("action") and not policy_bound:
+                reason = "stale_cached_policy_decision"
+                return {"policy_id": active_id, "advice": policy.get("advice"),
+                        "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
+                        "applied": False, "action": None, "level": None,
+                        "source": "stale_cached_decision", "reason": reason,
+                        "recorded": recorded,
+                        "cached_policy_id": cached.get("policy_id"),
+                        "active_policy_id": active_id}
+            if fresh and recorded.get("adopted") and dispatch.get("action") \
+                    and policy_bound and not action_legal:
+                # The cached action is no longer a legal action for the current scheduler, so
+                # the cache must not authorise it.
+                reason = "cached_action_not_in_legal_set"
+                return {"policy_id": active_id, "advice": policy.get("advice"),
+                        "decision": None, "conditions_ok": conditions_ok, "unmet": unmet,
+                        "applied": False, "action": None, "level": None,
+                        "source": "stale_cached_decision", "reason": reason,
+                        "recorded": recorded, "cached_action": dispatch.get("action"),
+                        "legal_actions": sorted(item for item in legal if item)}
+    return {"policy_id": (candidate or {}).get("policy_id"), "advice": policy.get("advice"),
+            "decision": decision, "conditions_ok": conditions_ok, "unmet": unmet,
+            "applied": applied, "tampered": False, "diagnostics": [],
+            "action": (decision or {}).get("chosen") if applied else None,
+            # The level the policy actually recorded (L1/L2/L3), not a flat "L2".
+            "level": (policy.get("level") or "L2") if applied else None,
+            "policy_approved": policy.get("approved"),
+            "approver": policy.get("approver"),
+            "source": "active_scoped_policy" if applied else "scheduler",
+            "reason": reason, "recorded": None}
+
+
 def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     preset = presets_by_id()["research-loop"]
-    step = _loop_step(ctx)
+    dispatch = strategy_dispatch(ctx)
+    step = _loop_step(ctx, strategy_choice=dispatch.get("action") if dispatch["applied"] else None)
     # The next round consumes what the previous round decided: the adapter records its choice
     # in the scheduler telemetry, and the loop prefers that action while it is still legal.
     recorded = sm.latest_strategy_decision(ctx["scheduler"])
     guidance = None
     if isinstance(recorded, dict):
-        dispatch = recorded.get("dispatch") or {}
+        dispatch_previous = recorded.get("dispatch") or {}
         guidance = {
-            "dispatch": dispatch,
+            "dispatch": dispatch_previous,
             "discovery_operator": recorded.get("discovery_operator"),
             "adopted": recorded.get("adopted"),
             "decision_changed": recorded.get("decision_changed"),
@@ -2091,31 +2322,122 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
         status = "BLOCKED"
     else:
         status = "OK"
+    write_failure = None
+    if dispatch.get("tampered"):
+        # A tampered policy store stops policy consumption; it is not a "no policy" state.
+        # It must not downgrade a handler-derived BLOCKED (exit 3) to HOLD (exit 4).
+        if status != "BLOCKED":
+            status = "HOLD"
+        write_failure = "policy_store_tampered"
     next_action = step["action"]
     if guidance and not guidance["stale"] and guidance["dispatch"].get("action"):
         next_action = (f"{step['action']}；上一轮策略决策："
                        f"{guidance['dispatch'].get('action')}"
                        f"（算子 {guidance.get('discovery_operator')}）")
+
+    writes = ["cognition/ 投影（经 cognition build）"]
+    strategy_changed_dispatch = bool(step.get("strategy_overrode_scheduler"))
+    # A policy delta exists only when a policy actually changed the dispatched action. Reporting
+    # "an L2 policy was consumed" while nothing was dispatched (or while the decision came from
+    # strategy memory rather than a scoped policy) is a false Delta.
+    policy_delta: Dict[str, Any] = {"status": "none", "level": None, "policy_id": None,
+                                    "scope": None}
+    if dispatch["applied"] and strategy_changed_dispatch and step.get("dispatched_action") \
+            and dispatch.get("policy_id"):
+        # A dispatch that came from the recorded strategy telemetry has no policy behind it;
+        # reporting an L2 policy delta there would be a policy claim without a policy.
+        policy_delta = {"status": "applied", "level": dispatch.get("level") or "L2",
+                        "policy_id": dispatch.get("policy_id"),
+                        "scope": (dispatch.get("advice") or {}).get("scope")}
+    if apply and dispatch["applied"] and step.get("dispatched_action"):
+        import decision_trajectory as dt
+        state = ctx["state"]
+        trajectory = ctx["route_dir"] / dt.TRAJECTORY_NAME
+        try:
+            context = dt.record_context(state, state_path=ctx["state_path"],
+                                        scheduler=ctx["scheduler"])
+            record = dt.build_decision_record(
+                state, route=_route_name(ctx["state_path"]), project=ctx["route_dir"].name,
+                context=context,
+                candidates=[{"action": item.get("action"), "type": item.get("type"),
+                             "target": item.get("target"), "eig": item.get("eig"),
+                             "cost": item.get("cost")}
+                            for item in (ctx["scheduler"] or {}).get("next_actions") or []
+                            if isinstance(item, dict)],
+                chosen=step["dispatched_action"],
+                scheduler_priority={"level": 4, "label": "high_information_gain_test"},
+                policy_version=dispatch.get("policy_id") or "strategy-memory",
+                policy_changed_order=strategy_changed_dispatch,
+                dispatch_status="dispatched")
+            outcome = dt.append_record(trajectory, record, state=state,
+                                       route=cg.route_of(ctx["state_path"]))
+            if outcome["status"] == "APPENDED":
+                writes.append(dt.TRAJECTORY_NAME)
+            elif outcome["status"] == "DUPLICATE":
+                # Nothing new was written; claiming a write would be a false write report.
+                pass
+            else:
+                # An INVALID trajectory write is a real failure, not a silent no-op.
+                write_failure = "decision_trajectory_rejected"
+        except (dt.TrajectoryError, OSError) as exc:
+            # A damaged trajectory store must produce a diagnosable HOLD, not a traceback.
+            write_failure = f"decision_trajectory_unreadable: {type(exc).__name__}"
+        if write_failure is None and ctx["scheduler"] and dispatch.get("decision"):
+            try:
+                updated = sm.record_strategy_decision(
+                    ctx["scheduler"], dispatch["decision"],
+                    dispatch_result=f"dispatched {step['dispatched_action']}")
+                _atomic_write_json(ctx["route_dir"] / cg.SCHEDULER_NAME, updated)
+                writes.append(cg.SCHEDULER_NAME)
+            except OSError as exc:
+                write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
+    if write_failure:
+        status = "HOLD"
+        policy_delta = {"status": "none", "level": None, "policy_id": None, "scope": None}
+
     return _result(preset, status, observed={"loop": loop, "current": step,
                                              "switch_action": switch.get("action"),
                                              "strategy_guidance": guidance,
+                                             "scoped_policy": {
+                                                 "policy_id": dispatch.get("policy_id"),
+                                                 "applied": dispatch.get("applied"),
+                                                 "conditions_ok": dispatch.get("conditions_ok"),
+                                                 "unmet_conditions": dispatch.get("unmet"),
+                                                 "level": dispatch.get("level"),
+                                                 "policy_approved": dispatch.get("policy_approved"),
+                                                 "approver": dispatch.get("approver"),
+                                                 "source": dispatch.get("source"),
+                                                 "tampered": dispatch.get("tampered"),
+                                                 "diagnostics": dispatch.get("diagnostics"),
+                                                 "write_failure": write_failure,
+                                                 "dispatched_action": step.get("dispatched_action"),
+                                                 "strategy_overrode_scheduler":
+                                                     strategy_changed_dispatch},
                                              "assurance": step.get("assurance"),
                                              "assurance_pending": step.get("assurance_pending")},
                    decision={"next_action": next_action,
                              "consumes_previous_decision": bool(guidance and not guidance["stale"]),
                              "step": step["step"],
+                             "dispatched_action": step.get("dispatched_action"),
+                             "strategy_changed_dispatch": strategy_changed_dispatch,
+                             "scientific_delta": "none",
+                             "decision_delta": ("decision" if strategy_changed_dispatch
+                                                or switch.get("action") != "CONTINUE_ATTRIBUTION"
+                                                else "none"),
+                             "policy_delta": policy_delta,
                              "pending_r10": step.get("pending_r10"),
                              "blocked_experiments": step.get("blocked_experiments"),
                              "decision_gate": step.get("decision_gate"),
                              "assurance_pending": step.get("assurance_pending"),
                              "assurance_dependent": step.get("assurance_dependent"),
                              "assurance_paths": step.get("assurance_paths"),
-                             "stop_reason": step.get("hold_reason")
+                             "stop_reason": write_failure or step.get("hold_reason")
                              or (None if not step["blocked"] else "contract missing")},
-                   steps=steps, writes=["cognition/ 投影（经 cognition build）"],
-                   changed_decision=switch.get("action") != "CONTINUE_ATTRIBUTION",
+                   steps=steps, writes=writes,
+                   changed_decision=switch.get("action") != "CONTINUE_ATTRIBUTION"
+                   or strategy_changed_dispatch,
                    next_action=next_action,
-                   hold_reason=step.get("hold_reason"))
+                   hold_reason=write_failure or step.get("hold_reason"))
 
 
 REPRESENTATION_AXES: Tuple[str, ...] = ("object", "variable", "assumption", "objective",
@@ -2497,12 +2819,20 @@ def _handle_stagnation_breaker(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
                                "python3 scripts/prediction_compare.py switch --state <state>"}])
     switch = stagnation["switch"]
     action = switch.get("action")
+    # Advice alone never produced a method. When the state shows an actionable insight, the
+    # breaker hands the Loop a concrete I2M step; the switch wording stays authoritative for
+    # the diagnosis side.
+    method_step = i2m.loop_step(ctx["state"], ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                route_dir=ctx.get("route_dir"))
     return _result(preset, "OK",
                    observed={"zero_streak": stagnation["zero_streak"],
                              "reasons": stagnation["reasons"],
+                             "i2m": (method_step or {}).get("i2m", {}),
+                             "i2m_step": (method_step or {}).get("step"),
                              "witness": switch.get("competition_verdicts") or switch.get("basis")},
                    decision={"switch_action": action,
                              "next_intervention": switch.get("note"),
+                             "i2m_next": (method_step or {}).get("action"),
                              "single_negative_is_not_stagnation": True},
                    steps=[{"step": "1 行为切换", "command":
                            "python3 scripts/prediction_compare.py switch --state <state>"},
@@ -2510,8 +2840,9 @@ def _handle_stagnation_breaker(ctx: Dict[str, Any], apply: bool) -> Dict[str, An
                            "python3 scripts/prediction_compare.py compete --state <state> --competition <CP>"},
                           {"step": "3 停手或重定义", "command":
                            "python3 scripts/prediction_compare.py switch --state <state> --scheduler <scheduler>"}],
-                   writes=[], changed_decision=action != "CONTINUE_ATTRIBUTION",
-                   next_action=action)
+                   writes=(method_step or {}).get("writes", []),
+                   changed_decision=action != "CONTINUE_ATTRIBUTION",
+                   next_action=(method_step or {}).get("action") or action)
 
 
 def _handle_experiment_failure_recovery(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
@@ -2803,24 +3134,37 @@ def _handle_discovery_replay(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]
     cases_dir = Path(__file__).resolve().parent.parent / "examples" / "replay" / "adversarial"
     cases = rr.load_cases(cases_dir) if cases_dir.is_dir() else rr.adversarial_cases()
     report = rr.run_suite(cases, runs=1)
-    dimensions = {name: {"mean": block.get("mean"), "n": block.get("n")}
-                  for name, block in (report.get("per_arm", {}).get("full_cie", {})
-                                      .get("dimensions", {}) or {}).items()}
+    arms = report.get("per_arm", {}) or {}
+    dimensions = {name: {"mean": block.get("mean"),
+                         "observable_cases": block.get("observable_cases"),
+                         "total_cases": block.get("total_cases")}
+                  for name, block in (arms.get("full_cie", {}).get("dimensions", {}) or {}).items()}
+    results = [result for arm in arms.values() for result in arm.get("results") or []]
+    support = {}
+    for arm in arms.values():
+        for name, count in (arm.get("evidence_support") or {}).items():
+            support[name] = support.get(name, 0) + count
     return _result(preset, "OK",
                    observed={"sample_size": report.get("sample_size"),
                              "per_dimension": dimensions,
                              "undifferentiated_arms": report.get("undifferentiated_arms"),
-                             "leak_checked": all(item.get("leak_checked") for item in
-                                                 report.get("results", []) or [])},
+                             "evidence_support": support,
+                             "unobservable_decisions": report.get("unobservable_decisions"),
+                             "leak_checked": bool(results) and all(
+                                 result.get("leak_checked") for result in results),
+                             "isolation_verified": bool(results) and all(
+                                 result.get("isolation_verified", True) for result in results)},
                    decision={"limitations": report.get("limitations"),
                              "composite_score": None,
-                             "note": "合成回放不是真实科研能力证据"},
+                             "note": "合成回放不是真实科研能力证据；NO_SUPPORT 分支不得用于晋升"},
                    steps=[{"step": "1 加载 case", "command":
                            "python3 scripts/research_replay.py validate --dir examples/replay/adversarial"},
                           {"step": "2 回放", "command":
                            "python3 scripts/research_replay.py suite --dir examples/replay/adversarial --runs 2"},
                           {"step": "3 消融", "command":
-                           "python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --runs 2"}],
+                           "python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --runs 2"},
+                          {"step": "4 RSI 消融", "command":
+                           "python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2"}],
                    writes=[], changed_decision=None,
                    next_action="把指标交给 strategy-evolution，不作为科学结论")
 
@@ -2873,14 +3217,86 @@ def run_preset(
     if preset is None:
         return ({"error": f"unknown preset: {preset_id}", "known": list(PRESET_IDS)}, [], EXIT_ERROR)
     handler = HANDLERS[preset_id]
-    context = project_context(state_path, cognition_dir)
-    payload = handler(context, apply)
+    try:
+        context = project_context(state_path, cognition_dir)
+    except (cg.CognitionError, OSError, UnicodeDecodeError) as exc:
+        # A malformed project artefact is a diagnosable HOLD, not a traceback.
+        return ({"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                 "protocol": preset["protocol"], "entry": preset["entry"],
+                 "execution_scope": preset["execution_scope"],
+                 "reused": list(preset["reuses"]),
+                 "observed": {"context_error": f"{type(exc).__name__}: {exc}"},
+                 "decision": {}, "steps": [], "writes": [], "changed_decision": None,
+                 "next_action": None, "hold_reason": "project_context_unreadable"},
+                [Diagnostic("PR10", "context", f"无法读取项目上下文：{exc}")], EXIT_ENV)
+    # Skill-RSI source freeze: the before/after digest check runs on EVERY preset execution,
+    # including read-only diagnosis (Skill-RSI §9 asks for the loaded source digest at the
+    # start of a research run). The audit EVENT is written only when the caller authorised
+    # action (`apply`), because a read-only request must not itself write.
+    import source_freeze as sf
+    freeze = sf.SourceFreeze(route_dir=None, context=f"preset:{preset_id}")
+    freeze.__enter__()
+    handler_error: Optional[str] = None
+    try:
+        payload = handler(context, apply)
+    except (cg.CognitionError, OSError) as exc:
+        # A handler that cannot do its job must produce a diagnosable HOLD, not a traceback
+        # out of the router. Genuinely unrecoverable errors (MemoryError, KeyboardInterrupt)
+        # still propagate.
+        handler_error = f"{type(exc).__name__}: {exc}"
+        payload = {"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                   "protocol": preset["protocol"],
+                   "entry": preset["entry"], "execution_scope": preset["execution_scope"],
+                   "reused": list(preset["reuses"]), "observed": {"handler_error": handler_error},
+                   "decision": {}, "steps": [], "writes": [], "changed_decision": None,
+                   "next_action": None, "hold_reason": "handler_error"}
+    finally:
+        freeze.__exit__(None, None, None)
+    integrity: Dict[str, Any] = dict(freeze.result or {})
+    payload["source_integrity"] = integrity
+    violated = integrity.get("status") != "PASS"
+    # The audit event is written only when `apply` was passed AND (the handler declared at
+    # least one write OR the source boundary was violated). Without `apply` a read-only
+    # request stays completely write-free, even if something looked like a violation — the
+    # caller still sees the VIOLATION in source_integrity and gets a HOLD.
+    if apply and (violated or payload.get("writes")):
+        try:
+            if violated:
+                hold = sf.hold_on_violation(context["route_dir"], integrity,
+                                            context=f"preset:{preset_id}")
+                event = hold.get("event")
+            else:
+                event = sf.record_integrity_event(context["route_dir"], {
+                    "action": "VERIFY_PASS", "status": "PASS",
+                    "context": f"preset:{preset_id}", "checked": integrity.get("checked"),
+                })
+        except OSError as exc:
+            # An unwritable route means the control plane cannot be trusted for this run.
+            event = None
+            integrity["event_error"] = f"{type(exc).__name__}: {exc}"
+            payload["status"] = "HOLD"
+            payload["hold_reason"] = "control_plane_unwritable"
+        if event:
+            # Declare the audit write; an undeclared write is a contract violation even when
+            # the file is legitimate telemetry.
+            payload.setdefault("writes", []).append(sf.INTEGRITY_NAME)
+            integrity["event"] = str(event)
+    if violated:
+        payload["status"] = "HOLD"
+        payload["hold_reason"] = "skill_source_modified"
     payload["canonical_digest_before"] = context["canonical_digest"]
     payload["canonical_digest_after"] = cg.digest_of(cg.load_state(state_path))
     payload["canonical_untouched"] = (payload["canonical_digest_before"]
                                       == payload["canonical_digest_after"])
     payload["apply"] = apply
     hard = [item for item in context["diagnostics"] if not cg.is_warning(item.rule)]
+    if handler_error is not None:
+        hard.append(Diagnostic("PR10", "handler",
+                               f"Preset 处理器无法完成：{handler_error}（HOLD，不重试、不放宽门禁）"))
+    if integrity.get("status") not in (None, "PASS", "SKIPPED"):
+        hard.append(Diagnostic("SRC1", "skill-source",
+                               "运行期间 Skill 源码被修改：立即 HOLD，记录审计事件，"
+                               "停止继续应用策略；不自动修订源码"))
     payload["diagnostics"] = [item.as_dict() for item in hard]
     if scope_privilege(payload.get("execution_scope")) == "read_only" \
             and not payload["canonical_untouched"]:

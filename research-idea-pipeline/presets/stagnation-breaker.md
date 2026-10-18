@@ -52,7 +52,13 @@
   - `scripts/prediction_compare.py`
   - `scripts/cognition.py`
   - `scripts/strategy_memory.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/decision_trajectory.py`（Skill-RSI：判断重复诊断是否真的改变过任何后续决定）
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
+
+**行为切换的证据必须是真实决定（Skill-RSI）：** 多次实验没有产生新的可区分预测、不断增加新解释却没有
+新的识别实验、新假设与已失败机制结构等价、只缩小缺陷范围却不改方法设计、相同证据下重复审查、
+已耗尽诊断预算、或新行动无法改变任何后续决定时，优先切换到停止某条诊断路径、重新设计方法、
+有界竞争机制测试、R5.1 定向检索、R3/R6 结构性探索或 R14 决策。**不得**用「再跑一次 RSI」代替决策改变。
 
 ## 6. 执行步骤
 
@@ -69,6 +75,8 @@
 | # | 步骤 | 命令 |
 |---|---|---|
 | 1 | 1 停滞检测 | `python3 scripts/prediction_compare.py switch --state <state>` |
+| 2 | 2 设计判别干预 | `python3 scripts/prediction_compare.py compete --state <state> --competition <CP>` |
+| 3 | 3 停手或重定义 | `python3 scripts/prediction_compare.py switch --state <state> --scheduler <scheduler>` |
 
 > 上表由 `preset_router.py run --preset stagnation-breaker` 实际返回，文档与代码由 `test_preset_router` 断言一致。
 

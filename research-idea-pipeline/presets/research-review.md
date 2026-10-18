@@ -53,7 +53,7 @@
   - `scripts/strategy_memory.py`
   - `scripts/prediction_compare.py`
   - `scripts/evidence_outcome.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+- 规则号：本仓库自身产生 `PR1`—`PR10`；科学判定仍由既有规则号给出。
 
 ## 6. 执行步骤
 
@@ -104,3 +104,15 @@
   - 报告输出即停
 - 失败处理：无法继续时 `HOLD`（退出码 4）并说明 `hold_reason`；不重复检查、不放宽门禁。
 - 恢复条件：状态变化后可再次尝试；同一指纹超过上限即交人裁决。
+
+---
+
+## 深度总结模式（只读）
+
+权限与科学纪律由本 preset 决定（`read_only`：不改 state、不跑实验、不派遣）；
+**报告的覆盖深度与结构**由通用提示词
+[深度科研总结提示词](../references/deep-research-summary.md) 定义（11 节 + 5 结论/3 问题/1 行动
++ 统一回报契约）。默认输出仍是"一页现状"；用户要求"深度总结"时按该提示词执行。
+
+只读投影工具：`python3 scripts/research_summary.py --state <state.json>`（缺失处标 `[待补]`，
+`--check` 为幂等闸门，不会修改 state）。

@@ -7,20 +7,9 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复。 |
+| [`research-idea-pipeline/`](research-idea-pipeline/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复；I2M 把机制洞见转成方法草案/设计契约，科研品味以四轴偏好（无评分）参与候选选择。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改：提供 Coherence Audit、Compact/Full Blueprint、suggestion bank 与风格门禁；可独立安装。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图字符草稿：读代码/论文/配置产出多份 Markdown 字符示意图，供 SVG/TikZ/Figma 绘制；强制四级证据与 train/inference/frozen 区分，不补造模块。 |
-
-## 新增论文架构、审计与修改
-
-[`scientific-manuscript-reviser`](scientific-manuscript-reviser/SKILL.md) 是独立 skill，核心对象是 scientific argument。
-
-- **Audit** 审计已有论文，先检查科学推理，再检查 narrative、段落、语言和 style。默认提供多选建议，保护 Keep as is。
-- **Architect** 从不完整研究材料构建 thesis、claim/evidence map 和论文蓝图。普通大纲使用 Compact，详细大纲使用 paragraph-level Full Blueprint。
-- **Revise** 在明确要求修改时，按诊断和选择重写，并检查 scientific invariance 与个人 hard style rules。已批准蓝图可用于逐节起草。
-
-示例请求包括“分析这一节并给多个修改方向”“基于这些实验笔记给详细论文大纲”和“按已选建议修改并保留数值、scope 与 limitation”。计划实验不能写成已完成结果。生成和审计使用相同科学标准，不以 reviewer 分数或 AI detector 为优化目标。
-详细用法、验证边界和示例见 [skill README](scientific-manuscript-reviser/README.md)。
 
 ## 约定
 

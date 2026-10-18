@@ -1831,8 +1831,13 @@ class TestReleaseCheckGate(unittest.TestCase):
         self.assertTrue(ok, detail)
 
     def test_referenced_scripts_step_detects_a_missing_script(self) -> None:
-        ok, _ = self._mutate("SKILL.md", "name: research-idea-pipeline",
-                             "name: research-idea-pipeline\n\n见 `scripts/no_such_script.py`。",
+        # Anchor on the frontmatter line actually present: the component is installable under a
+        # different `name:` (see root AGENTS.md §21), so hard-coding the upstream name made this
+        # mutation fail to apply - and the copied skill's own gate fail - after a rename.
+        skill_doc = (self.rc.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        name_line = re.search(r"^name: .*$", skill_doc, re.M).group(0)
+        ok, _ = self._mutate("SKILL.md", name_line,
+                             name_line + "\n\n见 `scripts/no_such_script.py`。",
                              self.rc.step_referenced_scripts_exist)
         self.assertFalse(ok, "引用了不存在的脚本时该步骤必须 FAIL")
 

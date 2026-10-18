@@ -315,6 +315,103 @@ B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用�
 
 ---
 
+### 0.31 Cold Handoff vs Research Resume（入口分类）
+
+两个**完全不同**的操作，不要混用（判定见 `scripts/legacy_handoff.py:resume_decision`）：
+
+| 场景 | 操作 | 说明 |
+|---|---|---|
+| 无 canonical state | Bootstrap | 按 §0.3 执行 |
+| 有历史但未完成接管 / 真实不兼容迁移 | **Cold Handoff**（`legacy_handoff.py take`）| 一次性：兼容性审计、投影重建、接管报告、可回滚；**不伪造预注册**，canonical state 无损 |
+| 已有有效 state（含 `/loop` 每轮唤醒、`continue-research`、会话恢复、上下文压缩后重载）| **Research Resume** | 直接读 canonical state + 认知投影 + Scheduler + 已有方法产物，继续未完成的科研行动 |
+| state 不可读 / 真实证据异常 | Recover / HOLD | 走既有恢复链，**不得**通过重建 state 绕过 |
+
+**已有 `research-state.json` ≠ 需要完整接管**；`state_version` 增长、缺少派生报告都**不**构成重新
+接管的理由。职责边界：Legacy Handoff 只做一次性接管；Research Recovery 恢复当前科研状态；
+Context Drift Recovery 处理投影漂移；Cognition 维护可重建记忆；Scheduler/I2M 决定下一步行动。
+
+### 0.4 Insight-to-Method Transition（I2M）
+
+> **核心行为约束（逐字）：** 科研诊断必须服务于一个**可改变的研究决定**。发现可操作的机制后，
+> 应优先设计**具体方法及最小判别干预**，而非继续无限细化解释。**方法贡献必须由实际算法变化
+> 与可信实验支持，不能仅通过叙事声称。**
+
+推进逻辑：`Problem → Insight → Method Synthesis → Minimal Intervention → Method Development
+→ Validation → Contribution`。机制发现对**方法类**研究不是终点，而是提出新算法、新目标、
+新结构或新训练/求解策略的基础；但**不得强行编造方法**。
+
+**五步（不新增 R 阶段、不新增第九类对象、不建平行状态机）：**
+
+| 步骤 | 产物 | 落点（复用既有对象） |
+|---|---|---|
+| **A. Insight Readiness** | 六项判据的就绪结论 + 机制是「已验证/仍是假设/无法形成干预」 | 由 `hypotheses[]`（`statement`/`operator`/`intervention_axis`/`falsifier`/`nearest_prior`/`novelty_source`）与 `uncertainties[].cheapest_discriminating_test` 派生；不自建事实源 |
+| **B. Method Synthesis** | 2—3 种有**实质差异**的干预方案 + 七项对比 | `hypotheses[].method`（R3/R6 已拥有该集合）|
+| **C. Method Design Contract** | 15 个必填字段（`problem_ref`…`evidence_status`） | `experiments[].preregistration.method_contract`（R8 的既有冻结机制）+ 决策记录 |
+| **D. Minimal Intervention Test** | 预注册指标/判据/停止条件 + 公平性核验 | R8 登记 `planned` 实验；PEIG / AALG / 预算 / 人工审批门禁**不变** |
+| **E. Method Development Loop** | 设计→实现→有效性→消融→公平对比→泛化→贡献 | 每轮必须回答「方法真的变了吗 / 哪项新证据支持它 / 是否更接近主锚点 / 继续还是终止」|
+
+**边界与禁止项：**
+
+- readiness **不是科学证实**：可以基于未完全证实的机制提出方法，但必须标为假设并在干预中同时检验。
+- 纯超参数调整**不算**方法合成；候选不得同构凑数；未经核实的创新性不得写成事实。
+- 最小实验失败必须区分**实现错误 / 干预无效 / 机制被削弱 / 实验不可判别**，
+  **不得自动归因，也不得事后修改预注册判据**。
+- **新增解释、文档、实验数量或自评得分都不算方法进展**；进展要求存在可归属的新证据或方法版本变化（定义见运行时）。
+  同一证据快照下重复改写解释**不得重置**停滞计数。
+- 生成候选、改写报告、策略自评**不得**作为 RSI 的 L3 能力提升证据（`PE17`）。
+
+**主锚点兼容（不得把方法创新强加给所有项目）：**
+
+- 方法/性能主锚点 → 优先 `METHOD_SYNTHESIS`（可执行算法与干预）；
+- 理论 / 现象 / 基准 / 可行性 / 负结果主锚点 → `ANCHOR_NATIVE`，产出各自可验证的贡献，
+  **不强制转成算法**；
+- **Method Readiness、Anchor Eligibility、Anchor Satisfaction 是三个不同的判断**：
+  主锚点尚未满足**不构成**阻止方法探索的理由；但**局部进展或辅助贡献不得被误判为主锚点达成**。
+- 持续维护 **Anchor Gap**（已满足条件 / 缺失证据 / 被否定的要求 / 可行干预 / 下一步判别实验 /
+  退出条件），优先做能缩小关键缺口的事，而不是反复生成解释。
+- 路线无法直接服务主锚点时：先检查是否存在**可证伪的** `serving`（`serves` + `serves_evidence`
+  + 会改变哪个下游决策及其可测影响）；答不出只能标 `orthogonal` 并保留其独立价值，
+  **不得作为原项目投稿主线**。
+- 证据表明主锚点不可达时，只能通过既有 **R14 与 §0.2** 提请调整；
+  **agent 不得自行替换主锚点、放宽冻结成功标准，或通过修改叙事制造达标**。
+
+**运行时落点：** `scripts/insight_to_method.py`（readiness/synthesis/contract/minimal-test/progress/
+anchor）；Loop 在**所有硬门禁之后**咨询它（`preset_router._loop_step` 末尾、`stagnation-breaker`），
+因此它**不会**越过完整性、未决攻击、失效传播、PEIG/AALG、预算或人工审批；
+`references/scheduler-policy.md` §3.1 与 §4 给出可执行规则与 `method_synthesis` 动作类型。
+
+**决策完整性（第十三轮，机械可校验）：**
+
+**决策完整性（要点；实现细节以运行时与 policy 文档为唯一权威，本节不再复制）：**
+
+| 约束 | 一句话 | 权威来源 |
+|---|---|---|
+| 动作状态 | `proposed → admissible → authorized_in_queue → dispatched → executed`；建议文本不是执行 | `references/scheduler-policy.md` §3.1、`insight_to_method.candidate_method_action` |
+| 授权绑定 | 队列条目须带 `method_candidate`/`method_version`/`method_digest`/`state_version`；仅同类型不授权；新方法走 `register_method_candidate` 首入 | 同上 |
+| Insight 绑定 | 机制/干预/预测/判别实验/对照必须来自**同一个主候选 H** 及其可追溯依赖链；不得跨对象拼接，refuted/killed/stale 不得凑数 | `insight_to_method._binding_errors`（I2M60–64） |
+| 证据方向 | `depends_on` ≠ `supports`；只有合格 `supports` 才抬高机制结论；自述审查不是审查 | `insight_to_method._mechanism_support`、`_review_credential` |
+| 进展五维 | Epistemic / Design / Implementation / Validation / Anchor，互不冒充；**同一方法版本的独立验证即 Validation Progress，无须改算法** | `insight_to_method.method_progress`（唯一定义处） |
+| 进展归属 | 证据须解析到真实 Experiment 并与方法版本/契约摘要匹配；去重跨重启有效 | 同上 |
+| 契约版本 | 按版本号/登记时间；不可排序返回 `ambiguous`；失效契约仅审计 | `insight_to_method.select_method_contract` |
+| 锚点判定 | 逐项 requirement 判定；文字提及不算关联；缺条件为 `undetermined` | `insight_to_method.anchor_gap`、`references/claim-first-policy.md` §6 |
+| 调度让位 | I2M 仅建议；1—3 级必要动作（`repair`/失效传播）优先 | `insight_to_method.loop_step` |
+
+**两段式方法产物：** 探索阶段先写 **Method Sketch** 四问（由 `transition` 的 `sketch` 阶段提出）；
+**完整 Design Contract 只在冻结实验前要求**（`insight_to_method.method_sketch_errors`）。
+
+**科研品味（选择值得做的贡献，不做评分）：** 在**都可执行**的候选之间，按四轴给出**偏好理由**并说明
+最大不确定性——`Importance` 问题是否真的重要 / `Insight` 发现了什么改变设计的结构或规律 /
+`Elegance` 是否直接、简洁且能解释「为何不更简单」/ `Evidence` 什么关键实验能区分作用与替代解释。
+比较是**建议**，不是门禁，也不是分数；**保留备选路线**，不因当前偏好删除。
+**不强制凑候选**：机制只指向一种自然干预时，提交**一个**候选并写明「不存在值得比较的设计分歧」即可；
+只有存在**真实设计分歧**时才比较 2—3 个。探索阶段用 **Method Sketch** 四问（解决什么问题 / 利用什么
+Insight / 修改什么算法 / 什么结果会否定它），**完整 Design Contract 只在冻结实验前要求**。
+每个方法候选应能用三句话建立 `Problem → Insight → Method → 判别实验` 的连贯性；连不起来通常说明
+其中一环尚未想清楚（这是**一致性检查**，不是让你为叙事修改数据）。
+
+**每轮面向用户的汇报形态：** `Problem / Insight / Method / Evidence / Next Decision`（五段），
+而不是长篇归因报告。
+
 ## 1. 全局不变量（所有 R 阶段强制遵守）
 
 以下六条是硬约束，任何 R 阶段都不得违反。执行前先确认，输出时自检。
@@ -870,7 +967,7 @@ python3 scripts/research_replay.py smoke --work /tmp/cie-smoke
 
 ---
 
-### 1.10 Research Preset Library 与 Intent Router（`PR1`—`PR9`）
+### 1.10 Research Preset Library 与 Intent Router（`PR1`—`PR10`）
 
 **用户说人话，Router 选协议。** 内容包（`shared-contract.md` + `preset-registry.json` +
 `presets/<id>.md` 16 份独立协议 + `router-fixtures.json`）已集成；`scripts/preset_router.py` 是可执行
@@ -923,6 +1020,39 @@ python3 scripts/preset_router.py run --preset loop-health-check --state <researc
 必须经 Strategy Decision Adapter 改变下一轮**真实动作选择**（同 `EIG ÷ cost` 层内重排 + `scheduler.strategy_decisions[]` 遥测），
 改不动就记录原因；被采纳 ≠ 研究能力提升。
 
+### 1.11 Skill-RSI：策略级自我改进（受控、可审计、可回滚）
+
+> **只在需要「从真实科研经验改进科研策略」时加载**
+> [references/skill-rsi-policy.md](references/skill-rsi-policy.md)。它不是第 16 个阶段，
+> 不是第九类 canonical 对象，也不是第二个 CIE；它是既有机制之上的**策略控制平面**。
+
+```text
+Research Experience → Policy Hypothesis → Replay Evaluation → Controlled Adaptation
+        → New Research Experience
+```
+
+**三条不可让步的边界：**
+
+1. **科研事实仍由证据裁决。** 决策轨迹与策略记忆是控制平面经验，**永不写入 `evidence[]`**，
+   也不能用「某策略在三个项目失败」去否证任何科学机制。
+2. **策略只能改策略。** 只允许调整探索算子偏好、菜单选择、同层动作排序、策略适用性、
+   候选探索顺序与保留探索下限的局部分配；八级硬优先级、`EIG ÷ cost`、执行门禁、
+   Evidence Qualification、AALG 预算、契约与锚点、GPU 授权、冻结实验计划一律不动。
+3. **运行期不得自主修改 Skill 源码。** 源码冻结与写入白名单按**规范化真实路径**判定；
+   检测到修改立即 `HOLD`、写审计事件、停止应用策略，且**不自动修订源码**。
+
+**真实消费者（缺一不可）：** 晋升后的策略只经现有 `strategy_memory.strategy_decision()`
+在同一 `EIG ÷ cost` 层内重排已通过硬门禁的动作，由 `research-loop` 实际派遣；
+选择是否被采用、是否真正改变派遣写入决策轨迹与 `scheduler.strategy_decisions[]`。
+改不动就如实记录原因，**不得制造差异**。
+
+**等级不得混淆：** L1 实现有效性、L2 运行有效性、L3 科研改进必须分别申报。
+策略候选已生成 ≠ 策略已被应用 ≠ 科研行为已改变 ≠ 科研能力获得独立证据支持的改善。
+没有独立、未见过的真实科研案例对照时，明确标记 **L3 未验证**。
+
+**不得用更多循环代替更好的决策：** 科研 Loop 不应每完成一个小动作就再跑一次 RSI；
+策略进化受既有触发规则、冷却、预算与合法调度约束。
+
 ## 2. 共享资源索引
 
 | 资源 | 位置 | 内容 |
@@ -971,6 +1101,12 @@ python3 scripts/preset_router.py run --preset loop-health-check --state <researc
 | **策略记忆脚本** | [scripts/strategy_memory.py](scripts/strategy_memory.py) | `value` / `taste` / `operators` / `recommend` / `apply` / `validate`；字典序排序（无权重）、探索下限、算子重启条件；**scheduler.json 只读** |
 | **历史回放与验证（CIE Phase 4）** | [references/discovery-replay.md](references/discovery-replay.md) | replay case schema、隐藏信息泄漏防护（`RP2`）、七维独立指标、四 arm 消融、十四个对抗 case、端到端 smoke；**未做真实 Agent A/B** |
 | **回放脚本与 fixture** | [scripts/research_replay.py](scripts/research_replay.py)、[examples/replay/](examples/replay/README.md) | `validate` / `show` / `run` / `suite` / `ablate` / `adversarial` / `smoke`；可插拔 `--runner module:function`；fixture 为**合成**，不是真实科研证据 |
+| **Skill-RSI 政策（策略级自我改进）** | [references/skill-rsi-policy.md](references/skill-rsi-policy.md) | 在既有 R0—R14 与硬门禁内让**科研策略**演化：三层记忆分离（科学 / 决策经验 / 策略）、反事实证据分级（`OBSERVED` / `REPLAY_SUPPORTED` / `NO_SUPPORT`）、有作用域的策略候选与生命周期（`PROPOSED`→…→`ACTIVE`，失败 `REJECTED`/`HOLD`/`ROLLED_BACK`）、独立评价晋升、回滚、源码冻结与写入白名单；**不新增 canonical 对象、不新增 Preset、不在运行期修改 Skill 源码** |
+| **决策轨迹脚本** | [scripts/decision_trajectory.py](scripts/decision_trajectory.py) | `<route>/decision-trajectory.jsonl`：append-only + 哈希链 + 尾部摘要；Context / Decision / Prediction / Outcome / Learning；规则 `DT0`—`DT10`（过期状态、事后预测、结果泄漏、来源悬空、未合格证据不得声称科学增量）；**轨迹不是科学证据，永不写入 `evidence[]`** |
+| **策略演化脚本** | [scripts/policy_evolution.py](scripts/policy_evolution.py) | 有作用域的策略候选（`PE1`—`PE16`）、评价规则冻结、生命周期与晋升门、回滚、失败签名上限（换 `policy_id` 无效）；晋升后只经既有 `strategy_decision()` 生效 |
+| **策略迁移脚本** | [scripts/policy_transfer.py](scripts/policy_transfer.py) | 只读的三层记忆分离视图、基于**声明结构**（不是领域关键词）的迁移门 `PT1`—`PT11`、过期经验与已否证机制的拒绝、无损记忆压缩检查 |
+| **源码冻结脚本** | [scripts/source_freeze.py](scripts/source_freeze.py) | 受保护源码清单 + 规范路径/符号链接核验 + 写入白名单 + 哈希链审计事件；运行期检测到源码被改即 `HOLD` 且**不自动修订**；如实声明残余风险（Prompt 禁令不是安全边界） |
+| **RSI 消融与开销** | [scripts/rsi_ablation.py](scripts/rsi_ablation.py) | 四臂冻结之上追加 `rsi_full` 与 leave-one-out；逐维比较、报告不可区分与 `NO_SUPPORT`；字节/延迟/额外调用开销；L1/L2/L3 分别如实申报 |
 
 ---
 

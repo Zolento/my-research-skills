@@ -370,7 +370,13 @@ def scheduler_check(state, scheduler):
         seen.add(xid)
         if not x or x['status'] != 'done' or not x.get('outcome_analysis'):
             errors.append('EIG_NEEDS_SOURCE_RECEIPT: ' + str(xid)); continue
-        delta, rating = actual_eig(x['outcome_analysis'])
+        try:
+            delta, rating = actual_eig(x['outcome_analysis'])
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
+            # A malformed receipt must be a FAIL, not an exception: the contract of this
+            # function is to return {'status': 'FAIL'|'PASS', 'errors': [...]}.
+            errors.append('EIG_SOURCE_MALFORMED: ' + str(xid) + ' (' + type(exc).__name__ + ')')
+            continue
         if record.get('observed_delta') != delta or record.get('actual_information_gain') != rating: errors.append('FABRICATED_EIG: ' + xid)
         if record.get('predicted_information_gain') not in ('high','medium','low'): errors.append('INVALID_PREDICTED_EIG')
     for x in experiments.values():

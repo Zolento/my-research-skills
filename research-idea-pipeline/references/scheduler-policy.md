@@ -85,6 +85,20 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 - 同一结果、同一证据快照下，不重复审计。只有新证据或明确未完成项才触发复核。
 - 资源被占用时，继续候选推导、代码实现或独立低成本测试。不要反复轮询代替研究。
 
+**I2M 与调度（要点；完整规则以 `scripts/insight_to_method.py` 为唯一权威）：**
+
+- 动作状态 `proposed → admissible → authorized_in_queue → dispatched → executed`；授权必须绑定
+  候选 id/版本/摘要/状态版本，**仅同类型不授权**；新方法经 `register_method_candidate` 首入。
+- 触发：**readiness 成立即可**（不必等停滞）或零信息增益；**I2M 只提建议**，仍受 PEIG/AALG、预算、
+  授权与人工审批约束；队列存在 1—3 级必要动作（`repair` / 失效传播）时 I2M 让位。
+- `planned` 实验在派遣前做决策价值检查；**running 不得为切换方法而中断**。
+- 诊断动作须声明它会改变哪个研究决定，否则不得仅凭便宜反复优先。
+
+**科学回报的软性偏好（不改变任何硬优先级与门禁）：** 在同一层合法动作之间，优先推进能把重要
+Insight 转化为**关键方法干预**、并可能产生独立科学贡献的动作；方法干预若能区分竞争机制，
+它本身也可以是高信息增益实验，不必被归类为低优先级的局部优化。偏好必须给出理由并说明不确定性，
+**不得**凌驾完整性、未决攻击、失效传播、科学有效性与资源资格。
+
 在对应阶段产物的动作说明中记录依赖、预期改变的决定和重选条件，按 `next_actions[].action` 关联。
 方法检索调用见 [phase-r2-r5-field-mapping-retrieval.md](phase-r2-r5-field-mapping-retrieval.md) §R5.1。
 不增加评分或 state 对象。优先级 4 延后时，说明它为何不再阻塞当前探索。
@@ -112,7 +126,7 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
 | 字段 | 取值 | 说明 |
 |---|---|---|
 | `action` | 字符串 | 动作标识（可引用 `X<n>` / `H<n>` / `P<n>` / `R<n>`） |
-| `type` | `discriminating_experiment` \| `remote_analogy` \| `literature_collision` \| `repair` \| `propagate_invalidation` \| `narrative` | 动作类别 |
+| `type` | `discriminating_experiment` \| `remote_analogy` \| `literature_collision` \| `repair` \| `propagate_invalidation` \| `narrative` \| `method_synthesis` \| `method_design` \| `method_minimal_test` | 动作类别。三个 `method_*` 由 §3.1 的 I2M 规则产生：合成候选、冻结设计契约、执行最小干预测试；它们不提升优先级，只在同层内可选 |
 | `target` | 字符串 | 作用对象（`U`/`C`/`H`/`AS` 的 id 或 `P<n>`） |
 | `eig` | `high` \| `medium` \| `low` \| `unknown` | **LLM 估计**的期望信息增益；**必须按 §6.1 校准**。排序时把它连同 ①改哪条 `U` / ②预期方向 / ③成本口径一起写进 `predicted_information_gain`（**生产者在 R9，消费者在 R11**） |
 | `cost` | `high` \| `medium` \| `low` | 成本档（口径见 `phase-r9-r11-experiment-loop.md` §R9） |

@@ -57,6 +57,7 @@
 from __future__ import annotations
 
 import pathlib
+import ast
 import json
 import re
 import shutil
@@ -85,18 +86,88 @@ def _run(args: List[str]) -> Tuple[int, str]:
 # 各步骤
 # ---------------------------------------------------------------------------
 
+#: Every shipped test suite. Deleting one used to be invisible to this gate: the Skill-RSI
+#: step hard-coded a pre-round-6 list and no test count was asserted, so removing the
+#: credential/PE15/PE16 suites still printed PASS.
+EXPECTED_TEST_SUITES = (
+    "test_cognition.py",
+    "test_counterfactual_replay.py",
+    "test_decision_trajectory.py",
+    "test_evidence_outcome.py",
+    "test_execution_gate.py",
+    "test_golden_path.py",
+    "test_insight_to_method.py",
+    "test_research_continuity.py",
+    "test_research_taste.py",
+    "test_research_summary.py",
+    "test_launchability.py",
+    "test_l3_trust_boundary.py",
+    "test_legacy_handoff.py",
+    "test_literature_search.py",
+    "test_loop_runtime_correctness.py",
+    "test_policy_evolution.py",
+    "test_policy_transfer.py",
+    "test_prediction_compare.py",
+    "test_preset_router.py",
+    "test_promotion_credentials.py",
+    "test_promotion_integrity.py",
+    "test_r10_liveness.py",
+    "test_refs_index.py",
+    "test_release_metadata.py",
+    "test_render_status.py",
+    "test_research_replay.py",
+    "test_rhetorical_realization.py",
+    "test_rsi_ablation.py",
+    "test_skill_rsi_e2e.py",
+    "test_source_freeze.py",
+    "test_state_check.py",
+    "test_strategy_memory.py",
+    "test_structural_equivalence.py",
+    "test_zotero_client.py",
+    "test_zotero_crud.py",
+    "test_zotero_deepread.py",
+    "test_zotero_fulltext.py",
+    "test_zotero_refs.py",
+    "test_zotero_write.py",
+)
+#: Conservative lower bound; the suite may grow but a mass deletion must fail the gate.
+MIN_TESTS = 1700
+
+
 def step_tests() -> Tuple[bool, str]:
+    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
+    missing = sorted(set(EXPECTED_TEST_SUITES) - on_disk)
+    if missing:
+        return False, "test suites missing: " + ", ".join(missing)
     code, out = _run(["-m", "unittest", "discover", "-s", "scripts", "-p", "test_*.py"])
     tail = [line for line in out.strip().splitlines() if line.startswith(("Ran ", "OK", "FAILED"))]
+    counted = re.search(r"Ran (\d+) tests?", out)
+    if counted is None:
+        return False, "could not read the test count: " + (" · ".join(tail) or out[-160:])
+    if int(counted.group(1)) < MIN_TESTS:
+        return False, (f"only {counted.group(1)} tests ran (expected >= {MIN_TESTS}): "
+                       "a suite was deleted or emptied")
     return code == 0, " · ".join(tail) or out.strip()[-160:]
 
 
+#: Modules with a `--selftest`. `unittest discover` never invokes these, so without this step a
+#: regression inside them would be invisible (and the L1 evidence they are cited for ungated).
+SELFTEST_MODULES = ("state_check", "decision_trajectory", "policy_evolution", "policy_transfer",
+                    "source_freeze", "rsi_ablation", "insight_to_method",
+                    "legacy_handoff", "research_summary")
+
+
 def step_selftest() -> Tuple[bool, str]:
-    code, out = _run(["scripts/state_check.py", "--selftest"])
-    lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
-    summary = next((line for line in reversed(lines) if "selftest" in line.lower()),
-                   lines[-1] if lines else "no output")
-    return code == 0, f"{summary}（exit={code}）"
+    passed = []
+    for module in SELFTEST_MODULES:
+        code, out = _run([f"scripts/{module}.py", "--selftest"])
+        lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
+        summary = next((line for line in reversed(lines) if "selftest" in line.lower()),
+                       lines[-1] if lines else "no output")
+        if code != 0 or "selftest OK" not in summary:
+            return False, f"{module}.py --selftest did not pass: {summary[:120]}（exit={code}）"
+        passed.append(module)
+    return True, f"{len(passed)}/{len(SELFTEST_MODULES)} module selftests OK"
 
 
 def step_template() -> Tuple[bool, str]:
@@ -773,6 +844,111 @@ def step_execution_identifiability() -> Tuple[bool, str]:
     return True, 'CT→MRI design + schemas/templates + capacity mutation (mock execution is covered by tests)'
 
 
+def step_skill_rsi() -> Tuple[bool, str]:
+    """Skill-RSI: selftests, the unit suite, the ablation harness and the `.dev/` guard.
+
+    The gate treats a missing `.dev/` runtime dependency as a rule, not a convention: the
+    shipped skill must run without the development workspace (root `AGENTS.md` §15).
+    """
+    details: List[str] = []
+    for script in ("decision_trajectory.py", "policy_evolution.py", "policy_transfer.py",
+                   "source_freeze.py", "rsi_ablation.py"):
+        code, out = _run(["scripts/" + script, "--selftest"])
+        if code != 0:
+            tail = [line for line in out.strip().splitlines() if line.strip()]
+            return False, f"{script} selftest failed: {tail[-1][:160] if tail else code}"
+        details.append(script.replace(".py", ""))
+    code, out = _run(["-m", "unittest", "discover", "-s", "scripts",
+                      "-p", "test_decision_trajectory.py"])
+    if code != 0:
+        return False, "decision trajectory tests failed"
+    for pattern in ("test_policy_evolution.py", "test_policy_transfer.py",
+                    "test_counterfactual_replay.py", "test_source_freeze.py",
+                    "test_rsi_ablation.py", "test_skill_rsi_e2e.py",
+                    "test_promotion_integrity.py", "test_promotion_credentials.py",
+                    "test_l3_trust_boundary.py"):
+        proc_code, proc_out = _run(["-m", "unittest", "discover", "-s", "scripts", "-p", pattern])
+        if proc_code != 0:
+            tail = [line for line in proc_out.strip().splitlines() if line.strip()]
+            return False, f"{pattern} failed: {tail[-1][:160] if tail else proc_code}"
+        details.append(pattern.replace("test_", "").replace(".py", ""))
+    # The shipped skill must not depend on `.dev/` (root AGENTS.md §15). This is an AST scan
+    # for string literals whose value has `.dev` as a whole path segment AND that are actually
+    # used to build or open a path. Regex line matching missed `os.path.join(root, ".dev", x)`
+    # and matched `config.dev.json`; a raw AST scan flags docstrings and the legitimate
+    # exclusion tuples. Only real usage counts:
+    #   * a literal passed to a call, or joined with `/`, or
+    #   * a module-level constant like `DEV = ".dev"` that is then used in a call/path operand.
+    # Selftest/fixture helpers legitimately build a throwaway `.dev` tree and are skipped by
+    # enclosing-function name. A name assembled at runtime (`"." + "dev"`) still evades this;
+    # that limit is stated rather than pretended away.
+    offenders: List[str] = []
+
+    def _is_dev_segment(value: str) -> bool:
+        return ".dev" in re.split(r"[/\\]", value)
+
+    def _iter_with_context(node, enclosing):
+        for child in ast.iter_child_nodes(node):
+            inner = enclosing
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                inner = child.name
+            yield child, inner
+            yield from _iter_with_context(child, inner)
+
+    for path in sorted(SCRIPTS.glob("*.py")):
+        if path.name.startswith("test_"):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:
+            return False, f"{path.name} does not parse: {exc}"
+
+        # module-level constants that hold a `.dev` path
+        dev_names: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                if any(isinstance(target, ast.Name) for target in node.targets) \
+                        and isinstance(node.value, ast.Constant) \
+                        and isinstance(node.value.value, str) and _is_dev_segment(node.value.value):
+                    dev_names.update(target.id for target in node.targets
+                                     if isinstance(target, ast.Name))
+
+        def _used_as_path(node) -> bool:
+            for child, enclosing in _iter_with_context(tree, ""):
+                pass
+            return False
+
+        used_names: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Call, ast.BinOp)):
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Name):
+                        used_names.add(sub.id)
+
+        for child, enclosing in _iter_with_context(tree, ""):
+            if enclosing and ("selftest" in enclosing or "fixture" in enclosing):
+                continue
+            if not isinstance(child, ast.Constant) or not isinstance(child.value, str):
+                continue
+            if not _is_dev_segment(child.value):
+                continue
+            parent_is_usage = False
+            for ancestor in ast.walk(tree):
+                if isinstance(ancestor, (ast.Call, ast.BinOp)) and any(
+                        item is child for item in ast.walk(ancestor)):
+                    parent_is_usage = True
+                    break
+            if parent_is_usage:
+                offenders.append(f"{path.name}:{child.lineno}")
+        for name in sorted(dev_names & used_names):
+            offenders.append(f"{path.name}:{name}")
+    if offenders:
+        return False, "shipped scripts depend on .dev/: " + ", ".join(sorted(set(offenders)))
+    return True, ("5 selftests + 7 RSI suites green; policy promotion needs an independent "
+                  "replay; NO_SUPPORT decisions cannot be promoted; no .dev/ runtime dependency; "
+                  "levels: " + ", ".join(details[:5]) + " ...")
+
+
 def step_preset_library() -> Tuple[bool, str]:
     """Presets, the intent router and the strategy decision adapter, on the real interfaces."""
     import preset_router as pr
@@ -798,6 +974,15 @@ def step_preset_library() -> Tuple[bool, str]:
                 return False, f"{preset['id']}: {phrase!r} did not route"
     if pr.resolve("不要审计")["action"] != "HOLD":
         return False, "a negated request still routed"
+    registry = json.loads((ROOT / "preset-registry.json").read_text(encoding="utf-8"))["presets"]
+    for preset in registry:
+        text = (ROOT / preset["path"]).read_text(encoding="utf-8")
+        match = re.search(r"\|\s*registry trigger\s*\|\s*`([^`]+)`\s*\|", text)
+        if match is None:
+            return False, f"{preset['preset_id']}: 协议未声明 registry trigger"
+        if match.group(1) != preset.get("trigger"):
+            return False, (f"{preset['preset_id']}: registry trigger 漂移 "
+                           f"({preset.get('trigger')!r} vs 协议 {match.group(1)!r})")
     if pr.resolve("总结进展")["execution_scope"] != "read_only":
         return False, "a read-only question was escalated"
     if pr.resolve("训练 OOM 了")["next_action"] != "diagnose":
@@ -854,16 +1039,33 @@ def step_release_metadata() -> Tuple[bool, str]:
     registry = json.loads((root / 'preset-registry.json').read_text(encoding='utf-8'))
     if registry.get('schema_version') != '0.1':
         return False, 'the preset registry schema version must not track the release'
-    # Once the tag exists it must point *exactly* at this commit (never merely an ancestor).
+    # Once the tag exists it must point *exactly* at the release commit (never merely an
+    # ancestor). `tag == HEAD` is a release-branch invariant: on a development branch or
+    # worktree HEAD advances by design, so there the release invariant is checked against
+    # `refs/heads/main` plus an ancestry rule instead.
     tag = f'research-idea-pipeline/v{version}'
     tagged = sub.run(['git', 'rev-parse', f'{tag}^{{}}'], capture_output=True, text=True,
                      cwd=str(root.parent))
     if tagged.returncode == 0:
+        tagged_sha = tagged.stdout.strip()
         head = sub.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True,
                        cwd=str(root.parent)).stdout.strip()
-        if tagged.stdout.strip() != head:
-            return False, (f'{tag} points at {tagged.stdout.strip()[:8]}, not at the release '
+        branch = sub.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], capture_output=True,
+                         text=True, cwd=str(root.parent)).stdout.strip()
+        if branch == 'main' and tagged_sha != head:
+            return False, (f'{tag} points at {tagged_sha[:8]}, not at the release '
                            f'commit {head[:8]}')
+        if branch != 'main':
+            main = sub.run(['git', 'rev-parse', 'refs/heads/main'], capture_output=True,
+                           text=True, cwd=str(root.parent)).stdout.strip()
+            if main and tagged_sha != main:
+                return False, (f'{tag} points at {tagged_sha[:8]}, not at the main release '
+                               f'commit {main[:8]}')
+            ancestor = sub.run(['git', 'merge-base', '--is-ancestor', tagged_sha, head],
+                               capture_output=True, text=True, cwd=str(root.parent))
+            if ancestor.returncode != 0:
+                return False, (f'development branch is not based on the released commit '
+                               f'{tagged_sha[:8]}')
     proc = sub.run([sys.executable, str(root / 'scripts' / 'test_release_metadata.py')],
                    capture_output=True, text=True, cwd=str(root))
     if proc.returncode != 0:
@@ -887,6 +1089,7 @@ STEPS = (
     ("Legacy Handoff（无损接管/幂等/Bootstrap 拒绝/阻止写回）", step_legacy_handoff),
     ("科学价值与自适应发现（无总分/锚点只读/算子不封禁）", step_scientific_value),
     ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
+    ("Skill-RSI（轨迹/策略生命周期/源码冻结/反事实/消融）", step_skill_rsi),
     ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )

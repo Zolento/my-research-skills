@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 import time
 
@@ -82,6 +83,99 @@ def config_binding(protocol):
     return {k: protocol[k] for k in ('arms', 'intervention', 'evaluation')}
 
 
+def effective_spend(ledger, family, permission):
+    """(A4/B1) 实际生效的消费 = consume 事件减去被退还的 launch_failed 事件。
+
+    损坏的账本行（非对象）会被跳过而不是抛异常：一个坏行不能让预算核算整条崩掉。
+    """
+    events = [e for e in (getattr(ledger, 'events', None) or []) if isinstance(e, dict)]
+    consumed = [e for e in events if e.get('kind') == 'consume'
+                and e.get('dry_run') is not True
+                and e.get('family') == family and e.get('permission') == permission]
+    seals = {e.get('seal'): e.get('receipt_id') for e in consumed}
+    refunded = [e for e in events if e.get('kind') == 'launch_failed'
+                and e.get('family') == family and e.get('permission') == permission
+                and e.get('consume_seal') in seals
+                and seals.get(e.get('consume_seal')) == e.get('receipt_id')]
+    refund_ids = {e.get('receipt_id') for e in refunded}
+    return [e for e in consumed if e.get('receipt_id') not in refund_ids]
+
+
+def ensure_executable(path):
+    """生成编排脚本后置 +x（A5）。返回是否具备可执行位。"""
+    try:
+        target = Path(path)
+    except TypeError:
+        return False
+    if not target.is_file():
+        return False
+    mode = target.stat().st_mode
+    target.chmod(mode | 0o111)
+    return os.access(str(target), os.X_OK)
+
+
+def launch_probe(manifest):
+    """A2：在**不启动外部命令**的前提下，机械判定"这条命令能否被 exec"。
+
+    只做 OS 在 exec 时真正检查的事：argv[0] 能否解析（绝对/相对文件或 PATH）、是否具备可执行位
+    与可读位、cwd 是否存在且可进入、argv[1:] 中的解释器参数文件是否可读。它**不**证明科学正确性，
+    也**不**证明命令会成功——只排除启动期必然失败的命令。
+    """
+    cwd = Path(manifest['cwd']).resolve()
+    argv = manifest.get('argv')
+    if not isinstance(argv, list) or not argv or not str(argv[0]).strip():
+        return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: argv 为空或不是非空列表'}
+    argv0 = str(argv[0])
+    # subprocess/execvp semantics: a bare name (no path separator) is resolved through PATH;
+    # only a path ("/x", "./x", "a/b") is opened directly. Treating "train.sh" in cwd as
+    # launchable was wrong: subprocess would search PATH and fail.
+    has_separator = os.sep in argv0 or bool(os.altsep and os.altsep in argv0)
+    if has_separator or argv0.startswith('.'):
+        local = Path(argv0) if os.path.isabs(argv0) else (cwd / argv0)
+        if not local.is_file():
+            return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: 文件不存在: ' + argv0, 'argv0': argv0}
+        resolved, via_path = str(local), False
+    else:
+        found = shutil.which(argv0)
+        if not found:
+            return {'ok': False, 'argv0': argv0,
+                    'error': 'UNLAUNCHABLE_ARGV: 裸命令按 PATH 解析但未找到: ' + argv0
+                             + '（项目内脚本请写 ./name）'}
+        resolved, via_path = found, True
+    if not os.access(resolved, os.X_OK):
+        return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: argv[0] 缺少可执行位（chmod +x）: ' + argv0,
+                'argv0': argv0, 'resolved': resolved}
+    if not os.access(resolved, os.R_OK):
+        return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: argv[0] 不可读: ' + argv0,
+                'argv0': argv0, 'resolved': resolved}
+    if not os.access(str(cwd), os.X_OK):
+        return {'ok': False, 'error': 'UNLAUNCHABLE_CWD: 工作目录不可进入: ' + str(cwd)}
+    for arg in manifest['argv'][1:]:
+        probe = Path(arg)
+        local_arg = probe if probe.is_absolute() else (cwd / probe)
+        if local_arg.is_file() and not os.access(str(local_arg), os.R_OK):
+            return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: 参数文件不可读: ' + arg}
+    return {'ok': True, 'resolved': resolved, 'via_path': via_path, 'argv0': argv0}
+
+
+def argv_launch_error(cwd, argv, bound_paths, manifest):
+    """A1：argv[0] 是项目内文件时必须有可执行位；随后由 `launch_probe` 做启动探测。
+
+    返回错误字符串或 None。抽成独立函数以便在不构造完整 manifest 的情况下测试该判据。
+    """
+    if not isinstance(argv, list) or not argv:
+        return 'UNLAUNCHABLE_ARGV: argv 为空或不是非空列表'
+    probe = launch_probe(manifest)
+    if not probe['ok']:
+        return probe['error']
+    argv0 = str(argv[0])
+    if os.sep in argv0 or argv0.startswith('.'):
+        local = Path(argv0) if os.path.isabs(argv0) else cwd / argv0
+        if local.is_file() and str(local.resolve()) not in bound_paths:
+            return 'UNBOUND_EXECUTABLE'
+    return None
+
+
 def manifest_binding(state, experiment, manifest):
     errors = eg.schema_errors(manifest, 'execution-manifest.schema.json')
     if errors: raise ValueError('INVALID_MANIFEST: ' + '; '.join(errors))
@@ -101,8 +195,9 @@ def manifest_binding(state, experiment, manifest):
     mask = ','.join(manifest['gpu_devices'])
     if any(',' in d for d in manifest['gpu_devices']) or manifest['env'].get('CUDA_VISIBLE_DEVICES',mask) != mask: raise ValueError('GPU_MASK_MISMATCH')
     argv = manifest['argv']
-    executable = Path(argv[0]); local = executable if executable.is_absolute() else cwd / executable
-    if local.is_file() and str(local.resolve()) not in paths: raise ValueError('UNBOUND_EXECUTABLE')
+    launch_error = argv_launch_error(cwd, argv, paths, manifest)
+    if launch_error:
+        raise ValueError(launch_error)
     for arg in argv[1:]:
         local = cwd / arg
         if local.is_file() and str(local.resolve()) not in paths: raise ValueError('UNBOUND_COMMAND_FILE: ' + arg)
@@ -170,7 +265,8 @@ def issue(state, experiment_id, manifest, ledger, now=None, scheduler=None):
         if gate['status'] != 'HOLD':
             budget = gate['budget_hours']; requested = manifest.get('requested_hours', 0)
             if type(requested) not in (float,int) or not 0 < requested <= budget: gate = {'status':'HOLD','errors':['REQUESTED_BUDGET_EXCEEDS_PROTOCOL']}
-            spent = [e for e in ledger.events if e.get('kind') == 'consume' and e.get('family') == family]
+            spent = (effective_spend(ledger, family, 'PILOT_ONLY')
+                     + effective_spend(ledger, family, 'PASS'))
             if gate['status'] == 'PILOT_ONLY':
                 limits = x['execution_protocol']['pilot']
                 pilots = [e for e in spent if e['permission'] == 'PILOT_ONLY']
@@ -227,22 +323,29 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
         gate = eg.peig(state, experiment_id)
         if not sc.check_state(state).ok or x['status'] != 'planned' or gate['status'] != receipt['permission']: return {'status':'HOLD','errors':['GATE_CHANGED']}
         # Recheck reservations under the same lock: issued receipts do not reserve yet.
-        spent = [e for e in ledger.events if e.get('kind') == 'consume'
-                 and e.get('dry_run') is not True
-                 and e.get('family') == receipt['family'] and e['permission'] == receipt['permission']]
+        spent = effective_spend(ledger, receipt['family'], receipt['permission'])
         p = x['execution_protocol']; hours = receipt['requested_hours']
-        if receipt['permission'] == 'PILOT_ONLY':
+        # B2 裁定：先在**资源预算闸门之前**校验人工授权。授权只可解除"预算/资源"限制，
+        # 绝不越过证据、完整性、预注册与执行资格门禁（那些检查在本函数与 PEIG 中位于此处之前/之外）。
+        exception_ok = bool(receipt['human_exception']) and now < receipt['human_exception']['expires_at']
+        if receipt['human_exception'] and not exception_ok:
+            return {'status':'HOLD','errors':['EXPIRED_HUMAN_EXCEPTION']}
+        if exception_ok:
+            budget_gate = None
+        elif receipt['permission'] == 'PILOT_ONLY':
             if len(spent) >= min(p['pilot']['max_runs'],ledger.policy['max_pilot_runs']) or sum(e['hours'] for e in spent) + hours > min(p['pilot']['max_hours'],ledger.policy['max_pilot_hours']): return {'status':'HOLD','errors':['PILOT_BUDGET_EXHAUSTED']}
         else:
             caps = [e['budget_hours'] for e in ledger.events if e.get('kind') == 'issue' and e.get('family') == receipt['family'] and e['receipt']['permission'] == 'PASS']
             if any(e['experiment_id'] == experiment_id for e in spent) or sum(e['hours'] for e in spent) + hours > min(caps): return {'status':'HOLD','errors':['FORMAL_BUDGET_EXHAUSTED']}
-        if receipt['human_exception'] and now >= receipt['human_exception']['expires_at']: return {'status':'HOLD','errors':['EXPIRED_HUMAN_EXCEPTION']}
         if not execute:
-            # Preview: every gate above has been re-checked under the lock, and nothing is
-            # consumed. The receipt stays valid for exactly one real execution, so a preview can
-            # never burn GPU hours, pilot runs or the single-use receipt.
+            # Preview: every gate above has been re-checked under the lock and nothing is
+            # consumed, so it cannot burn GPU hours, pilot runs or the single-use receipt.
+            # What it *does* prove about launchability is limited: argv[0] resolves and is
+            # executable, cwd is enterable, argument files are readable (see `launch_probe`).
+            # It does NOT start the command, so it cannot promise the run will proceed.
             return {'status':'PASS','errors':[],'dry_run':True,'preview':True,'consumed':False,
                     'command_started':False,'receipt_id':receipt['id'],
+                    'launch_probe':launch_probe(manifest),
                     'execution_record':{'receipt':receipt,'launch_seal':None,'dry_run':True},
                     'would_execute':{'argv':list(manifest['argv']),'cwd':manifest['cwd'],
                                      'gpu_devices':list(manifest['gpu_devices']),
@@ -260,6 +363,39 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
         with log_path.open('x',encoding='utf-8') as log:
             completed = subprocess.run(manifest['argv'], cwd=manifest['cwd'], env=environment, timeout=hours*3600/len(manifest['gpu_devices']), stdout=log, stderr=subprocess.STDOUT, check=False)
         return {'status':'PASS' if completed.returncode == 0 else 'FAIL','errors':[] if completed.returncode == 0 else ['EXECUTION_FAILED'],'returncode':completed.returncode,'log_path':str(log_path),'receipt_id':receipt['id'], 'execution_record':execution_record}
+    except (PermissionError, FileNotFoundError, NotADirectoryError) as exc:
+        # A4: the OS refused to start the command (exec-time failure); B1: such a run never
+        # started, so it must not consume the budget. The refund is written **inside the lock**
+        # and against a freshly re-read chain: appending it outside the lock used the stale
+        # `self.events` from the previous critical section and corrupted the hash chain when
+        # another writer had appended in between (reproduced: LEDGER_TAMPERED afterwards).
+        refunded, refund = False, None
+        with ledger.locked():
+            consume = [e for e in ledger.events
+                       if e.get('kind') == 'consume' and e.get('receipt_id') == receipt['id']
+                       and e.get('dry_run') is False]
+            already = [e for e in ledger.events if e.get('kind') == 'launch_failed'
+                       and e.get('receipt_id') == receipt['id']]
+            binding_ok = bool(consume) and not already \
+                and consume[-1].get('family') == receipt['family'] \
+                and consume[-1].get('permission') == receipt['permission'] \
+                and consume[-1].get('hours') == hours \
+                and consume[-1].get('experiment_id') == experiment_id
+            if binding_ok:
+                refund = ledger.append({'kind':'launch_failed','family':receipt['family'],
+                                        'receipt_id':receipt['id'],
+                                        'experiment_id':experiment_id,
+                                        'permission':receipt['permission'],'hours':hours,
+                                        'timestamp':now,'reason':type(exc).__name__,
+                                        'consume_seal':consume[-1]['seal']})
+                refunded = True
+        return {'status':'FAIL','errors':['LAUNCH_FAILED: '+type(exc).__name__+': '+str(exc)],
+                'receipt_id':receipt['id'],'execution_record':execution_record,
+                'budget_refunded':refunded,
+                'refund_seal':refund['seal'] if refund else None,
+                'note': ('命令未启动：收据已消费（防双发），预算已按 launch_failed 事件退还'
+                         if refunded else
+                         '命令未启动：但没有可绑定的消费事件（或已退还过），本次不退款')}
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {'status':'FAIL','errors':['EXECUTION_FAILED: '+str(exc)],'receipt_id':receipt['id'], 'execution_record':execution_record}
 

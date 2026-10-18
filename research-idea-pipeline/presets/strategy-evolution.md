@@ -52,7 +52,40 @@
   - `scripts/strategy_memory.py`
   - `scripts/research_replay.py`
   - `scripts/cognition.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/decision_trajectory.py`（Skill-RSI：决策轨迹，策略经验的来源）
+  - `scripts/policy_evolution.py`（Skill-RSI：有作用域的策略候选、评价、晋升、回滚）
+  - `scripts/policy_transfer.py`（Skill-RSI：跨项目迁移门）
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10` / `PE1`—`PE16` /
+  `PT1`—`PT11`；科学判定仍由既有规则号给出。
+
+**Skill-RSI 生命周期命令（按需，不在每轮循环内执行）：**
+
+| # | 步骤 | 命令 |
+|---|---|---|
+| R1 | 冻结评价规则 | `python3 scripts/policy_evolution.py freeze-rules --state <state>` |
+| R2 | 提出候选 | `python3 scripts/policy_evolution.py propose --state <state> --policy <candidate.json> --trajectory <trajectory.jsonl>` |
+| R3 | Shadow 评价 | `python3 scripts/policy_evolution.py transition --state <state> --policy-id <P> --to SHADOW` |
+| R4 | 独立回放评价 | `python3 scripts/research_replay.py ablate --dir examples/replay/adversarial --rsi --runs 2` |
+| R5 | 记录评价结论 | `python3 scripts/policy_evolution.py evaluate --state <state> --policy-id <P> --report <report.json>` |
+| R6 | 有限试运行 | `python3 scripts/policy_evolution.py trial --state <state> --policy-id <P> --dispatch '{"dispatched":"R2"}'` |
+| R7 | L3 真实科研验证（需人工批准） | `python3 scripts/policy_evolution.py approve-l3 --state <state> --policy-id <P> --validation <credential.json> --approver <human> --confirm-human` 然后 `... validate-research --state <state> --policy-id <P> --validation <credential.json>` |
+| R8 | 晋升 ACTIVE | `python3 scripts/policy_evolution.py promote --state <state> --policy-id <P> --reason '{"scope_evidence_ok":true}'` |
+| R9 | 回滚 | `python3 scripts/policy_evolution.py rollback --state <state> --policy-id <P> --to-policy-id <prev> --reason <why>` |
+| R10 | 真实消费 | `python3 scripts/strategy_memory.py decide --state <state> --scheduler <scheduler> --record` |
+
+> `REPLAY_EVALUATED` / `BOUNDED_TRIAL` / `VALIDATED` / `ACTIVE` **不能**用 `transition --to` 达到：
+> 它们必须由受控入口完成，并由入口写出、绑定策略版本与冻结评价规则的评价产物作为依据。
+> **Two credential classes:** `evaluate` 产出的是**回放凭证（上限 L2）**；`VALIDATED`/`ACTIVE`
+> 需要**真实科研验证凭证（L3）**，由 `validate-research` 提交，且必须带真实任务来源、
+> 独立执行者、逐 case 隔离证明与**实际派遣记录**的绑定。合成回放不得升级为 L3。
+
+> **HOLD 是正常出口：** 若回放报告显示没有收益维度正向改善（`UNDIFFERENTIATED`）、样本不足、
+> 存在未观测分支，或两臂区间重叠导致方向不确信，`evaluate` 会返回 `HOLD` 而非进入
+> `REPLAY_EVALUATED`；此时**不得**继续 `trial`（会被 `PE10` 拒绝），应改进实验或如实记录
+> 「本轮无可晋升策略」。
+>
+> 上表是**策略演化**的操作面，不进 `preset_router.py` 的自动步骤；晋升后的策略由
+> 现有 Strategy Decision Adapter 消费。详见 [references/skill-rsi-policy.md](../references/skill-rsi-policy.md)。
 
 ## 6. 执行步骤
 
@@ -83,18 +116,24 @@
 
 L1 建议、L2 实际调度影响证据、L3 独立效果证据，分别标记 verified/unverified；下一步合法探索动作。
 
-- 机器可读字段：
-  - `priors_before`
-  - `priors_after`
-  - `recommendation_before`
-  - `recommendation_after`
+- 机器可读字段（与 `_handle_strategy_evolution` 实际返回一致）：
+  - `advice`（菜单/算子/island/shift/basis）
+  - `candidates_before` / `candidates_after`
+  - `chosen_without_memory` / `chosen`（同 `state_version`、同一合法动作集下的 with/without-memory 对照）
+  - `strategy_applied` / `reason_if_not`
+  - `dispatch`（实际派遣目标；未派遣时为 `null` 而不是伪装成已派遣）
   - `changed_decision`
+  - Skill-RSI：`policy_delta` 只在实际改变了动作**且**该动作被派遣时才出现，否则为 `none`
   - 统一字段：`preset_id` / `status` / `entry` / `execution_scope` / `protocol` / `reused` / `observed` / `decision` / `steps` / `writes` / `changed_decision` / `next_action` / `canonical_untouched`。
 
 ## 8. 状态写回
 
 - 允许写入：
-  - 策略修订（append-only 修订日志）
+  - 策略修订（`cognition/model-revisions.jsonl`，append-only）
+  - `scheduler.json`（只追加 `strategy_decisions[]` 遥测，其余键逐字节不变）
+  - Skill-RSI 策略候选与状态转移（`<route>/policy/`，append-only）
+  - 运行期源码完整性审计事件（`<route>/source-integrity.jsonl`）
+- **不写** `decision-trajectory.jsonl`：决策轨迹由 `research-loop` 在 apply 路径上记录
 - canonical `research-state.json`：不写 canonical（只写策略记忆）。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 

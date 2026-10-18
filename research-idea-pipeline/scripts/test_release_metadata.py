@@ -76,12 +76,17 @@ class TestReleaseMetadata(unittest.TestCase):
         self.assertIn('evidence-outcome-assurance@1', outcome)
 
     def test_the_release_tag_points_exactly_at_the_verified_release_commit(self):
-        """A released tag must point **at** the verified commit, not merely at an ancestor.
+        """A released tag must point **at** the verified release commit, not merely at an ancestor.
 
         `--is-ancestor` would also accept a tag left on some earlier commit of the same branch,
         which is precisely the "tag behind main" drift this check exists to prevent. Before the
         tag is created the check is reported as skipped; it activates by itself once the tag
         exists, so no test ever creates a tag.
+
+        The identity `tag == HEAD` is a property of the **release branch**. On a development
+        branch or worktree HEAD advances by design, so the check keeps the release invariant
+        (`tag == refs/heads/main`, and `main` is an ancestor of HEAD) and applies the exact
+        `tag == HEAD` rule on `main` itself.
         """
         version = declared_version()
         tag = f'research-idea-pipeline/v{version}'
@@ -94,11 +99,20 @@ class TestReleaseMetadata(unittest.TestCase):
                               capture_output=True, text=True).stdout.strip()
         main = subprocess.run(['git', 'rev-parse', 'refs/heads/main'], cwd=str(REPO),
                               capture_output=True, text=True).stdout.strip()
-        self.assertEqual(tagged, head,
-                         f'{tag} must point at the verified release commit {head[:8]}, '
-                         f'not {tagged[:8]}')
+        branch = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=str(REPO),
+                                capture_output=True, text=True).stdout.strip()
+        if branch == 'main':
+            self.assertEqual(tagged, head,
+                             f'{tag} must point at the verified release commit {head[:8]}, '
+                             f'not {tagged[:8]}')
         if main:
             self.assertEqual(tagged, main, f'{tag} must be the main release commit')
+        if branch != 'main':
+            ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', tagged, head],
+                                      cwd=str(REPO), capture_output=True, text=True)
+            self.assertEqual(ancestor.returncode, 0,
+                             f'development branch must be based on the released commit '
+                             f'{tagged[:8]}')
 
 
 if __name__ == '__main__':

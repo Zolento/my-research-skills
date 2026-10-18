@@ -52,7 +52,7 @@
   - `scripts/strategy_memory.py`
   - `scripts/cognition.py`
   - `scripts/state_check.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+- 规则号：本仓库自身产生 `PR1`—`PR10`；科学判定仍由既有规则号给出。
 
 ## 6. 执行步骤
 

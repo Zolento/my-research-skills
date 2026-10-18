@@ -582,3 +582,144 @@ DELETE
 以及：
 
 «Development history may live on feature branches, while "main" should contain only durable code, tests, and documentation.»
+
+## 21. Skill Installation: Local Directory Source
+
+本仓库的一级子目录是独立 skill 组件。除在仓库内直接使用外，也可以把组件**安装**到本机
+agent 配置目录，供本机各 agent 加载。本节规定安装方式，尤其是**用不同名字安装开发分支**的做法。
+
+> **工具边界：** `dsh` 本身**没有** skill 安装子命令（只有 `dsh plugin` 用于插件）；
+> skill 由文件系统发现。安装使用生态 CLI `npx skills`。首次运行需要网络或已缓存的 npm 包。
+
+### 21.1 为什么用本地目录源
+
+`npx skills add` 既支持 GitHub 仓库，也**支持本地目录**（CLI 会打印 `Local path validated`
+并回显 `Source: <path>`）。本仓库是私有仓库、skill 位于仓库**子目录**，且经常需要安装
+**尚未合并的开发分支**，因此统一使用本地目录源：
+
+```sh
+npx skills add <本地目录> -g -y
+```
+
+常用开关：`-g/--global`（用户级，而非项目级）、`-y/--yes`（免交互）、
+`--copy`（每个 agent 目录各放一份副本，而非符号链接）、`-a/--agent <agents>`（限定目标 agent）、
+`-l/--list`（只列出可安装的 skill）、`-s/--skill <names>`（选择仓库内的某个 skill）。
+
+### 21.2 安装后的布局与发现规则
+
+CLI 默认行为：
+
+- **真实内容**落在 `<agentsHome>/skills/<skill-name>/`，本机即 `~/.agents/skills/<skill-name>/`；
+- 其它 agent 目录（`~/.claude/skills/` 等）建立指向该目录的**符号链接**；
+- 使用 `--copy` 时改为在每个 agent 目录各放一份副本。
+
+DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
+
+| 优先级 | 来源 | 路径 |
+|---|---|---|
+| 100 | `project-dsh` | `<projectRoot>/.dsh/skills` |
+| 200 | `project-agents` | `<projectRoot>/.agents/skills` |
+| 300 | `custom` | 配置项 `customSkillDirs` |
+| 400 | `user-dsh` | `$DSH_HOME/skills`（默认 `~/.dsh/skills`）|
+| 500 | `user-agents` | `$DSH_AGENTS_HOME/skills`（默认 `~/.agents/skills`）|
+
+发现规则：
+
+- 只认扫描根**顶层**的 `<name>/SKILL.md`（或扁平 `<name>.md`），**不递归** `**/SKILL.md`；
+- catalog 名取自 `SKILL.md` frontmatter 的 `name:`，**不是目录名**；
+- **`name:` 必须是 kebab-case**：provider 用 `/^[a-z0-9]+(?:-[a-z0-9]+)*$/` 校验，
+  **含大写、下划线、首尾连字符或连续连字符的名字会被整个 skill 丢弃**
+  （provider 只写一条 warning，catalog 里看不到，极易误判为「安装失败」）；
+- `npx skills add` 会把**目录名**规范化为小写（例如 frontmatter 写 `RSI-pipeline` 时目录是
+  `rsi-pipeline`），但 catalog 名仍取自 frontmatter —— 两者不一致时以 frontmatter 为准；
+- 根目录被 watch：新增、改名、删除的 skill 无需重启即可进入下一轮 catalog；
+- 多个根按上表 rank 顺序扫描；**不要依赖「同名后来者覆盖」这种未文档化的行为**——
+  安装变体一律使用不同的 `name:`（见 §21.3）。
+
+### 21.3 用不同名字安装同一组件的开发分支（后缀 `-rsi` 的做法）
+
+**关键约束：** 安装后的 skill id 来自 frontmatter `name:`。因此**不要直接安装工作树**——
+它与已安装的稳定版同名，会互相覆盖。正确做法是从分支导出一份干净副本、在副本里改名：
+
+1. 从目标分支导出该组件的干净副本（只取版本库内容）到临时目录：
+
+   ```sh
+   git -C <worktree> archive <branch> <component> | tar -x -C <tmp>
+   ```
+
+2. 剔除只属于开发分支的产物与机器缓存：
+
+   ```sh
+   rm -rf <tmp>/<component>/.dev
+   find <tmp>/<component> -name __pycache__ -type d -prune -exec rm -rf {} +
+   ```
+
+3. **只在这个安装副本里**修改 `SKILL.md` 的 frontmatter：
+
+   - 把 `name:` 改为带后缀的**合法 kebab-case** 名字（例如 `research-idea-pipeline-rsi`、
+     `rsi-pipeline`）；**不要用大写**（`RSI-pipeline` 会被 provider 静默丢弃）；
+   - 建议在 `description:` 前加一行可区分的说明（例如「[RSI 开发版] 来自分支 X」），
+     否则模型难以在稳定版与变体之间正确选择。
+
+   **仓库里的 `SKILL.md` 不得为此改名**：`name:` 是组件身份，改名属于安装副本的本地适配。
+
+   > 安装后若 catalog 里看不到：先核对 `name:` 是否满足上面的 kebab-case 语法
+   > （这是最常见的「装上了但看不见」原因），再核对扫描根与 `SKILL.md` 是否在根目录顶层。
+
+4. 安装：
+
+   ```sh
+   npx skills add <tmp>/<component> -g -y
+   ```
+
+5. 核对（应同时列出稳定版与后缀变体）：
+
+   ```sh
+   npx skills list -g
+   ```
+
+6. 卸载：`npx skills remove <带后缀的名字> -g -y`
+
+**必须注意：**
+
+- 安装副本**没有 `.git`**。组件内的发布闸门会自动跳过 tag 校验；实测该副本中
+  `python3 scripts/release_check.py` 仍为 `PASS`。
+- 安装副本里的 **schema id**（`research-idea-pipeline/...@1`）与**运行时目录**
+  （`.research-idea-pipeline/routes/...`）保持原名：它们是数据契约与落盘路径标识，
+  与 skill 的 catalog 名无关，改名会破坏兼容性。
+- 用默认（符号链接）方式安装时，`<agentsHome>/skills/<name>/` 必须是**持久目录**。
+  不要把源指向会被清理的 `/tmp` 目录；需要临时目录时用 `--copy`，或先把副本放到持久位置。
+- 安装副本与本仓库工作树是两份独立内容：修改工作树不会自动更新已安装的 `--copy` 副本。
+
+### 21.4 与开发流程的关系
+
+- 安装副本属于**本机环境**，不是仓库内容：不得提交进仓库，也不得写入组件目录。
+- `.dev/` 是开发分支产物，**不得**进入安装副本（见 §5、§13、§15）。
+- L3 级别的「已安装版本」声明必须来自正式发布的 tag；分支安装副本只是本机测试环境，
+  不代表发布了新版本（见 §6、§9）。
+
+## 22. Production Consumer Verification（运行时能力交付验收）
+
+适用于本仓库**所有组件**。新增或修改运行时能力时，必须能指出并证明五环完整：
+
+| 环 | 要求 |
+|---|---|
+| **Producer** | 该能力实际产出了什么（文件、字段、记录、返回值） |
+| **Runtime Entry** | **正常运行流程**能否到达它（不是只在 selftest 或测试里被调用） |
+| **Consumer** | 哪个生产组件实际消费其结果 |
+| **Decision Effect** | 是否产生**声明中的影响**；若声明为建议/展示，则明确标注为 advisory |
+| **Persistence / Recovery** | 下一轮/重启后是否仍然有效（写盘位置、幂等、失效条件） |
+
+硬性要求：
+
+1. 声称"影响行为"的功能，测试必须**通过真实生产入口**验证效果（端到端调用链），
+   并且在**断开该调用或忽略其结果时测试必须失败**。
+2. 仅存在 API、仅在 selftest/测试中调用、仅返回新字段、或仅被文档引用，**都不足以**证明能力已交付。
+3. 纯展示、诊断或开发工具必须**明确标注作用范围**，不强制拥有决策效果。
+4. 产出"校准/偏好/报告"这类信号时，必须说明它是 **advisory（供人或模型重新考虑）** 还是
+   **decision effect（进入选择逻辑）**；两者不得混称。
+5. 记录方式：一次实际调用链 + 一个行为回归案例即可。**不要**为此新建检查框架或报告模板。
+
+> 经验教训（本仓库实际发生过两次）：`sketch`/`taste` 与 `resume_decision`/`route_dir` 都曾
+> "有 API、有测试、文档已写"，但生产路径从未调用；随后又出现"有调用者但结果未影响决策"
+> （校准只进报告、`indeterminate` 被默认取第一个候选）。这就是本节存在的原因。

@@ -1,4 +1,4 @@
-# Research Preset Library 与 Intent Router（`PR1`—`PR9`）
+# Research Preset Library 与 Intent Router（`PR1`—`PR10`）
 
 > **结论：用户说人话，Router 选协议；Loop 看机器可读信号选恢复协议；自进化必须改变下一轮真实动作选择。**
 
@@ -16,7 +16,10 @@
    （`IC1`—`IC6`）与 PEIG/AALG 全部照旧；预设只能**调用**它们。
 4. **不得刷新 AALG 诊断预算**，不得因失败无限重启同一实验。
 5. **工程故障 ≠ 科学否证**：`ENGINEERING_FAILURE_KINDS` 只用于路由与修复，永不写假设状态。
-6. **只读预设不写 canonical**：`run` 结束会逐字节比对 canonical 摘要（违反即 `PR9` + `BLOCKED`）。
+6. **处理器失败即 HOLD**：Preset 处理器无法完成（`CognitionError` / `OSError`）时返回
+   `HOLD` + `PR10` 诊断，**不重试、不放宽门禁、不把工程故障写成科学否证**；调用方看到状态
+   而不是 traceback。编程错误与不可恢复错误（如 `ValueError` / `MemoryError`）仍然抛出。
+7. **只读预设不写 canonical**：`run` 结束会逐字节比对 canonical 摘要（违反即 `PR9` + `BLOCKED`）。
 
 ## 2. 十六个预设（`preset-registry.json` 为元数据来源）
 

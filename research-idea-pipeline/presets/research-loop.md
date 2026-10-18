@@ -16,6 +16,14 @@
 用户要求“继续科研、自动运行、持续 Loop”。已初始化项目直接继续，绝不重新 Bootstrap。只在已经授权的范围内持续推进。
 
 - 中文意图：在既有 R0—R14 与硬门禁内，按 Recall→Understand→Discover→Predict→Intervene→Verify→Revise→Consolidate→Loop 持续推进，直到停止条件出现
+- **I2M 分支（默认启用）**：当诊断连续零信息增益或 `diagnosis_switch` 不再返回
+  `CONTINUE_ATTRIBUTION` 时，本轮不是再写一份解释，而是走
+  `Insight 就绪 → 方法合成 → 设计契约（R8 冻结）→ 最小干预测试（PEIG/AALG 不变）→ 方法进展判定`；
+  未能形成可执行干预时，输出「判别实验 / 重定义 / 停止」，不得强行制造方法。
+  主锚点为理论/现象/基准/可行性/负结果时走锚点原生贡献路径，不转算法。
+  进展按 Epistemic / Design / Implementation / Validation / Anchor **五个维度分别记录**，
+  互不冒充：指纹变化不是验证成功，无关新证据不加进展，同方法独立验证无须改算法；
+  可信负结果同样是有效进展。readiness 成立即可开始，**不必等停滞**；I2M 只提候选动作。
 - English intent: run the CIE scientific loop inside the existing stages and gates
 - 入口 `continue-research`；授权 `execute`；共同约束见 [shared-contract.md](../shared-contract.md)。
 
@@ -58,7 +66,15 @@
   - `scripts/execution_gate.py`
   - `scripts/experiment_execute.py`
   - `scripts/evidence_outcome.py`
-- 规则号：本仓库自身产生 `PR1`—`PR9`；科学判定仍由既有规则号给出。
+  - `scripts/policy_evolution.py`（Skill-RSI：读取 ACTIVE 策略；只读，不在此处晋升）
+  - `scripts/decision_trajectory.py`（Skill-RSI：应用路径记录实际派遣）
+- 规则号：本仓库自身产生 `PR1`—`PR10`；Skill-RSI 另产生 `DT0`—`DT10`；科学判定仍由既有规则号给出。
+
+**策略消费（Skill-RSI，只读）：** 若存在 ACTIVE 且有作用域的策略，Loop 通过现有
+`strategy_memory.strategy_decision()` 在同一 `EIG ÷ cost` 层内重排已通过硬门禁的动作，
+并采用其结果作为下一项**实际派遣**的动作；适用范围不满足或跨项目迁移未通过时忽略该策略并记录原因。
+`apply` 路径把这次派遣写入决策轨迹与 `scheduler.strategy_decisions[]`；只读路径不写。
+输出区分 `scientific_delta` / `decision_delta` / `policy_delta`，三者均可为 `none`。
 
 ## 6. 执行步骤
 
@@ -96,7 +112,9 @@
 - 机器可读字段：
   - `loop_state`
   - `next_action`
+  - `dispatched_action` / `strategy_changed_dispatch`
   - `evidence_delta`
+  - `scientific_delta` / `decision_delta` / `policy_delta`（`policy_delta` 必须带评价等级）
   - `changed_decision`
   - `hold_reason`
   - 统一字段：`preset_id` / `status` / `entry` / `execution_scope` / `protocol` / `reused` / `observed` / `decision` / `steps` / `writes` / `changed_decision` / `next_action` / `canonical_untouched`。
@@ -107,6 +125,9 @@
   - research-state.json（只经既有 R 阶段与门禁）
   - cognition/ 投影
   - 执行账本
+  - `decision-trajectory.jsonl`（**仅 apply 路径**：把本次实际派遣写入决策轨迹）
+  - `scheduler.json`（**仅 apply 路径**：把策略决策追加到既有 `strategy_decisions[]` 遥测）
+  - `source-integrity.jsonl`（运行前后的源码完整性审计事件）
 - canonical `research-state.json`：只经既有 R 阶段与门禁写。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
 

@@ -894,9 +894,17 @@ def action_affinity(action: Dict[str, Any], state: Dict[str, Any],
 
     Two mechanical routes: the action targets a hypothesis whose `operator` or `island` is
     the advised one, or it targets an uncertainty whose declared cheapest discriminating test
-    is this very action. Anything else is `unaligned` — the adapter will not invent a link,
-    and an unaligned candidate keeps its original order.
+    is this very action. An explicitly preferred action id (a scoped Skill-RSI policy's
+    `same_tier_preference`) is also a declared link. Anything else is `unaligned` — the
+    adapter will not invent a link, and an unaligned candidate keeps its original order.
     """
+    preferred = advice.get("prefer_actions") or []
+    identifier = action.get("action")
+    if isinstance(identifier, str) and identifier and identifier in preferred:
+        # The position in the requested list is the rank, so `same_tier_order` honours the
+        # order it asked for instead of only its membership.
+        return {"aligned": True, "basis": f"policy_prefers[{identifier}]",
+                "prefer_rank": preferred.index(identifier)}
     target = _action_target_kind(action, state)
     if target["kind"] == "hypothesis":
         if target.get("operator") and target["operator"] == advice.get("operator"):
@@ -1004,12 +1012,21 @@ def _order_actions(
             {"aligned": False, "basis": "no advice"}
         annotated.append({**action, "tier": tier["label"], "tier_rank": tier["rank"],
                           "aligned": affinity["aligned"], "affinity_basis": affinity["basis"],
+                          "prefer_rank": affinity.get("prefer_rank"),
                           "declared_order": index,
                           "legal": True})
     best = max((item["tier_rank"] for item in annotated), default=0)
     top = [item for item in annotated if item["tier_rank"] == best]
     rest = [item for item in annotated if item["tier_rank"] != best]
-    top.sort(key=lambda item: (0 if item["aligned"] else 1, item["declared_order"]))
+    # Aligned first, and an explicitly requested rank always beats alignment that came from an
+    # operator/island match. Without this, `prefer_actions` lost to any earlier-declared
+    # operator-aligned action, which contradicted the comment and the policy contract.
+    explicit = len(set((advice or {}).get("prefer_actions") or [])) if advice else 0
+    top.sort(key=lambda item: (
+        0 if item["aligned"] else 1,
+        item["prefer_rank"] if item["prefer_rank"] is not None
+        else explicit + item["declared_order"],
+        item["declared_order"]))
     return top + rest
 
 
@@ -1018,6 +1035,7 @@ def strategy_decision(
     index: Dict[str, Any],
     scheduler: Optional[Dict[str, Any]] = None,
     revisions: Optional[Sequence[Dict[str, Any]]] = None,
+    advice: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Turn the strategy advice into a decision inside the existing selection flow.
 
@@ -1026,9 +1044,15 @@ def strategy_decision(
     memory alone. When the hard gates leave no room (a single legal candidate in the best tier,
     or no aligned candidate), the decision reports `strategy_applied: false` and the reason
     instead of manufacturing a difference.
+
+    `advice` lets an already-authorised producer (Skill-RSI's scoped policy memory) supply the
+    advice, so a promoted policy is consumed through this same adapter instead of a second
+    ranking path. The advice must still be an operator/menu/island shaped hint: the tier rule,
+    the hard gates and the budgets are unchanged.
     """
     import prediction_compare as pc
-    advice = recommend_strategy(state, index, scheduler, revisions)
+    if advice is None:
+        advice = recommend_strategy(state, index, scheduler, revisions)
     legal, blocked, verdict = _legal_actions(state, scheduler)
     without = _order_actions(state, legal, None)
     with_memory = _order_actions(state, legal, advice)
