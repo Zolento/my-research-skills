@@ -30,9 +30,9 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v1.0.0** — first stable release. Capability documentation below is version-free;
+**Current release: v1.1.0** — first stable release. Capability documentation below is version-free;
 historical iterations (v1.2.0—v2.3.3) are recorded in [CHANGELOG.md](CHANGELOG.md) and the current
-release notes are [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
+release notes are [docs/releases/v1.1.0.md](docs/releases/v1.0.0.md).
 
 The package is data-driven: `preset-registry.json` is the source of truth for ids, entries,
 triggers, execution scopes, protocol paths and the 16×3 intent examples; `shared-contract.md` is the

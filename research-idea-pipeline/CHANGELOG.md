@@ -1,10 +1,40 @@
 # Changelog — research-idea-pipeline
 
-本文件记录 Research Idea Pipeline 的正式发行历史。**当前正式稳定版：1.0.0**。
+本文件记录 Research Idea Pipeline 的正式发行历史。**当前正式稳定版：1.1.0**。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
+
+## 1.1.0 — 2026-10-18
+
+Skill-RSI 集成版。**代码合并提交**与**发布提交**分离：先以单次提交把开发分支的可分发树
+（不含 `.dev/`）并入 `main`，再以本提交升级版本、CHANGELOG 与 Release Notes。
+
+**Added**
+- Insight-to-Method Transition：Sketch → Candidate → Preference → Contract → Minimal Test，
+  产物落盘于 `<route>/methods/` 并从磁盘恢复；`indeterminate` 不再被默认取第一个候选。
+- Research Resume 与 Cold Handoff 的入口分类（`legacy_handoff.resume_decision`）。
+- 科研选择比较：四轴（Importance / Insight / Elegance / Evidence）给出 `prefer` / `indeterminate`、
+  反对意见、最大不确定性与“复杂度是否必要”，不产生综合评分。
+- 只读深度科研总结（11 节 + 统一回报契约），配套通用提示词与 `research_summary.py`。
+
+**Fixed**
+- P0 账本完整性：启动失败退款改为在锁内基于重新读取的链写入，并绑定实际消费事件；
+  拒绝重复/跨 family/伪造退款。此前锁外追加会破坏哈希链，导致账本永久 `LEDGER_TAMPERED`。
+- P1 预算口径统一（`issue()` 与 `run()` 同用 `effective_spend`）；人工例外在预算闸门之前校验，
+  仅解除资源限制。
+- P1 argv 解析与真实 `subprocess` 一致（裸命令走 PATH，路径形式直接打开），
+  不可启动的 `argv[0]` 在执行前被拒绝；启动失败与执行失败语义分离。
+- 畸形输入不再以未捕获异常终止闸门（非对象 state、空 argv、损坏账本行）。
+
+**Verification**
+- L1（实现有效性）：**已验证** — 2054 tests OK / 3 skipped、9 个模块 selftest、`release_check.py` PASS。
+- L2（运行有效性）：**部分验证** — 离线回放、真实文件锁与账本、真实 exec 失败路径；真实 GPU /
+  外部 Harness 未验证。
+- L3（科研有效性）：**未验证** — 未做真实科研 A/B；本版本不主张任何真实科研收益。
+
+见 [docs/releases/v1.1.0.md](docs/releases/v1.1.0.md)。
 
 ## 1.0.0 — 2026-10-10
 
