@@ -84,6 +84,29 @@ class LaunchabilityCase(unittest.TestCase):
         self.assertFalse(ex.ensure_executable(self.cwd / "missing.sh"))
 
 
+class MalformedInputCase(unittest.TestCase):
+    """畸形输入不得以未捕获异常终止（闸门应给出可诊断结论）。"""
+
+    def test_an_empty_argv_is_reported_not_raised(self):
+        probe = ex.launch_probe({"argv": [], "cwd": ".", "files": []})
+        self.assertFalse(probe["ok"])
+        self.assertIn("argv", probe["error"])
+
+    def test_a_non_list_argv_is_reported_not_raised(self):
+        self.assertFalse(ex.launch_probe({"argv": "sh", "cwd": ".", "files": []})["ok"])
+
+    def test_a_corrupt_ledger_line_is_skipped(self):
+        ledger = type("L", (), {"events": ["bad", None, {"kind": "consume",
+                                                         "family": "F",
+                                                         "permission": "PILOT_ONLY",
+                                                         "receipt_id": "R1",
+                                                         "hours": 1, "dry_run": False}]})()
+        self.assertEqual(len(ex.effective_spend(ledger, "F", "PILOT_ONLY")), 1)
+
+    def test_ensure_executable_tolerates_none(self):
+        self.assertFalse(ex.ensure_executable(None))
+
+
 class BudgetAccountingCase(unittest.TestCase):
     class _Ledger:
         def __init__(self, events):

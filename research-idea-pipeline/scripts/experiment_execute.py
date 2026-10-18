@@ -84,11 +84,15 @@ def config_binding(protocol):
 
 
 def effective_spend(ledger, family, permission):
-    """(A4/B1) 实际生效的消费 = consume 事件减去被退还的 launch_failed 事件。"""
-    consumed = [e for e in ledger.events if e.get('kind') == 'consume'
+    """(A4/B1) 实际生效的消费 = consume 事件减去被退还的 launch_failed 事件。
+
+    损坏的账本行（非对象）会被跳过而不是抛异常：一个坏行不能让预算核算整条崩掉。
+    """
+    events = [e for e in (getattr(ledger, 'events', None) or []) if isinstance(e, dict)]
+    consumed = [e for e in events if e.get('kind') == 'consume'
                 and e.get('dry_run') is not True
                 and e.get('family') == family and e.get('permission') == permission]
-    refunded = [e for e in ledger.events if e.get('kind') == 'launch_failed'
+    refunded = [e for e in events if e.get('kind') == 'launch_failed'
                 and e.get('family') == family and e.get('permission') == permission]
     refund_ids = {e.get('receipt_id') for e in refunded}
     return [e for e in consumed if e.get('receipt_id') not in refund_ids]
@@ -96,7 +100,10 @@ def effective_spend(ledger, family, permission):
 
 def ensure_executable(path):
     """生成编排脚本后置 +x（A5）。返回是否具备可执行位。"""
-    target = Path(path)
+    try:
+        target = Path(path)
+    except TypeError:
+        return False
     if not target.is_file():
         return False
     mode = target.stat().st_mode
@@ -112,7 +119,10 @@ def launch_probe(manifest):
     也**不**证明命令会成功——只排除启动期必然失败的命令。
     """
     cwd = Path(manifest['cwd']).resolve()
-    argv0 = str(manifest['argv'][0])
+    argv = manifest.get('argv')
+    if not isinstance(argv, list) or not argv or not str(argv[0]).strip():
+        return {'ok': False, 'error': 'UNLAUNCHABLE_ARGV: argv 为空或不是非空列表'}
+    argv0 = str(argv[0])
     candidate = Path(argv0)
     local = candidate if candidate.is_absolute() else (cwd / candidate)
     resolved = ""

@@ -145,10 +145,16 @@ def _decision_delta(state: Dict[str, Any], root: Optional[pathlib.Path]) -> str:
     return f"decision.verdict={verdict}" if verdict else "none（未记录研究决策变化）"
 
 
-def render_summary(state: Dict[str, Any], *, route: str = "", root: Optional[pathlib.Path] = None,
+def render_summary(state: Any, *, route: str = "", root: Optional[pathlib.Path] = None,
                    route_dir: Optional[pathlib.Path] = None,
                    skill_version: str = "", cutoff: str = "") -> str:
-    """Render the eleven-section, read-only research summary."""
+    """Render the eleven-section, read-only research summary.
+
+    A non-object state (a JSON list or `null`) is not a canonical state: render it as an empty
+    projection rather than raising, and let the caller report it as invalid.
+    """
+    if not isinstance(state, dict):
+        state = {}
     contract = state.get("contract") if isinstance(state.get("contract"), dict) else {}
     claims = _classify_claims(state)
     experiments = _items(state, "experiments")
@@ -383,6 +389,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
         print(f"state 不可读（{type(exc).__name__}）：不重建、不补造，请先修复", file=sys.stderr)
+        return EXIT_MISSING
+    if not isinstance(state, dict):
+        print(f"state 顶层不是对象（{type(state).__name__}）：不是 canonical Research State，"
+              "不重建、不补造", file=sys.stderr)
         return EXIT_MISSING
     route_dir = pathlib.Path(args.route_dir).expanduser() if args.route_dir else state_path.parent
     root = pathlib.Path(args.root).expanduser() if args.root else route_dir.parent.parent

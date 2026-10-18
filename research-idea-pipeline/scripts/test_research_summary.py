@@ -95,6 +95,25 @@ class TestSummaryContent(unittest.TestCase):
                          rs.render_summary(state(), route="A"))
 
 
+class TestMalformedState(unittest.TestCase):
+    def test_a_non_object_state_renders_as_an_empty_projection(self):
+        for bad in ([], None, "text", 3):
+            report = rs.render_summary(bad, route="A")
+            self.assertIn(rs.TBD, report)
+
+    def test_the_cli_rejects_a_non_object_state_with_exit_4(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as temp:
+            state = pathlib.Path(temp) / "research-state.json"
+            state.write_text("[]", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(SCRIPT), "--state", str(state)],
+                                    capture_output=True, text=True, cwd=str(ROOT),
+                                    stdin=subprocess.DEVNULL)
+            self.assertEqual(result.returncode, rs.EXIT_MISSING)
+            self.assertIn("顶层不是对象", result.stderr)
+
+
 class TestReadOnlyCli(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
