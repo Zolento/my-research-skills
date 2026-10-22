@@ -153,7 +153,7 @@
     "stop": "Budget exhausted or stop rule triggered",
     "redesign": "Comparator cannot isolate the intervention"
   },
-  "budget_hours": 2,
+  "budget_hours": 12,
   "pilot": {
     "goal": "Calibrate observable dose",
     "measurement": "effective SSL gradient norm",

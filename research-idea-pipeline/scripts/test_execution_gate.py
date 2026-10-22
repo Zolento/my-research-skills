@@ -459,3 +459,24 @@ class TestMalformedReceipt(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL", result)
         self.assertTrue(any("EIG_SOURCE_MALFORMED" in item or "STATE_INVALID" in item
                             for item in result["errors"]), result["errors"])
+
+
+class DefaultBudgetTemplate(unittest.TestCase):
+    """默认 GPU 预算的唯一定义处是协议模板；受 pin 保护，防止被静默改回。"""
+
+    def test_the_protocol_template_defaults_to_twelve_gpu_hours(self):
+        import json
+        import pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent
+        document = json.loads((root / "templates" / "preflight-protocol.template.json")
+                              .read_text(encoding="utf-8"))
+        self.assertEqual(document["budget_hours"], 12)
+        # pilot 仍是廉价校准闸门，不随正式预算一起抬高
+        self.assertLessEqual(document["pilot"]["max_hours"], 1)
+        self.assertEqual(document["pilot"]["max_runs"], 1)
+        errors = eg.schema_errors(document, "preflight-protocol.schema.json")
+        self.assertFalse(errors, errors)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1059,8 +1059,19 @@ def step_release_metadata() -> Tuple[bool, str]:
             main = sub.run(['git', 'rev-parse', 'refs/heads/main'], capture_output=True,
                            text=True, cwd=str(root.parent)).stdout.strip()
             if main and tagged_sha != main:
-                return False, (f'{tag} points at {tagged_sha[:8]}, not at the main release '
-                               f'commit {main[:8]}')
+                # A development branch may sit on an *older* release line while main has moved to
+                # a newer one; that is lag, not the "tag behind main" drift this check exists to
+                # prevent. Drift means the tag is not an ancestor of main.
+                newer = sub.run(['git', 'show', 'refs/heads/main:research-idea-pipeline/SKILL.md'],
+                                capture_output=True, text=True, cwd=str(root.parent)).stdout
+                found = re.search(r'version:\s*"([^"]+)"', newer or '')
+                behind = sub.run(['git', 'merge-base', '--is-ancestor', tagged_sha, main],
+                                 capture_output=True, text=True, cwd=str(root.parent))
+                if found and found.group(1) != version and behind.returncode == 0:
+                    pass                                   # dev lags main's newer release
+                else:
+                    return False, (f'{tag} points at {tagged_sha[:8]}, not at the main release '
+                                   f'commit {main[:8]}')
             ancestor = sub.run(['git', 'merge-base', '--is-ancestor', tagged_sha, head],
                                capture_output=True, text=True, cwd=str(root.parent))
             if ancestor.returncode != 0:
