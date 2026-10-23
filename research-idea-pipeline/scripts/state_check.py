@@ -1859,12 +1859,14 @@ def emit(report: Report, as_json: bool, quiet: bool) -> None:
             print(violation.render())
         for violation in report.violations:
             print(violation.render())
+        for violation in report.outcome:
+            print(violation.render())
     print(report.summary())
     if not quiet and report.shape:
         print("[hint] 形状错误形如「S 号 硬违规 · JSON 路径 判据 · 现值」；"
               "先修形状，V1—V24 尚未执行；规则定义见 "
               "references/research-state-policy.md §4.0")
-    elif report.violations and not quiet:
+    elif (report.violations or report.outcome) and not quiet:
         print("[hint] 每条违规形如「规则号 硬违规 · JSON 路径 判据 · 现值」；"
               "规则定义见本 skill 的 references/research-state-policy.md §4.1")
 

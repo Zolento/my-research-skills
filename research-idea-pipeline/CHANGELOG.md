@@ -6,6 +6,40 @@
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
 
+## Unreleased — 2026-10-24
+
+Research-first communication, internally managed operations, evidence-grounded autonomy.
+No version bump on this development branch; the next release will align metadata,
+CHANGELOG and release notes.
+
+### Added
+- `references/scientific-communication-policy.md`: default
+  `Problem → Insight → Method → Evidence → Decision` report, dynamic length, six-question
+  method-depth check, causality/smoke/fabrication prohibitions, default-hidden operational
+  details, explicit audit expansion and the R12 boundary.
+- `references/operational-autonomy-policy.md`: A/B/C operation classes, automatic routine
+  maintenance, evidence-gated scientific updates, unchanged privileged actions, termination and
+  stale-telemetry rules, bounded recovery and pre-report reconciliation.
+- `scripts/operational_reconcile.py`: thin coordinator for idempotent cognition/STATUS refresh,
+  scheduler/monitor freshness, prepared outcome-bundle detection, and structured holds.
+- `examples/scientific-reporting.md`: before/after X88–X90 examples plus audit expansion.
+- `scripts/test_operational_reconcile.py` and `scripts/test_scientific_communication.py`.
+
+### Changed
+- `research-loop` now reconciles before selecting an action, emits `operations` /
+  `operational_holds`, excludes stale scheduler actions and no longer dispatches stopped
+  experiments as if they were runnable.
+- `state_check.py` prints EO1/EX1 rows by default instead of only the violation count.
+- Shared contract, invocation prompts, preset protocol, scheduler policy, research-state policy
+  and evidence policy point to the two new policies.
+
+### Fixed
+- The loop previously declared a cognition projection write without executing it.
+- A stale scheduler could still supply `next_actions` when its `state_version` did not match
+  canonical state.
+- A structured stop record (`SIGTERM` / user pause) could be treated as runnable work; it is
+  now held as non-completion and never converted to `done` or negative evidence.
+
 ## 1.0.0 — 2026-10-10
 
 首个正式稳定版。功能集合与 v2.3.3 之后的 main 一致（含 Loop Runtime Correctness Hotfix 与

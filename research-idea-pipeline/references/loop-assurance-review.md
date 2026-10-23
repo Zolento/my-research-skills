@@ -90,3 +90,6 @@ FAIL=3、NEEDS_REVIEW=4。
 待办审查 → R7 任务、`UNKNOWN` → 等待、`FAILED` → `HOLD`、`VERIFIED` → 下一项合法动作。
 `run_preset research-loop` 的 `observed.assurance` / `decision.assurance_*` 会给出每个实验的生命周期、
 reviewer、tier、检查结论与复审条件。
+
+**汇报口径：** 默认只写 R7 的生命周期与阻塞原因；具体产物路径、摘要与 reviewer 细节
+只在用户要求审计 / 调试 / 完整记录时展开。科学结论与阻塞不得因省略路径而消失。

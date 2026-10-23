@@ -101,6 +101,18 @@ python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/
 
 **先区分意图。**「下一步建议是什么」只要求建议。「接着做」「继续探索方法」授权执行。
 用户明确要求只给建议时，给出建议后停止。不得把执行请求默认改成咨询。
+**只分析 / 只总结的请求不得启动实验、写科学状态或自动提交 outcome。**
+
+**默认汇报科学，不汇报操作流水账。** 面向用户的返回按
+[scientific-communication-policy.md](scientific-communication-policy.md) 的
+`Problem / Insight / Method / Evidence / Decision` 组织。先给科学结论或研究决定；
+运行状态只在影响进度、成本或科学有效性时用一行说明。PID、GPU UUID、长路径、
+内部状态版本默认不出现。用户显式要求审计 / 调试 / 完整记录时才展开。
+
+**例行维护不询问用户。** 认知投影、STATUS、索引与不改变科学事实的同步按
+[operational-autonomy-policy.md](operational-autonomy-policy.md) 的 A 类自动执行。
+outcome / claim / assurance / failure / decision 属于 B 类，必须过既有门禁；
+门禁未过时 `HOLD` 并说明原因，不得反复请求「是否允许刷新记录」。
 
 **默认是 Method-Driven，但边界不变。** 研究行动必须改变**可验证的科研决定**；机制发现应
 尽可能转化为针对问题的贡献设计；贡献需要**真实实现或相应形式化产物 + 可信验证**；
@@ -143,13 +155,18 @@ Insight 的简洁方法；相比最简单的替代方案为何必要）、**Evid
 执行请求下，在已授权范围内循环：
 
 1. 核对 state、scheduler 与最新实验产物。记录尚未核实的差异。
+   先做 operational reconciliation：A 类投影按需刷新；scheduler 过期则不得使用其
+   `next_actions`；终态实验缺 outcome 事务时检查三件套是否齐备。
 2. 读认知记忆 `cognition/context-brief.md`（默认路径，无需用户指定）：
    恢复机制、未解异常、未收口竞争、禁止重复方向与上一轮决策。
 3. 按 [scheduler-policy.md](scheduler-policy.md) §3 选择当前可执行动作。
 4. 执行动作，核验产物，按对应阶段契约回写 state。
+   合法的 outcome 事务可自动提交；证据不足则 `HOLD`，不得从日志现编 outcome。
 5. 用新增证据重选动作；收尾时重建认知记忆
    （`python3 scripts/cognition.py build --state <state.json>`，并让 `check` 退出 0）。
    已有授权不因跨越阶段而失效。
+6. 按 [scientific-communication-policy.md](scientific-communication-policy.md) 汇报：
+   先科学结论与下一步决定，操作细节只保留影响判断的部分。
 
 停止条件是用户指定边界、预算耗尽、必要授权缺失，或确无可执行动作。
 若修复尚未闭环，停止不代表阶段完成。报告阻塞，保留有效状态和未完成产物；不得伪造 closure。
@@ -168,7 +185,7 @@ stop rules，并通过 planning 与 post-update Assurance；缺审计则 HOLD。
 候选失败后检查失败范围。遇到方法瓶颈，按 R5.1 补检索并阅读关键机制与实现资料。
 将资料转成有来源、适用条件和最小对照的方法干预，再继续探索。
 不要求先解释全部未知。遇到真实阻塞时说明依赖和可继续的独立工作。
-回报新增证据、方法变化、已执行动作和下一步。
+回报科学结论、方法变化、关键证据与下一步；不要回报操作流水账。
 ```
 
 ---

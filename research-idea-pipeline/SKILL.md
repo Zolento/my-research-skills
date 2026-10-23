@@ -412,6 +412,33 @@ Insight / 修改什么算法 / 什么结果会否定它），**完整 Design Con
 **每轮面向用户的汇报形态：** `Problem / Insight / Method / Evidence / Next Decision`（五段），
 而不是长篇归因报告。
 
+### 0.5 Scientific Communication 与 Operational Autonomy（默认行为）
+
+**默认先做内部维护，再汇报科学。** 面向用户的汇报遵守
+[scientific-communication-policy.md](references/scientific-communication-policy.md)；
+内部操作分类与授权边界遵守
+[operational-autonomy-policy.md](references/operational-autonomy-policy.md)。
+
+**两句话规则：**
+
+1. **汇报科学优先。** 默认 `Problem → Insight → Method → Evidence → Decision`。
+   按阶段调整篇幅；有新方法时深入解释机制；有负结果时保留负证据。
+   PID、GPU UUID、文件大小、内部版本号与长路径默认隐藏。
+   用户显式要求审计 / 调试 / 完整记录时才展开。
+2. **例行维护自动做完。** 认知投影、STATUS 投影、索引与不改变科学事实的同步属于
+   **A 类**，默认自动执行，不询问用户。改变 outcome / claim / assurance / decision
+   的更新属于 **B 类**，必须过 R9.O / R10 / R11 / R7 与校验器。改主锚点、破预算、
+   改冻结协议、未授权大规模训练属于 **C 类**，仍只由用户授权。
+
+**边界：**
+
+- 不得把相关性写成因果性，不得把 engineering smoke 当作科学有效性证据，
+  不得编造数学目标、机制或统计结论。
+- 不得把进程终止自动解释为科学完成，不得用过期 telemetry 或未验证日志推断 outcome。
+- 维护失败必须保留真实阻塞原因，不得宣称已同步。
+- R12 是论文叙事机制；日常科研汇报**不得**改造成 R12 叙事流程。
+- 本政策不改变 Discovery / Assurance 权限分离，也不新增任何科研权限。
+
 ## 1. 全局不变量（所有 R 阶段强制遵守）
 
 以下六条是硬约束，任何 R 阶段都不得违反。执行前先确认，输出时自检。
@@ -545,6 +572,11 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 （与 §1.1 的「禁止推断」同一条纪律）。
 
 - 结构化报告，使用标题和表格。
+- **默认科研汇报按 [scientific-communication-policy.md](references/scientific-communication-policy.md)
+  组织：科学结论在前，操作细节只保留影响判断的部分。** 用户显式要求审计 / 调试 /
+  完整记录时，展开证据、路径与运行信息。
+- **例行维护按 [operational-autonomy-policy.md](references/operational-autonomy-policy.md)
+  自动完成，不向用户询问是否刷新投影或同步记录。**
 - 所有引用给出具体出处，格式 `[作者, 会议/年份]`。
 - 无法确认的信息标注 **"待核实"**，**不得臆造**。
   **证据等级 ↔ 允许/禁止表述的权威定义见
@@ -1067,6 +1099,9 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 | 项目组织规范 | [references/project-layout.md](references/project-layout.md) | **Wave 6 目录规范**：**八条 DI invariant**、`routes/` 聚合、**`README`/`STATUS`/`INDEX` 三文件职责分离**、**`STATUS.md = f(research-state.json)` 投影**、`XID` 贯穿、`experiments/` 与 `results/` 分离、`docs/decisions/DEC`、**三层锚点体系落盘**（`anchor_role`/`serves`）、`docs/` 命名与 `slug` 封闭枚举 + `subtype`、**落盘三档**（交付物/中间产物/状态）、锚点变更单、route fork 门槛、Git 边界、`AGENTS.md` 优先与可达性校验、并发写入 |
 | 评分与聚合政策 | [references/scoring-policy.md](references/scoring-policy.md) | **两层**：**硬门禁 `G1—G5`（不聚合、不打分）** + **排序六维**（**R12 主用**）；1—5 标尺；极性归一化（**仅 R7 / R10 / R13 仍用**）；逐维度中位数、**一票否决 + 带条件的推荐出口** |
 | 证据等级与措辞 | [references/evidence-policy.md](references/evidence-policy.md) | **五类共享政策**：已核实 / 部分核实 / 据本次检索未见 / 待核实 / 待补证明 ↔ 允许与禁止表述；**§3 认知状态 ↔ 措辞等级映射**（各 R 阶段 不再各自定义） |
+| **科研汇报政策** | [references/scientific-communication-policy.md](references/scientific-communication-policy.md) | **默认用户汇报**：`Problem → Insight → Method → Evidence → Decision`、按阶段调整篇幅、**method-depth 六问**、因果 / smoke / 编造禁令、默认隐藏的操作细节、审计 / 调试展开规则、**R12 边界** |
+| **运维自主政策** | [references/operational-autonomy-policy.md](references/operational-autonomy-policy.md) | **A 类例行维护自动执行 / B 类证据门禁更新 / C 类特权动作仍由用户授权**；canonical 唯一写入、进程终止不等于完成、过期 telemetry 不得作决策依据、有限恢复、汇报前 reconciliation |
+| **运维协调脚本** | [scripts/operational_reconcile.py](scripts/operational_reconcile.py) | 薄层协调：A 类投影幂等刷新、scheduler / monitor 新鲜度、终态实验 outcome 条件检测、结构化 `HOLD`；**不重建证据门禁、不写第二套 canonical state** |
 | 受控中文写作 | [references/writing-policy.md](references/writing-policy.md) | **落盘文档 / 对话返回 / 子代理意见共用**：三档 **asd-ste100（可选最强档，须用户显式声明）/ Strict / 中文-顺**、结构规则（硬）、词汇规则（方向；asd-ste100 档下升为执行）、中文六种机器味、**情态是内容** |
 | 受控中文 linter | [scripts/ste_lint_zh.py](scripts/ste_lint_zh.py) | 机械首查：分号 / 超长句 / 虚动词 / 营销词 / 套话 / 同义轮换 / 被动 / 复合体貌 / 含糊词 / 半角标点；`--baseline`、`--disable`、`--selftest`（MIT，vendored） |
 | 检索实现脚本 | [scripts/literature_search.py](scripts/literature_search.py) | 可运行实现：**本地 + 多源**并集、每源状态、`--level`、`--exhaustive`、`--also-query`、`--venue`、`--cited-by`、退避、代理检测、`--check-env` |
@@ -1325,6 +1360,10 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
   `uncertainty` 可 `high → medium → low` 而 `status` 保持 `open`（两个维度独立，**不得**判不闭环）。
 - **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
   EIG 对照写同目录的 `scheduler.json`（telemetry，由 execution gate 检查来源和状态）。
+- **维护 vs 科学更新：** 投影刷新、STATUS 重渲染、索引与日志归档属于 A 类，可自动执行；
+  outcome / claim / assurance / failure / decision 属于 B 类，必须过 R9.O / R10 / R11 / R7。
+  进程终止、过期 scheduler 与未验证日志不得产生 `done` 或科学负结论。详见
+  [operational-autonomy-policy.md](references/operational-autonomy-policy.md)。
 
 ### R13 / R14 — artifact 审计与决策
 
@@ -1344,12 +1383,25 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
    Discovery（R3—R6）与 Assurance（R7）都不得直接改 ——
    防「自己给自己判分」。
 3. **每阶段收尾跑** `python3 scripts/state_check.py --check <state.json>`，**硬违规须为 0**；exit 3 = 硬违规，exit 4 = 文件缺失 / JSON 非法。
+4. **汇报前先做 operational reconciliation**：A 类投影先刷新，B 类先过门禁，再按
+   [scientific-communication-policy.md](references/scientific-communication-policy.md) 汇报。
+   维护失败保留 `hold_reason`，不得用报告掩盖阻塞。
 
 **反馈环：** R14 的 `pivot` 回 **R3**；`continue` 回 **R9**；R10 的 `KILL_BRANCH` 归档该分支。
 
 ## 6. 执行自检清单（每次输出前）
 
 - [ ] phase 已明确，且与该阶段的输入约定一致。
+- [ ] **面向用户的汇报科学优先**：默认五段、先结论；没有把 PID / GPU UUID / 长路径 /
+      内部版本号当作主文；没有把相关性写成因果性，没有把 smoke 写成有效性。
+- [ ] **提出或修改方法时已做 method-depth 检查**：六问有实质回答或明确标 `unknown`；
+      没有编造数学目标、机制或统计结论。
+- [ ] **例行维护已实际完成**：认知投影 / STATUS / 索引等 A 类动作已执行或已确认无变化；
+      没有向用户询问是否执行例行维护；维护失败已保留 `hold_reason`，没有宣称已同步。
+- [ ] **B 类更新全部过门禁**：outcome / claim / assurance / failure / decision 没有绕过
+      R9.O / R10 / R11 / R7；进程终止未被写成科学完成；过期 telemetry 未被当作当前事实。
+- [ ] **负结果与阻塞仍可见**：没有因为简洁而隐藏负证据、重大不确定性或门禁阻塞。
+- [ ] **用户只请求分析时没有执行实验**；用户请求继续科研时没有因例行维护反复请求批准。
 - [ ] **锚定点（核心目标）已与用户确认**，并已写入 frontmatter 的 `core_goal`、
       路线 `INDEX.md` 的路线概要、以及 `state.json`；**未确认就开工属于违规**。
 - [ ] **锚点体系完整（新增）**：根 `INDEX.md` 已声明**项目主锚点**；
@@ -1557,6 +1609,13 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
     `(Attack, Target Claim, Alternative, Discriminating Test, Kill Condition)` 里每一格
     都直接对应一个可执行动作或一次实验 —— 这正是从「评审意见」走向「科研搜索」的一步。
 
+17. **为什么把「科研汇报」与「运维自主」单独立成政策？** 科研系统的失败不只来自证据不足，
+    也来自**注意力错配**：Agent 把篇幅花在 PID、GPU、路径和状态同步上，用户看不到方法原理
+    与下一步判别实验；同时把本可自动完成的记录维护转交给用户确认。两者都会降低科研决策速度。
+    因此把**汇报顺序**（科学优先、操作细节按需展开）与**操作分类**（A 例行维护自做 /
+    B 证据门禁 / C 用户授权）写成独立政策，并由 `operational_reconcile.py` 在 Loop 内执行。
+    **这不是放宽证据门禁，也不是新增权限**：B 类仍走 R9.O / R10 / R11 / R7，C 类仍只由
+    用户授权；政策只把「不需要用户决策的事」移出交互，把「需要科学判断的事」放到汇报前面。
 
 ---
 

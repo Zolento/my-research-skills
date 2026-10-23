@@ -217,6 +217,10 @@ writes over the source state or an existing output file. Inspect and persist a p
 R11 workflow. A decision without Assurance returns HOLD. Scripts do not call a model,
 execute experiments, infer causes by regex or perform arbitrary JSON patches.
 
+`scripts/operational_reconcile.py` may discover a **prepared** triple and call the same
+`apply()` under the existing execute authorization. It never authors a packet, analysis or
+audit, never infers an outcome from logs, and never writes a second canonical state.
+
 ## Managed execution adoption
 
 See [execution identifiability](execution-identifiability.md). For an experiment
