@@ -50,6 +50,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import cognition as cg
 import insight_to_method as i2m
 import evidence_outcome as eo
+import operational_reconcile as ops
 import prediction_compare as pc
 import state_check as sc
 import strategy_memory as sm
@@ -1946,7 +1947,9 @@ def _loop_step(ctx: Dict[str, Any], *,
 
     Ordering: contract → candidates → damaged receipts (hold) → missing analyses (R9.O) →
     failed Assurance (hold) → dependent planned work (hold) → independent planned work →
-    consolidate a stale projection → pending Assurance → the Scheduler's next legal action.
+    stopped experiments (hold) → consolidate a stale projection → pending Assurance →
+    the Scheduler's next legal action. Stopped experiments are removed from the dispatchable
+    set before planned work is selected; a stale scheduler never supplies an action.
     A completed outcome transaction never authorizes new dependent work by itself, and a review
     that is merely missing is a todo, not a failure.
 
@@ -2018,6 +2021,13 @@ def _loop_step(ctx: Dict[str, Any], *,
                  for xid, item in sorted(assurance.items())}
     running_experiments = [item for item in experiments if item.get("status") == "running"]
     planned_raw = [item for item in experiments if item.get("status") == "planned"]
+    stopped_experiments = {str(item.get("id")): ops.stopped_execution(item)
+                           for item in running_experiments + planned_raw
+                           if ops.stopped_execution(item)}
+    running_experiments = [item for item in running_experiments
+                           if str(item.get("id")) not in stopped_experiments]
+    planned_raw = [item for item in planned_raw
+                   if str(item.get("id")) not in stopped_experiments]
     stale_planned: Dict[str, List[str]] = {}
     planned = list(running_experiments)          # running work is never interrupted
     # Only a *hard* defect removes an experiment from the queue: no decision value left, or a
@@ -2046,7 +2056,17 @@ def _loop_step(ctx: Dict[str, Any], *,
         return {"phase": "R8/R9", "step": "Intervene",
                 "action": f"为 {len(planned)} 个 planned/running 实验走 PEIG/AALG 后执行",
                 "blocked": False, "hold": False, "pending_r10": [],
-                "stale_planned": stale_planned,
+                "stale_planned": stale_planned, "stopped_experiments": stopped_experiments,
+                "assurance_pending": pending, "assurance": guarantee}
+    if stopped_experiments:
+        return {"phase": "HOLD", "step": "HOLD",
+                "action": ("以下实验已被停止或中止，未形成科学完成："
+                           + "、".join(sorted(stopped_experiments))
+                           + "。必须先决定恢复还是记为 incomplete execution，"
+                             "不得自动重启或写成 negative result。"),
+                "blocked": False, "hold": True,
+                "hold_reason": "execution_stopped_not_completion",
+                "stopped_experiments": stopped_experiments,
                 "assurance_pending": pending, "assurance": guarantee}
     if stale_planned:
         # They keep their frozen pre-registration and history, but they no longer hold the queue.
@@ -2090,8 +2110,10 @@ def _loop_step(ctx: Dict[str, Any], *,
     # Insight-to-Method Transition. Consulted only here, after integrity, critical attack,
     # invalidation propagation, Assurance, planned work and every gate above has had its say,
     # so method synthesis can never outrank them or unblock a stop rule.
-    method_step = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
-                                route_dir=ctx.get("route_dir"))
+    scheduler = ctx.get("scheduler") or {}
+    scheduler_stale = bool(scheduler) and scheduler.get("state_version") != state.get("state_version")
+    method_step = i2m.loop_step(state, None if scheduler_stale else ctx.get("scheduler"),
+                                gap=ctx.get("anchor_gap"), route_dir=ctx.get("route_dir"))
     if method_step:
         if resume is not None:
             method_step["resume_decision"] = resume
@@ -2100,8 +2122,9 @@ def _loop_step(ctx: Dict[str, Any], *,
         method_step["assurance_pending"] = pending
         method_step["dispatched_action"] = None
         return method_step
-    actions = [item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
-               if isinstance(item, dict) and item.get("action")]
+    actions = [] if scheduler_stale else [
+        item for item in (ctx.get("scheduler") or {}).get("next_actions") or []
+        if isinstance(item, dict) and item.get("action")]
     if actions:
         scheduler_first = actions[0].get("action")
         # A diagnosis that cannot name the decision it would change may not keep re-occupying
@@ -2132,6 +2155,16 @@ def _loop_step(ctx: Dict[str, Any], *,
                 "scheduler_first_action": scheduler_first,
                 "strategy_overrode_scheduler": overrode,
                 "next_actions": [item.get("action") for item in actions[:5]]}
+    if scheduler_stale:
+        return {"phase": "HOLD", "step": "HOLD",
+                "action": ("scheduler telemetry 与 canonical state_version 不一致："
+                           f"{scheduler.get('state_version')!r} vs "
+                           f"{state.get('state_version')!r}。下一步必须按当前 state 重新评估，"
+                           "不得使用旧 next_actions / 监控记录。"),
+                "blocked": False, "hold": True, "hold_reason": "stale_scheduler",
+                "stale_scheduler": {"state_version": scheduler.get("state_version"),
+                                    "canonical_state_version": state.get("state_version")},
+                "assurance": guarantee, "pending_r10": []}
     return {"phase": "HOLD", "step": "HOLD",
             "action": "无新状态、无待分析结果、无合法下一动作：停下交人裁决",
             "blocked": False, "hold": True, "hold_reason": "no_legal_action",
@@ -2284,6 +2317,12 @@ def strategy_dispatch(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
     preset = presets_by_id()["research-loop"]
+    # A-class maintenance is performed before the action decision. A prepared, fully
+    # audited outcome transaction may commit here, but only through evidence_outcome.apply()
+    # and only when this handler was called with the existing execute authorization.
+    operational = ops.reconcile(ctx["state_path"], apply=apply)
+    if operational.get("state_changed"):
+        ctx = project_context(ctx["state_path"], ctx["cognition_dir"])
     dispatch = strategy_dispatch(ctx)
     step = _loop_step(ctx, strategy_choice=dispatch.get("action") if dispatch["applied"] else None)
     # The next round consumes what the previous round decided: the adapter records its choice
@@ -2303,9 +2342,12 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
         }
     switch = pc.diagnosis_switch(ctx["state"], (ctx["index"].get("competitions") or []),
                                  ctx["scheduler"], ctx["index"].get("mechanisms"))
-    loop = ["Recall", "Understand", "Discover", "Predict", "Intervene", "Verify", "Revise",
-            "Consolidate", "Loop"]
+    loop = ["Reconcile", "Recall", "Understand", "Discover", "Predict", "Intervene", "Verify",
+            "Revise", "Consolidate", "Loop"]
+    reconcile_command = ("python3 scripts/operational_reconcile.py --state <state>"
+                         + (" --apply" if apply else ""))
     steps = [
+        {"step": "Reconcile", "command": reconcile_command},
         {"step": "Recall", "command": "python3 scripts/cognition.py recall --state <state>"},
         {"step": "Understand", "command": "python3 scripts/state_check.py <state> --quiet"},
         {"step": "Discover", "command": "python3 scripts/strategy_memory.py recommend --state <state>"},
@@ -2335,7 +2377,18 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                        f"{guidance['dispatch'].get('action')}"
                        f"（算子 {guidance.get('discovery_operator')}）")
 
-    writes = ["cognition/ 投影（经 cognition build）"]
+    writes = list(operational.get("writes") or [])
+    operational_codes = {str(item.get("code")) for item in operational.get("holds") or []}
+    blocking_operational = {
+        "monitor_record_conflict", "scheduler_gate_failed", "outcome_transaction_invalid",
+        "outcome_backlog_unresolved", "outcome_receipt_blocked",
+        "projection_refresh_failed", "status_render_failed",
+    }
+    operational_failure = next((code for code in sorted(operational_codes)
+                                if code in blocking_operational), None)
+    if operational_failure and status == "OK":
+        status = "HOLD"
+        write_failure = f"operational_hold:{operational_failure}"
     strategy_changed_dispatch = bool(step.get("strategy_overrode_scheduler"))
     # A policy delta exists only when a policy actually changed the dispatched action. Reporting
     # "an L2 policy was consumed" while nothing was dispatched (or while the decision came from
@@ -2414,7 +2467,9 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                                  "strategy_overrode_scheduler":
                                                      strategy_changed_dispatch},
                                              "assurance": step.get("assurance"),
-                                             "assurance_pending": step.get("assurance_pending")},
+                                             "assurance_pending": step.get("assurance_pending"),
+                                             "operations": operational,
+                                             "operational_holds": operational.get("holds") or []},
                    decision={"next_action": next_action,
                              "consumes_previous_decision": bool(guidance and not guidance["stale"]),
                              "step": step["step"],
@@ -2425,6 +2480,22 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                                 or switch.get("action") != "CONTINUE_ATTRIBUTION"
                                                 else "none"),
                              "policy_delta": policy_delta,
+                             "operations": {
+                                 "status": operational.get("status"),
+                                 "maintenance": operational.get("maintenance"),
+                                 "scheduler": (operational.get("scheduler") or {}).get("status"),
+                                 "scheduler_state_version":
+                                     (operational.get("scheduler") or {}).get("state_version"),
+                                 "outcome_pending": [
+                                     row["experiment"] for row in
+                                     (operational.get("outcomes") or {}).get("experiments") or []
+                                     if row.get("status") in ("MISSING", "READY", "BLOCKED",
+                                                              "STOPPED_NOT_COMPLETION")],
+                                 "hold_counts": operational.get("hold_counts") or {},
+                                 "outcome_counts": operational.get("outcome_counts") or {},
+                                 "writes": operational.get("writes") or [],
+                             },
+                             "operational_holds": operational.get("holds") or [],
                              "pending_r10": step.get("pending_r10"),
                              "blocked_experiments": step.get("blocked_experiments"),
                              "decision_gate": step.get("decision_gate"),
