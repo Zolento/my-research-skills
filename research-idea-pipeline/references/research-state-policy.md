@@ -708,6 +708,16 @@ S 只查**齐全 / 必填 / 类型 / 枚举 / 对象形状**；语义一致性�
    **R14 的写集合永不含 `claims[].status`**。停一个 hypothesis / 停一条路线是**资源决策**，
    不是**真值判决**。完整定义见 [../SKILL.md](../SKILL.md) §1.7。
 
+**维护更新 ≠ 科学更新（新增，不改既有写表）：**
+
+- **A 类维护**（认知投影、`STATUS.md`、索引、日志归档、非科学事实同步）**只写派生视图**，
+  **不得写 `research-state.json`，不得推高 `state_version`**。重复执行必须幂等。
+- **B 类科学更新**（outcome / claim / hypothesis / evidence / failure / assurance /
+  decision）必须走本表列出的阶段与既有事务，**不得**用「维护」名义直接改 canonical。
+- 投影刷新失败时保留原 state 与失败原因，**不得**声称已同步。
+- 详细分类与授权边界见
+  [operational-autonomy-policy.md](operational-autonomy-policy.md)。
+
 ---
 
 ## 6. 与既有权威文件的接口

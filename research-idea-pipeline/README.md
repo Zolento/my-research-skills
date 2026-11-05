@@ -99,6 +99,20 @@ the Assurance / Decision Gate before consuming the Scheduler's next legal action
 experiment is therefore never re-analysed because a repair happens to be missing, and a damaged or
 version-conflicting receipt produces an explicit `HOLD` instead of silent retries.
 
+**Scientific communication and operational autonomy:** the default user-facing report is
+`Problem → Insight → Method → Evidence → Decision`, not an operations log. Method proposals must
+answer the six method-depth questions or mark them unknown; correlation is not written as causation,
+and engineering smoke is not treated as scientific validity. PID, GPU UUID, long paths, internal
+version numbers and routine synchronization stay out of the main report. They expand only for an
+explicit audit/debug request. Routine maintenance (cognitive projection, `STATUS.md`, indexes and
+non-scientific synchronization) is class A and runs automatically without asking the user; outcome,
+claim, assurance, failure and decision updates are class B and must pass the existing R9.O / R10 /
+R11 / R7 gates; anchor changes, budget exceptions and frozen-protocol edits remain class C and need
+the user's authorization. The thin coordinator is
+[`scripts/operational_reconcile.py`](scripts/operational_reconcile.py); the policies are
+[scientific-communication-policy.md](references/scientific-communication-policy.md) and
+[operational-autonomy-policy.md](references/operational-autonomy-policy.md).
+
 **Who triggers what:** the event listener, dispatcher and any background loop belong to the
 caller — the existing Scheduler, the runtime, or a platform hook. This skill ships an executable,
 idempotent trigger/record interface (`trigger`, `record`, `cognition/recovery-log.jsonl`) with
@@ -478,6 +492,7 @@ fixtures cannot substitute for one. See the
 | [example-d-narrative.md](examples/example-d-narrative.md) | Claim-first narrative selection |
 | [example-followup-review.md](examples/example-followup-review.md) | Continuing an existing review |
 | [example-writing-tier.md](examples/example-writing-tier.md) | Controlled-language writing tiers |
+| [scientific-reporting.md](examples/scientific-reporting.md) | Science-first X88–X90 reports, before/after operations leakage, method depth and audit expansion |
 | [Rhetorical realization](examples/narrative-realization/README.md) | Frozen sources, four expression profiles, recovery probes and fragility checks |
 | [Evidence outcomes](examples/evidence-outcome/README.md) | Positive, negative, invalid, pivot and mixed state transitions |
 | [Structural equivalence fixtures](examples/structural-equivalence/) | Near-neighbor audits and structural deltas |

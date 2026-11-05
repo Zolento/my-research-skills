@@ -49,11 +49,17 @@
 - 允许：
   - 调用既有阶段与脚本
   - 在 PEIG/AALG 授权内执行实验
+  - 自动执行 A 类例行维护：认知投影、STATUS 投影、索引与不改变科学事实的同步
 - 禁止：
   - 绕过 R8/R9.O/R10 的证据门禁
   - 自行改写 contract/锚点
   - 刷新 AALG 诊断预算
+  - 把进程终止、过期 telemetry 或未验证日志当作科学 outcome
+  - 因例行维护向用户反复请求批准
 - 共同硬边界见 `shared-contract.md`：canonical state 是唯一科学事实、只读请求不得触发执行、工程故障不得写成否证、AALG/PEIG/容量与公平对照优先于 Preset、不得自行授权 GPU 或发布。
+- 操作分类与汇报顺序见
+  [operational-autonomy-policy.md](../references/operational-autonomy-policy.md) 与
+  [scientific-communication-policy.md](../references/scientific-communication-policy.md)。
 
 ## 5. 复用的阶段、脚本与检查器
 
@@ -63,6 +69,7 @@
   - `scripts/prediction_compare.py`
   - `scripts/strategy_memory.py`
   - `scripts/state_check.py`
+  - `scripts/operational_reconcile.py`
   - `scripts/execution_gate.py`
   - `scripts/experiment_execute.py`
   - `scripts/evidence_outcome.py`
@@ -81,6 +88,7 @@
 **提供版执行协议（逐字）：**
 
 1. 恢复项目锚点、当前路线、State、Scheduler、Cognitive Memory、证据和在途实验；校验 Skill 版本及预算，确认未完成动作是否已被执行。
+   **先做 operational reconciliation：** A 类投影按需刷新；scheduler / monitor 过期则不得使用；终态实验检查 outcome 三件套是否齐备。
 2. 调用现有 Meta-Controller 选择合法动作；优先能够改变科学认识、产生区分性预测或形成方法干预的动作，不以填满日志为目标。
 3. 对机制假设构造适用条件、竞争解释、可观测预测和便宜的判别干预；允许清楚标注的探索性假设，不可事后伪造预注册。
 4. 执行前经过 R8、容量/强度/优化条件/可识别性、公平比较及 GPU 授权检查；执行进程用已存在的运行 ID 与结果记录防重。
@@ -91,6 +99,8 @@
 
 | # | 步骤 | 命令 |
 |---|---|---|
+| 0 | Reconcile | `python3 scripts/operational_reconcile.py --state <state>` |
+| 0a | Reconcile（已授权写入） | `python3 scripts/operational_reconcile.py --state <state> --apply` |
 | 1 | Recall | `python3 scripts/cognition.py recall --state <state>` |
 | 2 | Understand | `python3 scripts/state_check.py <state> --quiet` |
 | 3 | Discover | `python3 scripts/strategy_memory.py recommend --state <state>` |
@@ -109,6 +119,13 @@
 
 每轮简要记录有效证据、新预测、模型修订、下一次决策、实际派遣、state_version、预算与停止原因；没有 Insight 就报告没有。
 
+**面向用户的默认形态：** 按
+[scientific-communication-policy.md](../references/scientific-communication-policy.md)
+输出 `Problem / Insight / Method / Evidence / Decision`。先写科学结论与下一步决定；
+运行状态只在影响进度、成本或科学有效性时用一行说明；PID、GPU UUID、长路径与内部
+版本号默认不出现。用户显式要求审计 / 调试 / 完整记录时才展开。
+**没有 Insight 就写 `none`；没有新证据就写 `none`。**
+
 - 机器可读字段：
   - `loop_state`
   - `next_action`
@@ -117,19 +134,24 @@
   - `scientific_delta` / `decision_delta` / `policy_delta`（`policy_delta` 必须带评价等级）
   - `changed_decision`
   - `hold_reason`
+  - `operations`：A/B/C 分类、投影刷新结果、scheduler 新鲜度、outcome 条件检测
+  - `operational_holds`：结构化的维护 / 证据 / telemetry 阻塞原因
+  - `hold_counts` / `outcome_counts`：按原因与 outcome 状态计数，避免用户报告逐条倾倒
   - 统一字段：`preset_id` / `status` / `entry` / `execution_scope` / `protocol` / `reused` / `observed` / `decision` / `steps` / `writes` / `changed_decision` / `next_action` / `canonical_untouched`。
 
 ## 8. 状态写回
 
 - 允许写入：
-  - research-state.json（只经既有 R 阶段与门禁）
+  - research-state.json（只经既有 R 阶段与门禁；合法的 outcome 事务可自动提交）
   - cognition/ 投影
+  - `routes/<R>/STATUS.md`（由 state 重新渲染，幂等）
   - 执行账本
   - `decision-trajectory.jsonl`（**仅 apply 路径**：把本次实际派遣写入决策轨迹）
   - `scheduler.json`（**仅 apply 路径**：把策略决策追加到既有 `strategy_decisions[]` 遥测）
   - `source-integrity.jsonl`（运行前后的源码完整性审计事件）
 - canonical `research-state.json`：只经既有 R 阶段与门禁写。
 - 恢复动作记录到 `cognition/recovery-log.jsonl`；策略决策记录到 `scheduler.strategy_decisions[]`（皆为控制平面/遥测，不是科学事实）。
+- 例行维护失败时保留 `hold_reason` 与真实阻塞信息，不得宣称已同步。
 
 ## 9. 停止、失败与恢复
 
@@ -142,5 +164,9 @@
   - 证据冲突未解
   - 需要人类裁决
   - 连续无决策变化
+  - `stale_scheduler`：scheduler 与 canonical `state_version` 不一致
+  - `outcome_transaction_missing` / `outcome_transaction_stale`：结果存在但无合法事务
+  - `projection_refresh_failed` / `status_render_failed`：维护失败，状态未同步
+  - `execution_stopped_not_completion`：进程中止，不得写科学完成
 - 失败处理：无法继续时 `HOLD`（退出码 4）并说明 `hold_reason`；不重复检查、不放宽门禁。
 - 恢复条件：状态变化后可再次尝试；同一指纹超过上限即交人裁决。

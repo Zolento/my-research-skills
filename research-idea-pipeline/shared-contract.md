@@ -1,6 +1,6 @@
 # CIE Preset Shared Contract（所有 Preset 共同适用）
 
-> 这是加载时的共同契约，不是新的 R 阶段、Research State 或 Scheduler。加载一个预设时，先读取当前安装版 `SKILL.md`、项目 `AGENTS.md` / 适用 `CLAUDE.md`，再加载本文件与选中的单个 Preset；需要时按现有 references 补充。不得一次注入所有预设。
+> 这是加载时的共同契约，不是新的 R 阶段、Research State 或 Scheduler。加载一个预设时，先读取当前实际加载版本的 `SKILL.md`、项目 `AGENTS.md` / 适用 `CLAUDE.md`，再加载本文件与选中的单个 Preset；需要时按现有 references 补充。不得一次注入所有预设。
 
 ## 权威与权限
 
@@ -11,10 +11,21 @@
 5. 先判断意图是否只读/建议/执行；只读请求不能触发实验或科学状态写入。不可自行授权 GPU、修改主锚点、推送、合并、发布或执行破坏性操作。
 6. 每次科研动作之前从磁盘恢复相关 State、Scheduler、Cognitive Memory 与尚未完成的执行检查点；重要更新后核验、持久化并保证可恢复，不依赖聊天历史。
 7. 如本环境没有自动事件监听器、运行时执行器或 Dispatcher，不能假装 Preset 已自动触发/动作已派遣。明确输出 `recommendation_only` / `blocked` 以及缺口。
+8. 例行维护（认知投影、STATUS、索引与不改变科学事实的同步）属于 A 类，按
+   [references/operational-autonomy-policy.md](references/operational-autonomy-policy.md)
+   自动执行，**不向用户询问是否维护**。outcome / claim / assurance / failure / decision
+   属于 B 类，必须过既有门禁；改主锚点、破预算、改冻结协议属于 C 类，仍只由用户授权。
+
+启用 DSH Research Mesh 时，额外遵循 [project-layout.md 的 worktree 契约](references/project-layout.md#001-dsh-research-mesh-团队-worktree-模式)；Preset 不获得 canonical state 写入或资源扩展权限。
 
 ## 标准执行与回报
 
-- 开始：报告 `preset_id`、入口、路线、state_version、意图与执行边界，核验关键先决条件。
-- 过程：使用已有 R 阶段和工具完成本 Preset 所定义的工作；任何失败、证据与权限冲突均保留原始来源和范围。
-- 结束：给出 `action_taken`、`scientific_delta`、`decision_delta`、`state_writeback`、`next_action`、`stop_reason`；无变化应如实写 `none`，不得包装为 Insight。
+- 开始：内部读取 `preset_id`、入口、路线、`state_version`、意图与执行边界，核验关键先决条件。
+  **对用户不必先播报这些元数据**；只有影响判断时说明。
+- 过程：使用已有 R 阶段和工具完成本 Preset 所定义的工作；任何失败、证据与权限冲突均保留原始来源和范围。A 类维护先做完再汇报。
+- 结束：机器字段保留 `action_taken`、`scientific_delta`、`decision_delta`、`state_writeback`、
+  `next_action`、`stop_reason`；**面向用户的文字按
+  [references/scientific-communication-policy.md](references/scientific-communication-policy.md)
+  组织**：科学结论与下一步决定在前，操作细节只在影响进度、成本或有效性时出现。
+  无变化应如实写 `none`，不得包装为 Insight。
 - 派生记忆写回前先确认源版本；若 State 变化，按现有授权更新 canonical 再重建认知投影。只有实际拥有的 API 才能调用，不得虚构工具或状态字段。

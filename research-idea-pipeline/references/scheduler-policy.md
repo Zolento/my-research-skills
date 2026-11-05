@@ -218,7 +218,7 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
 
 ---
 
-## 6. 边界（不得越权，三条硬规则）
+## 6. 边界（不得越权，四条硬规则）
 
 1. **只排序，不改变标准。** scheduler **不得**改动角色库、评分维度、门禁规则（`G1—G5`、
    `V1`—`V24`）或派遣方式（§3.1）。
@@ -226,6 +226,15 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
    落盘一律由该阶段按自己的读写契约执行（`research-state-policy.md` §5）。
 3. **telemetry 不得被当作科学证据。** `scheduler.json` 里的任何统计
    **不得**被 `evidence[]` 引用、**不得**进入叙事。
+4. **过期 telemetry 不得驱动当前决策。** `scheduler.state_version` 与 canonical
+   `state_version` 不一致时，其 `next_actions`、监控记录与 EIG 记录只能作为历史；
+   Loop 必须 `HOLD`（`stale_scheduler`）并按当前 state 重新评估。
+   **不得只改 `state_version` 假装刷新。**
+
+**维护分类（A 类 vs B 类）：** A 类只读取并检查 freshness、归档旧 telemetry、
+重建派生投影，不改变 `next_actions` 的科学内容。B 类重新评估 `next_actions`、
+写入 `eig_calibration` 与 `strategy_decisions[]`，必须基于当前 state 与合法证据。
+进程终止、旧监控记录与旧 PID 既不构成 A 类同步内容，也不得写成 B 类 outcome。
 
 > **并且：`eig` 是估计值，不是事实。** 每个实验做完后必须把估计与
 > **实际信息增益**对照（Wave 5 spec §5 的 P1-10），否则 `EIG` 只是另一个
