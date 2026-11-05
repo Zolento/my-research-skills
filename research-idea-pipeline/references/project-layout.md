@@ -36,6 +36,32 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 ---
 
+## 0.0.1 DSH Research Mesh 团队 worktree 模式
+
+**协作契约：** `dsh-research-mesh/mesh-collaboration@1`。
+
+当项目由 DSH Research Mesh 以团队方式运行时，遵循下面的补充约定；它不改变
+DI-1—DI-8，也不产生第二份 canonical 事实。
+
+- **canonical checkout 仍只有一个**：单开会话和普通 RSI 会话在日常项目根目录工作。
+- Mesh 的每个 Research Group 使用仓库外的 Git worktree，分支为 `mesh/<group>`；
+  worktree 是临时检出，不是 route 副本，不形成第二份 implementation。
+- Mesh 的 controlDir/worktreesDir 必须在仓库之外，不得提交进 Git，也不得污染
+  canonical 的 `git status`。
+- worktree 内的 agent 只读项目根的
+  `.research-idea-pipeline/routes/<R>/research-state.json`，不得在 worktree 内
+  另造同名 state，也不得把 worktree state 当成 canonical。
+- 建组前先提交或 stash canonical 的未提交改动；worktree 从 `HEAD` 创建。
+- 单开会话与 Mesh 组不得同时占用同一 GPU/实验；以 Mesh GPU lease 与 RSI
+  scheduler 为准。
+- 组结束后 review worktree 提交，再决定是否合并/摘回 canonical；不得删除失败
+  记录、预算或历史证据。
+
+若当前会话的 cwd 是一个 linked worktree，第一步仍是读取该项目的 `AGENTS.md`
+与 canonical Research State；不要把 worktree 当独立项目重新 Bootstrap。
+
+---
+
 ## 0.1 八条目录 invariant（**硬规则，冻结**）
 
 **这八条是本文件的最高硬规则。** 任何布局建议、模板、示例与本表冲突时，以本表为准。

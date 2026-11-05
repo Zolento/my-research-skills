@@ -723,3 +723,47 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 > 经验教训（本仓库实际发生过两次）：`sketch`/`taste` 与 `resume_decision`/`route_dir` 都曾
 > "有 API、有测试、文档已写"，但生产路径从未调用；随后又出现"有调用者但结果未影响决策"
 > （校准只进报告、`indeterminate` 被默认取第一个候选）。这就是本节存在的原因。
+
+## 23. DSH Research Mesh 统一协作契约
+
+<!-- [AI-gen] 2026-11-05 用户要求把 RSI skill、MoSA AGENTS 与 dsh-research-mesh 作为统一整体。 -->
+
+跨组件契约标识：`dsh-research-mesh/mesh-collaboration@1`。
+
+### 23.1 三处必须一致
+
+| 位置 | 职责 |
+|---|---|
+| `research-idea-pipeline/references/project-layout.md` §0.0.1 | worktree 是临时检出，不是 route/canonical 副本；canonical state 只读 |
+| `research-idea-pipeline/SKILL.md` §3.1.0 | 派遣前检查 canonical/worktree/GPU 冲突 |
+| 项目根 `AGENTS.md` §11 | 项目级固定路径、单开会话与 Mesh 并存规则 |
+| `dsh-research-mesh/docs/MESH-OPERATING-RULES.md` | 插件实际强制执行的配置/恢复行为 |
+
+四者不一致时，先停止群组创建，修复文档和插件行为后再继续；不得只改其中一处。
+
+### 23.2 不可违反的边界
+
+- canonical checkout 只有一个；Mesh worktree 是临时检出，不能成为第二份科学事实。
+- Mesh controlDir/worktreesDir 必须在仓库之外；不得提交进 Git。
+- worktree 只读项目根的 canonical `research-state.json`；不得另造/改写同名 state。
+- 建组前提交或 stash canonical 改动；worktree 从 HEAD 创建。
+- 单开会话与 Mesh 组不得并发占用同一 GPU/实验；以 GPU lease 和 RSI scheduler 为准。
+- 未经用户明确同意，不创建 Mesh group，不跑真实实验，不修改 canonical RSI state。
+- 不复制完整仓库（如 9.3GB MoSA）；用 Git branch/worktree 表达变体。
+
+### 23.3 变更闭环
+
+修改契约中的任一文件时，必须同时：
+
+1. 更新对应文档与版本/契约标识；
+2. 在 `dsh-research-mesh` 跑 `npm run typecheck`、`npm run test:all`；
+3. 在 skills-dev 跑 `python3 research-idea-pipeline/scripts/release_check.py`；
+4. 复核工作区的 `git diff`，确认没有把 `.dev/` 或临时产物带入安装副本；
+5. 安装副本与开发工作树分离；安装后重新跑 release_check。
+
+### 23.4 安装规则
+
+- 安装到 `~/.agents/skills/rsi-pipeline` 前，先从 `skills-dev` 导出干净副本，剔除
+  `.dev/`、`__pycache__`、临时文件；安装副本的 `SKILL.md` 才可改名/加 `[RSI dev]` 标识。
+- 仓库内的 `research-idea-pipeline/SKILL.md` 保持 `name: research-idea-pipeline`，不得为安装改名。
+- 安装前备份旧目录；安装后核对 `npx skills list -g` 或直接检查 frontmatter。
