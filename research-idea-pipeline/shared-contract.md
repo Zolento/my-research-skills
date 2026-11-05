@@ -1,6 +1,6 @@
 # CIE Preset Shared Contract（所有 Preset 共同适用）
 
-> 这是加载时的共同契约，不是新的 R 阶段、Research State 或 Scheduler。加载一个预设时，先读取当前安装版 `SKILL.md`、项目 `AGENTS.md` / 适用 `CLAUDE.md`，再加载本文件与选中的单个 Preset；需要时按现有 references 补充。不得一次注入所有预设。
+> 这是加载时的共同契约，不是新的 R 阶段、Research State 或 Scheduler。加载一个预设时，先读取当前实际加载版本的 `SKILL.md`、项目 `AGENTS.md` / 适用 `CLAUDE.md`，再加载本文件与选中的单个 Preset；需要时按现有 references 补充。不得一次注入所有预设。
 
 ## 权威与权限
 
@@ -15,6 +15,8 @@
    [references/operational-autonomy-policy.md](references/operational-autonomy-policy.md)
    自动执行，**不向用户询问是否维护**。outcome / claim / assurance / failure / decision
    属于 B 类，必须过既有门禁；改主锚点、破预算、改冻结协议属于 C 类，仍只由用户授权。
+
+启用 DSH Research Mesh 时，额外遵循 [project-layout.md 的 worktree 契约](references/project-layout.md#001-dsh-research-mesh-团队-worktree-模式)；Preset 不获得 canonical state 写入或资源扩展权限。
 
 ## 标准执行与回报
 

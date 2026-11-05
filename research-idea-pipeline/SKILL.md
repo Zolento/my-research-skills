@@ -1179,6 +1179,13 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 > ⚠️ **不得用「6 个子代理都同意」声称 reviewer consensus** —— 六个 reviewer **不是独立
 > 样本**（同一基础模型换 prompt，`corr ≫ 0`）。见 [scoring-policy.md](references/scoring-policy.md) §3。
 
+### 3.1.0 DSH Research Mesh worktree 模式
+
+已获用户授权的 Mesh 团队运行遵循 `dsh-research-mesh/mesh-collaboration@1`；派遣前读取
+[project-layout.md 的 Mesh 补充约定](references/project-layout.md#001-dsh-research-mesh-团队-worktree-模式)，核对 canonical 根、state 版本、group worktree、真实输出路径及资源授权。
+worker 不直接回写 canonical state；artifact/outcome 交 RSI 单写者按原门禁审核。
+已授权的团队不重复询问是否启用 Team；未授权时仍按 §3.1 处理。
+
 ### 3.1 派遣方式：Team 优先询问（强制）
 
 **每次准备派发子代理前，先判断当前环境是否具备 Team 能力**（能创建持久、可被寻址的

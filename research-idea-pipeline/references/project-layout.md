@@ -36,6 +36,21 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 ---
 
+## 0.0.1 DSH Research Mesh 团队 worktree 模式
+
+**协作契约：** `dsh-research-mesh/mesh-collaboration@1`。仅在用户已授权启用 Mesh 时适用；不自动建组、启动实验或扩大资源范围。
+
+- canonical checkout 是单开会话和 RSI 状态的项目根；每个 Mesh group 使用仓库外的 `mesh/<group>` Git worktree。controlDir/worktreesDir 均在仓库外，整仓项目显式配置 `sourceDir: .`。
+- worktree 是临时分支检出，不是 route 副本；从已核对的 commit 创建，默认基线为 HEAD。stash 不会把未提交代码带入 worktree，不擅自 stash 他人改动。
+- worker 显式读取 canonical 绝对路径 `.research-idea-pipeline/routes/<R>/research-state.json`，不写该状态。Git 自然检出的 tracked state 仅是基线快照，不另立权威，也不将其作为当前研究状态。
+- worker 只写分配的 worktree 与产物路径；协调者串行预留 route/XID，按 group/run 隔离输出。共享 store 软链接不提供写隔离，必须核对真实输出路径。
+- 共享索引与 canonical state 由指定 RSI 单写者维护；接收 worker 的 artifact/outcome 时核对基线 state_version，审核并通过原有门禁后回写。Mesh successor copy 不等于 canonical 已提交。
+- 同时核对 Mesh GPU lease、RSI scheduler 和实际进程；lease 不是系统锁，不假定两层调度已自动同步。单开与团队不得冲突占用同 GPU/实验。
+- review worktree 提交及产物后再决定合并/摘回；清理前保存证据，不重置失败、预算或历史记录。
+- 明确实际加载的 Skill 路径与版本；使用开发版时显式配置 `rsi.skillPath`，不能把默认发现的安装副本当作开发分支。
+
+linked worktree 不得作为新项目重新 Bootstrap。未启用 Mesh 时，本节不改变普通 RSI 流程；详细派遣入口见 [../SKILL.md](../SKILL.md) §3.1。
+
 ## 0.1 八条目录 invariant（**硬规则，冻结**）
 
 **这八条是本文件的最高硬规则。** 任何布局建议、模板、示例与本表冲突时，以本表为准。
@@ -701,10 +716,12 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 |---|---|---|---|
 | **交付物** | `routes/<R>/docs/`（扁平，**不分子目录**） | anchor / field-map / discovery / proposal / experiment-plan / result-analysis / narrative / review | 否（是路线资产） |
 | **中间产物** | `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 | 可（review 自带摘要） |
-| **机器状态** | `.research-idea-pipeline/routes/<R>/research-state.json` | **R1 常驻状态**（就地覆盖，不按阶段切分） | 可 |
+| **机器状态** | `.research-idea-pipeline/routes/<R>/research-state.json` | **R1 常驻状态**（合法回写，不按阶段切分） | 否；保留版本与历史 |
 | **实验注册** | `experiments/<R>/<XID>/` + `results/<R>/<XID>/` | 预注册、人可读摘要、指标（见 §6.3） | experiments 否 / results 视体积 |
 
 **所有文档产出按「交付物」列落盘；所有子代理原始件按「中间产物」列落盘。**
+
+canonical state、history、预注册及持久 provenance 不按缓存清理。可重建 cache/runtime 可按任务范围清理；体积较大的证据优先归档并保留索引和迁移记录，不以清理产物为由删除研究历史。
 
 ### 6.2 各阶段的产出与落盘路径
 
