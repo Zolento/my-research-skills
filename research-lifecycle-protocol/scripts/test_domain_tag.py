@@ -153,6 +153,16 @@ class TestClassification(unittest.TestCase):
 
     def test_new_evidence_breaks_the_repeat(self):
         self.harness.record_repeat("snr_limit", "10x vd 20-coil")
+        # T04 seed: a *resolvable, valid* evidence entry is real new support.
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("evidence", []).append(
+            {"id": "E9", "kind": "experiment", "scope": "10x VD", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X9（seed=1）", "verification_tier": "T2",
+             "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                            "since_state_version": 4}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
         declaration = self.harness.declaration("snr_limit", "10x vd 20-coil")
         declaration["evidence_refs"] = ["E7", "E9"]
         path = self.harness.route / "declaration.json"
@@ -164,35 +174,135 @@ class TestClassification(unittest.TestCase):
         self.assertEqual(verdict["tag_class"], "NOVEL_DECISION_RELEVANT_DIAGNOSIS")
         self.assertEqual(verdict["new_evidence_refs"], ["E9"])
 
+    def test_a_fresh_evidence_id_with_identical_content_is_not_novelty(self):
+        """T04：同一归因更换证据 ID、内容等价 → 不得视为研究进展。"""
+        self.harness.record_repeat("snr_limit", "10x vd 20-coil")
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        base = {"kind": "experiment", "scope": "10x VD", "supports": [],
+                "contradicts": [], "epistemic_status": "Observed",
+                "source_ref": "X9（seed=1）", "verification_tier": "T2",
+                "depends_on": [],
+                "validity": {"status": "valid", "reason": "已按预注册",
+                             "since_state_version": 4}}
+        state.setdefault("evidence", []).append({"id": "E9", **base})
+        state["evidence"].append({"id": "E10", **base})   # same content, new id
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
+        path = self.harness.route / "declaration.json"
+        first = self.harness.declaration("snr_limit", "10x vd 20-coil")
+        first["evidence_refs"] = ["E7", "E9"]
+        path.write_text(json.dumps(first, ensure_ascii=False), encoding="utf-8")
+        verdict1 = json.loads(run_guard("classify", "--state", self.harness.state_path,
+                                        "--declaration", path, "--record").stdout)
+        self.assertEqual(verdict1["tag_class"], "NOVEL_DECISION_RELEVANT_DIAGNOSIS")
+        second = self.harness.declaration("snr_limit", "10x vd 20-coil")
+        second["evidence_refs"] = ["E7", "E10"]          # fresh id, same content
+        path.write_text(json.dumps(second, ensure_ascii=False), encoding="utf-8")
+        verdict2 = json.loads(run_guard("classify", "--state", self.harness.state_path,
+                                        "--declaration", path).stdout)
+        self.assertEqual(verdict2["tag_class"], "REPEATED_ATTRIBUTION", str(verdict2))
+        self.assertTrue(any("不构成科研增量" in n for n in verdict2["notes"]))
+
     def test_operator_defect_is_never_suppressed_by_repetition(self):
+        """T05：真实算子失败（canonical failed 实验）→ VALIDITY_BLOCKER 优先于重复。"""
         verdict = self.harness.record_repeat("noise_level", "10x vd 20-coil")
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("experiments", []).append(
+            {"id": "X11", "status": "failed", "stage": "X2", "claim_targeted": [],
+             "parent": None, "preregistration": {"frozen_at_state_version": 4}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
         declaration = self.harness.declaration("noise_level", "10x vd 20-coil")
         declaration["validity_findings"] = ["adjoint consistency check failed on X11"]
+        declaration["validity_evidence_refs"] = ["X11"]
         path = self.harness.route / "declaration.json"
         path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
         proc = run_guard("classify", "--state", self.harness.state_path,
                          "--declaration", path)
         verdict = json.loads(proc.stdout)
         self.assertEqual(verdict["tag_class"], "VALIDITY_BLOCKER", str(verdict))
-        self.assertNotEqual(verdict["tag_class"], verdict and verdict["tag_class"] and
-                            "REPEATED_ATTRIBUTION")
+        self.assertIn("X11", verdict["reason"])
 
-    def test_physical_limit_requires_scope_and_is_not_auto_block(self):
+    def test_an_unproven_validity_risk_gets_a_safety_review_not_a_verified_defect(self):
+        """T05b：纯文本“可能存在算子错误”→ 安全审查，不得登记为已验证故障。"""
+        self.harness.record_repeat("noise_level", "10x vd 20-coil")
+        declaration = self.harness.declaration("noise_level", "10x vd 20-coil")
+        declaration["validity_findings"] = ["adjoint consistency check failed on X11"]
+        path = self.harness.route / "declaration.json"
+        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        verdict = json.loads(run_guard("classify", "--state", self.harness.state_path,
+                                       "--declaration", path).stdout)
+        self.assertEqual(verdict["tag_class"], "INSUFFICIENT_EVIDENCE", str(verdict))
+        self.assertTrue(verdict["review_required"])
+        self.assertEqual(verdict["safety"], "hold_pending_verification")
+
+    def test_physical_limit_requires_evidence_scope_and_limit_type(self):
+        """T01/T02：verified 标签本身不再决定结论；证据解析 + limit_type 决定。"""
         harness = self.harness
+        state = json.loads(harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("evidence", []).append(
+            {"id": "E9", "kind": "experiment", "scope": "20x VD", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X9 oracle power run", "verification_tier": "T2",
+             "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                            "since_state_version": 4}})
+        harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                      encoding="utf-8")
+        path = harness.route / "declaration.json"
         declaration = harness.declaration("undersampling_information", "10x vd 20-coil")
         declaration["physical_limit"] = {"verified": True, "scope": ">=20x，微血管直径 <1.5px"}
+        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        verdict = json.loads(run_guard("classify", "--state", harness.state_path,
+                                       "--declaration", path).stdout)
+        # T01: "verified": true without limit_type/sources must NOT self-certify.
+        self.assertEqual(verdict["tag_class"], "INSUFFICIENT_EVIDENCE", str(verdict))
+        self.assertTrue(verdict["review_required"])
+        declaration["physical_limit"] = {"verified": True,
+                                         "limit_type": "detection_power_limit",
+                                         "scope": ">=20x，微血管直径 <1.5px",
+                                         "source_refs": ["E9"]}
+        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        verdict = json.loads(run_guard("classify", "--state", harness.state_path,
+                                       "--declaration", path).stdout)
+        self.assertEqual(verdict["tag_class"], "PHYSICAL_LIMIT_WITH_SCOPE", str(verdict))
+        self.assertIn("条件性结论", verdict["reason"])
+        self.assertTrue(any("不得虚构可行改进" in note for note in verdict["notes"]))
+        # An unverified interpretation never self-upgrades.
+        declaration["physical_limit"] = {"verified": True, "limit_type":
+                                         "physical_interpretation",
+                                         "scope": ">=20x", "source_refs": ["E9"]}
+        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        verdict = json.loads(run_guard("classify", "--state", harness.state_path,
+                                       "--declaration", path).stdout)
+        self.assertEqual(verdict["tag_class"], "INSUFFICIENT_EVIDENCE", str(verdict))
+
+    def test_a_revoked_evidence_stops_backing_a_recorded_limit(self):
+        """T03：证据被撤销后，既有物理限制不得继续作为可靠结论。"""
+        harness = self.harness
+        state = {"state_version": 5, "evidence": [
+            {"id": "E9", "kind": "experiment", "scope": "20x VD", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X9 oracle power run", "verification_tier": "T2",
+             "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                            "since_state_version": 4}}]}
+        harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                      encoding="utf-8")
         path = harness.route / "declaration.json"
+        declaration = harness.declaration("undersampling_information", "10x vd 20-coil")
+        declaration["physical_limit"] = {"verified": True,
+                                         "limit_type": "detection_power_limit",
+                                         "scope": ">=20x", "source_refs": ["E9"]}
         path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
         verdict = json.loads(run_guard("classify", "--state", harness.state_path,
                                        "--declaration", path).stdout)
         self.assertEqual(verdict["tag_class"], "PHYSICAL_LIMIT_WITH_SCOPE")
-        self.assertTrue(any("不得虚构可行改进" in note for note in verdict["notes"]))
-        declaration["physical_limit"] = {"verified": True}
-        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        state["evidence"][0]["validity"]["status"] = "invalid"   # later revoked
+        harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                      encoding="utf-8")
         verdict = json.loads(run_guard("classify", "--state", harness.state_path,
                                        "--declaration", path).stdout)
-        self.assertTrue(verdict["review_required"])
-        self.assertEqual(verdict["tag_class"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(verdict["tag_class"], "INSUFFICIENT_EVIDENCE", str(verdict))
+        self.assertIn("不可用", verdict["reason"])
 
     def test_incomplete_declaration_is_insufficient_evidence(self):
         path = self.harness.route / "declaration.json"
@@ -204,6 +314,15 @@ class TestClassification(unittest.TestCase):
 
     def test_reworded_mechanism_is_not_a_new_fingerprint(self):
         """换了说法不等于新机制：指纹由结构决定，与自由文本无关。"""
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("evidence", []).append(
+            {"id": "E7", "kind": "experiment", "scope": "3D wave", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X7", "verification_tier": "T2", "depends_on": [],
+             "validity": {"status": "valid", "reason": "已按预注册",
+                          "since_state_version": 4}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
         first = self.harness.declaration("conditioning", "3d wave 20-coil slab")
         path = self.harness.route / "declaration.json"
         path.write_text(json.dumps(first, ensure_ascii=False), encoding="utf-8")
@@ -224,6 +343,27 @@ class TestClassification(unittest.TestCase):
                                        "--declaration", path).stdout)
         self.assertEqual(verdict["tag_class"], "REPEATED_ATTRIBUTION",
                          "same structure under different prose is still a repeat")
+
+    def test_a_declared_prediction_difference_keeps_novelty_honest(self):
+        """新证据 + 相同预测 → 记录判别力不足的提示，不得自动宣称机制推进。"""
+        self.harness.record_repeat("snr_limit", "10x vd 20-coil")
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("evidence", []).append(
+            {"id": "E9", "kind": "experiment", "scope": "10x VD", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X9（seed=1）", "verification_tier": "T2",
+             "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                            "since_state_version": 4}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
+        declaration = self.harness.declaration("snr_limit", "10x vd 20-coil")
+        declaration["evidence_refs"] = ["E7", "E9"]     # same predictions as history
+        path = self.harness.route / "declaration.json"
+        path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
+        verdict = json.loads(run_guard("classify", "--state", self.harness.state_path,
+                                       "--declaration", path).stdout)
+        self.assertEqual(verdict["tag_class"], "NOVEL_DECISION_RELEVANT_DIAGNOSIS")
+        self.assertTrue(any("预测与历史相同" in n for n in verdict["notes"]), str(verdict))
 
 
 class TestLoopBehaviour(unittest.TestCase):

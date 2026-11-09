@@ -26,7 +26,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.0.0"
+  version: "2.0.1"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline

@@ -39,7 +39,8 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
 **Current release: v2.0.0** — the Research Lifecycle Protocol rename plus the MRI
-reconstruction domain profile. Capability documentation below is version-free; historical
+reconstruction domain profile. The 2.0.1 line (this branch) hardens the domain
+evidence qualification and the TAG/MMS execution paths. Capability documentation below is version-free; historical
 iterations (v1.2.0—v2.3.3 under the former name) are recorded in [CHANGELOG.md](CHANGELOG.md)
 and the release notes live under [docs/releases/](docs/releases/).
 
