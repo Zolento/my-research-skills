@@ -617,7 +617,7 @@ def reconcile(state_path: pathlib.Path, *, apply: bool = False,
         target = ready[0]
         payloads = target.pop("_payloads", {})
         result = eo.apply(state, payloads["packet"], payloads["analysis"], payloads["audit"],
-                          timestamp=timestamp)
+                          timestamp=timestamp, state_path=state_path)
         if result.get("status") == "PASS":
             _atomic_write_json(state_path, result["state"])
             writes.append(_rel(state_path, route_dir))

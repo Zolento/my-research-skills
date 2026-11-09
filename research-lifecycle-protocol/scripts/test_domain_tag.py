@@ -44,12 +44,15 @@ def profile_config() -> dict:
         "gt": {"available": False, "usage": "none"},
         "ssl": {"type": "ssdu",
                 "split": {"input": "theta", "loss": "lambda",
-                          "held_out_validation": "omega_val"},
+                          "held_out_validation": "omega_val",
+                          "measurement_identity": {"fields": "subject/slice/volume/acquisition", "mask_sharing_allowed": True}},
                 "acs": {"usage": "frozen_protocol"}},
         "model_selection": {"protocol": "omega_val_only", "uses_gt": False},
         "frozen": {"components": ["wave operator", "z slab", "stage1 anchor"],
                    "forbidden_changes": ["采样协议"]},
         "metrics": {"primary": {"name": "nmse_global", "threshold": 0.02,
+                                "direction": "lower_is_better",
+                                "preregistration_ref": "X1",
                                 "frozen_before_results": True,
                                 "frozen_at_state_version": 0}},
         "resources": {"gpu_hours_budget": 12},
@@ -63,7 +66,22 @@ class LoopHarness:
         self.root = pathlib.Path(temp)
         self.route = self.root / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
         self.route.mkdir(parents=True, exist_ok=True)
-        self.state = eo.apply(*fixture("positive"), timestamp=TIMESTAMP)["state"]
+        # Real R8 sequence: bind the frozen metric contract into the preregistration
+        # BEFORE the outcome transaction exists, then re-derive the packet's experiment
+        # digest. Binding after an analysed transaction is illegal (immutable analysis).
+        state0, packet, analysis, audit = fixture("positive")
+        state0 = dp.bind_metric_contract(profile_config(), state0)
+        packet["experiment_digest"] = eo.digest(
+            [x for x in state0["experiments"] if x["id"] == "X1"][0])
+        # the analysis binds state/context/packet digests; re-derive after the binding
+        analysis["base_state_digest"] = eo.digest(state0)
+        analysis["context_digest"] = eo.digest(eo.validation_context(state0))
+        analysis["packet_digest"] = eo.digest(packet)
+        audit["analysis_digest"] = eo.digest(analysis)
+        audit["packet_digest"] = eo.digest(packet)
+        audit["state_digest"] = analysis["base_state_digest"]
+        self.state = eo.apply(state0, packet, analysis, audit,
+                              timestamp=TIMESTAMP)["state"]
         self.state_path = self.route / "research-state.json"
         self.write_state(self.state)
         self.declare_profile()
@@ -495,10 +513,19 @@ class TestLoopHandlerPersistence(unittest.TestCase):
         records, problems = dg.load_events(self.harness.route)
         self.assertEqual(problems, [])
         self.assertEqual(len(records), 3)
-        # The event file lives in the route control plane only; canonical state untouched.
+        # The event file lives in the route control plane only; canonical state untouched
+        # apart from the prereg metric-contract binding done at freeze time.
         self.assertTrue((self.harness.route / "domain" / "tag-events.jsonl").is_file())
-        self.assertEqual(self.harness.state,
-                         eo.apply(*fixture("positive"), timestamp=TIMESTAMP)["state"])
+        # The TAG event lives in the route control plane only: the canonical state file
+        # is byte-identical before and after the enforcement.
+        self.assertTrue((self.harness.route / "domain" / "tag-events.jsonl").is_file())
+        before = self.harness.state_path.read_bytes()
+        self.harness.write_state(self.harness.state)
+        self.assertEqual(self.harness.state_path.read_bytes(), before)
+        bound = self.harness.state["experiments"][0]["preregistration"].get(
+            "domain_metric_contract")
+        self.assertIsNotNone(bound, "the harness freezes the metric contract at R8")
+        self.assertIn("nmse_global", bound.get("metric_digests", {}))
 
     def test_guard_cli_check_validates_the_chain(self):
         self.harness.record_repeat("snr_limit", "10x vd 20-coil")

@@ -1957,8 +1957,9 @@ def _tag_loop_check(state: Dict[str, Any], action: Any, ctx: Dict[str, Any]) -> 
     if route_dir is None:
         return None
     try:
-        profile, report = dp.active_profile(ctx.get("state_path") or
-                                            Path(route_dir) / "research-state.json")
+        profile, report = dp.active_profile(
+            ctx.get("state_path") or Path(route_dir) / "research-state.json",
+            state=ctx.get("state"))
     except dp.rlp.AmbiguousStorageRoot as exc:
         return {"tag_class": "HOLD", "reason": f"存储根歧义：{exc}",
                 "fingerprint": None, "review_required": True, "notes": [], "hold": True,

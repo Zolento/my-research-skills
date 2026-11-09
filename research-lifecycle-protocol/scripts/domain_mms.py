@@ -300,16 +300,22 @@ def _selftest() -> int:
                         "undersampling": {"pattern": "vd"}, "noise": {"model": "gaussian"}},
         "gt": {"available": False, "usage": "none"},
         "ssl": {"type": "ssdu", "split": {"input": "theta", "loss": "lambda",
-                                          "held_out_validation": "omega_val"},
+                                          "held_out_validation": "omega_val",
+                                          "measurement_identity": {"fields": "subject/slice/volume/acquisition", "mask_sharing_allowed": True}},
                 "acs": {"usage": "frozen"}},
         "model_selection": {"protocol": "omega_val", "uses_gt": False},
         "frozen": {"components": ["backbone"], "forbidden_changes": []},
         "metrics": {"primary": {"name": "nmse", "threshold": 0.02,
+                                "direction": "lower_is_better",
+                                "preregistration_ref": "X1",
                                 "frozen_before_results": True,
                                 "frozen_at_state_version": 1}},
         "resources": {"gpu_hours_budget": 1},
     }
-    expect("profile 配置合法（供 MM 用）", not dp.validate(config, state={"state_version": 2}))
+    state2 = dp.bind_metric_contract(config, {"state_version": 2, "experiments": [
+        {"id": "X1", "status": "running", "parent": None, "stage": "X2",
+         "claim_targeted": [], "preregistration": {"frozen_at_state_version": 1}}]})
+    expect("profile 配置合法（供 MM 用）", not dp.validate(config, state=state2))
 
     good = {
         "_schema": CANDIDATE_SCHEMA, "direction": "prior_posterior_adaptation",
@@ -326,7 +332,8 @@ def _selftest() -> int:
         "anchor_alignment": "microvascular structure recovery (primary_anchor)",
         "mechanism_evidence": "",
     }
-    state = {"state_version": 2, "contract": {"primary_anchor": "structure recovery"}}
+    state = {"state_version": 2, "contract": {"primary_anchor": "structure recovery"},
+             "experiments": state2["experiments"]}
     expect("完整候选通过", not candidate_errors(good, profile_config=config, state=state),
            str(candidate_errors(good, profile_config=config, state=state)))
     bad = json.loads(json.dumps(good))

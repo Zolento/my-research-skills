@@ -161,7 +161,8 @@ def validation_context(state):
     return context
 
 
-def _validate(state, packet, analysis, audit=None, *, bind_state=True):
+def _validate(state, packet, analysis, audit=None, *, bind_state=True,
+              state_path=None):
     errors, unresolved = [], []
     experiment = index(state, 'experiments').get(packet.get('experiment_id'))
     if experiment is None:
@@ -373,17 +374,45 @@ def _validate(state, packet, analysis, audit=None, *, bind_state=True):
                 errors.append('invalid local semantic audit check')
             elif check['status'] == 'FAIL': errors.append(('UNSUPPORTED_FAILURE_ATTRIBUTION' if name == 'attributions_grounded' else name) + ': ' + check['reason'])
             elif check['status'] == 'UNKNOWN': unresolved.append(name + ': ' + check['reason'])
+    # Domain-profile validity checks (DP12–DP15 at the gate). They run after every
+    # core gate, can only *add* violations, and never relax one: a domain violation
+    # blocks the SUPPORTED confirmation while the raw packet and experiment records
+    # stay untouched on disk. Without a state path the check is reported as skipped —
+    # every production caller (CLI, operational_reconcile) supplies one.
+    domain_check = 'skipped:no_state_path'
+    if state_path is not None:
+        try:
+            import domain_profile as domain_profile_module
+            route_dir = domain_profile_module.pathlib.Path(state_path).parent
+            _profile_id, _report = None, None
+            report = domain_profile_module.load(
+                route_dir, domain_profile_module.PROFILE_IDS[0], state=state)
+            if report.active and not report.ok:
+                errors.append('domain/config-invalid: 已声明的领域配置非法：'
+                              + '；'.join(report.hard_messages()[:2]))
+                domain_check = 'failed:config-invalid'
+            elif report.active:
+                domain_problems = domain_profile_module.domain_outcome_errors(
+                    state, packet, analysis, report)
+                errors.extend(domain_problems)
+                domain_check = ('violations' if domain_problems else 'applied')
+            else:
+                domain_check = 'inactive'
+        except Exception as exc:  # pragma: no cover - a broken hook must fail closed
+            errors.append(f'domain/check-error: {type(exc).__name__}: {exc}')
+            domain_check = 'failed:exception'
     return {'status': 'FAIL' if errors else 'NEEDS_REVIEW' if unresolved else 'PASS', 'errors': errors, 'unresolved': unresolved,
-            'experiment_validity': validity, 'outcome': analysis['outcome']}
+            'experiment_validity': validity, 'outcome': analysis['outcome'],
+            'domain_check': domain_check}
 
 
-def validate(state, packet, analysis, audit=None):
+def validate(state, packet, analysis, audit=None, state_path=None):
     try:
         import state_check
         baseline = state_check.check_state(state)
         if baseline.shape or baseline.violations:
             return {'status': 'FAIL', 'errors': ['source Research State violates original shape/scientific gates'], 'unresolved': [], 'state_report': baseline.as_dict()}
-        return _validate(state, packet, analysis, audit)
+        return _validate(state, packet, analysis, audit, state_path=state_path)
     except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
         return {'status': 'FAIL', 'errors': ['invalid outcome artifact: ' + str(exc)], 'unresolved': []}
 
@@ -395,9 +424,9 @@ def _new_id(state, collection, prefix):
     return prefix + str(n)
 
 
-def _apply(state, packet, analysis, audit, timestamp=None):
+def _apply(state, packet, analysis, audit, timestamp=None, state_path=None):
     """R10/R11 transaction: validate, copy, mutate allowed scientific fields, check; never edit input."""
-    gate = validate(state, packet, analysis, audit)
+    gate = validate(state, packet, analysis, audit, state_path=state_path)
     if gate['status'] != 'PASS':
         return {'status': gate['status'], 'errors': gate['errors'], 'unresolved': gate['unresolved']}
     out = copy.deepcopy(state)
@@ -500,13 +529,14 @@ def _apply(state, packet, analysis, audit, timestamp=None):
                     'note': 'Historical adoption is incomplete. Finish source-grounded backlog analyses before accepting or using this state.'}
         return {'status': 'FAIL', 'errors': ['transaction violates Research State gates'], 'state_report': report.as_dict()}
     return {'status': 'PASS', 'state': out, 'state_delta': delta, 'decision_status': 'PENDING_ASSURANCE',
+            'domain_check': gate.get('domain_check', 'skipped:no_state_path'),
             'note': 'Recommendations do not authorize execution; run the post-update Assurance/decision gate.'}
 
 
-def apply(state, packet, analysis, audit, timestamp=None):
+def apply(state, packet, analysis, audit, timestamp=None, state_path=None):
     """Reject malformed transactions without mutating their source snapshot."""
     try:
-        return _apply(state, packet, analysis, audit, timestamp)
+        return _apply(state, packet, analysis, audit, timestamp, state_path=state_path)
     except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
         return {'status': 'FAIL', 'errors': ['invalid outcome transaction: ' + str(exc)]}
 
@@ -958,7 +988,9 @@ def main(argv=None):
                 execution_errors = experiment_execute.verify_result_execution(state, experiment_execute.Ledger(args.execution_ledger or args.state.parent / '.execution'))
                 if execution_errors: raise ValueError('; '.join(execution_errors))
             packet, analysis, audit = read(args.packet), read(args.analysis), read(args.audit)
-            result = validate(state, packet, analysis, audit) if args.command == 'validate' else apply(state, packet, analysis, audit)
+            result = (validate(state, packet, analysis, audit, state_path=args.state)
+                      if args.command == 'validate'
+                      else apply(state, packet, analysis, audit, state_path=args.state))
             if args.command == 'apply' and result['status'] == 'PASS':
                 if args.output.resolve() == args.state.resolve(): raise ValueError('write a new state copy; do not overwrite the source snapshot')
                 with args.output.open('x', encoding='utf-8') as output:
