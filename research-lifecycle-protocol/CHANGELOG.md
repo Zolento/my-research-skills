@@ -9,8 +9,8 @@
 ## 2.0.0 — 2026-11-10
 
 Research Lifecycle Protocol rename plus the MRI Reconstruction Domain Profile.
-Released on the `research-lifecycle-protocol/dev` branch; the tag is created only when
-this line merges to `main`. See `docs/releases/v2.0.0.md`.
+Merged into `main` on 2026-11-10 and tagged `research-lifecycle-protocol/v2.0.0`.
+See `docs/releases/v2.0.0.md`.
 
 ### Added
 - Domain profiles: optional `mri-reconstruction` profile under `domain-profiles/`
