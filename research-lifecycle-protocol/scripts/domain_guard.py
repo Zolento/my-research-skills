@@ -628,6 +628,7 @@ def classify(declaration: Declaration, records: Sequence[Dict[str, Any]],
 def event_from_classification(declaration: Declaration, verdict: Dict[str, Any],
                               source: str, *, state: Optional[Dict[str, Any]] = None
                               ) -> Dict[str, Any]:
+    limit = declaration.physical_limit if isinstance(declaration.physical_limit, dict) else None
     event = {"fingerprint": verdict["fingerprint"], "mechanism": declaration.mechanism,
              "scope": declaration.scope, "assumptions": declaration.assumptions,
              "evidence_refs": declaration.evidence_refs,
@@ -640,6 +641,9 @@ def event_from_classification(declaration: Declaration, verdict: Dict[str, Any],
              "tag_class": verdict["tag_class"],
              "review_required": verdict["review_required"],
              "source": source}
+    if limit is not None:
+        event["physical_limit"] = {"limit_type": limit.get("limit_type"),
+                                   "scope": limit.get("scope")}
     if state is not None:
         event["state_version"] = state.get("state_version")
         event["state_digest"] = cg.digest_of(state)
