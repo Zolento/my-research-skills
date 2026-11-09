@@ -1089,6 +1089,45 @@ def step_release_metadata() -> Tuple[bool, str]:
                   f'release notes and the metadata test suite')
 
 
+def step_domain_profiles() -> Tuple[bool, str]:
+    """Optional domain profiles: registry parity, config validator, TAG/MMS enforcement."""
+    import domain_profile as dp
+    import domain_guard as dg
+    import domain_mms as mms
+    problems = []
+    # Registry ids must have contract docs and the docs must reference the real modules.
+    for profile_id in dp.PROFILE_IDS:
+        doc = ROOT / 'domain-profiles' / profile_id / 'PROFILE.md'
+        if not doc.is_file():
+            problems.append(f'缺少 {profile_id} 的 PROFILE.md')
+            continue
+        text = doc.read_text(encoding='utf-8')
+        if 'scripts/domain_profile.py' not in text:
+            problems.append(f'{profile_id}/PROFILE.md 未引用 loader')
+        for sub in ('acquisition-contract.md', 'ssl-contract.md', 'evaluation-policy.md',
+                    'attribution-guard.md', 'mechanism-search.md'):
+            if not (ROOT / 'domain-profiles' / profile_id / sub).is_file():
+                problems.append(f'{profile_id} 缺少 {sub}')
+    # The loop must really consume the guard: a broken import or missing hook is a fail.
+    router_text = (ROOT / 'scripts' / 'preset_router.py').read_text(encoding='utf-8')
+    for needle in ('_tag_loop_check', 'loop_guard', 'transition_menu'):
+        if needle not in router_text:
+            problems.append(f'preset_router 缺少 TAG 消费点 {needle}')
+    # Validators stay honest: selftests must pass through the real CLIs.
+    for module in (dp, dg, mms):
+        name = module.__name__
+        try:
+            rc = module.main(['--selftest'])
+        except SystemExit as exc:
+            rc = exc.code
+        if rc != 0:
+            problems.append(f'{name} --selftest 失败（exit {rc}）')
+    if problems:
+        return False, '；'.join(problems)
+    return True, (f'{len(dp.PROFILE_IDS)} 个领域 profile（文档/校验/事件链/循环消费点齐备；'
+                  'DP/TG/MM selftests 通过）')
+
+
 STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),    ("state_check --selftest", step_selftest),
     ("模板自身通过校验", step_template),
@@ -1106,6 +1145,7 @@ STEPS = (
     ("历史回放（对抗 case/泄漏防护/消融/端到端 smoke）", step_discovery_replay),
     ("Skill-RSI（轨迹/策略生命周期/源码冻结/反事实/消融）", step_skill_rsi),
     ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
+    ("Domain Profiles（registry/契约文档/TAG 循环消费/DP·TG·MM selftests）", step_domain_profiles),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )
 

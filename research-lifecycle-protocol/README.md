@@ -491,6 +491,42 @@ improvement is **not verified** — no unseen real research A/B has been run, an
 fixtures cannot substitute for one. See the
 [Skill-RSI policy](references/skill-rsi-policy.md).
 
+## Domain profiles (optional)
+
+A project or route can declare a **domain profile** — currently
+`mri-reconstruction` — to add field-specific contracts on top of the same lifecycle:
+the physical forward model and frozen components, the self-supervision information
+boundary (`Ω = Θ ∪ Λ`, `Ω_val` for model selection), the evaluation policy with
+thresholds frozen before results, and two task variants (CT→MRI generative-prior
+adaptation, 3D Wave-TOF structure recovery). A profile is rules, never a second source
+of truth: evidence qualification and the R7/R8/R9.O/R10/R11 gates keep the final say,
+and an undeclared profile leaves RLP Core untouched.
+
+Two domain capabilities attack the stalling problem directly:
+
+- **Trivial Attribution Guard (TAG)** classifies an attribution into six classes and
+  withholds a queued diagnosis whose structural fingerprint was already classified as
+  `REPEATED_ATTRIBUTION` with no new evidence — while a `VALIDITY_BLOCKER` (a real
+  operator defect, leakage, measurement mismatch) is never suppressed, and an equivalence
+  that cannot be proven mechanically becomes a review judgement instead of a block.
+  Verdicts persist in `<route>/domain/tag-events.jsonl` (append-only hash chain).
+- **Mechanism-to-Method Search (MMS)** turns a stalled diagnosis into a method menu over
+  six exploration directions (no aggregate score) and a ten-question candidate contract
+  (equal-capacity control, falsification test, SSL-boundary compliance, anchor
+  alignment). Candidates enter the existing Insight-to-Method pipeline; nothing bypasses
+  the evidence and identifiability gates.
+
+```sh
+python3 scripts/domain_profile.py load --state <route>/research-state.json --profile mri-reconstruction
+python3 scripts/domain_guard.py classify --state <state> --declaration declaration.json --record
+python3 scripts/domain_mms.py menu --state <route>/research-state.json
+python3 scripts/domain_mms.py validate --candidate candidate.json --state <state>
+```
+
+The identity, protocol-namespace and storage-root compatibility boundary is described in
+[identity-and-compatibility.md](references/identity-and-compatibility.md) and enforced by
+[scripts/rlp_paths.py](scripts/rlp_paths.py).
+
 ## Examples
 
 | Example | What it demonstrates |

@@ -1941,6 +1941,57 @@ def _assurance_dependencies(state: Dict[str, Any], pending: Sequence[str]) -> Li
     return sorted(dependent)
 
 
+def _tag_loop_check(state: Dict[str, Any], action: Any, ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Run the optional domain Trivial Attribution Guard on the first queued action.
+
+    Active only when the route (or project) declares a domain profile config; a missing
+    or undecryptable declaration keeps plain RLP Core behaviour. A damaged TAG event
+    chain yields an explicit hold directive instead of silently disabling the guard.
+    """
+    try:
+        import domain_guard as dg
+        import domain_profile as dp
+    except ImportError:                                  # pragma: no cover - shipped module
+        return None
+    route_dir = ctx.get("route_dir")
+    if route_dir is None:
+        return None
+    try:
+        profile, report = dp.active_profile(ctx.get("state_path") or
+                                            Path(route_dir) / "research-state.json")
+    except dp.rlp.AmbiguousStorageRoot as exc:
+        return {"tag_class": "HOLD", "reason": f"存储根歧义：{exc}",
+                "fingerprint": None, "review_required": True, "notes": [], "hold": True,
+                "hold_reason": "tag_ambiguous_root"}
+    if profile and not report.ok:
+        # A declared-but-invalid domain config is fail-closed (same rule as
+        # domain_profile.py check): a domain contract that cannot be parsed must not
+        # silently degrade to "no domain rules".
+        return {"tag_class": "HOLD",
+                "reason": "已声明的领域配置非法：" + "; ".join(report.hard_messages()[:2]),
+                "fingerprint": None, "review_required": True,
+                "notes": ["修复 domain/<profile>.json 后重跑"], "hold": True,
+                "hold_reason": "tag_invalid_profile"}
+    if not profile:
+        return None
+    return dg.loop_guard(state, action, route_dir)
+
+
+def _mms_menu(state: Dict[str, Any], ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The Mechanism-to-Method Search menu attached to a TAG transition (advisory)."""
+    try:
+        import domain_mms as mms
+    except ImportError:                                  # pragma: no cover - shipped module
+        return None
+    route_dir = ctx.get("route_dir")
+    if route_dir is None:
+        return None
+    try:
+        return mms.recommend_directions(state, route_dir)
+    except Exception:                                    # a menu must never break the loop
+        return None
+
+
 def _loop_step(ctx: Dict[str, Any], *,
                strategy_choice: Optional[str] = None) -> Dict[str, Any]:
     """Choose the next loop step from **per-experiment** todo and Assurance state.
@@ -2142,6 +2193,44 @@ def _loop_step(ctx: Dict[str, Any], *,
                 override["preempted_diagnosis"] = scheduler_first
                 override["preempt_reason"] = impact[0].message
                 return override
+        # Trivial Attribution Guard (domain profile, optional). A queued diagnosis whose
+        # attribution was already classified REPEATED_ATTRIBUTION — same structural
+        # fingerprint, no new evidence — is not dispatched again; the loop moves to the
+        # existing method-transition path instead. TAG never outranks the gates above
+        # (it runs here, after them), never bypasses PEIG/AALG and never writes state.
+        tag = _tag_loop_check(state, actions[0], ctx)
+        if tag and tag.get("tag_class") == "HOLD":
+            # A damaged TAG chain or an invalid domain config must not silently disable
+            # the guard, and must not be read as a verdict either: hold with a
+            # diagnosable reason.
+            return {"phase": "HOLD", "step": "HOLD",
+                    "action": f"领域守卫暂停：{tag['reason']}",
+                    "blocked": False, "hold": True,
+                    "hold_reason": tag.get("hold_reason") or "tag_domain_hold",
+                    "tag": tag, "pending_r10": []}
+        if tag and tag.get("tag_class") == "REPEATED_ATTRIBUTION":
+            override = i2m.loop_step(state, ctx.get("scheduler"), gap=ctx.get("anchor_gap"),
+                                     route_dir=ctx.get("route_dir"))
+            menu = _mms_menu(state, ctx)
+            if override and override.get("stage") == "synthesis":
+                override.setdefault("pending_r10", [])
+                override["assurance"] = guarantee
+                override["assurance_pending"] = pending
+                override["dispatched_action"] = None
+                override["preempted_diagnosis"] = scheduler_first
+                override["preempt_reason"] = tag["reason"]
+                override["tag"] = tag
+                override["tag"]["transition_menu"] = menu
+                return override
+            return {"phase": "R3—R6", "step": "Discover",
+                    "action": (f"动作 {scheduler_first} 的归因已被判定为重复；"
+                               "不得再派遣同类诊断。请从领域方法菜单选择一个方向，"
+                               "按 MMS 十问具体化后走既有 I2M 流程"),
+                    "blocked": False, "hold": False, "pending_r10": [],
+                    "assurance": guarantee, "assurance_pending": pending,
+                    "dispatched_action": None,
+                    "tag": {**tag, "transition_menu": menu},
+                    "next_actions": [item.get("action") for item in actions[:5]]}
         dispatched = scheduler_first
         overrode = False
         if strategy_choice and any(item.get("action") == strategy_choice for item in actions):
@@ -2444,6 +2533,21 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                 writes.append(cg.SCHEDULER_NAME)
             except OSError as exc:
                 write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
+        if write_failure is None and apply and (step.get("tag") or {}).get("tag_class") \
+                not in (None, "VALIDITY_BLOCKER"):
+            # Persist the TAG enforcement so the next round (and an audit) sees that the
+            # repeated diagnosis was withheld. Control-plane only: <route>/domain/.
+            try:
+                import domain_guard as tag_guard
+                event = dict(step["tag"])
+                event.pop("transition_menu", None)
+                event["event_kind"] = "loop_preempted"
+                event["preempted_action"] = step["tag"].get("preempted_action")
+                record = tag_guard.append_event(ctx["route_dir"], event)
+                writes.append(str(tag_guard.events_path(ctx["route_dir"]).relative_to(
+                    ctx["route_dir"])))
+            except Exception as exc:
+                write_failure = f"tag_event_unwritable: {type(exc).__name__}"
     if write_failure:
         status = "HOLD"
         policy_delta = {"status": "none", "level": None, "policy_id": None, "scope": None}
@@ -2469,7 +2573,8 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                                              "assurance": step.get("assurance"),
                                              "assurance_pending": step.get("assurance_pending"),
                                              "operations": operational,
-                                             "operational_holds": operational.get("holds") or []},
+                                             "operational_holds": operational.get("holds") or [],
+                                             "tag": step.get("tag")},
                    decision={"next_action": next_action,
                              "consumes_previous_decision": bool(guidance and not guidance["stale"]),
                              "step": step["step"],

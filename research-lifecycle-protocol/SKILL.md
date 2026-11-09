@@ -1168,6 +1168,11 @@ Research Experience → Policy Hypothesis → Replay Evaluation → Controlled A
 | **策略迁移脚本** | [scripts/policy_transfer.py](scripts/policy_transfer.py) | 只读的三层记忆分离视图、基于**声明结构**（不是领域关键词）的迁移门 `PT1`—`PT11`、过期经验与已否证机制的拒绝、无损记忆压缩检查 |
 | **源码冻结脚本** | [scripts/source_freeze.py](scripts/source_freeze.py) | 受保护源码清单 + 规范路径/符号链接核验 + 写入白名单 + 哈希链审计事件；运行期检测到源码被改即 `HOLD` 且**不自动修订**；如实声明残余风险（Prompt 禁令不是安全边界） |
 | **RSI 消融与开销** | [scripts/rsi_ablation.py](scripts/rsi_ablation.py) | 四臂冻结之上追加 `rsi_full` 与 leave-one-out；逐维比较、报告不可区分与 `NO_SUPPORT`；字节/延迟/额外调用开销；L1/L2/L3 分别如实申报 |
+| **领域协议（Domain Profiles）** | [domain-profiles/README.md](domain-profiles/README.md) | **可选**领域研究协议；显式启用（`<route|project>/domain/<profile>.json`），未声明 = RLP Core；Profile 是规则扩展，不是第二份事实，不新增 canonical 对象 |
+| **MRI 重建领域协议** | [domain-profiles/mri-reconstruction/PROFILE.md](domain-profiles/mri-reconstruction/PROFILE.md) | 自监督/欠采样 MRI：物理与信息边界（[acquisition](domain-profiles/mri-reconstruction/acquisition-contract.md) / [ssl](domain-profiles/mri-reconstruction/ssl-contract.md)）、评价与阈值冻结（[evaluation](domain-profiles/mri-reconstruction/evaluation-policy.md)）、任务变体（[CT→FM](domain-profiles/mri-reconstruction/variants/cross-domain-generative-prior.md) / [Wave-3D](domain-profiles/mri-reconstruction/variants/wave-3d-structure.md)）；规则 `DP1`—`DP14`（[scripts/domain_profile.py](scripts/domain_profile.py)） |
+| **平凡归因守卫（TAG）** | [domain-profiles/mri-reconstruction/attribution-guard.md](domain-profiles/mri-reconstruction/attribution-guard.md) | 六类归因判定（`VALIDITY_BLOCKER` / `NOVEL…` / `REPEATED_ATTRIBUTION` / `PHYSICAL_LIMIT_WITH_SCOPE` / `METHOD_TRANSITION_READY` / `INSUFFICIENT_EVIDENCE`）；结构化机制指纹（非关键词匹配）；规则 `TG1`—`TG9`；事件链 `<route>/domain/tag-events.jsonl`；**不绕过 PEIG/AALG、不阻断真实缺陷**（[scripts/domain_guard.py](scripts/domain_guard.py)） |
+| **机制到方法搜索（MMS）** | [domain-profiles/mri-reconstruction/mechanism-search.md](domain-profiles/mri-reconstruction/mechanism-search.md) | 六方向菜单（无聚合分）+ 方法候选十问契约 `MM1`—`MM8a`；经既有 I2M 进入 R8，不建平行流水线（[scripts/domain_mms.py](scripts/domain_mms.py)） |
+| **身份与兼容** | [references/identity-and-compatibility.md](references/identity-and-compatibility.md) | Skill 名称 / 协议命名空间 / 运行目录三层边界；双根 fail-closed；旧项目兼容检查与人工迁移步骤（[scripts/rlp_paths.py](scripts/rlp_paths.py)） |
 
 ---
 
