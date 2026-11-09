@@ -675,6 +675,93 @@ def action_fingerprint(action: Any) -> Optional[str]:
                          "scope": scope})
 
 
+#: How many times a diagnosis action may be queued without a structured attribution
+#: before the loop escalates from "annotate and ask" to a bounded hold (4.2: ask once,
+#: never nag forever, never hold ordinary exploration).
+ATTRIBUTION_REVIEW_ESCALATION = 2
+
+
+def diagnosis_action_id(action: Any) -> Optional[str]:
+    if not isinstance(action, dict):
+        return None
+    ident = str(action.get("action") or action.get("target") or "").strip()
+    return ident or None
+
+
+def missing_attribution_fields(action: Any) -> List[str]:
+    """The minimal attribution fields a queued diagnosis still has to declare."""
+    if not isinstance(action, dict):
+        return []
+    required = []
+    if not str(action.get("attribution_mechanism") or "").strip():
+        required.append("attribution_mechanism")
+    if not str(action.get("attribution_scope") or "").strip():
+        required.append("attribution_scope")
+    if not action.get("attribution_assumptions"):
+        required.append("attribution_assumptions")
+    return required
+
+
+def review_diagnosis_action(state: Dict[str, Any], action: Any,
+                            route_dir: Any) -> Optional[Dict[str, Any]]:
+    """4.1/4.2 — the structured review path for diagnosis actions without attribution.
+
+    A diagnosis queued without ``attribution_mechanism``/``attribution_scope``/
+    ``attribution_assumptions`` is NOT assumed novel and NOT silently dispatched past
+    the guard forever: the first occurrence is annotated with the minimal fields to
+    declare (the action keeps its normal priority — ordinary exploration is never
+    held for missing attribution fields); from the second occurrence on the same
+    action id escalates to a bounded hold. Non-diagnosis actions are out of scope.
+
+    Occurrences are recorded as idempotent events keyed by
+    (route, action, state_version), so session restarts and retried applies do not
+    inflate the count.
+    """
+    if not isinstance(state, dict) or not route_dir or not isinstance(action, dict):
+        return None
+    if str(action.get("type") or "") != "discriminating_experiment":
+        return None                       # non-diagnosis actions are not TAG's business
+    missing = missing_attribution_fields(action)
+    if not missing:
+        return None                       # fully declared → classify/loop_guard own it
+    ident = diagnosis_action_id(action) or "?"
+    route_name = cg.route_of(pathlib.Path(route_dir) / "research-state.json")
+    key = {"route": route_name, "action": ident, "state_version":
+           state.get("state_version"), "fingerprint": None,
+           "tag_class": "ATTRIBUTION_REVIEW", "event_kind": "attribution_missing"}
+    event_id = event_id_from(key)
+    records, problems = load_events(route_dir)
+    if problems:
+        return {"hold": True, "escalate": True, "hold_reason": "tag_chain_damaged",
+                "reason": "TAG 事件链损坏：" + "; ".join(problems[:2]),
+                "attribution_review": {"action": ident, "required_fields": missing,
+                                       "occurrences": None}}
+    prior = [r for r in records if r.get("event_id") == event_id]
+    occurrences = len(prior) + 1
+    if occurrences <= ATTRIBUTION_REVIEW_ESCALATION:
+        try:
+            append_event(route_dir, {
+                "fingerprint": None, "mechanism": None, "scope": None,
+                "assumptions": [], "evidence_refs": [], "tag_class":
+                    "ATTRIBUTION_REVIEW", "review_required": True,
+                "source": "loop", "event_kind": "attribution_missing",
+                "event_id": event_id, "action": ident,
+                "route": route_name, "state_version": state.get("state_version"),
+                "required_fields": missing},
+                idempotency_key=key)
+        except (ChainDamaged, OSError):
+            pass                          # the annotation is advisory; never crash the loop
+    escalate = occurrences >= ATTRIBUTION_REVIEW_ESCALATION
+    return {"hold": escalate, "escalate": escalate,
+            "hold_reason": "tag_attribution_missing" if escalate else None,
+            "reason": (f"诊断动作 {ident} 缺少结构化归因（{', '.join(missing)}）；"
+                       + ("同一动作已多次未声明：暂停该动作，补充归因声明或改派其他动作"
+                          if escalate else
+                          "本次照常派遣，但必须补充最小归因声明（否则重复归因无法被识别）")),
+            "attribution_review": {"action": ident, "required_fields": missing,
+                                   "occurrences": occurrences}}
+
+
 def loop_guard(state: Dict[str, Any], action: Any, route_dir: Any) -> Optional[Dict[str, Any]]:
     """Called by `preset_router._loop_step` for the scheduler's first queued action.
 

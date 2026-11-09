@@ -1941,6 +1941,33 @@ def _assurance_dependencies(state: Dict[str, Any], pending: Sequence[str]) -> Li
     return sorted(dependent)
 
 
+def _attribution_review_check(state: Dict[str, Any], action: Any,
+                              ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Run the optional structured-attribution review on the first queued action."""
+    try:
+        import domain_guard as dg
+        import domain_profile as dp
+    except ImportError:                                  # pragma: no cover - shipped module
+        return None
+    route_dir = ctx.get("route_dir")
+    if route_dir is None:
+        return None
+    try:
+        profile, report = dp.active_profile(
+            ctx.get("state_path") or Path(route_dir) / "research-state.json",
+            state=state)
+    except dp.rlp.AmbiguousStorageRoot:
+        return None
+    if not profile or not report.ok:
+        return None
+    try:
+        return dg.review_diagnosis_action(state, action, route_dir)
+    except Exception as exc:                             # a broken review must fail closed
+        return {"hold": True, "escalate": True,
+                "hold_reason": "tag_attribution_review_error",
+                "reason": f"归因审查异常：{type(exc).__name__}: {exc}"}
+
+
 def _tag_loop_check(state: Dict[str, Any], action: Any, ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Run the optional domain Trivial Attribution Guard on the first queued action.
 
@@ -2194,6 +2221,17 @@ def _loop_step(ctx: Dict[str, Any], *,
                 override["preempted_diagnosis"] = scheduler_first
                 override["preempt_reason"] = impact[0].message
                 return override
+        # Structured-attribution review (4.1/4.2): a diagnosis queued without the
+        # minimal attribution declaration is annotated once per state_version and
+        # escalates to a bounded hold from the second occurrence. Non-diagnosis
+        # actions are never touched; a fully declared action goes to TAG below.
+        attribution_review = _attribution_review_check(state, actions[0], ctx)
+        if attribution_review and attribution_review.get("hold"):
+            return {"phase": "HOLD", "step": "HOLD",
+                    "action": f"归因审查：{attribution_review['reason']}",
+                    "blocked": False, "hold": True,
+                    "hold_reason": attribution_review.get("hold_reason"),
+                    "attribution_review": attribution_review, "pending_r10": []}
         # Trivial Attribution Guard (domain profile, optional). A queued diagnosis whose
         # attribution was already classified REPEATED_ATTRIBUTION — same structural
         # fingerprint, no new evidence — is not dispatched again; the loop moves to the
@@ -2241,6 +2279,8 @@ def _loop_step(ctx: Dict[str, Any], *,
                 "action": f"按 Scheduler 选择下一项合法动作：{dispatched}",
                 "blocked": False, "hold": False, "pending_r10": [],
                 "assurance": guarantee, "assurance_pending": pending,
+                "attribution_review": (attribution_review or {}).get(
+                    "attribution_review"),
                 "dispatched_action": dispatched,
                 "scheduler_first_action": scheduler_first,
                 "strategy_overrode_scheduler": overrode,

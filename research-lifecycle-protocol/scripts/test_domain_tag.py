@@ -484,6 +484,80 @@ class TestLoopBehaviour(unittest.TestCase):
         self.assertEqual(step["hold_reason"], "tag_chain_damaged")
 
 
+class TestAttributionReview(unittest.TestCase):
+    """T10 — 未经结构化声明的诊断动作进入审查路径：第一次注解要求补全，
+    同一动作再次出现升级为有界 HOLD；非诊断动作永不被拦截。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.harness = LoopHarness(self.tmp.name)
+
+    def bare_diagnosis(self, action="X14"):
+        return {"action": action, "type": "discriminating_experiment",
+                "target": "U3", "eig": "high", "cost": "low"}
+
+    def test_t10_first_occurrence_annotates_and_dispatches(self):
+        action = self.bare_diagnosis()
+        step = pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        review = step.get("attribution_review")
+        self.assertIsNotNone(review)
+        self.assertFalse(step["hold"], step)
+        self.assertEqual(review["required_fields"],
+                         ["attribution_mechanism", "attribution_scope",
+                          "attribution_assumptions"])
+        self.assertEqual(review["occurrences"], 1)
+        self.assertEqual(step.get("dispatched_action"), "X14")
+
+    def test_t10_second_occurrence_escalates_to_a_bounded_hold(self):
+        self.harness.record_repeat("snr_limit", "10x vd 20-coil")  # seed events
+        action = self.bare_diagnosis()
+        first = pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        self.assertFalse(first["hold"])
+        second = pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        self.assertTrue(second["hold"], second.get("action"))
+        self.assertEqual(second["hold_reason"], "tag_attribution_missing")
+        self.assertIn("补充归因声明", second["action"])
+        # the escalation is idempotent per state_version: no event spam
+        records, problems = dg.load_events(self.harness.route)
+        self.assertEqual(problems, [])
+        reviews = [r for r in records if r.get("event_kind") == "attribution_missing"]
+        self.assertEqual(len(reviews), 1, records)
+
+    def test_t10_declared_actions_skip_the_review(self):
+        action = self.bare_diagnosis()
+        action.update({"attribution_mechanism": "noise_level",
+                       "attribution_scope": "10x vd 20-coil",
+                       "attribution_assumptions": ["高斯噪声"]})
+        step = pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        self.assertIsNone(step.get("attribution_review"))
+        self.assertEqual(step.get("dispatched_action"), "X14")
+
+    def test_t10_non_diagnosis_actions_are_never_reviewed(self):
+        action = {"action": "P4", "type": "remote_analogy", "target": "AS1",
+                  "eig": "unknown", "cost": "low"}
+        step = pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        self.assertIsNone(step.get("attribution_review"))
+        self.assertEqual(step.get("dispatched_action"), "P4")
+
+    def test_t10_inactive_profile_never_reviews(self):
+        (self.harness.route / "domain" / "mri-reconstruction.json").unlink()
+        step = pr._loop_step(self.harness.ctx(self.harness.scheduler(
+            self.bare_diagnosis())))
+        self.assertIsNone(step.get("attribution_review"))
+        self.assertEqual(step.get("dispatched_action"), "X14")
+
+    def test_t10_repeated_undeclared_repeats_are_event_idempotent(self):
+        """会话恢复/重试不会让同一轮的注解事件翻倍。"""
+        action = self.bare_diagnosis()
+        pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        pr._loop_step(self.harness.ctx(self.harness.scheduler(action)))
+        records, problems = dg.load_events(self.harness.route)
+        self.assertEqual(problems, [])
+        reviews = [r for r in records if r.get("event_kind") == "attribution_missing"]
+        self.assertEqual(len(reviews), 1, records)
+
+
 class TestLoopHandlerPersistence(unittest.TestCase):
 
     def setUp(self):
