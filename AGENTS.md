@@ -91,7 +91,7 @@ Agent 在开始修改前必须确认
 
 ```
 scientific-manuscript-reviser/narrative-style-dev
-research-idea-pipeline/failure-recovery-dev
+research-lifecycle-protocol/failure-recovery-dev
 plugin-name/api-refactor-dev
 ```
 
@@ -100,7 +100,7 @@ plugin-name/api-refactor-dev
 例如
 
 ```
-research-idea-pipeline/.dev/architecture.md
+research-lifecycle-protocol/.dev/architecture.md
 scientific-manuscript-reviser/.dev/review.md
 ```
 
@@ -656,7 +656,7 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 3. **只在这个安装副本里**修改 `SKILL.md` 的 frontmatter：
 
-   - 把 `name:` 改为带后缀的**合法 kebab-case** 名字（例如 `research-idea-pipeline-rsi`、
+   - 把 `name:` 改为带后缀的**合法 kebab-case** 名字（例如 `research-lifecycle-protocol-rsi`、
      `rsi-pipeline`）；**不要用大写**（`RSI-pipeline` 会被 provider 静默丢弃）；
    - 建议在 `description:` 前加一行可区分的说明（例如「[RSI 开发版] 来自分支 X」），
      否则模型难以在稳定版与变体之间正确选择。
@@ -734,8 +734,8 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 | 位置 | 职责 |
 |---|---|
-| `research-idea-pipeline/references/project-layout.md` §0.0.1 | worktree 是临时检出，不是 route/canonical 副本；canonical state 只读 |
-| `research-idea-pipeline/SKILL.md` §3.1.0 | 派遣前检查 canonical/worktree/GPU 冲突 |
+| `research-lifecycle-protocol/references/project-layout.md` §0.0.1 | worktree 是临时检出，不是 route/canonical 副本；canonical state 只读 |
+| `research-lifecycle-protocol/SKILL.md` §3.1.0 | 派遣前检查 canonical/worktree/GPU 冲突 |
 | 项目根 `AGENTS.md` §11 | 项目级固定路径、单开会话与 Mesh 并存规则 |
 | `dsh-research-mesh/docs/MESH-OPERATING-RULES.md` | 插件实际强制执行的配置/恢复行为 |
 
@@ -757,13 +757,16 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 1. 更新对应文档与版本/契约标识；
 2. 在 `dsh-research-mesh` 跑 `npm run typecheck`、`npm run test:all`；
-3. 在 skills-dev 跑 `python3 research-idea-pipeline/scripts/release_check.py`；
+3. 在 skills-dev 跑 `python3 research-lifecycle-protocol/scripts/release_check.py`；
 4. 复核工作区的 `git diff`，确认没有把 `.dev/` 或临时产物带入安装副本；
 5. 安装副本与开发工作树分离；安装后重新跑 release_check。
 
 ### 23.4 安装规则
 
-- 安装到 `~/.agents/skills/rsi-pipeline` 前，先从 `skills-dev` 导出干净副本，剔除
-  `.dev/`、`__pycache__`、临时文件；安装副本的 `SKILL.md` 才可改名/加 `[RSI dev]` 标识。
-- 仓库内的 `research-idea-pipeline/SKILL.md` 保持 `name: research-idea-pipeline`，不得为安装改名。
+- 正式安装名称是 `research-lifecycle-protocol`（原 `research-idea-pipeline`；旧名称的
+  安装副本必须移除，避免 catalog 同时出现两套身份）。安装前先从 `skills-dev` 导出干净
+  副本，剔除 `.dev/`、`__pycache__`、临时文件；安装副本的 `SKILL.md` 才可改名/加
+  `[dev]` 标识（例如 `research-lifecycle-protocol-dev`）。
+- 仓库内的 `research-lifecycle-protocol/SKILL.md` 保持 `name: research-lifecycle-protocol`，不得为安装改名。
 - 安装前备份旧目录；安装后核对 `npx skills list -g` 或直接检查 frontmatter。
+- 安装源不得指向会被清理的 `/tmp`；用持久目录或 `--copy`。
