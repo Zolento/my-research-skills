@@ -55,3 +55,14 @@
   （live + .bak 备份 + 大写 RSI-pipeline 死链接）已全部卸载，catalog 只剩新名称。
 - 已知限制：沙箱内 `~/.agents` 只读，变异测试（写真实文件再还原）无法在安装副本
   原位运行；用可写副本 + diff -r 字节一致替代验证。
+
+
+## 2026-11-10 v2.0.1 收尾
+
+- 六个提交（Phase A–E）：4a8f9a5 / 574a1ca / c8820f8 / 5aaed54 / 08427f1 / 2db2852。
+- 缺陷修复矩阵与链路图见 docs/releases/v2.0.1.md；replay 接口见
+  scripts/domain_replay.py + examples/domain/mri-reconstruction/。
+- L3：NOT YET VALIDATED。下一步 = 真实 CT-FM / Wave-TOF 路线按 pack schema 固化后盲化 A/B。
+- 遗留：TAG classify 的机制枚举仍是封闭集合（新机制登记 other_declared 待审）；
+  指标契约的 GT 来源验证只覆盖 config/protocol 类来源中的机器记录，
+  checkpoint 选择记录的深度验证需要 Execution Manifest 落地后的第二阶段。
