@@ -7,7 +7,7 @@
 
 | 目录 | 是什么 |
 |---|---|
-| [`research-idea-pipeline/`](research-idea-pipeline/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复；I2M 把机制洞见转成方法草案/设计契约，科研品味以四轴偏好（无评分）参与候选选择。 |
+| [`research-lifecycle-protocol/`](research-lifecycle-protocol/) | 科研搜索系统：R0—R14 双循环由 24 条硬规则强制，含证据资格与对抗审查；认知引擎维护机制/异常/竞争记忆，可跨会话重建；16 个 Preset 支持自然语言调用与自动恢复；I2M 把机制洞见转成方法草案/设计契约，科研品味以四轴偏好（无评分）参与候选选择。 |
 | [`scientific-manuscript-reviser/`](scientific-manuscript-reviser/) | 科学论文架构、审计与修改：提供 Coherence Audit、Compact/Full Blueprint、suggestion bank 与风格门禁；可独立安装。 |
 | [`academic-figure-draft-architect/`](academic-figure-draft-architect/) | 学术示意图字符草稿：读代码/论文/配置产出多份 Markdown 字符示意图，供 SVG/TikZ/Figma 绘制；强制四级证据与 train/inference/frozen 区分，不补造模块。 |
 
@@ -28,7 +28,7 @@
 npx skills add Zolento/my-research-skills -l
 
 # 逐个装（source 相同，便于统一更新）
-npx skills add Zolento/my-research-skills -g -s research-idea-pipeline -y
+npx skills add Zolento/my-research-skills -g -s research-lifecycle-protocol -y
 npx skills add Zolento/my-research-skills -g -s academic-figure-draft-architect -y
 npx skills add Zolento/my-research-skills -g -s scientific-manuscript-reviser -y
 
@@ -54,14 +54,16 @@ npx skills add "Zolento/my-research-skills#<分支>@<skill>" -g -y
 
 ## 版本与发布
 
-每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-idea-pipeline`
-当前为 **1.1.0**）。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
+每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-lifecycle-protocol`
+当前为 **2.0.0**）。2.0.0 = 正式更名（原 `research-idea-pipeline`）+ MRI 重建领域协议；
+机器协议 id 与旧项目运行目录保持兼容，见
+`research-lifecycle-protocol/references/identity-and-compatibility.md`。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
 的提交上；tag 消息里写清 merge commit、升级注意、验收读数与安装结果。
-1.0.0 = 首个正式稳定版：完整能力说明见 `research-idea-pipeline/docs/releases/v1.0.0.md`，
-历史迭代（v1.2.0—v2.3.3）见 `research-idea-pipeline/CHANGELOG.md`。
+1.0.0 = 首个正式稳定版：完整能力说明见 `research-lifecycle-protocol/docs/releases/v1.0.0.md`，
+历史迭代（v1.2.0—v2.3.3）见 `research-lifecycle-protocol/CHANGELOG.md`。
 
 ```bash
-git tag -l 'research-idea-pipeline/v*'          # 看已发布版本
+git tag -l 'research-lifecycle-protocol/v*'          # 看已发布版本
 git show research-idea-pipeline/v2.3.0          # 看该版本的发布说明
 ```
 
@@ -70,8 +72,8 @@ git show research-idea-pipeline/v2.3.0          # 看该版本的发布说明
 ```bash
 npx skills list -g                              # 看已装
 npx skills update -g -y                         # 全部更新
-npx skills update research-idea-pipeline -g -y  # 单独更新
-npx skills remove research-idea-pipeline -g -y  # 卸载
+npx skills update research-lifecycle-protocol -g -y  # 单独更新
+npx skills remove research-lifecycle-protocol -g -y  # 卸载
 ```
 
 改动请改本仓库，不要改 `~/.agents/skills/` 下的安装副本；新增子 skill 后要重新 `add`，
@@ -102,7 +104,7 @@ npx skills remove research-idea-pipeline -g -y  # 卸载
 my-research-skills/
 ├── AGENTS.md                          # 仓库开发规范：worktree / 分支 / 开发产物隔离
 ├── README.md                          # 本文件：子目录索引 + 安装与维护
-├── research-idea-pipeline/            # skill 1（自带 README.md、docs/、.gitignore）
+├── research-lifecycle-protocol/            # skill 1（自带 README.md、docs/、.gitignore）
 │   ├── SKILL.md                       # 入口（frontmatter: name / description / argument-hint）
 │   └── references/ scripts/ templates/ examples/
 ├── academic-figure-draft-architect/   # skill 2（自带 README.md）
@@ -112,4 +114,4 @@ my-research-skills/
     ├── SKILL.md                       # 入口；按模式渐进读取 references
     └── references/ scripts/ templates/ examples/ tests/
 ```
-1.1.0 = Skill-RSI 集成版（I2M 产物交接、Research Resume、科研选择质量、只读深度总结、启动期与账本完整性修复）：见 `research-idea-pipeline/docs/releases/v1.1.0.md`。
+1.1.0 = Skill-RSI 集成版（I2M 产物交接、Research Resume、科研选择质量、只读深度总结、启动期与账本完整性修复）：见 `research-lifecycle-protocol/docs/releases/v1.1.0.md`。
