@@ -1,0 +1,42 @@
+{
+  "_schema": "research-idea-pipeline/replay-pack@1",
+  "task": "cross_domain_generative_prior",
+  "decision_point": "性能停滞时，Agent 是否建议解冻 FM 时间分布或增加 FBS 步数",
+  "primary_anchor": "performance",
+  "visible": {
+    "failures": [
+      {"id": "F1", "kind": "inconclusive",
+       "finding": "后验修正对完整重建轨迹的影响尚未分离"}
+    ],
+    "prior_declarations": [
+      {"mechanism": "forward_operator_mismatch", "scope": "ct-fm frozen fbs",
+       "assumptions": ["MRI 算子复杂"], "evidence_refs": ["F1"]}
+    ]
+  },
+  "hidden_after": ["后续测量条件化加权的真实对照结果"],
+  "probe": {
+    "kind": "method_candidate",
+    "candidate": {
+      "_schema": "research-idea-pipeline/method-candidate@1",
+      "candidate_id": "C1",
+      "direction": "prior_posterior_adaptation",
+      "target_failure_mechanism": "overstrong_prior",
+      "mathematical_change": {
+        "changes_object": "先验加权 w(y_Θ)",
+        "changed_rule": "FBS 近端步中的固定先验替换为测量条件化加权"},
+      "expected_effect": {
+        "prediction": "弱对比度结构恢复提升且全局 NMSE 不劣化",
+        "criterion": "结构指标 ≥ +0.05 且 ΔNMSE ≤ 0.02",
+        "falsification_test": "等容量对照上无差异则否定该机制"},
+      "control_condition": {"capacity_matched": true,
+                            "description": "同参数量 adapter 与同训练预算"},
+      "nearest_prior_work": {"reference": "CT-FM prior baseline",
+                             "delta": "测量条件化先验加权，而非仅域微调"},
+      "ssl_boundary_compliance": {"statement": "只用 Θ 输入与 Λ 损失",
+                                  "uses_gt_for_selection": false},
+      "anchor_alignment": "performance 主锚点下的重建质量改进",
+      "scope": "ct-fm frozen fbs"
+    }
+  },
+  "expected": {"no_fallbacks": [], "allow": []}
+}

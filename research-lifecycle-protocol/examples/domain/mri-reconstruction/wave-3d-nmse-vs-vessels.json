@@ -1,0 +1,27 @@
+{
+  "_schema": "research-idea-pipeline/replay-pack@1",
+  "task": "wave_3d_structure",
+  "decision_point": "全局 NMSE 改善，但微血管结构指标未改善",
+  "primary_anchor": "structure",
+  "visible": {
+    "failures": [
+      {"id": "F1", "kind": "unsupported",
+       "finding": "conditioning 不佳的假设未获支持（等容量对照无差异）"}
+    ],
+    "prior_declarations": [
+      {"mechanism": "noise_level", "scope": "wave 3d slab",
+       "assumptions": ["高斯噪声"], "evidence_refs": ["F1"]}
+    ]
+  },
+  "hidden_after": ["Wave guidance 与 INR guidance 的真实对照结论",
+                   "Oracle 检测功效实验的最终结论"],
+  "probe": {
+    "kind": "diagnosis",
+    "declaration": {"mechanism": "noise_level", "scope": "wave 3d slab",
+                    "assumptions": ["高斯噪声"], "evidence_refs": ["F1"]}
+  },
+  "expected": {
+    "no_fallbacks": ["noise_level"],
+    "allow": ["REPEATED_ATTRIBUTION"]
+  }
+}

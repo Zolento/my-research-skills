@@ -53,15 +53,6 @@ Agent 生命周期、沙箱、工具执行与外部调度，两者保持职责�
 ---
 
 
-# Research Lifecycle Protocol（顶会研究创意流水线）
-
-一套面向 CVPR / ICML / NeurIPS / MICCAI 投稿的**科研搜索系统**，不是文档流水线。
-以 **Research State 为中心**，同时运行 **Discovery Loop**（扩大候选、保多样性）与
-**Assurance Loop**（对抗审核、修复、可复现），共 15 个 R 阶段（R0—R14）。
-
-**本 Skill 只做编排与串联。** 子代理的角色设定、评分维度、审查视角沿用统一角色库
-（见 [references/roles.md](references/roles.md)），不在各 R 阶段内重新定义。
-
 ---
 
 ## 0. 入口：**语义入口优先**
