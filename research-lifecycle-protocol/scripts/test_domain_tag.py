@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -504,6 +505,180 @@ class TestLoopHandlerPersistence(unittest.TestCase):
         proc = run_guard("check", "--route", self.harness.route)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("链完整", proc.stdout)
+
+
+def _mp_append_worker(args):
+    """Module-level so multiprocessing can pickle it (T06)."""
+    route, worker_id = args
+    appended = []
+    for i in range(4):
+        record = dg.append_event(route, {
+            "fingerprint": f"fp-{worker_id}-{i}", "mechanism": "noise_level",
+            "scope": "s", "assumptions": [], "evidence_refs": ["E1"],
+            "tag_class": "NOVEL_DECISION_RELEVANT_DIAGNOSIS",
+            "review_required": False, "source": f"w{worker_id}"})
+        appended.append(record["seq"])
+    return appended
+
+
+_MP_KEY = {"route": "A", "state_version": 7, "action": "X13",
+           "fingerprint": "fp-fixed", "tag_class": "REPEATED_ATTRIBUTION",
+           "event_kind": "loop_preempted"}
+
+
+def _mp_idempotent_worker(route):
+    record, status = dg.append_event_once(
+        route, {"fingerprint": "fp-fixed", "mechanism": "snr_limit",
+                "scope": "s", "assumptions": [], "evidence_refs": ["E1"],
+                "tag_class": "REPEATED_ATTRIBUTION", "review_required": False,
+                "source": "worker", "event_kind": "loop_preempted"},
+        idempotency_key=_MP_KEY)
+    return status
+
+
+class TestLoopApplyEndToEnd(unittest.TestCase):
+    """T07/T08 — enforcement events must flow through the real `run_preset(apply=True)`
+    entry, not through a direct append_event() call. Repeated applies must not append
+    twice (idempotency), and a damaged chain must produce a diagnosable HOLD."""
+
+    def harness_with_scheduler(self):
+        harness = LoopHarness(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(harness.root, ignore_errors=True))
+        harness.record_repeat("snr_limit", "10x vd 20-coil")
+        action = {"action": "X13", "type": "discriminating_experiment",
+                  "target": "U2", "eig": "high", "cost": "low",
+                  "attribution_mechanism": "snr_limit",
+                  "attribution_scope": "10x vd 20-coil",
+                  "attribution_assumptions": ["高斯噪声"]}
+        # The scheduler gate is source-bound: every done experiment needs an EIG
+        # calibration record computed from the real receipt, or the actions are not
+        # usable as current decisions (MISSING_EIG).
+        import execution_gate as eg
+        receipt = [x for x in harness.state["experiments"] if x["id"] == "X1"][0][
+            "outcome_analysis"]
+        delta, rating = eg.actual_eig(receipt)
+        scheduler = {"_schema": "research-idea-pipeline/scheduler@1",
+                     "state_version": harness.state["state_version"],
+                     "next_actions": [action],
+                     "eig_calibration": {"records": [
+                         {"experiment": "X1", "predicted_information_gain": "high",
+                          "observed_delta": delta, "actual_information_gain": rating}]}}
+        (harness.route / "scheduler.json").write_text(json.dumps(scheduler,
+                                                                 ensure_ascii=False),
+                                                      encoding="utf-8")
+        return harness, scheduler
+
+    @staticmethod
+    def _apply_until_tag(harness, max_rounds=4):
+        """apply#1 consolidates the stale projection; the TAG check runs on a later
+        apply once the loop reaches the scheduler-actions branch."""
+        import preset_router as pr
+        for _ in range(max_rounds):
+            payload, _, code = pr.run_preset("research-loop", harness.state_path,
+                                             apply=True)
+            current = payload["observed"]["current"]
+            tag = current.get("tag") or {}
+            if tag.get("tag_class") in ("REPEATED_ATTRIBUTION", "HOLD"):
+                return payload, tag, code
+        return payload, tag, code
+
+    def test_t08_apply_really_writes_the_enforcement_event(self):
+        import preset_router as pr
+        harness, _ = self.harness_with_scheduler()
+        payload, tag, code = self._apply_until_tag(harness)
+        self.assertEqual(code, pr.EXIT_OK, payload.get("hold_reason"))
+        self.assertEqual(tag.get("tag_class"), "REPEATED_ATTRIBUTION", tag)
+        self.assertIsNone(payload["observed"]["current"].get("dispatched_action"))
+        records, problems = dg.load_events(harness.route)
+        self.assertEqual(problems, [])
+        preempted = [r for r in records if r.get("event_kind") == "loop_preempted"]
+        self.assertEqual(len(preempted), 1, records)
+        self.assertEqual(preempted[0].get("preempted_action"), "X13")
+        self.assertIn("domain/tag-events.jsonl", payload["writes"])
+
+    def test_t07_a_repeated_apply_does_not_duplicate_the_event(self):
+        import preset_router as pr
+        harness, _ = self.harness_with_scheduler()
+        self._apply_until_tag(harness)
+        # a retry / rerun of the same logical preemption must not append again
+        for _ in range(2):
+            payload, _, code = pr.run_preset("research-loop", harness.state_path,
+                                             apply=True)
+            self.assertEqual(code, pr.EXIT_OK, payload.get("hold_reason"))
+        records, problems = dg.load_events(harness.route)
+        self.assertEqual(problems, [])
+        preempted = [r for r in records if r.get("event_kind") == "loop_preempted"]
+        self.assertEqual(len(preempted), 1,
+                         "the same logical preemption must map to one event")
+        self.assertIsNotNone(preempted[0].get("event_id"))
+        self.assertIsNotNone(preempted[0].get("state_digest"))
+
+    def test_a_damaged_chain_holds_the_applying_loop(self):
+        """T09：TAG 日志损坏 → 可诊断 HOLD，不静默跳过、不追加。"""
+        import preset_router as pr
+        harness, _ = self.harness_with_scheduler()
+        path = harness.route / "domain" / "tag-events.jsonl"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        tampered = json.loads(lines[0]); tampered["seq"] = 42
+        lines[0] = json.dumps(tampered, ensure_ascii=False, sort_keys=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        payload, tag, code = self._apply_until_tag(harness)
+        self.assertEqual(tag.get("tag_class"), "HOLD", tag)
+        self.assertEqual(payload["observed"]["current"].get("hold_reason"),
+                         "tag_chain_damaged")
+        # nothing was appended to the damaged chain
+        records, problems = dg.load_events(harness.route)
+        self.assertTrue(problems)
+
+    def test_recovery_is_explicit_and_never_automatic(self):
+        harness, _ = self.harness_with_scheduler()
+        path = harness.route / "domain" / "tag-events.jsonl"
+        path.write_text("not json\n", encoding="utf-8")
+        proc = run_guard("recover", "--route", str(harness.route))
+        self.assertEqual(proc.returncode, dg.EXIT_ENV, proc.stdout + proc.stderr)
+        self.assertIn("--archive", proc.stderr)
+        proc = run_guard("recover", "--route", str(harness.route), "--archive")
+        self.assertEqual(proc.returncode, dg.EXIT_OK, proc.stdout + proc.stderr)
+        archived = list((harness.route / "domain").glob("tag-events.jsonl.corrupt-*"))
+        self.assertEqual(len(archived), 1, "the damaged log must be archived, not deleted")
+        records, problems = dg.load_events(harness.route)
+        self.assertEqual((records, problems), ([], []))
+        # the fresh chain accepts appends with seq restarting at 1 for the new chain
+        event = dg.append_event(harness.route, {"fingerprint": "fp", "mechanism": "m",
+                                                "scope": "s", "assumptions": [],
+                                                "evidence_refs": ["E1"],
+                                                "tag_class": "NOVEL_DECISION_RELEVANT_DIAGNOSIS",
+                                                "review_required": False,
+                                                "source": "test"})
+        self.assertEqual(event["seq"], 1)
+
+    def test_multiprocess_appends_keep_the_chain_consistent(self):
+        """T06：多进程并发追加——seq 唯一、哈希链完整、无交叉损坏。"""
+        import multiprocessing as mp
+        harness = LoopHarness(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(harness.root, ignore_errors=True))
+
+        with mp.get_context("fork").Pool(4) as pool:
+            results = pool.map(_mp_append_worker, [(harness.route, w) for w in range(4)])
+        seqs = sorted(s for batch in results for s in batch)
+        self.assertEqual(seqs, list(range(1, 17)),
+                         "16 concurrent appends must produce unique seqs 1..16")
+        records, problems = dg.load_events(harness.route)
+        self.assertEqual(problems, [])
+        self.assertEqual(len(records), 16)
+        self.assertEqual([r["seq"] for r in records], list(range(1, 17)))
+
+    def test_multiprocess_idempotent_appends_collapse_to_one_event(self):
+        import multiprocessing as mp
+        harness = LoopHarness(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(harness.root, ignore_errors=True))
+        with mp.get_context("fork").Pool(6) as pool:
+            statuses = pool.map(_mp_idempotent_worker, [harness.route] * 6)
+        self.assertEqual(statuses.count("APPENDED"), 1, statuses)
+        self.assertEqual(statuses.count("DUPLICATE"), 5, statuses)
+        records, problems = dg.load_events(harness.route)
+        self.assertEqual(problems, [])
+        self.assertEqual(len(records), 1)
 
 
 class TestSelftest(unittest.TestCase):

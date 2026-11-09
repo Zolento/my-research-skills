@@ -2533,21 +2533,38 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                 writes.append(cg.SCHEDULER_NAME)
             except OSError as exc:
                 write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
-        if write_failure is None and apply and (step.get("tag") or {}).get("tag_class") \
-                not in (None, "VALIDITY_BLOCKER"):
-            # Persist the TAG enforcement so the next round (and an audit) sees that the
-            # repeated diagnosis was withheld. Control-plane only: <route>/domain/.
-            try:
-                import domain_guard as tag_guard
-                event = dict(step["tag"])
-                event.pop("transition_menu", None)
-                event["event_kind"] = "loop_preempted"
-                event["preempted_action"] = step["tag"].get("preempted_action")
-                record = tag_guard.append_event(ctx["route_dir"], event)
-                writes.append(str(tag_guard.events_path(ctx["route_dir"]).relative_to(
-                    ctx["route_dir"])))
-            except Exception as exc:
-                write_failure = f"tag_event_unwritable: {type(exc).__name__}"
+    if write_failure is None and apply and (step.get("tag") or {}).get("tag_class") \
+            not in (None, "VALIDITY_BLOCKER"):
+        # TAG enforcement transaction — separate from the dispatch transaction above
+        # (a preempted step has no dispatched_action, and must never borrow one).
+        # Persists that the repeated diagnosis was withheld; control-plane only
+        # (<route>/domain/). Idempotent: the same logical preemption (same state,
+        # action, fingerprint, verdict) maps to one event_id, so a retried apply
+        # returns DUPLICATE instead of appending a second copy.
+        try:
+            import domain_guard as tag_guard
+            tag = step["tag"]
+            event = {k: v for k, v in tag.items() if k != "transition_menu"}
+            event["event_kind"] = "loop_preempted"
+            event["preempted_action"] = tag.get("preempted_action")
+            event["route"] = cg.route_of(ctx["state_path"])
+            event["state_version"] = ctx["state"].get("state_version")
+            event["state_digest"] = cg.digest_of(ctx["state"])
+            key = {k: event.get(k) for k in
+                   ("route", "state_version", "state_digest", "preempted_action",
+                    "fingerprint", "tag_class", "event_kind")}
+            record, status = tag_guard.append_event_once(ctx["route_dir"], event,
+                                                         idempotency_key=key)
+            rel = str(tag_guard.events_path(ctx["route_dir"])
+                      .relative_to(ctx["route_dir"]))
+            if status == "APPENDED" and rel not in writes:
+                writes.append(rel)
+        except tag_guard.ChainDamaged as exc:
+            # A chain that went bad between the step decision and the writeback is
+            # a diagnosable failure, never a silent skip.
+            write_failure = f"tag_event_chain_damaged: {exc}"
+        except OSError as exc:
+            write_failure = f"tag_event_unwritable: {type(exc).__name__}: {exc}"
     if write_failure:
         status = "HOLD"
         policy_delta = {"status": "none", "level": None, "policy_id": None, "scope": None}

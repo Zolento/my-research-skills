@@ -40,6 +40,7 @@ import json
 import os
 import pathlib
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -191,10 +192,32 @@ def load_events(route_dir: Any) -> Tuple[List[Dict[str, Any]], List[str]]:
     return records, problems
 
 
-def append_event(route_dir: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Append one event under an exclusive lock, extending the hash chain."""
+def lock_path(route_dir: Any) -> pathlib.Path:
+    """A dedicated, stable lock file next to the event log.
+
+    Locking the log file itself would break whenever the log is rotated or recovered
+    (the lock would guard the wrong inode), so the lock lives in its own file.
+    """
+    return pathlib.Path(route_dir).expanduser() / EVENTS_DIRNAME / (EVENTS_NAME + ".lock")
+
+
+def event_id_from(payload: Dict[str, Any]) -> str:
+    """A stable idempotency id for one logical enforcement.
+
+    Binds the identity fields the caller supplies (route / state / action /
+    fingerprint / verdict / kind). The same logical operation retried after a lost
+    response maps to the same id and must not append twice; genuinely new evidence or
+    a new decision changes at least one field and gets a new id.
+    """
+    identity = {k: payload.get(k) for k in
+                ("route", "state_version", "state_digest", "action", "fingerprint",
+                 "tag_class", "event_kind") if payload.get(k) is not None}
+    return cg.digest_of(identity)
+
+
+def _append_locked(route_dir: pathlib.Path, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The append transaction. Caller must hold the lock."""
     path = events_path(route_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
     records, problems = load_events(route_dir)
     if problems:
         raise ChainDamaged("; ".join(problems[:3]))
@@ -205,12 +228,88 @@ def append_event(route_dir: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
     line = json.dumps(record, ensure_ascii=False, sort_keys=True)
     handle = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX)
         os.write(handle, (line + "\n").encode("utf-8"))
         os.fsync(handle)
     finally:
         os.close(handle)
     return record
+
+
+def append_event_once(route_dir: Any, payload: Dict[str, Any],
+                      idempotency_key: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
+    """Idempotent append. Returns (record, status) with status APPENDED or DUPLICATE."""
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = dict(payload)
+    body["event_id"] = event_id_from(idempotency_key)
+    lock_handle = os.open(str(lock_path(route)), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        records, problems = load_events(route)
+        if problems:
+            raise ChainDamaged("; ".join(problems[:3]))
+        for existing in records:
+            if existing.get("event_id") == body["event_id"]:
+                return existing, "DUPLICATE"
+        return _append_locked(route, body), "APPENDED"
+    finally:
+        fcntl.flock(lock_handle, fcntl.LOCK_UN)
+        os.close(lock_handle)
+
+
+def append_event(route_dir: Any, payload: Dict[str, Any],
+                 idempotency_key: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Append one event, extending the hash chain.
+
+    The whole transaction — read, validate, sequence, construct, append, fsync — runs
+    inside one exclusive critical section on the dedicated lock file, so concurrent
+    writers can never fork the chain. With ``idempotency_key`` the event id is derived
+    from the given identity fields; when an event with that id already exists the
+    existing record is returned unchanged and nothing is appended.
+
+    Raises ChainDamaged on a corrupt log. Recovery is explicit
+    (``main recover --route ... --archive``), never automatic.
+    """
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = dict(payload)
+    if idempotency_key:
+        body["event_id"] = event_id_from(idempotency_key)
+    lock = lock_path(route)
+    lock_handle = os.open(str(lock), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        if "event_id" in body:
+            records, problems = load_events(route)
+            if problems:
+                raise ChainDamaged("; ".join(problems[:3]))
+            for existing in records:
+                if existing.get("event_id") == body["event_id"]:
+                    return existing
+        return _append_locked(route, body)
+    finally:
+        fcntl.flock(lock_handle, fcntl.LOCK_UN)
+        os.close(lock_handle)
+
+
+def recover_log(route_dir: Any) -> Dict[str, Any]:
+    """Archive a damaged log and start a fresh chain. Explicit, auditable, never silent."""
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    _records, problems = load_events(route)
+    if not problems:
+        return {"status": "OK", "archived": None, "problems": []}
+    stamp = pathlib.Path(time.strftime("%Y%m%dT%H%M%S")).name if False else None
+    import time as _time
+    archive = path.with_name(path.name + f".corrupt-{_time.strftime('%Y%m%dT%H%M%S')}")
+    if path.is_file():
+        os.replace(path, archive)
+    lock = lock_path(route)
+    if lock.exists():
+        lock.unlink()
+    return {"status": "ARCHIVED", "archived": str(archive), "problems": problems[:5]}
 
 
 class ChainDamaged(RuntimeError):
@@ -735,6 +834,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                                                               required=True)
     sub.add_parser("check", help="validate the event chain").add_argument("--route",
                                                                          required=True)
+    rec = sub.add_parser("recover", help="archive a damaged chain and start fresh")
+    rec.add_argument("--route", required=True)
+    rec.add_argument("--archive", action="store_true",
+                     help="required confirmation: move the damaged log aside")
     args = parser.parse_args(argv)
     if args.selftest:
         return _selftest()
@@ -785,6 +888,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print(f"[FAIL] {item}", file=sys.stderr)
             return EXIT_HARD
         print(f"[ok] {events_path(args.route)} 链完整")
+        return EXIT_OK
+    if args.command == "recover":
+        route = pathlib.Path(args.route)
+        _, problems = load_events(route)
+        if not problems:
+            print(f"[ok] {events_path(route)} 链完整，无需恢复")
+            return EXIT_OK
+        if not args.archive:
+            for item in problems[:3]:
+                print(f"[FAIL] {item}", file=sys.stderr)
+            print("[env] 确认后加 --archive 才会归档损坏日志并重新开始链条；"
+                  "不会静默清空或重置序号", file=sys.stderr)
+            return EXIT_ENV
+        result = recover_log(route)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return EXIT_OK
     parser.error("需要子命令或 --selftest")
     return EXIT_ERROR
