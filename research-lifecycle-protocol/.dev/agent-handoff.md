@@ -43,3 +43,15 @@
    提交保留；`feat/zotero` 按任务要求保留。
 4. `domain_mms.recommend_directions` 的失败-机制映射基于 finding 文本中的受控 token；
    项目的 failure 记录应尽量把 `mechanism` 字段写成受控枚举，以提高菜单质量。
+
+## 2026-11-10 收尾（合并与安装）
+
+- main 已合并本分支：merge commit `dacfcd6`（`.dev/` 按约定未进 main，KEEP_BRANCH_ONLY）。
+- 已打 annotated tag `research-lifecycle-protocol/v2.0.0`（指向 dacfcd6）并推送 origin。
+- 合并前的重复段落（invocation-prompts.md Method-Driven/Resume/核心行为 ×2）已在
+  1ee83b0 修复，main 上为单份。
+- 正式安装：`~/.agents/skills/research-lifecycle-protocol/`（真实目录，v2.0.0，
+  release_check PASS 于可写副本；安装副本与发布树字节一致）。旧 `rsi-pipeline`
+  （live + .bak 备份 + 大写 RSI-pipeline 死链接）已全部卸载，catalog 只剩新名称。
+- 已知限制：沙箱内 `~/.agents` 只读，变异测试（写真实文件再还原）无法在安装副本
+  原位运行；用可写副本 + diff -r 字节一致替代验证。
