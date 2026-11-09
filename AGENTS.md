@@ -763,7 +763,10 @@ DSH 的 skill 扫描根与优先级（`@deepseek-ai/dsh-skill-filesystem`）：
 
 ### 23.4 安装规则
 
-- 安装到 `~/.agents/skills/rsi-pipeline` 前，先从 `skills-dev` 导出干净副本，剔除
-  `.dev/`、`__pycache__`、临时文件；安装副本的 `SKILL.md` 才可改名/加 `[RSI dev]` 标识。
+- 正式安装名称是 `research-lifecycle-protocol`（原 `research-idea-pipeline`；旧名称的
+  安装副本必须移除，避免 catalog 同时出现两套身份）。安装前先从 `skills-dev` 导出干净
+  副本，剔除 `.dev/`、`__pycache__`、临时文件；安装副本的 `SKILL.md` 才可改名/加
+  `[dev]` 标识（例如 `research-lifecycle-protocol-dev`）。
 - 仓库内的 `research-lifecycle-protocol/SKILL.md` 保持 `name: research-lifecycle-protocol`，不得为安装改名。
 - 安装前备份旧目录；安装后核对 `npx skills list -g` 或直接检查 frontmatter。
+- 安装源不得指向会被清理的 `/tmp`；用持久目录或 `--copy`。

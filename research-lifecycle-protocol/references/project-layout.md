@@ -961,6 +961,21 @@ X021  ⟷  experiments/A/X021-identifiability/
 
 `results/` 视体积决定，但**至少 `summary.md` / `summary.json` / `metrics.json` 应保留**。
 
+### 9.1 大型产物 store
+
+- 各服务器的大型产物默认持久化到 `/data/zhanglt/<项目名>_store/`（例如
+  `/data/zhanglt/MoSA_store/`），用于 checkpoints、results、archive_code、
+  Mesh artifact 等大文件；项目内可保留 `store` 软链接及 README。
+- `store` 不是 canonical Research State，也不是第二份科学事实。canonical state、
+  history、预注册和摘要仍按 §9 进入版本控制；不得因为产物外置而删除状态、失败记录、
+  预算或历史证据。
+- 本地向服务器同步只覆盖声明的代码、配置和脚本；排除产物与 store 内容，保护远程
+  dataset/store/result 软链接，不以本地入口替换或解引用复制其内容。
+- 迁移前核对引用与运行任务，保留旧路径映射；用户指定新位置后才迁移，不得只改文档
+  冒充搬迁完成。
+- Mesh 的共享 store 软链接不提供写隔离；每个 group/run 必须使用独立输出路径，
+  并在 artifact manifest 中记录真实路径与校验信息。
+
 > **DI-7 落地：** `cache` / `runtime` 与 durable research provenance 严格分离。
 > `.gitignore` 不得把 `routes/**`、`docs/**`、`research-state.json` 一起忽略掉。
 
