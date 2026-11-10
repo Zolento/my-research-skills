@@ -242,7 +242,12 @@ def plan(
     if not preset_id:
         context = (registry.get("entry_context") or {}).get(entry) or {}
         if not context:
-            problems.append(f"entry {entry} 既无预设也无 entry_context 声明")
+            # 该入口的上下文由**预设**决定；没有预设就是还没路由，不是「不需要读」。
+            available = [item["preset_id"] for item in registry.get("presets") or []
+                         if item.get("entry") == entry]
+            problems.append(
+                f"NEEDS_PRESET: entry {entry} 需要先选定一个预设"
+                + (f"（可选：{', '.join(sorted(available))}）" if available else ""))
         for rel in context.get("required") or []:
             rel = _resolve_domain_placeholder(rel, domain)
             path = root / rel
@@ -823,6 +828,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                        conditional_active=args.conditional or (), include_deep=args.deep)
         if payload.get("status") == "FAIL":
             print(payload.get("error"), file=sys.stderr)
+            return EXIT_ERROR
+        needs = [item for item in payload.get("problems") or []
+                 if item.startswith("NEEDS_PRESET")]
+        if needs:
+            print(needs[0].split(": ", 1)[1], file=sys.stderr)
             return EXIT_ERROR
         if args.command == "load":
             payload = execute(payload, root=root)
