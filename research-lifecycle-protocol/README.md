@@ -40,8 +40,8 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 
 **Current release: v2.0.0** — the Research Lifecycle Protocol rename plus the MRI
 reconstruction domain profile. The 2.0.1 line hardens domain evidence qualification
-and the TAG/MMS execution paths; 2.1.0 (this branch) unifies the project control-root
-storage and ships the safe migration tool. Capability documentation below is version-free; historical
+and the TAG/MMS execution paths; 2.1.0 unified the project control-root storage and shipped the
+migration tool; 2.1.1 (this branch) hardens the migration transaction. Capability documentation below is version-free; historical
 iterations (v1.2.0—v2.3.3 under the former name) are recorded in [CHANGELOG.md](CHANGELOG.md)
 and the release notes live under [docs/releases/](docs/releases/).
 

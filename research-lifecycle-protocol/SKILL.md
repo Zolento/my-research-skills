@@ -26,7 +26,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.1.0"
+  version: "2.1.1"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -40,6 +40,12 @@ Agent 生命周期、沙箱、工具执行与外部调度，两者保持职责�
 
 以 **Research State 为中心**，同时运行 **Discovery Loop**（扩大候选、保多样性）与
 **Assurance Loop**（对抗审核、修复、可复现），共 15 个 R 阶段（R0—R14）。
+
+> **项目存储：** 正式运行只使用 `<project>/.research-lifecycle-protocol/`；旧根
+> `.research-idea-pipeline/` 只作迁移/审计/灾难恢复来源，遇到旧根的执行入口返回
+> `MIGRATION_REQUIRED`。迁移用 `scripts/migrate_project_root.py`（默认只读），
+> 迁移期间 RLP 写入入口受维护锁保护；外部写入者需操作者确认静止。
+> 详见 [references/identity-and-compatibility.md](references/identity-and-compatibility.md)。
 
 > **命名与兼容：** 本 Skill 原名 `research-idea-pipeline`，2.0.0 起正式更名为
 > `research-lifecycle-protocol`。机器协议命名空间（schema id `research-idea-pipeline/...@1`）
