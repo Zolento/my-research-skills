@@ -30,9 +30,10 @@ See `docs/releases/v2.0.0.md`.
 - Skill identity: `research-idea-pipeline` → `research-lifecycle-protocol`
   (frontmatter `name`, install slug, repository directory and development branch).
   The protocol namespace `research-idea-pipeline/...@1` and the legacy project root
-  `.research-idea-pipeline/` are frozen for compatibility; new projects default to
-  `.research-lifecycle-protocol/`, and a project carrying both roots fails closed
-  instead of silently picking one.
+  `.research-idea-pipeline/` were frozen for compatibility at that release; new
+  projects defaulted to `.research-lifecycle-protocol/`, and a project carrying both
+  roots failed closed instead of silently picking one. (v2.1.0 made the new root the
+  only runtime root and added the migration tool.)
 
 ### Compatibility
 - Legacy projects keep loading without re-bootstrap, without state resets and without

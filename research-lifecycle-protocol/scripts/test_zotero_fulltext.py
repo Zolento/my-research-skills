@@ -604,13 +604,13 @@ class CacheTests(TempDirTestCase):
 
     def test_default_cache_root_is_gitignored(self):
         parts = zf.default_cache_root().parts
-        self.assertIn(".research-idea-pipeline", parts)
+        self.assertIn(".research-lifecycle-protocol", parts)
         self.assertEqual(parts[-1], "zotero-fulltext-cache")
 
         gitignore = Path(__file__).resolve().parent.parent / ".gitignore"
         if gitignore.is_file():
             text = gitignore.read_text(encoding="utf-8")
-            self.assertIn(".research-idea-pipeline/", text)
+            self.assertIn(".research-lifecycle-protocol/", text)
 
     def test_env_override(self):
         with mock.patch.dict(os.environ, {zf.CACHE_ROOT_ENV: str(self.tmp / "alt")}):

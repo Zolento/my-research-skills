@@ -10,7 +10,7 @@ Attribution Guard (TAG) and Mechanism-to-Method Search (MMS).
 
 > Formerly `research-idea-pipeline`. Machine protocol ids
 > (`research-idea-pipeline/...@1`) and the legacy project root
-> (`.research-idea-pipeline/`) stay compatible; see
+> (`.research-lifecycle-protocol/`) stay compatible; see
 > [references/identity-and-compatibility.md](references/identity-and-compatibility.md).
 
 | Entry | Input | Output |
@@ -338,9 +338,9 @@ they are decisions, not measurements. Recall is tiered into hot, warm and cold m
 bounded by a context budget, so a session does not receive the whole history.
 
 ```sh
-python3 scripts/cognition.py build --state .research-idea-pipeline/routes/A/research-state.json
-python3 scripts/cognition.py check --state .research-idea-pipeline/routes/A/research-state.json
-python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/A/research-state.json --budget 4000
+python3 scripts/cognition.py build --state .research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/cognition.py check --state .research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/cognition.py brief --state .research-lifecycle-protocol/routes/A/research-state.json --budget 4000
 ```
 
 The builder never writes `research-state.json`; `check` compares the stored projection
@@ -372,8 +372,8 @@ froze one. Cognitive memory is reconstructed from canonical evidence and every
 reconstructed entry is marked retrospective.
 
 ```sh
-python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/A/research-state.json
-python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/legacy_handoff.py detect --state .research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-lifecycle-protocol/routes/A/research-state.json
 ```
 
 A severe compatibility error writes nothing and exits 3. Rebuilding a new Research State to

@@ -16,7 +16,7 @@
 | 项 | 规定 |
 |---|---|
 | 触发条件 | 用户所在的**项目根目录已经有代码 / 实验 / 文献 / 结论** |
-| 产出落点 | `.research-idea-pipeline/routes/<R>/research-state.json` 的 `contract` + 首批八类对象条目 |
+| 产出落点 | `.research-lifecycle-protocol/routes/<R>/research-state.json` 的 `contract` + 首批八类对象条目 |
 | 是否新阶段 | 否。流程仍走 R0 之后的正常阶段序列，阶段一律用 **R0—R14** |
 | 是否改锚点 | 否。见 §4 硬规则 5 |
 | 疑问处理 | 见 §5。**一次问完**，且只问「缺失且会实质影响科研判断」的项 |

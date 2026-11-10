@@ -12,7 +12,7 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 | 世界 | 落点 | 回答 |
 |---|---|---|
-| Research World | `.research-idea-pipeline/routes/<R>/research-state.json` | 我们目前认为世界是什么样 |
+| Research World | `.research-lifecycle-protocol/routes/<R>/research-state.json` | 我们目前认为世界是什么样 |
 | Human Knowledge | `README` / `STATUS` / `INDEX` / `docs` | 人应该怎样理解现在的研究 |
 | Experimental World | `experiments` / `results` / `logs` / `checkpoints` | 实际做过什么、观察到什么 |
 | Implementation | `src` / `scripts` / `configs` | 怎样把实验运行出来 |
@@ -42,7 +42,7 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 - canonical checkout 是单开会话和 RSI 状态的项目根；每个 Mesh group 使用仓库外的 `mesh/<group>` Git worktree。controlDir/worktreesDir 均在仓库外，整仓项目显式配置 `sourceDir: .`。
 - worktree 是临时分支检出，不是 route 副本；从已核对的 commit 创建，默认基线为 HEAD。stash 不会把未提交代码带入 worktree，不擅自 stash 他人改动。
-- worker 显式读取 canonical 绝对路径 `.research-idea-pipeline/routes/<R>/research-state.json`，不写该状态。Git 自然检出的 tracked state 仅是基线快照，不另立权威，也不将其作为当前研究状态。
+- worker 显式读取 canonical 绝对路径 `.research-lifecycle-protocol/routes/<R>/research-state.json`，不写该状态。Git 自然检出的 tracked state 仅是基线快照，不另立权威，也不将其作为当前研究状态。
 - worker 只写分配的 worktree 与产物路径；协调者串行预留 route/XID，按 group/run 隔离输出。共享 store 软链接不提供写隔离，必须核对真实输出路径。
 - 共享索引与 canonical state 由指定 RSI 单写者维护；接收 worker 的 artifact/outcome 时核对基线 state_version，审核并通过原有门禁后回写。Mesh successor copy 不等于 canonical 已提交。
 - 同时核对 Mesh GPU lease、RSI scheduler 和实际进程；lease 不是系统锁，不假定两层调度已自动同步。单开与团队不得冲突占用同 GPU/实验。
@@ -59,11 +59,11 @@ linked worktree 不得作为新项目重新 Bootstrap。未启用 Mesh 时，本
 |---|---|---|
 | **DI-1** | **`R0`—`R14` 永远不成为目录结构。** 阶段是系统行为，不是文件树。 | `routes/` 下不得出现以 `R` 阶段命名的目录 |
 | **DI-2** | **每条战略研究路线只对应一个 route**；hypothesis 不自动建 route（门槛见 §8.2）。 | 新 route 必须满足 §8.2 五条门槛中至少两条 |
-| **DI-3** | **每条 route 只有一个 canonical `research-state.json`。** | 每条 route 恰好一份 `.research-idea-pipeline/routes/<R>/research-state.json` |
+| **DI-3** | **每条 route 只有一个 canonical `research-state.json`。** | 每条 route 恰好一份 `.research-lifecycle-protocol/routes/<route>/research-state.json`（唯一运行时控制根；旧根仅作迁移来源） |
 | **DI-4** | **`README` / `STATUS` / `INDEX` 都是人类视图，不是第二份 machine state** —— 它们必须可从 state 投影，不得独立演化出真相。 | `STATUS.md` 可由 `render_status.py` 幂等重生成 |
 | **DI-5** | **所有正式实验拥有唯一 `XID`**，并贯穿 `config / result / log / checkpoint / state`。 | `rg "<XID>"` 在五处同时可查到（见 §6.3） |
 | **DI-6** | **代码只维护 canonical implementation，route 不复制代码。** route 的差异用 `configs/routes/<R>/` 表达。 | 任意 `routes/*/src/` 为空或不存在 |
-| **DI-7** | **`cache` / `runtime` 与 durable research provenance 严格分离。** | `.research-idea-pipeline/{cache,runtime}` 不在 Git tracked 列表 |
+| **DI-7** | **`cache` / `runtime` 与 durable research provenance 严格分离。** | `.research-lifecycle-protocol/cache` 与 `.research-lifecycle-protocol/runtime` 不在 Git tracked 列表，且不得混入 durable provenance |
 | **DI-8** | **任何机器状态都必须存在一个合理的人类入口**，但不要求人直接阅读机器状态。 | §13 映射表每个「人类入口」都真实存在 |
 
 **DI-8 是本 Wave 的灵魂。** 它同时否掉两个极端：既不让人读 JSON，
@@ -130,7 +130,7 @@ linked worktree 不得作为新项目重新 Bootstrap。未启用 Mesh 时，本
 ├── logs/<R>/<XID>/
 ├── shared/                      # 极小；只放无法归入 src/docs/configs 的多路线资产
 │
-└── .research-idea-pipeline/     # ★ 机器控制平面（**可忽略**，见 §11.1）
+└── .research-lifecycle-protocol/     # ★ 机器控制平面（**可忽略**，见 §11.1）
     ├── project/{contract.json,route-registry.json,constraints.json}
     ├── routes/<R>/{research-state.json,history/,actions/,
     │                populations/{archive/,intermediates/,fingerprints/},
@@ -494,7 +494,7 @@ anchor_hash: null           # 仅 type: anchor：正文内容哈希（sha256sum 
   - `research-state.json`、原始 JSON、state 片段；
   - 日志、traceback、CUDA / 环境报错原文；
   - 子代理的原始评审件（原始件属中间产物，见 §6.1）。
-  **机器状态放 `.research-idea-pipeline/routes/<R>/`，日志放 `logs/`，
+  **机器状态放 `.research-lifecycle-protocol/routes/<R>/`，日志放 `logs/`，
   正文只放结论与依据。**
 - ❌ 禁止只有标题没有内容的空壳文档。
 - ❌ **禁止为了过 linter 而删情态**：「可能 / 初步 / 倾向于」承载置信度，是内容不是修饰
@@ -677,7 +677,7 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
   **`STATUS.md` 刻意没有该字段** —— 它是 `research-state.json` 的幂等投影（§4.2），
   写入墙钟时间会破坏 DI-4。本桶（工程记录 / Bugs）里出现的 `最后更新` 同样只指前者。
 - **`.gitignore` 不得吞掉保留物：** `results/*/summary.*` 与
-  `.research-idea-pipeline/**/research-state.json` 必须可进版本库（见 §9）。
+  `.research-lifecycle-protocol/**/research-state.json` 必须可进版本库（见 §9）。
 
 ---
 
@@ -697,7 +697,7 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 | `shared/` | 按 `AGENTS.md` 规定；无规定时默认**只在明确需要时改**，改前先读 |
 | `docs/refs/` | 追加式写入；缓存文件名由 query hash 决定，天然不冲突 |
 | `docs/refs/index.json` | **单写者**：PDF 索引是整文件重写，同一时刻只允许一个成员重建（`refs_index.py`） |
-| `.research-idea-pipeline/routes/<R>/research-state.json` | **单写者**：整文件就地覆盖，改动前先读 |
+| `.research-lifecycle-protocol/routes/<R>/research-state.json` | **单写者**：整文件就地覆盖，改动前先读 |
 
 > **序号分配与 INDEX 更新必须串行进行**：先读取现有最大序号 / 当前 INDEX 内容，
 > 再写入新文件与新行。并发时由 Lead（或指定的单写者）统一执行这两步。
@@ -715,8 +715,8 @@ STATUS 必须自动或半自动生成，不得成为新的人工 truth source。
 | 档 | 落盘位置 | 例 | 可否删除 |
 |---|---|---|---|
 | **交付物** | `routes/<R>/docs/`（扁平，**不分子目录**） | anchor / field-map / discovery / proposal / experiment-plan / result-analysis / narrative / review | 否（是路线资产） |
-| **中间产物** | `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 | 可（review 自带摘要） |
-| **机器状态** | `.research-idea-pipeline/routes/<R>/research-state.json` | **R1 常驻状态**（合法回写，不按阶段切分） | 否；保留版本与历史 |
+| **中间产物** | `.research-lifecycle-protocol/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 | 可（review 自带摘要） |
+| **机器状态** | `.research-lifecycle-protocol/routes/<R>/research-state.json` | **R1 常驻状态**（合法回写，不按阶段切分） | 否；保留版本与历史 |
 | **实验注册** | `experiments/<R>/<XID>/` + `results/<R>/<XID>/` | 预注册、人可读摘要、指标（见 §6.3） | experiments 否 / results 视体积 |
 
 **所有文档产出按「交付物」列落盘；所有子代理原始件按「中间产物」列落盘。**
@@ -739,7 +739,7 @@ canonical state、history、预注册及持久 provenance 不按缓存清理。�
 > 1. **正式 review 必须自带摘要**（结论 + 评分 + 关键证据 + 交叉质询记录）——
 >    否则删掉原始件就等于丢结论。
 > 2. **原始件不得被当作结论引用**：引用一律指向 review 正文
->    （`<被审ID>-review-rNN.md`），不得指向 `.research-idea-pipeline/` 里的原件。
+>    （`<被审ID>-review-rNN.md`），不得指向 `.research-lifecycle-protocol/` 里的原件。
 >    **`routes/<R>/docs/` 内不得建子目录** —— 原始件不属于交付物，不要硬塞。
 
 **审阅结论对状态的映射：** R7 / R10 / R13 的结论要**翻译成 `STATUS.md` 条目** ——
@@ -764,7 +764,7 @@ X021  ⟷  experiments/A/X021-identifiability/
       ⟷  results/A/X021/
       ⟷  logs/A/X021/
       ⟷  checkpoints/A/X021/
-      ⟷  .research-idea-pipeline/routes/A/experiments/X021/
+      ⟷  .research-lifecycle-protocol/routes/A/experiments/X021/
 ```
 
 于是 `rg "X021"` 就把整个 provenance 找出来。
@@ -817,12 +817,12 @@ X021  ⟷  experiments/A/X021-identifiability/
 
 1. 建 `docs/{refs/{papers,cache/<source>}/,decisions/}`、`routes/`、`experiments/`、
    `results/`、`src/`、`scripts/`、`configs/`、`shared/`、
-   `.research-idea-pipeline/{project,cache,runtime}/`
-   （后者还要放**中间产物**：`.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/`）。
+   `.research-lifecycle-protocol/{project,cache,runtime}/`
+   （后者还要放**中间产物**：`.research-lifecycle-protocol/routes/<R>/<被审ID>-r<NN>/`）。
 2. 生成空的 PDF 索引：`python3 scripts/refs_index.py --refs-dir docs/refs`（会写出
    `docs/refs/index.json`）。之后**每次增删 PDF 都要重跑**。
    若已有旧索引而 `--check` 报「缺少 pdfs 数组」→ 用 `--migrate`，**不要直接重建**（会丢旧字段）。
-3. 每条路线建 `routes/<R>/docs/`，并在 `.research-idea-pipeline/routes/<R>/` 放
+3. 每条路线建 `routes/<R>/docs/`，并在 `.research-lifecycle-protocol/routes/<R>/` 放
    **唯一** `research-state.json`（DI-3）。**`routes/<R>/` 内不建 `src/`**（DI-6）。
 4. 建三件套与根级两文件（**都必需**）：
    - 根 `README.md`（项目总览）与根 `INDEX.md`（**路线总表投影**：
@@ -836,7 +836,7 @@ X021  ⟷  experiments/A/X021-identifiability/
      `anchor_version` + `anchor_hash`）。
    之后**每次产出都要更新所在路线的 `INDEX.md`**；**当前状态只更新 `STATUS.md`**；
    跨路线层面变化同步根 `INDEX.md`。
-5. 写 `.research-idea-pipeline/project/route-registry.json`（见 §8.1），
+5. 写 `.research-lifecycle-protocol/project/route-registry.json`（见 §8.1），
    每条路线记 `{name, path, status, primary, parent, forked_from}`。
 
 **每次开工前的契约检查（`AGENTS.md`）：**
@@ -858,8 +858,8 @@ X021  ⟷  experiments/A/X021-identifiability/
 **每次产出新文档时：**
 
 0. **判断它属于哪一档**（§6.1）：交付物 → `routes/<R>/docs/`；
-   **中间产物 → `.research-idea-pipeline/routes/<R>/`**；
-   机器状态 → `.research-idea-pipeline/routes/<R>/research-state.json`。
+   **中间产物 → `.research-lifecycle-protocol/routes/<R>/`**；
+   机器状态 → `.research-lifecycle-protocol/routes/<R>/research-state.json`。
    **不要为了塞中间产物而在 `docs/` 下建子目录。**
 1. 扫描 `routes/<R>/docs/` 里匹配 `^<路线字母>\d{3}-` 的文件名，取最大序号 +1。
 2. 按 `<ID>-<slug>.md` 命名创建（**`slug` 只取 §2.1 封闭枚举**；枚举外的派生物写
@@ -882,7 +882,7 @@ X021  ⟷  experiments/A/X021-identifiability/
 2. 建 `experiments/<R>/<XID>-<slug>/`（README + manifest + config）。
 3. 结果落 `results/<R>/<XID>/`（`summary.md` + `summary.json` + `metrics.json`）。
 4. **预注册必须早于观察：** `experiments/` 与
-   `.research-idea-pipeline/routes/<R>/experiments/<XID>/preregistration.json` 冻结
+   `.research-lifecycle-protocol/routes/<R>/experiments/<XID>/preregistration.json` 冻结
    `Outcome → state_delta`，之后不得追改。
 
 **自检：**
@@ -914,7 +914,7 @@ X021  ⟷  experiments/A/X021-identifiability/
 
 ## 8. 路由注册表与 route fork 门槛
 
-### 8.1 route-registry：`.research-idea-pipeline/project/route-registry.json`
+### 8.1 route-registry：`.research-lifecycle-protocol/project/route-registry.json`
 
 **它是路线管理的核心。** 每条约 `{name, path, status, primary, parent, forked_from}`。
 
@@ -957,7 +957,7 @@ X021  ⟷  experiments/A/X021-identifiability/
 | `AGENTS.md` / `README.md` / `INDEX.md` / `routes/**` / `docs/**` | `checkpoints/` |
 | `src/**` / `scripts/**` / `configs/**` | `logs/` |
 | `experiments/**/{README.md,manifest.json,config.yaml}` | `dataset/` |
-| `.research-idea-pipeline/**/research-state.json`、`history/*`、`experiments/*/preregistration.json`、`meta/*` | `.research-idea-pipeline/cache/`、`.research-idea-pipeline/runtime/` |
+| `.research-lifecycle-protocol/**/research-state.json`、`history/*`、`experiments/*/preregistration.json`、`meta/*` | `.research-lifecycle-protocol/cache/`、`.research-lifecycle-protocol/runtime/` |
 
 `results/` 视体积决定，但**至少 `summary.md` / `summary.json` / `metrics.json` 应保留**。
 
@@ -999,7 +999,7 @@ X021  ⟷  experiments/A/X021-identifiability/
 ### 11.1 机器目录必须「可忽略」
 
 普通研究者只看 `README` / `INDEX` / `routes/` / `experiments/` / `results/` / `src/`
-就能正常工作，**完全不知道 `.research-idea-pipeline/` 内部细节也没关系**。
+就能正常工作，**完全不知道 `.research-lifecycle-protocol/` 内部细节也没关系**。
 
 ### 11.2 反过来说：控制平面内部不追求人类漂亮
 
@@ -1027,7 +1027,7 @@ human docs contain knowledge-worthy events.
 
 | 位置 | 成熟度 |
 |---|---|
-| `.research-idea-pipeline/runtime/` | `scratch` |
+| `.research-lifecycle-protocol/runtime/` | `scratch` |
 | `routes/<R>/docs/` | `working` / `canonical` |
 
 **`scratch` 不进 `routes/<R>/docs/`。** 若确需在 frontmatter 标注，只用三值
@@ -1053,7 +1053,7 @@ human docs contain knowledge-worthy events.
 | Failure | STATUS / result docs | `failures[]` |
 | Decision | `docs/decisions/` | `decision` + history |
 | Narrative | route docs | `narrative_view` |
-| Agent telemetry | 通常不展示 | `.research-idea-pipeline/meta/` |
+| Agent telemetry | 通常不展示 | `.research-lifecycle-protocol/meta/` |
 
 > **DI-8 的验收：** 本表每个「人类入口」都必须真实存在。
 > 机器状态可以复杂，但**每一个都必须有一个合理的人类入口**，且**不要求人直接阅读**。

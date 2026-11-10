@@ -40,7 +40,7 @@ EXIT_OK = 0
 EXIT_HARD = 3
 EXIT_ENV = 4
 
-STATE_REL = ".research-idea-pipeline/routes/{route}/research-state.json"
+STATE_REL = ".research-lifecycle-protocol/routes/{route}/research-state.json"
 STATUS_REL = "routes/{route}/STATUS.md"
 
 

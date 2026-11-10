@@ -23,7 +23,7 @@ Domain Profile 只补充**特定领域的语义、探索约束与评价规则**�
 ```text
 <project>/.research-lifecycle-protocol/domain/<profile-id>.json                  # 项目级（新根，文档默认）
 <project>/.research-lifecycle-protocol/routes/<R>/domain/<profile-id>.json       # 路线级（优先）
-<project>/.research-idea-pipeline/domain/<profile-id>.json                       # 项目级（旧根项目，同优先级）
+<project>/.research-lifecycle-protocol/domain/<profile-id>.json                       # 项目级（旧根项目，同优先级）
 <project>/domain/<profile-id>.json                                               # 2.0.x 平铺位置（兼容回退，最后）
 ```
 

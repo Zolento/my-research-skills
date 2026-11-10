@@ -283,7 +283,7 @@ HEDGE_MARKERS: Tuple[str, ...] = ("retrieved literature", "据本次检索未见
 AUDIT_DIR = "assurance/structural-equivalence"
 FINGERPRINT_DIR = "populations/fingerprints"
 AUDIT_REF_PATTERN = re.compile(
-    r"^\.research-idea-pipeline/routes/[^/]+/assurance/structural-equivalence/H\d+"
+    r"^(?:\.research-lifecycle-protocol|\.research-idea-pipeline)/routes/[^/]+/assurance/structural-equivalence/H\d+"
     r"(?:\.sena2)?\.json$"
 )
 _ID_H = re.compile(r"^H\d+$")
@@ -1124,7 +1124,7 @@ def check_route(route_dir: pathlib.Path) -> Report:
         text = str(audit_ref)
         if not AUDIT_REF_PATTERN.match(text):
             report.add("EQ12", f"{base}.audit_ref",
-                       "必须形如 .research-idea-pipeline/routes/<R>/"
+                       "必须形如 .research-lifecycle-protocol/routes/<R>/（历史记录兼容 .research-idea-pipeline/routes/<R>/）"
                        f"{AUDIT_DIR}/H<n>.json（或 .sena2.json）", text)
             continue
         route_name = text.split("/")[2]
@@ -1156,7 +1156,7 @@ def check_route(route_dir: pathlib.Path) -> Report:
 
     # --- EQ12 反向：磁盘 artifact 必须被 state 引用；并对每份被引用的 artifact 跑 artifact 规则 ---
     for path in _artifact_paths(route_dir):
-        rel = f".research-idea-pipeline/routes/{route_dir.name}/{AUDIT_DIR}/{path.name}"
+        rel = f".research-lifecycle-protocol/routes/{route_dir.name}/{AUDIT_DIR}/{path.name}"
         if rel not in referenced:
             report.add("EQ12", rel,
                        "artifact 存在但没有任何 assurance[].audit_ref 指向它（producer/carrier 缺口）",

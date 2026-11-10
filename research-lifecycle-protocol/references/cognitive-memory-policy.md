@@ -11,12 +11,12 @@ This is an internal capability, not a sixteenth R stage and not a ninth first-cl
 object. It is a **cognitive projection** over data that already exists.
 
 ```
-Canonical   .research-idea-pipeline/routes/<R>/research-state.json        ← sole authority
+Canonical   .research-lifecycle-protocol/routes/<R>/research-state.json        ← sole authority
             + experiments[].preregistration + raw evidence
-Event       .research-idea-pipeline/routes/<R>/cognition/model-revisions.jsonl
+Event       .research-lifecycle-protocol/routes/<R>/cognition/model-revisions.jsonl
             structural assertions + canonical pointers                    ← append-only, no epistemics
-Derived     .research-idea-pipeline/routes/<R>/cognition/index.json
-            .research-idea-pipeline/routes/<R>/cognition/context-brief.md ← rebuildable, never authority
+Derived     .research-lifecycle-protocol/routes/<R>/cognition/index.json
+            .research-lifecycle-protocol/routes/<R>/cognition/context-brief.md ← rebuildable, never authority
 ```
 
 The `cognition/` directory sits inside the route control plane, beside
@@ -209,10 +209,10 @@ policy only fixes where the anomaly record lives and what may be claimed from it
 ## 9. Commands
 
 ```sh
-python3 scripts/cognition.py build    --state .research-idea-pipeline/routes/A/research-state.json
-python3 scripts/cognition.py check    --state .research-idea-pipeline/routes/A/research-state.json
-python3 scripts/cognition.py brief    --state .research-idea-pipeline/routes/A/research-state.json --budget 4000
-python3 scripts/cognition.py recall   --state .research-idea-pipeline/routes/A/research-state.json
+python3 scripts/cognition.py build    --state .research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/cognition.py check    --state .research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/cognition.py brief    --state .research-lifecycle-protocol/routes/A/research-state.json --budget 4000
+python3 scripts/cognition.py recall   --state .research-lifecycle-protocol/routes/A/research-state.json
 python3 scripts/cognition.py --selftest
 ```
 

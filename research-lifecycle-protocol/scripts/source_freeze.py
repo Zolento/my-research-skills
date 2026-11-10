@@ -1012,7 +1012,7 @@ def selftest() -> int:
         root = Path(temp) / "skill"
         root.mkdir()
         _selftest_tree(root)
-        route = Path(temp) / "project" / ".research-idea-pipeline" / "routes" / "A"
+        route = Path(temp) / "project" / ".research-lifecycle-protocol" / "routes" / "A"
         route.mkdir(parents=True)
 
         first = manifest(root)

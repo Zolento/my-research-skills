@@ -38,7 +38,7 @@
 ├── experiments/A/X021-identifiability/    # ★ 想做什么（pre-registration）
 ├── results/A/X021/              # ★ 观察到什么（observation）
 ├── shared/                      # 跨路线公用代码/笔记
-└── .research-idea-pipeline/routes/A/research-state.json   # 机器状态（不入 docs）
+└── .research-lifecycle-protocol/routes/A/research-state.json   # 机器状态（不入 docs）
 ```
 
 **六条硬性规则：**
