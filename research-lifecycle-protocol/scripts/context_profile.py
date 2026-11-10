@@ -656,6 +656,8 @@ def profile_scenario(
     reads_key: str = "baseline_reads",
     architecture: str = "baseline",
     skill_doc_path: Optional[Path] = None,
+    texts: Optional[Dict[str, str]] = None,
+    tool_calls: Optional[int] = None,
 ) -> Dict[str, Any]:
     """测一个场景。
 
@@ -683,7 +685,9 @@ def profile_scenario(
     missing: List[str] = []
     calls = 0
     for rel in scenario.get(reads_key) or ():
-        text = _read(root, rel)
+        # 新架构臂用 `context_planner.execute()` 的真实输出：章节级依赖只计命中的章节，
+        # 不再按整份文件计。否则基准会把「按章节加载」算成「读全文」。
+        text = (texts or {}).get(rel) if texts is not None else _read(root, rel)
         if text is None:
             missing.append(rel)
             continue
@@ -720,7 +724,7 @@ def profile_scenario(
         "loaded_chars": loaded_chars,
         "loaded_bytes": loaded_bytes,
         "est_tokens": sum(estimate_tokens(text) for text in documents.values()),
-        "tool_calls": calls,
+        "tool_calls": calls if tool_calls is None else tool_calls,
         "duplicate": dup,
         "unused_chars": unused_chars,
         "unused_ratio": round(unused_chars / loaded_chars, 4) if loaded_chars else 0.0,
@@ -759,12 +763,30 @@ def planned_reads(scenario_id: str, root: Optional[Path] = None,
                          domain=params.get("domain"), authorization="execute",
                          conditional_active=params.get("conditional") or (),
                          domain_slices=params.get("slices") or ())
-    reads = [item["path"] for item in payload.get("required") or ()
-             if item["path"] != "SKILL.md"]
-    return reads, {"kind": "plan", "plan_digest": payload.get("plan_digest"),
-                   "can_proceed": payload.get("can_proceed"),
-                   "conditional": payload.get("conditional"),
-                   "budget": payload.get("budget")}
+    executed = cplan.execute(payload, root=root)
+    # 字符数按**要求项**计（章节级要求只计命中的章节），
+    # 工具调用按**唯一文档**计（同一文件的两个章节要求只读一次盘）。
+    reads: List[str] = []
+    unique_docs: List[str] = []
+    for item in executed.get("required") or ():
+        if item["path"] == "SKILL.md":
+            continue
+        reads.append(item["path"])
+        doc = item.get("doc") or item["path"]
+        if doc not in unique_docs:
+            unique_docs.append(doc)
+    texts = {}
+    for item in executed.get("loaded") or []:
+        texts[item["path"]] = item["text"]
+    if "SKILL.md" in texts:
+        texts.pop("SKILL.md")           # SKILL.md 由 skill-doc 参数单独计
+    return reads, {"kind": "plan", "plan_digest": executed.get("plan_digest"),
+                   "tool_calls": len(unique_docs),
+                   "can_proceed": executed.get("can_proceed"),
+                   "loaded_chars": executed.get("loaded_chars"),
+                   "blocked_missing": executed.get("blocked_missing"),
+                   "budget": executed.get("budget"),
+                   "texts": texts}
 
 
 def profile_all(
@@ -795,7 +817,9 @@ def profile_all(
                 scenario["_no_skill_doc"] = True
                 scenario["_subagent_text"] = extra.get("text") or ""
         item = profile_scenario(scenario, root=root, architecture=architecture,
-                                skill_doc=skill_doc, skill_doc_path=skill_doc_path)
+                                skill_doc=skill_doc, skill_doc_path=skill_doc_path,
+                                texts=(extra.get("texts") if extra else None),
+                                tool_calls=(extra.get("tool_calls") if extra else None))
         if extra:
             item["plan"] = extra
         results.append(item)

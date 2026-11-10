@@ -22,7 +22,7 @@ reuses; the router never invents state, never upgrades evidence and never grants
 authority. `Research State` stays canonical, the CIE projections stay derived, and
 `PEIG` / `AALG` / the R8 contract keep their authority.
 
-Rule namespace `PR1`—`PR9`; `S`/`V`, `CM`, `PC`, `SV`, `RP`, `LH`, `EO`, `EX`, `RE`, `EQ`/`NN`
+Rule namespace `PR1`—`PR12`; `S`/`V`, `CM`, `PC`, `SV`, `RP`, `LH`, `EO`, `EX`, `RE`, `EQ`/`NN`
 keep their own identities.
 
 Usage
@@ -3459,6 +3459,92 @@ def inspect(preset_id: str, root: Optional[Path] = None) -> Dict[str, Any]:
             "sections_required": list(PROTOCOL_SECTIONS)}
 
 
+# ---------------------------------------------------------------------------
+# 上下文计划：Router 的**真实消费点**
+# ---------------------------------------------------------------------------
+
+#: 权限档 → Context Planner 的授权等级。只有真正的 `execute` 档才给 `execute`；
+#: 探索 / 策略 / 建议档一律降为 `advisory`。上下文计划**不授予**任何权限，
+#: 这里只把 Router 已判定的档位翻译成 Planner 的词汇。
+def _authorisation_for(scope: Any) -> str:
+    privilege = scope_privilege(scope)
+    if privilege == "execute":
+        return "execute"
+    if privilege in ("read_only", "derived"):
+        return "read_only"
+    return "advisory"
+
+
+def _declared_domain(route_dir: Any) -> Optional[str]:
+    """读路线/控制根是否显式声明了领域协议。声明不唯一时返回 None（不猜）。"""
+    if not route_dir:
+        return None
+    route = Path(route_dir)
+    candidates = [route / "domain"]
+    try:
+        candidates.append(route.parents[1] / "domain")
+    except IndexError:                                    # pragma: no cover - shallow path
+        pass
+    found: List[str] = []
+    for directory in candidates:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.json")):
+            if path.stem not in found:
+                found.append(path.stem)
+    return found[0] if len(found) == 1 else None
+
+
+def context_gate(preset: Dict[str, Any], context: Dict[str, Any],
+                 *, root: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """为一次真实调用生成并**执行**上下文计划。
+
+    这是 `context_planner` 的生产消费点：计划不是报告，它决定这次调用能不能继续。
+    必需上下文缺失时返回 `can_proceed=False`，由 `run_preset` 转成 HOLD。
+    """
+    try:
+        import context_planner as cplan
+    except ImportError:                                   # pragma: no cover - shipped tree
+        return None
+    try:
+        payload = cplan.plan(
+            entry=preset.get("entry") or "",
+            preset_id=preset.get("preset_id") or preset.get("id"),
+            authorization=_authorisation_for(preset.get("execution_scope")),
+            domain=_declared_domain(context.get("route_dir")),
+            root=root,
+        )
+        return cplan.execute(payload, root=root)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        # 计划器自身不可用时**不能**假装计划通过：降级为阻断并如实记录。
+        return {"status": "BLOCKED", "can_proceed": False,
+                "blocked_missing": [{"path": "-",
+                                     "reason": f"context_planner unavailable: {exc}"}],
+                "loaded": [], "required": [], "budget": {}, "gates_remaining": [],
+                "plan_digest": None}
+
+
+#: 只把计划里**影响决策**的字段随 payload 返回，避免把整份计划塞进每一次调用。
+def summarise_plan(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not payload:
+        return {"status": "SKIPPED"}
+    return {
+        "status": payload.get("status"),
+        "can_proceed": payload.get("can_proceed"),
+        "plan_digest": payload.get("plan_digest"),
+        "authorization": payload.get("authorization"),
+        "domain": payload.get("domain"),
+        "required": [item.get("path") for item in payload.get("required") or []],
+        "loaded": payload.get("loaded_paths") or [],
+        "loaded_chars": payload.get("loaded_chars"),
+        "blocked_missing": payload.get("blocked_missing") or [],
+        "budget": {key: (payload.get("budget") or {}).get(key)
+                   for key in ("over_budget", "uncovered")},
+        "gates_remaining": payload.get("gates_remaining") or [],
+        "not_loaded_count": len(payload.get("not_loaded") or []),
+    }
+
+
 def run_preset(
     preset_id: str,
     state_path: Path,
@@ -3511,8 +3597,23 @@ def run_preset(
                  "decision": {}, "steps": [], "writes": [], "changed_decision": None,
                  "next_action": None, "hold_reason": "maintenance_in_progress"},
                 [Diagnostic("PR11", "maintenance", str(exc))], EXIT_ENV)
+    planned = context_gate(preset, context)
     try:
-        payload = handler(context, apply)
+        if planned is not None and not planned.get("can_proceed", True):
+            # 上下文计划说不能继续，就不执行处理器 —— 计划在这里**真的**是门禁。
+            payload = {"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                       "protocol": preset["protocol"],
+                       "entry": preset["entry"],
+                       "execution_scope": preset["execution_scope"],
+                       "reused": list(preset["reuses"]),
+                       "observed": {"context_incomplete": summarise_plan(planned)},
+                       "decision": {}, "steps": [], "writes": [],
+                       "changed_decision": None, "next_action": None,
+                       "hold_reason": "context_incomplete",
+                       "context_plan": summarise_plan(planned)}
+        else:
+            payload = handler(context, apply)
+            payload["context_plan"] = summarise_plan(planned)
     except (cg.CognitionError, OSError) as exc:
         # A handler that cannot do its job must produce a diagnosable HOLD, not a traceback
         # out of the router. Genuinely unrecoverable errors (MemoryError, KeyboardInterrupt)
@@ -3566,6 +3667,12 @@ def run_preset(
                                       == payload["canonical_digest_after"])
     payload["apply"] = apply
     hard = [item for item in context["diagnostics"] if not cg.is_warning(item.rule)]
+    if payload.get("hold_reason") == "context_incomplete":
+        missing = (payload.get("context_plan") or {}).get("blocked_missing") or []
+        hard.append(Diagnostic(
+            "PR12", "context",
+            "必需上下文缺失，未执行处理器：" + "、".join(
+                str(item.get("path")) for item in missing[:5])))
     if handler_error is not None:
         hard.append(Diagnostic("PR10", "handler",
                                f"Preset 处理器无法完成：{handler_error}（HOLD，不重试、不放宽门禁）"))

@@ -482,24 +482,34 @@ def execute(plan_payload: Dict[str, Any], root: Optional[Path] = None,
     loaded: List[Dict[str, Any]] = []
     missing: List[Dict[str, Any]] = []
     total = 0
+    # 同一份文档可能被两个不同章节的要求引用：只读一次盘。
+    # 这既省 I/O，也让「工具调用次数」这个指标不会被同一文件重复计数。
+    file_cache: Dict[str, str] = {}
     for item in payload.get("required") or []:
-        path = root / item["path"]
+        # **必须用 `doc`，不能用 `path`。** `path` 保留 `#章节查询` 以便报告里看出来源，
+        # 但它不是磁盘路径；把它当文件名会让「章节规划成功、加载却报文件缺失」。
+        doc_rel = item.get("doc") or split_requirement(item["path"])[0]
+        path = root / doc_rel
         if not path.is_file():
-            missing.append({"path": item["path"], "reason": "required 缺失"})
+            missing.append({"path": item["path"], "doc": doc_rel, "reason": "required 缺失"})
             continue
-        full = path.read_text(encoding="utf-8")
-        query = item.get("section_query")
+        if doc_rel not in file_cache:
+            file_cache[doc_rel] = path.read_text(encoding="utf-8")
+        full = file_cache[doc_rel]
+        query = item.get("section_query") or split_requirement(item["path"])[1]
         text = full
         if query:
             text, sections = section_text(full, query)
             if not sections:
-                missing.append({"path": item["path"],
+                missing.append({"path": item["path"], "doc": doc_rel,
                                 "reason": f"section query 未命中：{query}"})
                 continue
         total += len(text)
-        loaded.append({"path": item["path"], "layer": item["layer"],
-                       "chars": len(text), "digest": _digest(text),
-                       "sections": item.get("sections") or [], "text": text})
+        loaded.append({"path": item["path"], "doc": doc_rel, "layer": item["layer"],
+                       "chars": len(text), "full_chars": len(full),
+                       "digest": _digest(text),
+                       "sections": sections if query else (item.get("sections") or []),
+                       "text": text})
     payload["loaded"] = loaded
     payload["loaded_chars"] = total
     payload["loaded_paths"] = [item["path"] for item in loaded]

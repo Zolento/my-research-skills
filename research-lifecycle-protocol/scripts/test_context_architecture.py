@@ -231,6 +231,58 @@ class TestContextPlanner(unittest.TestCase):
             self.assertLess(item["chars"], item["full_chars"],
                             "章节加载必须真的比整份小")
 
+    def test_section_scoped_requirements_actually_load(self) -> None:
+        """回归：`plan()` 能解析 `path#章节`，`execute()` 却把带 `#` 的字符串当文件名。
+
+        这条链是新架构的核心能力。此前只有「章节规划的字符数更小」与「查询未命中被拒」
+        两个断言，两者在 `#` 路径上会**因为同一个错误原因**同时通过，掩盖了真实缺陷。
+        现在直接断言：执行成功、正文非空、确实是那一节、且严格小于整份文件。
+        """
+        payload = cplan.plan(entry="continue-research", preset_id="research-recovery",
+                             authorization="execute")
+        scoped = [item for item in payload["required"] if item.get("section_query")]
+        self.assertTrue(scoped, "research-recovery 应当按章节加载认知记忆策略")
+
+        executed = cplan.execute(payload)
+        self.assertTrue(executed["can_proceed"],
+                        f"章节级加载失败：{executed['blocked_missing']}")
+        self.assertEqual(executed["blocked_missing"], [])
+
+        loaded = {item["path"]: item for item in executed["loaded"]}
+        for item in scoped:
+            self.assertIn(item["path"], loaded, f"未进入 loaded：{item['path']}")
+            entry = loaded[item["path"]]
+            self.assertTrue(entry["text"].strip(), "加载到的章节正文为空")
+            self.assertTrue(entry["sections"], "loaded 未记录命中的 section id")
+            self.assertLess(entry["chars"], entry["full_chars"],
+                            "章节加载必须真的比整份小")
+            # 命中的章节正文必须能在原文件里定位到
+            source = (ROOT / item["doc"]).read_text(encoding="utf-8")
+            self.assertIn(entry["text"].split("\n", 1)[-1][:40], source)
+
+    def test_every_preset_with_sections_can_be_executed(self) -> None:
+        """任何声明了章节级必需项（或没有）的预设，都必须能 plan → execute → loaded。"""
+        registry = cplan.load_registry()
+        for preset in registry["presets"]:
+            payload = cplan.plan(entry=preset["entry"],
+                                 preset_id=preset["preset_id"],
+                                 authorization="execute")
+            executed = cplan.execute(payload)
+            self.assertTrue(executed["can_proceed"],
+                            f"{preset['preset_id']}: {executed['blocked_missing']}")
+            self.assertTrue(executed["loaded_paths"])
+
+    def test_execute_uses_doc_not_the_sectioned_path(self) -> None:
+        """直接锁死错误形态：`path` 含 `#`，`doc` 不含；execute 必须读 `doc`。"""
+        payload = cplan.plan(entry="continue-research", preset_id="context-drift-recovery")
+        scoped = [item for item in payload["required"] if item.get("section_query")]
+        self.assertTrue(scoped)
+        for item in scoped:
+            self.assertIn("#", item["path"])
+            self.assertNotIn("#", item["doc"])
+            self.assertTrue((ROOT / item["doc"]).is_file())
+        self.assertTrue(cplan.execute(payload)["can_proceed"])
+
     def test_section_query_miss_does_not_fall_back_to_the_whole_file(self) -> None:
         payload = cplan.plan(entry="continue-research", preset_id="research-loop")
         payload["required"][0] = dict(payload["required"][0],
@@ -296,8 +348,11 @@ class TestSubagentContext(unittest.TestCase):
 class TestContextPacket(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
-        self.route = pathlib.Path(self.temp.name) / "A"
-        self.route.mkdir()
+        # 真实布局：<project>/.research-lifecycle-protocol/routes/<R>/
+        # 这样 `route_dir` 的推导与 `/domain/<profile>.json` 的定位都被真实覆盖。
+        self.project = pathlib.Path(self.temp.name) / ".research-lifecycle-protocol"
+        self.route = self.project / "routes" / "A"
+        self.route.mkdir(parents=True)
         self.state_path = self.route / "research-state.json"
         template = (ROOT / "templates" / "research-state.template.json")
         self.state_path.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
@@ -340,6 +395,79 @@ class TestContextPacket(unittest.TestCase):
                       "required_domain_boundaries", "state_version", "canonical_digest"):
             self.assertIn(field, packet, f"预算压缩不得删掉 {field}")
         self.assertTrue(packet["budget"]["never_truncate"])
+
+    def test_domain_declaration_changes_invalidate_the_packet(self) -> None:
+        """回归：`_domain_digest` 只算 Skill 内 PROFILE.md，漏掉项目/路线实际声明。
+
+        项目把 `gt_free` 从 true 改成 false、或补上/撤掉 `<route>/domain/<p>.json`，
+        canonical state 可能一点没变。Packet 必须因此失效，否则它会把旧边界当新事实。
+        """
+        domain_dir = self.route / "domain"
+        domain_dir.mkdir()
+        config = domain_dir / "mri-reconstruction.json"
+        config.write_text(json.dumps({"profile": "mri-reconstruction", "gt_free": True}),
+                          encoding="utf-8")
+
+        packet = cp.build(self.state_path, domain="mri-reconstruction")
+        self.assertEqual([item["scope"] for item in packet["binding"]["domain_declaration"]],
+                         ["route"])
+        self.assertFalse(cp.verify(packet, self.state_path)["stale"],
+                         "配置未变时不应误判失效")
+
+        config.write_text(json.dumps({"profile": "mri-reconstruction", "gt_free": False}),
+                          encoding="utf-8")
+        changed = cp.verify(packet, self.state_path)
+        self.assertTrue(changed["stale"], "domain 声明变化必须让 Packet 失效")
+        self.assertIn("Domain", " ".join(changed["stale_reasons"]))
+
+        rebuilt = cp.build(self.state_path, domain="mri-reconstruction")
+        config.unlink()
+        removed = cp.verify(rebuilt, self.state_path)
+        self.assertTrue(removed["stale"], "撤掉 domain 声明也必须失效")
+
+    def test_domain_declaration_absent_is_still_a_stable_value(self) -> None:
+        """没有声明时摘要必须是一个**确定值**，否则补上声明不会触发失效。"""
+        first = cp.build(self.state_path, domain="mri-reconstruction")
+        self.assertEqual(first["binding"]["domain_declaration"], [])
+        domain_dir = self.route / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "mri-reconstruction.json").write_text('{"profile":"mri-reconstruction"}',
+                                                           encoding="utf-8")
+        self.assertTrue(cp.verify(first, self.state_path)["stale"])
+
+    def test_over_budget_is_not_reported_as_pass(self) -> None:
+        """回归：超预算压缩后无条件 `status="PASS"`，超限被静默吞掉。"""
+        packet = cp.build(self.state_path, budget=200)
+        self.assertEqual(packet["status"], "OVER_BUDGET",
+                         "超预算不得报 PASS")
+        self.assertTrue(packet["budget"]["over_budget"])
+        self.assertTrue(packet["budget"]["uncovered"], "必须列明被压缩的字段")
+        self.assertIn("next_step", packet, "超预算必须给出下一步，而不是给结论")
+
+    def test_over_budget_records_what_it_dropped(self) -> None:
+        """省略必须可追：只留前三条时要写清省了哪些 id。"""
+        packet = cp.build(self.state_path, budget=200)
+        omitted = packet["budget"]["omitted"]
+        self.assertTrue(omitted, "省略了内容却没有记录")
+        for field, ids in omitted.items():
+            self.assertIsInstance(ids, list)
+            self.assertTrue(all(isinstance(item, str) for item in ids))
+
+    def test_over_budget_never_shortens_protected_fields(self) -> None:
+        packet = cp.build(self.state_path, budget=200)
+        self.assertTrue(packet["budget"]["protected_intact"])
+        for field in ("authorization", "constraints", "anchor", "banned_retries",
+                      "required_domain_boundaries", "state_version", "canonical_digest"):
+            self.assertIn(field, packet, f"预算压缩删掉了不可截断字段 {field}")
+
+    def test_honest_status_is_exclusive(self) -> None:
+        """PASS 与 OVER_BUDGET 互斥，且 PASS 一定意味着未超限。"""
+        for budget in (cp.DEFAULT_RESEARCH_BUDGET, 600, 200):
+            packet = cp.build(self.state_path, budget=budget)
+            self.assertIn(packet["status"], ("PASS", "OVER_BUDGET"))
+            if packet["status"] == "PASS":
+                self.assertFalse(packet["budget"]["over_budget"])
+                self.assertLessEqual(packet["chars"], budget)
 
     def test_read_only_packet_offers_no_execution(self) -> None:
         packet = cp.build(self.state_path, authorization="read_only")
@@ -404,6 +532,107 @@ class TestContextProfile(unittest.TestCase):
             # 每次调用至少要比「只注入旧 SKILL.md」小得多
             self.assertLess(item["loaded_chars"], 156565,
                             f"{item['scenario']} 没有比旧 L0 更小")
+
+
+class TestRouterConsumesThePlan(unittest.TestCase):
+    """回归：Planner 与 Router 只靠文档「关联」，正常调用路径并不执行计划。
+
+    AGENTS.md §22 要求能力的五环完整（Producer → Runtime Entry → Consumer →
+    Decision Effect → Persistence）。只有 `plan()` 可被调用，证明的是第一环。
+    这组测试走**真实入口** `preset_router.run_preset`，要求计划被执行、被随结果返回，
+    并且在不能继续时**真的**挡住处理器。
+    """
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        project = pathlib.Path(self.temp.name) / ".research-lifecycle-protocol"
+        self.route = project / "routes" / "A"
+        self.route.mkdir(parents=True)
+        self.state_path = self.route / "research-state.json"
+        self.state_path.write_text(
+            (ROOT / "templates" / "research-state.template.json").read_text(encoding="utf-8"),
+            encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def test_real_entry_carries_an_executed_plan(self) -> None:
+        import preset_router as pr
+        payload, _, code = pr.run_preset("research-recovery", self.state_path)
+        self.assertEqual(code, pr.EXIT_OK)
+        plan = payload.get("context_plan")
+        self.assertIsNotNone(plan, "run_preset 没有消费上下文计划")
+        self.assertEqual(plan["status"], "PASS")
+        self.assertTrue(plan["plan_digest"])
+        self.assertTrue(plan["loaded"], "计划没有被执行（loaded 为空）")
+        self.assertIn("SKILL.md", plan["loaded"])
+        self.assertGreater(plan["not_loaded_count"], 0, "未列出「为什么没加载其他」")
+        self.assertTrue(plan["gates_remaining"], "计划没有声明剩余门禁")
+
+    def test_the_plan_path_is_the_one_that_loads(self) -> None:
+        """走真实入口时也必须经过章节级加载，而不是退化成整份读取。"""
+        import preset_router as pr
+        payload, _, _ = pr.run_preset("research-recovery", self.state_path)
+        loaded = payload["context_plan"]["loaded"]
+        sectioned = [path for path in loaded if "#" in path]
+        self.assertTrue(sectioned, "真实入口没有走章节级加载")
+        self.assertLessEqual(len(sectioned), 4)
+
+    def test_incomplete_context_blocks_the_handler(self) -> None:
+        """Decision Effect：计划说不能继续时，处理器不得运行。"""
+        import preset_router as pr
+        import context_planner as cplan
+        ran: list = []
+        original_handler = pr.HANDLERS["research-recovery"]
+        original_execute = cplan.execute
+
+        def fake_execute(plan, **kwargs):
+            out = original_execute(plan, **kwargs)
+            out["can_proceed"] = False
+            out["status"] = "BLOCKED"
+            out["blocked_missing"] = [{"path": "references/missing.md",
+                                       "reason": "probe: 必需上下文缺失"}]
+            return out
+
+        def spy(context, apply):
+            ran.append(True)
+            return original_handler(context, apply)
+
+        pr.HANDLERS["research-recovery"] = spy
+        cplan.execute = fake_execute
+        try:
+            payload, _, code = pr.run_preset("research-recovery", self.state_path)
+        finally:
+            pr.HANDLERS["research-recovery"] = original_handler
+            cplan.execute = original_execute
+
+        self.assertEqual(ran, [], "上下文不完整时处理器仍然执行了")
+        self.assertEqual(payload["status"], "HOLD")
+        self.assertEqual(payload["hold_reason"], "context_incomplete")
+        self.assertEqual(code, pr.EXIT_ENV)
+        self.assertTrue(any(item["rule"] == "PR12" for item in payload["diagnostics"]))
+
+    def test_authorisation_is_never_upgraded(self) -> None:
+        import preset_router as pr
+        self.assertEqual(pr._authorisation_for("execute"), "execute")
+        for scope in ("read_only", "inspect_only", "audit", "evaluation_only"):
+            self.assertEqual(pr._authorisation_for(scope), "read_only", scope)
+        for scope in ("discover_only", "strategy_update", "plan", "decision_only",
+                      "evidence_repair", "portfolio"):
+            self.assertEqual(pr._authorisation_for(scope), "advisory", scope)
+        self.assertNotIn(pr._authorisation_for("read_only"), ("execute",))
+        self.assertNotIn(pr._authorisation_for("discover_only"), ("execute",))
+
+    def test_declared_domain_is_detected_but_never_guessed(self) -> None:
+        import preset_router as pr
+        self.assertIsNone(pr._declared_domain(self.route))
+        domain_dir = self.route / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "mri-reconstruction.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(pr._declared_domain(self.route), "mri-reconstruction")
+        # 两个声明 → 不猜
+        (domain_dir / "other-profile.json").write_text("{}", encoding="utf-8")
+        self.assertIsNone(pr._declared_domain(self.route))
 
 
 if __name__ == "__main__":

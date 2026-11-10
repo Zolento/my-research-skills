@@ -110,19 +110,58 @@ def _skill_version(root: Path) -> Optional[str]:
     return None
 
 
-def _domain_digest(domain: Optional[str], root: Path) -> Optional[str]:
-    """Domain Profile **配置摘要**：Profile + 本路线声明的子协议名，不算入全部文档正文。"""
+#: Domain 声明的探针位置，按文档优先级排列（路线优先于项目）。
+#: 少了项目侧这一半，就会漏掉「项目改了 GT-free / 冻结约束但 state 没变」这种失效。
+def _domain_configs(domain: str, route_dir: Optional[Path]) -> List[Dict[str, Any]]:
+    candidates: List[Tuple[str, Path]] = []
+    if route_dir:
+        route_dir = Path(route_dir)
+        candidates.append(("route", route_dir / "domain" / f"{domain}.json"))
+        for offset, scope in ((1, "control-root"), (2, "project")):
+            try:
+                base = route_dir.parents[offset]
+            except IndexError:
+                continue
+            candidates.append((scope, base / "domain" / f"{domain}.json"))
+    found: List[Dict[str, Any]] = []
+    seen: set = set()
+    for scope, path in candidates:
+        try:
+            resolved = path.resolve()
+        except OSError:                                   # pragma: no cover - defensive
+            continue
+        if resolved in seen or not path.is_file():
+            continue
+        seen.add(resolved)
+        found.append({"scope": scope,
+                      "name": path.name,
+                      "digest": hashlib.sha256(path.read_bytes()).hexdigest()[:16]})
+    return found
+
+
+def _domain_digest(domain: Optional[str], root: Path,
+                   route_dir: Optional[Path] = None) -> Optional[str]:
+    """Domain **配置摘要**：Skill 侧 Profile + 子协议名 + 本项目/路线实际声明。
+
+    摘要只覆盖配置，不覆盖领域文档正文 —— 正文变更是 Skill 版本问题，由
+    `binding.skill_version` 承担。但**项目侧的声明必须进来**：
+    `<route>/domain/<profile>.json` 里写着 GT-free、冻结阈值与 SSL 约束，
+    只算 Skill 内的 PROFILE.md 会让「改了声明、state 没动」的 Packet 仍然判有效。
+    """
     if not domain:
         return None
     profile_dir = root / "domain-profiles" / domain
     profile = profile_dir / "PROFILE.md"
     if not profile.is_file():
         return None
+    configs = _domain_configs(domain, route_dir)
     payload = {
         "profile": domain,
         "profile_digest": hashlib.sha256(profile.read_bytes()).hexdigest()[:16],
         "slices": sorted(path.name for path in profile_dir.glob("*.md")
                          if path.name != "PROFILE.md"),
+        # `missing` 是**确定值**：项目后来补上声明时摘要会变，Packet 因此失效。
+        "declared": configs or "missing",
     }
     return _digest(payload)
 
@@ -327,6 +366,7 @@ def build(
     authorization: str = "read_only",
     root: Optional[Path] = None,
     budget: int = DEFAULT_RESEARCH_BUDGET,
+    route_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """从 canonical state 派生一个最小决策包。**只读**，不写任何文件。"""
     root = root or SKILL_ROOT
@@ -337,6 +377,10 @@ def build(
         return {"status": "FAIL", "error": f"state not found: {state_path}"}
 
     state = cg.load_state(state_path)
+    if route_dir is None and state_path.parent.parent.name == "routes":
+        # route_dir 是**路线目录**（`.../routes/<R>`），不是控制根。
+        # `<route>/domain/<profile>.json` 就在它下面。
+        route_dir = state_path.parent
     view = cg.CanonicalView(state)
     contract = state.get("contract") if isinstance(state.get("contract"), dict) else {}
     decided = state.get("decision") if isinstance(state.get("decision"), dict) else {}
@@ -388,7 +432,8 @@ def build(
         "canonical_digest": packet["canonical_digest"],
         "evidence_digests": evidence_digests,
         "skill_version": _skill_version(root),
-        "domain_digest": _domain_digest(domain, root),
+        "domain_digest": _domain_digest(domain, root, route_dir),
+        "domain_declaration": _domain_configs(domain, route_dir) if domain else [],
     }
     packet["stale"] = False
     packet["stale_reasons"] = []
@@ -403,6 +448,16 @@ def build(
         "note": ("超预算时只压缩可压缩字段（列表截断为计数），"
                  "授权、约束、锚点、冻结协议、禁重试路线、领域边界、失效标记永不截断。"),
     }
+    # 压缩前先在 never-truncate 字段上留指纹：它们**不允许**被缩短，稍后逐项复核。
+    protected = {name: _digest(packet.get(name)) for name in NEVER_TRUNCATE if name in packet}
+    omitted: Dict[str, List[str]] = {}
+
+    def _ids(value: Any) -> List[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item.get("id") or index) for index, item in enumerate(value)
+                if isinstance(item, dict)]
+
     if full > budget:
         priority = TASK_PRIORITY.get(task, ())
         compressible = [name for name in
@@ -412,23 +467,51 @@ def build(
         for name in compressible:
             value = packet.get(name)
             if isinstance(value, list) and len(value) > 3:
+                omitted[name] = _ids(value[3:])
                 packet[name] = value[:3]
                 packet["budget"]["compressed_fields"].append(name)
             elif isinstance(value, dict):
                 trimmed = {}
                 for key, item in value.items():
-                    trimmed[key] = item[:2] if isinstance(item, list) and len(item) > 2 else item
+                    if isinstance(item, list) and len(item) > 2:
+                        omitted[f"{name}.{key}"] = _ids(item[2:])
+                        trimmed[key] = item[:2]
+                    else:
+                        trimmed[key] = item
                 packet[name] = trimmed
                 packet["budget"]["compressed_fields"].append(name)
             if len(json.dumps(packet, ensure_ascii=False)) <= budget:
                 break
+
     packet["chars"] = len(json.dumps(packet, ensure_ascii=False))
-    packet["status"] = "PASS"
+    over_budget = packet["chars"] > budget
+    # 复核：never-truncate 字段必须逐字节未变，否则「不截断」就只是注释。
+    broken = [name for name, digest in protected.items()
+              if _digest(packet.get(name)) != digest]
+    packet["budget"]["over_budget"] = over_budget
+    packet["budget"]["omitted"] = omitted
+    packet["budget"]["protected_intact"] = not broken
+    if broken:                                            # pragma: no cover - invariant guard
+        packet["status"] = "FAIL"
+        packet["error"] = f"never-truncate fields were modified: {broken}"
+        return packet
+    if over_budget:
+        # **不得**把超预算报成 PASS：调用方必须知道「这份包本身已不完整」。
+        packet["status"] = "OVER_BUDGET"
+        packet["budget"]["uncovered"] = [name for name in
+                                         ("active_mechanisms", "competing_explanations",
+                                          "unresolved", "claims_under_review",
+                                          "evidence_refs", "experiments")
+                                         if name in omitted]
+        packet["next_step"] = ("研究上下文超出预算：先缩小任务范围、或按 section 精确读取原始证据，"
+                               "再重新 build。不得据此给出没有依据的科学判断。")
+    else:
+        packet["status"] = "PASS"
     return packet
 
 
-def verify(packet: Dict[str, Any], state_path: Path, *, root: Optional[Path] = None
-           ) -> Dict[str, Any]:
+def verify(packet: Dict[str, Any], state_path: Path, *, root: Optional[Path] = None,
+           route_dir: Optional[Path] = None) -> Dict[str, Any]:
     """核对 Packet 是否已失效。**不**改写 Packet，也**不**清空 state。"""
     root = root or SKILL_ROOT
     state_path = Path(state_path)
@@ -437,6 +520,10 @@ def verify(packet: Dict[str, Any], state_path: Path, *, root: Optional[Path] = N
     if packet.get("schema") != SCHEMA_PACKET:
         return {"status": "FAIL", "error": "not a context packet"}
     state = cg.load_state(state_path)
+    if route_dir is None and state_path.parent.parent.name == "routes":
+        # route_dir 是**路线目录**（`.../routes/<R>`），不是控制根。
+        # `<route>/domain/<profile>.json` 就在它下面。
+        route_dir = state_path.parent
     binding = packet.get("binding") or {}
     reasons: List[str] = []
 
@@ -454,8 +541,9 @@ def verify(packet: Dict[str, Any], state_path: Path, *, root: Optional[Path] = N
             reasons.append(f"evidence {ident} 内容变化")
     if binding.get("skill_version") != _skill_version(root):
         reasons.append("Skill 协议版本变化")
-    if binding.get("domain_digest") != _domain_digest(packet.get("domain"), root):
-        reasons.append("Domain Profile 配置变化")
+    if binding.get("domain_digest") != _domain_digest(packet.get("domain"), root,
+                                                      route_dir):
+        reasons.append("Domain 配置变化（Skill Profile 或本项目/路线的 domain 声明）")
 
     return {
         "schema": SCHEMA_PACKET,

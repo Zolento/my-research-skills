@@ -33,7 +33,7 @@ Skill 入口、科研哲学、权限规则、Router 说明、R0—R14 全部阶�
 | 级 | 内容 | 何时加载 | 规模 |
 |---|---|---|---|
 | **L0** | `SKILL.md`（27.5 KB） | 每次激活 | 固定 |
-| **L1** | `shared-contract.md` + 选中的**一个** Preset + 任务必需的 references + Research Context Packet | 每次任务动作 | 按任务，实测平均 21.6 KB |
+| **L1** | `shared-contract.md` + 选中的**一个** Preset + 任务必需的 references + Research Context Packet | 每次任务动作 | 按任务，实测平均 22.4 KB |
 | **L2** | 完整 policy、数学推导、专项审查、异常处理、Replay 审计、维护自检 | 只在需要细节时 | 按需 |
 
 **解析链：** `L0 → Selected Preset → State Context → Conditional Domain → Deep Reference`。

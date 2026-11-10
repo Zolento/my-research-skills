@@ -15,11 +15,13 @@
 | C 加载链路 | registry `context` 声明 + `scripts/context_planner.py` + `scripts/section_index.py` + `references/section-index.json` |
 | D 研究记忆 | `scripts/context_packet.py`（13 项，绑定 5 项，可检测失效） |
 | E 子 Agent | `scripts/subagent_context.py` + `references/subagent-context.md`（5 角色，5 条权限不变量） |
-| F 回归 | 2325 tests OK（skipped=4）、`release_check` PASS、MRI replay 4/4、安装副本 smoke PASS |
+| F 回归 | 2339 tests OK（skipped=4）、`release_check` PASS、MRI replay 4/4、安装副本 smoke PASS |
+| F+ 审查补丁 | 4 个执行链路缺陷已修（章节加载 / domain 绑定 / 超预算 PASS / Router 消费计划） |
 
 ### 实测读数
 
-- 每次调用协议上下文：平均 129,431 → 38,738 字符（−70%）；工具调用 4.08 → 3.42，无场景上升。
+- 每次调用协议上下文：平均 129,431 → 39,401 字符（−70%）；工具调用 4.08 → 3.75。
+  `resume` / `context-drift` 由 3 升到 4（显式加载认知记忆两个章节，旧基线漏计）。
 - 子 Agent 上下文：123,449 → 17,762 字符（−86%）。
 - `SKILL.md`：156,565 → 28,037 bytes（−82%）。**未达 10—15 KB 目标**，理由与组成见
   `docs/context-benchmark.md` §5；`release_check` 用 40,000 bytes 作为回归上限。
