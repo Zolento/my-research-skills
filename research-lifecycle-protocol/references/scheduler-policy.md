@@ -16,7 +16,7 @@ S_t --π(S_t)--> a_t --> S_{t+1}
 
 | 项 | 值 |
 |---|---|
-| 路径 | `.research-idea-pipeline/routes/<R>/scheduler.json` |
+| 路径 | `.research-lifecycle-protocol/routes/<R>/scheduler.json` |
 | 骨架 | [../templates/scheduler.template.json](../templates/scheduler.template.json) |
 
 **它不进 `research-state.json`，也不是第九类一等对象。**
@@ -203,7 +203,7 @@ source-grounded planning clearance，保留历史 stop rule；仅换 seed 不算
 2. **`dormant` 不等于淘汰。** 保留 exploration floor —— **不得**因成功率低就永久停用某算子。
    `dormant` 只表示「本轮没产出」；是否 reseed 由 `next_action_policy` 的
    `paradigm_escape_if_stagnant` 决定。
-3. **项目级汇总：** `.research-idea-pipeline/meta/operator-stats.json` 是各路线
+3. **项目级汇总：** `.research-lifecycle-protocol/meta/operator-stats.json` 是各路线
    `scheduler.json` 的 `operator_stats` 的**只读汇总**（跨路线看哪种算子整体有效）。
    它同样**不入 state**。
 

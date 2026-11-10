@@ -4,7 +4,7 @@
 职责：回答「这条路线有哪些材料」。
       只登记资产，不登记当前状态。当前状态看 STATUS.md。
       禁止出现 已证实 / 已证伪 / TODO / Bugs / Warnings 这类当前状态。
-      机器可读状态不放这里，放 .research-idea-pipeline/。
+      机器可读状态不放这里，放 .research-lifecycle-protocol/。
 -->
 
 # routes/<R> — INDEX

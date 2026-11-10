@@ -1,6 +1,6 @@
 # Changelog — research-lifecycle-protocol
 
-本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.0.0**。
+本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.0.0**（2.1.0 开发中，见 2.1.0 条目）。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
@@ -30,13 +30,79 @@ See `docs/releases/v2.0.0.md`.
 - Skill identity: `research-idea-pipeline` → `research-lifecycle-protocol`
   (frontmatter `name`, install slug, repository directory and development branch).
   The protocol namespace `research-idea-pipeline/...@1` and the legacy project root
-  `.research-idea-pipeline/` are frozen for compatibility; new projects default to
-  `.research-lifecycle-protocol/`, and a project carrying both roots fails closed
-  instead of silently picking one.
+  `.research-idea-pipeline/` were frozen for compatibility at that release; new
+  projects defaulted to `.research-lifecycle-protocol/`, and a project carrying both
+  roots failed closed instead of silently picking one. (v2.1.0 made the new root the
+  only runtime root and added the migration tool.)
 
 ### Compatibility
 - Legacy projects keep loading without re-bootstrap, without state resets and without
   budget or ledger changes. Existing tags and release notes keep their historical name.
+
+## 2.0.1 — 2026-11-10
+
+Domain evidence qualification and execution-path integrity. Released on the
+`research-lifecycle-protocol/dev` branch; the tag follows the merge to `main`.
+See `docs/releases/v2.0.1.md`.
+
+### Added
+- Evidence-qualified TAG verdicts: `PHYSICAL_LIMIT_WITH_SCOPE` and
+  `VALIDITY_BLOCKER` are bounded by resolvable canonical evidence
+  (`limit_type` + `source_refs` / `validity_evidence_refs`), not by the agent's own
+  `verified` label; detection-power results stay conditional and unverified
+  interpretations degrade to review.
+- Evidence revocation/dependency invalidation re-checked against the current state on
+  every classification; fresh evidence ids with identical content do not count as
+  novelty.
+- TAG event idempotency (`event_id`) and a lock-file transaction for concurrent
+  appends; loop enforcement events flow through the real `research-loop` apply entry.
+- DP12–DP14 participate in the real Evidence Outcome transaction (metric direction
+  contract, structural-recovery evidence, GT provenance), fail closed on a damaged
+  TAG log, and frozen thresholds bind to the frozen preregistration digest.
+- MMS candidate validation is wired into the I2M candidate path (unbypassable when a
+  domain profile is active), with physical-limit scope matching and structural
+  candidate deduplication.
+
+### Changed
+- `ssl-contract.md`: legal frozen-Ω_val model selection is not a GT leak; the
+  violation is GT selection or post-hoc rule changes.
+- `variants/wave-3d-structure.md`: 20 coils is a coil count, not an acceleration
+  factor; numeric examples are task-local.
+- `SKILL.md`: single introduction; the skill is defined as a stateful research
+  lifecycle protocol, not an idea pipeline.
+
+## 2.1.0 — 2026-11-10
+
+Project storage unification and safe legacy migration. Released on the
+`research-lifecycle-protocol/dev` branch; the tag follows the merge to `main`.
+See `docs/releases/v2.1.0.md`.
+
+### Added
+- The storage matrix: `.research-lifecycle-protocol/` is the only runtime control
+  root; `NEW_PROJECT / READY / MIGRATION_REQUIRED / AMBIGUOUS_STORAGE_ROOT /
+  INVALID_STORAGE_ROOT` are stable, machine-readable states
+  (`scripts/rlp_paths.py runtime_status/resolve_runtime_root`).
+- `scripts/migrate_project_root.py`: read-only inspect/plan, verified external
+  backup, same-filesystem staging with atomic rename cutover, opt-in
+  manifest-tracked operational rewrites, post-migration verification, guarded
+  rollback and interrupted-run recovery. Never re-bootstraps, never rewrites
+  historical records, never silently repairs.
+- `scripts/domain_replay.py` evaluation harness and four structural MRI replay packs
+  (CT-FM / Wave-TOF) for the future blinded real-project A/B (L3 NOT YET VALIDATED).
+
+### Changed
+- Runtime write entries gate on the storage matrix: research loop, operational
+  reconcile, managed execution (issue/run), cognition projections, render_status
+  and Cold Handoff `take`. `MIGRATION_REQUIRED` is an engineering control-plane
+  state — it never enters Failure Memory or triggers replanning.
+- Static storage-spec check (`test_storage_spec.py`): runtime modules may not
+  mention the legacy root; SKILL.md may discuss it only in a marked
+  legacy/migration/compat context.
+
+### Compatibility
+- Machine protocol namespace (`research-idea-pipeline/...@1`) stays frozen.
+- Legacy projects keep loading read-only (state_check, legacy detect, migration
+  tooling); formal runs require migration. No automatic migration ever runs.
 
 ## Unreleased — 2026-10-24
 

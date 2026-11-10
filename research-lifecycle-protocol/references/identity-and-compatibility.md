@@ -30,30 +30,58 @@ Cognitive Insight Engine（CIE）是内部认知能力模块的名称，不是 S
 `scripts/rlp_paths.py` 把上述常量集中到一处，并提供只读解析。它的 selftest 与
 `scripts/test_identity_compat.py` 是这条边界的机械证据。
 
-## 3. 运行时根解析规则
+## 3. 运行时根解析规则（v2.1.0 存储矩阵）
 
-`scripts/rlp_paths.resolve_storage_root(project_root)` 的固定顺序：
+**`.research-lifecycle-protocol/` 是唯一合法的运行时控制根。** 旧根
+`.research-idea-pipeline/` 只作为历史项目的迁移来源，不再是合法的日常运行目录。
 
-| 现场 | 解析结果 | 行为 |
+`scripts/rlp_paths.runtime_status(project_root)` 的固定状态矩阵：
+
+| 现场 | 状态 | 运行行为 |
 |---|---|---|
-| 只有 `.research-lifecycle-protocol/` | `current` | 使用新根 |
-| 只有 `.research-idea-pipeline/` | `legacy` | 使用旧根；**不迁移、不重建、不复制** |
-| 两者都存在 | 抛 `AmbiguousStorageRoot` | **fail closed**；两个根等于两份 canonical state，禁止静默选一个 |
-| 两者都不存在 | `new` | 新项目默认根是 `.research-lifecycle-protocol/` |
+| 两个目录都不存在 | `NEW_PROJECT` | 新项目初始化使用新根 |
+| 只有新根（有可识别内容） | `READY` | 正常加载和执行 |
+| 只有新根（空/不可识别） | `INVALID_STORAGE_ROOT` | 禁止静默修复或重建 |
+| 只有旧根 | `MIGRATION_REQUIRED` | 暂停正式运行，先迁移 |
+| 新旧根同时存在 | `AMBIGUOUS_STORAGE_ROOT` | fail closed |
 
-“两个根都不存在”时不会创建目录；创建只发生在项目初始化流程，且只创建新根。
+API 分层：
+
+- **正常运行路径**：`resolve_runtime_root(project_root)` / `default_state_path(...)`
+  —— 只返回新根；旧根场景抛出对应错误（异常类带稳定 `STATUS` 标记）。
+- **历史迁移路径**：`inspect_legacy_root(project_root)` /
+  `resolve_storage_root(...)` —— 专供迁移、审计和只读兼容检查使用。
+- **运行入口闸门**：Research Loop（`project_context`）、`operational_reconcile`、
+  `experiment_execute issue/run`、`cognition build`、`render_status --root` 与
+  `legacy_handoff take` 都先过存储矩阵；只读工具（`state_check`、
+  `legacy_handoff detect`、迁移工具）不受限。
+
+`MIGRATION_REQUIRED` 是**工程控制平面的迁移状态**，不是科研机制失败：
+不计入 Failure Memory，不触发科学重规划，不重启实验。
+
+迁移使用正式工具（默认只读，`--apply` 才执行）：
+
+```sh
+python3 scripts/migrate_project_root.py inspect --project <project>
+python3 scripts/migrate_project_root.py plan    --project <project> --backup-root <dir>
+python3 scripts/migrate_project_root.py migrate --project <project> --backup-root <dir> --apply
+python3 scripts/migrate_project_root.py verify  --project <project> --migration-id <id>
+python3 scripts/migrate_project_root.py rollback --project <project> --migration-id <id>
+```
+
+旧项目不得自动迁移；`start-project` / `continue-research` / Resume 遇到旧根只输出
+`MIGRATION_REQUIRED` 与迁移操作说明。
 
 CLI：
 
 ```sh
 python3 scripts/rlp_paths.py resolve --project <project-root>
-python3 scripts/rlp_paths.py resolve --state <project>/.research-idea-pipeline/routes/A/research-state.json
 python3 scripts/rlp_paths.py check   --project <project-root>
 ```
 
-`check` 在布局歧义时退出码 3；`resolve` 输出 JSON，含
-`storage_kind`（`current` / `legacy` / `new` / `ambiguous`）与
-`schema_namespace`（恒为 `research-idea-pipeline`，并标记 `frozen: true`）。
+`check` 在 `MIGRATION_REQUIRED` / `AMBIGUOUS_STORAGE_ROOT` / `INVALID_STORAGE_ROOT`
+时退出码 3，并提示迁移命令；`resolve` 输出 JSON（含 `runtime_status` 与
+`schema_namespace`——恒为 `research-idea-pipeline`，标记 `frozen: true`）。
 
 ## 4. 旧项目兼容检查
 

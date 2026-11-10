@@ -40,6 +40,7 @@ import json
 import os
 import pathlib
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -86,12 +87,24 @@ class Declaration:
     evidence_refs: List[str] = field(default_factory=list)
     decision_consequence: str = ""
     validity_findings: List[str] = field(default_factory=list)
+    validity_evidence_refs: List[str] = field(default_factory=list)
     physical_limit: Optional[Dict[str, Any]] = None
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def trivial_mechanism(self) -> bool:
         return self.mechanism in TRIVIAL_MECHANISMS
+
+
+#: What a ``physical_limit`` claim may be *backed by*, weakest to strongest. The class
+#: a limitation earns is bounded by this type — an agent saying "verified": true does
+#: not choose the bound; the resolved canonical evidence does (TG3).
+LIMIT_TYPES: Tuple[str, ...] = (
+    "mathematical_impossibility",   # proven: no estimator can recover the target
+    "detection_power_limit",        # a specific statistical test lacks power
+    "empirical_upper_bound",        # measured ceiling in one experimental configuration
+    "physical_interpretation",      # an unverified physical explanation
+)
 
 
 def parse_declaration(value: Any) -> Tuple[Optional[Declaration], List[str]]:
@@ -123,6 +136,9 @@ def parse_declaration(value: Any) -> Tuple[Optional[Declaration], List[str]]:
         evidence_refs=refs,
         decision_consequence=str(value.get("decision_consequence") or "").strip(),
         validity_findings=[str(item) for item in (value.get("validity_findings") or [])],
+        validity_evidence_refs=[str(item).strip() for item in
+                                (value.get("validity_evidence_refs") or [])
+                                if str(item).strip()],
         physical_limit=limit, raw=value)
     return declaration, problems
 
@@ -176,10 +192,32 @@ def load_events(route_dir: Any) -> Tuple[List[Dict[str, Any]], List[str]]:
     return records, problems
 
 
-def append_event(route_dir: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Append one event under an exclusive lock, extending the hash chain."""
+def lock_path(route_dir: Any) -> pathlib.Path:
+    """A dedicated, stable lock file next to the event log.
+
+    Locking the log file itself would break whenever the log is rotated or recovered
+    (the lock would guard the wrong inode), so the lock lives in its own file.
+    """
+    return pathlib.Path(route_dir).expanduser() / EVENTS_DIRNAME / (EVENTS_NAME + ".lock")
+
+
+def event_id_from(payload: Dict[str, Any]) -> str:
+    """A stable idempotency id for one logical enforcement.
+
+    Binds the identity fields the caller supplies (route / state / action /
+    fingerprint / verdict / kind). The same logical operation retried after a lost
+    response maps to the same id and must not append twice; genuinely new evidence or
+    a new decision changes at least one field and gets a new id.
+    """
+    identity = {k: payload.get(k) for k in
+                ("route", "state_version", "state_digest", "action", "fingerprint",
+                 "tag_class", "event_kind") if payload.get(k) is not None}
+    return cg.digest_of(identity)
+
+
+def _append_locked(route_dir: pathlib.Path, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The append transaction. Caller must hold the lock."""
     path = events_path(route_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
     records, problems = load_events(route_dir)
     if problems:
         raise ChainDamaged("; ".join(problems[:3]))
@@ -190,7 +228,6 @@ def append_event(route_dir: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
     line = json.dumps(record, ensure_ascii=False, sort_keys=True)
     handle = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX)
         os.write(handle, (line + "\n").encode("utf-8"))
         os.fsync(handle)
     finally:
@@ -198,37 +235,304 @@ def append_event(route_dir: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
     return record
 
 
+def append_event_once(route_dir: Any, payload: Dict[str, Any],
+                      idempotency_key: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
+    """Idempotent append. Returns (record, status) with status APPENDED or DUPLICATE."""
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = dict(payload)
+    body["event_id"] = event_id_from(idempotency_key)
+    lock_handle = os.open(str(lock_path(route)), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        records, problems = load_events(route)
+        if problems:
+            raise ChainDamaged("; ".join(problems[:3]))
+        for existing in records:
+            if existing.get("event_id") == body["event_id"]:
+                return existing, "DUPLICATE"
+        return _append_locked(route, body), "APPENDED"
+    finally:
+        fcntl.flock(lock_handle, fcntl.LOCK_UN)
+        os.close(lock_handle)
+
+
+def append_event(route_dir: Any, payload: Dict[str, Any],
+                 idempotency_key: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Append one event, extending the hash chain.
+
+    The whole transaction — read, validate, sequence, construct, append, fsync — runs
+    inside one exclusive critical section on the dedicated lock file, so concurrent
+    writers can never fork the chain. With ``idempotency_key`` the event id is derived
+    from the given identity fields; when an event with that id already exists the
+    existing record is returned unchanged and nothing is appended.
+
+    Raises ChainDamaged on a corrupt log. Recovery is explicit
+    (``main recover --route ... --archive``), never automatic.
+    """
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = dict(payload)
+    if idempotency_key:
+        body["event_id"] = event_id_from(idempotency_key)
+    lock = lock_path(route)
+    lock_handle = os.open(str(lock), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        if "event_id" in body:
+            records, problems = load_events(route)
+            if problems:
+                raise ChainDamaged("; ".join(problems[:3]))
+            for existing in records:
+                if existing.get("event_id") == body["event_id"]:
+                    return existing
+        return _append_locked(route, body)
+    finally:
+        fcntl.flock(lock_handle, fcntl.LOCK_UN)
+        os.close(lock_handle)
+
+
+def recover_log(route_dir: Any) -> Dict[str, Any]:
+    """Archive a damaged log and start a fresh chain. Explicit, auditable, never silent."""
+    route = pathlib.Path(route_dir).expanduser()
+    path = events_path(route)
+    _records, problems = load_events(route)
+    if not problems:
+        return {"status": "OK", "archived": None, "problems": []}
+    stamp = pathlib.Path(time.strftime("%Y%m%dT%H%M%S")).name if False else None
+    import time as _time
+    archive = path.with_name(path.name + f".corrupt-{_time.strftime('%Y%m%dT%H%M%S')}")
+    if path.is_file():
+        os.replace(path, archive)
+    lock = lock_path(route)
+    if lock.exists():
+        lock.unlink()
+    return {"status": "ARCHIVED", "archived": str(archive), "problems": problems[:5]}
+
+
 class ChainDamaged(RuntimeError):
     """The event chain failed validation; refuse to append to a tampered log."""
 
 
 def history_for(records: Sequence[Dict[str, Any]], fp: str) -> Dict[str, Any]:
-    """Aggregated history for one fingerprint: seen refs, counts, latest verdict."""
+    """Aggregated history for one fingerprint: seen refs, content digests, counts."""
     refs: set = set()
+    digests: set = set()
+    predictions: set = set()
     repeat_count = 0
     latest: Optional[Dict[str, Any]] = None
     for record in records:
         if record.get("fingerprint") != fp:
             continue
         refs.update(record.get("evidence_refs") or [])
+        digests.update(record.get("evidence_digests") or [])
+        predictions.update(record.get("predictions") or [])
         if record.get("tag_class") == "REPEATED_ATTRIBUTION":
             repeat_count += 1
         latest = record
-    return {"evidence_refs": refs, "repeat_count": repeat_count, "latest": latest}
+    return {"evidence_refs": refs, "evidence_digests": digests,
+            "predictions": predictions, "repeat_count": repeat_count, "latest": latest}
+
+
+# ---------------------------------------------------------------------------
+# Evidence resolution against the canonical Research State (TG2/TG3/TG5)
+# ---------------------------------------------------------------------------
+# TAG never keeps its own evidence database. Every claim about "verified",
+# "invalid", "revoked" is resolved against the canonical state the caller passes in,
+# so an attribution inherits exactly the epistemics the Research State already has.
+
+#: object-id prefixes → canonical collections (first match wins).
+REF_COLLECTIONS: Tuple[Tuple[str, str], ...] = (
+    ("E", "evidence"), ("X", "experiments"), ("C", "claims"), ("H", "hypotheses"),
+    ("F", "failures"), ("U", "uncertainties"), ("LIT", "literature"),
+)
+
+#: failure kinds that count as *recorded* engineering validity defects.
+VALIDITY_FAILURE_KINDS = ("engineering-failure", "failed-to-reproduce")
+
+
+def _items(state: Dict[str, Any], key: str) -> List[Dict[str, Any]]:
+    value = state.get(key) if isinstance(state, dict) else None
+    return [item for item in (value or []) if isinstance(item, dict)]
+
+
+def resolve_ref(state: Optional[Dict[str, Any]], ref: str) -> Optional[Dict[str, Any]]:
+    """Resolve one object id (``E7``, ``X11``, ``F3``, ...) in the canonical state."""
+    if not isinstance(state, dict) or not ref:
+        return None
+    prefix = next((p for p, _ in REF_COLLECTIONS if ref.startswith(p)), None)
+    if prefix is None:
+        return None
+    collection = next(c for p, c in REF_COLLECTIONS if p == prefix)
+    for item in _items(state, collection):
+        if str(item.get("id")) == ref:
+            return item
+    return None
+
+
+def _dependency_invalid(state: Dict[str, Any], item: Dict[str, Any],
+                        seen: Optional[set] = None) -> bool:
+    """One-hop dependency validity (V19 semantics, read-only re-derivation)."""
+    seen = seen if seen is not None else set()
+    refs = list(item.get("depends_on") or [])
+    if str(item.get("id", "")).startswith("C"):
+        refs += list(item.get("supporting_evidence") or [])
+        refs += list(item.get("refuting_evidence") or [])
+    for ref in refs:
+        if ref in seen:
+            continue
+        seen.add(ref)
+        other = resolve_ref(state, str(ref))
+        if other is None:
+            continue
+        status = str((other.get("validity") or {}).get("status") or "")
+        if status == "invalid":
+            return True
+    return False
+
+
+def evidence_usable(state: Optional[Dict[str, Any]],
+                    ref: str) -> Tuple[bool, str]:
+    """Is ``ref`` currently usable as scientific support?
+
+    Returns (usable, reason). Revoked (``validity.status`` invalid/stale), dependent-
+    invalidated and unresolvable refs are not usable — a TAG verdict may cite them as
+    history, never as current support.
+    """
+    item = resolve_ref(state, ref)
+    if item is None:
+        return False, f"{ref} 不存在于 canonical state"
+    status = str((item.get("validity") or {}).get("status") or "")
+    if status in ("invalid", "stale"):
+        return False, f"{ref} validity={status}（已失效/撤销）"
+    if state is not None and _dependency_invalid(state, item):
+        return False, f"{ref} 依赖已失效对象（一跳传播）"
+    return True, ""
+
+
+def evidence_content_digest(state: Optional[Dict[str, Any]], ref: str) -> Optional[str]:
+    """A structural digest of *what the evidence is* — not its id.
+
+    Two refs with the same digest carry the same evidential content; re-labelling an
+    old measurement with a fresh id must not manufacture novelty (TG5).
+    """
+    item = resolve_ref(state, ref)
+    if item is None:
+        return None
+    semantic = {k: item.get(k) for k in
+                ("kind", "scope", "strength", "epistemic_status", "verification_tier",
+                 "source_ref", "statement", "finding", "contradicts", "supports")
+                if item.get(k) is not None}
+    prereg = item.get("preregistration") if isinstance(item.get("preregistration"), dict) else {}
+    if prereg.get("outcomes"):
+        semantic["outcomes"] = prereg["outcomes"]
+    return cg.digest_of(semantic)
+
+
+def validity_refs_confirmed(state: Optional[Dict[str, Any]],
+                            refs: Sequence[str]) -> Tuple[List[str], List[str]]:
+    """Which validity-finding refs are *recorded* defects in the canonical state?
+
+    A ref counts as confirmed when it resolves to a failed experiment, a recorded
+    engineering failure, or observed evidence. Prose findings without any resolvable
+    source stay unconfirmed. Returns (confirmed_ids, rejection_reasons).
+    """
+    if state is None:
+        return [], ["无 canonical state，无法核证有效性发现"]
+    if not refs:
+        return [], ["validity_findings 未引用任何可解析来源"]
+    confirmed, missing = [], []
+    for ref in refs:
+        item = resolve_ref(state, ref)
+        if item is None:
+            missing.append(f"{ref} 不存在")
+            continue
+        kind = str(item.get("kind") or "")
+        status = str(item.get("status") or "")
+        if status == "failed" or kind in VALIDITY_FAILURE_KINDS:
+            confirmed.append(ref)
+            continue
+        if str(item.get("id", "")).startswith("E") and \
+                str(item.get("epistemic_status") or "") in ("Observed", "Verified"):
+            confirmed.append(ref)
+            continue
+        missing.append(f"{ref} 既非 failed 实验，也非已记录工程失败或已观测证据")
+    return confirmed, missing
+
+
+def physical_limit_verdict(state: Optional[Dict[str, Any]],
+                           limit: Dict[str, Any]) -> Tuple[str, str, bool]:
+    """Map a physical-limit claim to (tag_class, reason, review_required).
+
+    The agent's ``verified`` flag is a *proposal*. The bound the limitation earns
+    depends on ``limit_type`` and on evidence that actually resolves in the canonical
+    state right now; a detection-power result must never masquerade as a global
+    impossibility, and an unverified interpretation never self-upgrades.
+    """
+    limit_type = str(limit.get("limit_type") or "").strip()
+    if limit_type not in LIMIT_TYPES:
+        return ("INSUFFICIENT_EVIDENCE",
+                "物理限制缺少 limit_type（" + " / ".join(LIMIT_TYPES) + "）："
+                "结论强度无法确定，登记待审", True)
+    source_refs = [str(r).strip() for r in (limit.get("source_refs") or [])
+                   if str(r).strip()]
+    if state is None:
+        return ("INSUFFICIENT_EVIDENCE",
+                "无 canonical state：物理限制声明无法核证，不得自我升级为 verified", True)
+    if not source_refs:
+        return ("INSUFFICIENT_EVIDENCE",
+                "物理限制未引用任何来源（source_refs 为空）：仅凭声明不构成验证", True)
+    usable, reasons = [], []
+    for ref in source_refs:
+        ok, why = evidence_usable(state, ref)
+        (usable if ok else reasons).append(ref if ok else why)
+    if not usable:
+        return ("INSUFFICIENT_EVIDENCE",
+                "物理限制来源当前不可用：" + "；".join(reasons[:3]) +
+                "；已撤销/失效的证据不得继续支撑限制结论", True)
+    scope = str(limit.get("scope") or "").strip()
+    if not scope:
+        return ("INSUFFICIENT_EVIDENCE",
+                "物理限制缺少适用范围：无法机械确认", True)
+    if limit_type == "mathematical_impossibility":
+        reason = (f"已证明的数学不可能性（来源 {usable}），适用范围：{scope}")
+        return "PHYSICAL_LIMIT_WITH_SCOPE", reason, False
+    if limit_type == "detection_power_limit":
+        return ("PHYSICAL_LIMIT_WITH_SCOPE",
+                f"检测功效限制（来源 {usable}），适用范围：{scope}"
+                "；这是特定统计检验下的条件性结论，不得表述为全局不可恢复", False)
+    if limit_type == "empirical_upper_bound":
+        return ("PHYSICAL_LIMIT_WITH_SCOPE",
+                f"经验上限（来源 {usable}），适用范围：{scope}"
+                "；仅限该实验配置，不得推广到所有先验/数据分布/任务", False)
+    # physical_interpretation — an explanation is not a verified limitation; only the
+    # existing Evidence Qualification / Assurance can promote it.
+    return ("INSUFFICIENT_EVIDENCE",
+            "物理解释未经现有证据体系核证（来源存在但类型为解释）："
+            "不得自我升级为已验证限制；登记待审", True)
 
 
 # ---------------------------------------------------------------------------
 # Classification (TG1–TG7)
 # ---------------------------------------------------------------------------
 
-def classify(declaration: Declaration, records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
-    """Classify one attribution declaration. Pure: reads history, writes nothing."""
+def classify(declaration: Declaration, records: Sequence[Dict[str, Any]],
+             state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Classify one attribution declaration. Pure: reads history and state, writes nothing.
+
+    ``state`` is the current canonical Research State. Without it the guard can still
+    detect structural repetition, but it can never confirm a physical limitation or a
+    validity defect — those degrade to INSUFFICIENT_EVIDENCE + review instead of
+    trusting the agent's own "verified" label (TG2/TG3).
+    """
     fp = fingerprint(declaration)
     history = history_for(records, fp)
     seen_refs = history["evidence_refs"]
-    new_refs = [ref for ref in declaration.evidence_refs if ref not in seen_refs]
     review_required = False
     notes: List[str] = []
+    safety = None
 
     if declaration.mechanism not in MECHANISMS:
         # Not keyword fuzzing: an unknown token is structurally a new declaration that
@@ -236,30 +540,72 @@ def classify(declaration: Declaration, records: Sequence[Dict[str, Any]]) -> Dic
         review_required = True
         notes.append("机制不在受控枚举内：等价性无法机械证明，登记待审")
 
+    # TG5 evidence accounting happens once, before the class decision: a cited ref is
+    # *novel support* only when it (a) has not been cited for this fingerprint before,
+    # (b) does not duplicate already-seen evidential content under a fresh id, and
+    # (c) is currently usable in the canonical state (not revoked/invalidated).
+    fresh: List[str] = []
+    duplicate_content: List[str] = []
+    unusable: List[str] = []
+    new_digests: List[str] = []
+    for ref in declaration.evidence_refs:
+        if ref in seen_refs:
+            continue
+        digest_ = evidence_content_digest(state, ref) if state is not None else None
+        if digest_ is not None and digest_ in history["evidence_digests"]:
+            duplicate_content.append(ref)
+            continue
+        ok, _why = (evidence_usable(state, ref) if state is not None else (True, ""))
+        if not ok:
+            unusable.append(ref)
+            continue
+        fresh.append(ref)
+        if digest_ is not None:
+            new_digests.append(digest_)
+    new_refs = fresh
+    if duplicate_content:
+        notes.append("仅更换证据 ID、内容与既有证据等价（" +
+                     ", ".join(duplicate_content) + "）：不构成科研增量")
+    if unusable:
+        notes.append("引用的证据当前不可用（" + ", ".join(unusable) +
+                     "）：已撤销/失效证据不支撑新结论")
+
     if declaration.validity_findings:
-        # TG2 — a real validity defect wins over everything, including repetition.
-        tag_class = "VALIDITY_BLOCKER"
-        reason = "存在未解决的算子/流程验证失败或数据不一致证据：必须优先修复"
-    elif isinstance(declaration.physical_limit, dict) and \
-            declaration.physical_limit.get("verified") is True:
-        # TG3 — verified physical limit, scope required.
-        scope = str(declaration.physical_limit.get("scope") or "").strip()
-        if scope:
-            tag_class = "PHYSICAL_LIMIT_WITH_SCOPE"
-            reason = f"已验证的物理限制，适用范围：{scope}"
+        # TG2 — a *confirmed* validity defect wins over everything, including
+        # repetition. Findings backed by prose alone stay unconfirmed: they earn a
+        # bounded safety review, never a permanent "verified defect" registration.
+        confirmed, missing = validity_refs_confirmed(
+            state, declaration.validity_evidence_refs)
+        if confirmed:
+            tag_class = "VALIDITY_BLOCKER"
+            reason = ("存在已记录的有效性缺陷（来源 " + ", ".join(confirmed) +
+                      "）：必须优先修复；未修复前不得在同一缺陷上堆叠方法实验")
         else:
             review_required = True
+            safety = "hold_pending_verification"
             tag_class = "INSUFFICIENT_EVIDENCE"
-            reason = "物理限制声明缺少适用范围：无法机械确认，登记待审"
+            reason = ("有效性发现未经证据核证（" + "；".join(missing[:2]) +
+                      "）：按安全审查处理（有限 HOLD/升级审查），"
+                      "不得登记为已验证故障，也不得据此声称机制被否证")
+    elif isinstance(declaration.physical_limit, dict):
+        # TG3 — the limitation class is bounded by evidence resolution, not by the
+        # agent's own "verified" label.
+        tag_class, reason, review_required = physical_limit_verdict(
+            state, declaration.physical_limit)
     elif not new_refs and history["latest"] is not None:
-        # TG4 — same structural fingerprint, no evidence that history has not seen.
+        # TG4 — same structural fingerprint, no usable evidence history has not seen.
         tag_class = "REPEATED_ATTRIBUTION"
         reason = (f"等价归因（指纹 {fp[:16]}…）此前已记录 {history['repeat_count']} 次；"
                   f"本次证据引用 {declaration.evidence_refs} 均在历史集合内，无新增信息")
     elif new_refs:
-        # TG5 — genuinely new evidence for this mechanism fingerprint.
+        # TG5 — genuinely new, currently-usable evidence for this fingerprint.
+        predictions_changed = (not history["predictions"] or
+                               set(declaration.predictions) != history["predictions"])
         tag_class = "NOVEL_DECISION_RELEVANT_DIAGNOSIS"
-        reason = f"存在该机制历史上未见过的新证据引用：{new_refs}"
+        reason = f"存在该机制历史上未见过且当前可用的证据引用：{new_refs}"
+        if not predictions_changed:
+            notes.append("预测与历史相同：新证据需说明判别预测的差别，"
+                         "否则不足以改变机制竞争的可信度")
         if not declaration.decision_consequence:
             notes.append("未声明 decision_consequence：诊断必须说明不同结果会改变哪个研究决定"
                          "（与 I2M83 一致）")
@@ -274,19 +620,34 @@ def classify(declaration: Declaration, records: Sequence[Dict[str, Any]]) -> Dic
 
     return {"tag_class": tag_class, "reason": reason, "fingerprint": fp,
             "new_evidence_refs": new_refs, "repeat_count": history["repeat_count"],
-            "review_required": review_required, "notes": notes,
+            "review_required": review_required, "notes": notes, "safety": safety,
             "decision_consequence": declaration.decision_consequence,
             "mechanism": declaration.mechanism, "scope": declaration.scope}
 
 
 def event_from_classification(declaration: Declaration, verdict: Dict[str, Any],
-                              source: str) -> Dict[str, Any]:
-    return {"fingerprint": verdict["fingerprint"], "mechanism": declaration.mechanism,
-            "scope": declaration.scope, "assumptions": declaration.assumptions,
-            "evidence_refs": declaration.evidence_refs,
-            "decision_consequence": verdict["decision_consequence"],
-            "tag_class": verdict["tag_class"], "review_required": verdict["review_required"],
-            "source": source}
+                              source: str, *, state: Optional[Dict[str, Any]] = None
+                              ) -> Dict[str, Any]:
+    limit = declaration.physical_limit if isinstance(declaration.physical_limit, dict) else None
+    event = {"fingerprint": verdict["fingerprint"], "mechanism": declaration.mechanism,
+             "scope": declaration.scope, "assumptions": declaration.assumptions,
+             "evidence_refs": declaration.evidence_refs,
+             "evidence_digests": [d for d in
+                                  (evidence_content_digest(state, r)
+                                   for r in declaration.evidence_refs)
+                                  if d],
+             "predictions": list(declaration.predictions),
+             "decision_consequence": verdict["decision_consequence"],
+             "tag_class": verdict["tag_class"],
+             "review_required": verdict["review_required"],
+             "source": source}
+    if limit is not None:
+        event["physical_limit"] = {"limit_type": limit.get("limit_type"),
+                                   "scope": limit.get("scope")}
+    if state is not None:
+        event["state_version"] = state.get("state_version")
+        event["state_digest"] = cg.digest_of(state)
+    return event
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +673,93 @@ def action_fingerprint(action: Any) -> Optional[str]:
         return None
     return cg.digest_of({"mechanism": mechanism, "assumptions": assumptions,
                          "scope": scope})
+
+
+#: How many times a diagnosis action may be queued without a structured attribution
+#: before the loop escalates from "annotate and ask" to a bounded hold (4.2: ask once,
+#: never nag forever, never hold ordinary exploration).
+ATTRIBUTION_REVIEW_ESCALATION = 2
+
+
+def diagnosis_action_id(action: Any) -> Optional[str]:
+    if not isinstance(action, dict):
+        return None
+    ident = str(action.get("action") or action.get("target") or "").strip()
+    return ident or None
+
+
+def missing_attribution_fields(action: Any) -> List[str]:
+    """The minimal attribution fields a queued diagnosis still has to declare."""
+    if not isinstance(action, dict):
+        return []
+    required = []
+    if not str(action.get("attribution_mechanism") or "").strip():
+        required.append("attribution_mechanism")
+    if not str(action.get("attribution_scope") or "").strip():
+        required.append("attribution_scope")
+    if not action.get("attribution_assumptions"):
+        required.append("attribution_assumptions")
+    return required
+
+
+def review_diagnosis_action(state: Dict[str, Any], action: Any,
+                            route_dir: Any) -> Optional[Dict[str, Any]]:
+    """4.1/4.2 — the structured review path for diagnosis actions without attribution.
+
+    A diagnosis queued without ``attribution_mechanism``/``attribution_scope``/
+    ``attribution_assumptions`` is NOT assumed novel and NOT silently dispatched past
+    the guard forever: the first occurrence is annotated with the minimal fields to
+    declare (the action keeps its normal priority — ordinary exploration is never
+    held for missing attribution fields); from the second occurrence on the same
+    action id escalates to a bounded hold. Non-diagnosis actions are out of scope.
+
+    Occurrences are recorded as idempotent events keyed by
+    (route, action, state_version), so session restarts and retried applies do not
+    inflate the count.
+    """
+    if not isinstance(state, dict) or not route_dir or not isinstance(action, dict):
+        return None
+    if str(action.get("type") or "") != "discriminating_experiment":
+        return None                       # non-diagnosis actions are not TAG's business
+    missing = missing_attribution_fields(action)
+    if not missing:
+        return None                       # fully declared → classify/loop_guard own it
+    ident = diagnosis_action_id(action) or "?"
+    route_name = cg.route_of(pathlib.Path(route_dir) / "research-state.json")
+    key = {"route": route_name, "action": ident, "state_version":
+           state.get("state_version"), "fingerprint": None,
+           "tag_class": "ATTRIBUTION_REVIEW", "event_kind": "attribution_missing"}
+    event_id = event_id_from(key)
+    records, problems = load_events(route_dir)
+    if problems:
+        return {"hold": True, "escalate": True, "hold_reason": "tag_chain_damaged",
+                "reason": "TAG 事件链损坏：" + "; ".join(problems[:2]),
+                "attribution_review": {"action": ident, "required_fields": missing,
+                                       "occurrences": None}}
+    prior = [r for r in records if r.get("event_id") == event_id]
+    occurrences = len(prior) + 1
+    if occurrences <= ATTRIBUTION_REVIEW_ESCALATION:
+        try:
+            append_event(route_dir, {
+                "fingerprint": None, "mechanism": None, "scope": None,
+                "assumptions": [], "evidence_refs": [], "tag_class":
+                    "ATTRIBUTION_REVIEW", "review_required": True,
+                "source": "loop", "event_kind": "attribution_missing",
+                "event_id": event_id, "action": ident,
+                "route": route_name, "state_version": state.get("state_version"),
+                "required_fields": missing},
+                idempotency_key=key)
+        except (ChainDamaged, OSError):
+            pass                          # the annotation is advisory; never crash the loop
+    escalate = occurrences >= ATTRIBUTION_REVIEW_ESCALATION
+    return {"hold": escalate, "escalate": escalate,
+            "hold_reason": "tag_attribution_missing" if escalate else None,
+            "reason": (f"诊断动作 {ident} 缺少结构化归因（{', '.join(missing)}）；"
+                       + ("同一动作已多次未声明：暂停该动作，补充归因声明或改派其他动作"
+                          if escalate else
+                          "本次照常派遣，但必须补充最小归因声明（否则重复归因无法被识别）")),
+            "attribution_review": {"action": ident, "required_fields": missing,
+                                   "occurrences": occurrences}}
 
 
 def loop_guard(state: Dict[str, Any], action: Any, route_dir: Any) -> Optional[Dict[str, Any]]:
@@ -378,15 +826,50 @@ def _selftest() -> int:
     fresh = parse_declaration({**decl.raw, "evidence_refs": ["E7", "E9"]})[0]
     novel = classify(fresh, [event_from_classification(decl, first, "test")])
     expect("新增证据引用 → NOVEL", novel["tag_class"] == "NOVEL_DECISION_RELEVANT_DIAGNOSIS")
-    invalid = parse_declaration({**decl.raw, "validity_findings": ["adjoint test failed"]})[0]
-    blocker = classify(invalid, [])
-    expect("验证失败 → VALIDITY_BLOCKER 优先",
-           blocker["tag_class"] == "VALIDITY_BLOCKER")
+    # T01 — a self-declared "verified" physical limit without resolvable evidence must
+    # not earn a verified verdict (no state at all).
     limit = parse_declaration({**decl.raw, "physical_limit": {"verified": True,
                                                              "scope": ">=20x"}})[0]
     phys = classify(limit, [])
-    expect("已验证物理限制 → PHYSICAL_LIMIT_WITH_SCOPE",
-           phys["tag_class"] == "PHYSICAL_LIMIT_WITH_SCOPE")
+    expect("T01 自我声明 verified 无来源 → 不得认定已验证",
+           phys["tag_class"] == "INSUFFICIENT_EVIDENCE" and phys["review_required"],
+           str(phys))
+    # T02 — a limitation backed by resolvable, currently-valid evidence earns a scoped
+    # verdict bounded by its limit type.
+    state = {"state_version": 5, "evidence": [
+        {"id": "E9", "kind": "experiment", "scope": "20x VD", "supports": [],
+         "contradicts": [], "epistemic_status": "Observed",
+         "source_ref": "X9 oracle power run", "verification_tier": "T2",
+         "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                        "since_state_version": 4}}]}
+    limit2 = parse_declaration({**decl.raw, "physical_limit": {
+        "verified": True, "limit_type": "detection_power_limit",
+        "scope": ">=20x，直径 <1.5px 微血管", "source_refs": ["E9"]}})[0]
+    phys2 = classify(limit2, [], state=state)
+    expect("T02 有效证据支持的物理限制 → 带范围条件结论",
+           phys2["tag_class"] == "PHYSICAL_LIMIT_WITH_SCOPE"
+           and "条件性结论" in phys2["reason"], str(phys2))
+    # T03 — the same limitation whose evidence was later revoked stops binding.
+    revoked = json.loads(json.dumps(state))
+    revoked["evidence"][0]["validity"]["status"] = "invalid"
+    phys3 = classify(limit2, [], state=revoked)
+    expect("T03 证据被撤销 → 不再作为可靠限制",
+           phys3["tag_class"] == "INSUFFICIENT_EVIDENCE", str(phys3))
+    # T05 — a confirmed operator failure (failed experiment in state) wins.
+    op_state = {"state_version": 6, "experiments": [
+        {"id": "X9", "status": "failed", "stage": "X2", "claim_targeted": [],
+         "parent": None, "preregistration": {"frozen_at_state_version": 4}}]}
+    invalid = parse_declaration({**decl.raw, "validity_findings": ["adjoint test failed"],
+                                 "validity_evidence_refs": ["X9"]})[0]
+    blocker = classify(invalid, [], state=op_state)
+    expect("T05 真实算子失败（failed 实验）→ VALIDITY_BLOCKER 优先",
+           blocker["tag_class"] == "VALIDITY_BLOCKER", str(blocker))
+    invalid2 = parse_declaration({**decl.raw,
+                                  "validity_findings": ["adjoint test failed"]})[0]
+    unproven = classify(invalid2, [], state=op_state)
+    expect("T05b 纯文本有效性声明 → 安全审查而非已验证故障",
+           unproven["tag_class"] == "INSUFFICIENT_EVIDENCE"
+           and unproven["safety"] == "hold_pending_verification", str(unproven))
     limit_noscope = parse_declaration({**decl.raw,
                                        "physical_limit": {"verified": True}})[0]
     noscope = classify(limit_noscope, [])
@@ -442,6 +925,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                                                               required=True)
     sub.add_parser("check", help="validate the event chain").add_argument("--route",
                                                                          required=True)
+    rec = sub.add_parser("recover", help="archive a damaged chain and start fresh")
+    rec.add_argument("--route", required=True)
+    rec.add_argument("--archive", action="store_true",
+                     help="required confirmation: move the damaged log aside")
     args = parser.parse_args(argv)
     if args.selftest:
         return _selftest()
@@ -464,11 +951,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             for item in chain_problems:
                 print(f"[FAIL] {item}", file=sys.stderr)
             return EXIT_HARD
-        verdict = classify(declaration, records)
+        state = None
+        try:
+            loaded = json.loads(state_path.read_text(encoding="utf-8"))
+            state = loaded if isinstance(loaded, dict) else None
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            state = None
+        verdict = classify(declaration, records, state=state)
         print(json.dumps(verdict, ensure_ascii=False, indent=2))
         if args.record:
-            event = append_event(route_dir, event_from_classification(declaration, verdict,
-                                                                      "cli"))
+            event = append_event(route_dir, event_from_classification(
+                declaration, verdict, "cli", state=state))
             # Keep stdout machine-readable: the confirmation goes to stderr.
             print(f"[recorded] seq={event['seq']} → {events_path(route_dir)}",
                   file=sys.stderr)
@@ -486,6 +979,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print(f"[FAIL] {item}", file=sys.stderr)
             return EXIT_HARD
         print(f"[ok] {events_path(args.route)} 链完整")
+        return EXIT_OK
+    if args.command == "recover":
+        route = pathlib.Path(args.route)
+        _, problems = load_events(route)
+        if not problems:
+            print(f"[ok] {events_path(route)} 链完整，无需恢复")
+            return EXIT_OK
+        if not args.archive:
+            for item in problems[:3]:
+                print(f"[FAIL] {item}", file=sys.stderr)
+            print("[env] 确认后加 --archive 才会归档损坏日志并重新开始链条；"
+                  "不会静默清空或重置序号", file=sys.stderr)
+            return EXIT_ENV
+        result = recover_log(route)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return EXIT_OK
     parser.error("需要子命令或 --selftest")
     return EXIT_ERROR

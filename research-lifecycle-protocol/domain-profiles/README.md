@@ -21,12 +21,15 @@ Domain Profile 只补充**特定领域的语义、探索约束与评价规则**�
 项目或路线在控制平面写一个声明文件（**机器可读、人工可审**）：
 
 ```text
-<project>/.research-lifecycle-protocol/domain/<profile-id>.json     # 项目级
-<project>/.research-lifecycle-protocol/routes/<R>/domain/<profile-id>.json   # 路线级（优先）
+<project>/.research-lifecycle-protocol/domain/<profile-id>.json                  # 项目级（新根，文档默认）
+<project>/.research-lifecycle-protocol/routes/<R>/domain/<profile-id>.json       # 路线级（优先）
+<project>/.research-lifecycle-protocol/domain/<profile-id>.json                       # 项目级（旧根项目，同优先级）
+<project>/domain/<profile-id>.json                                               # 2.0.x 平铺位置（兼容回退，最后）
 ```
 
-旧项目兼容：当项目仍使用 `.research-idea-pipeline/` 时，同名相对位置同样有效。
-两个运行根同时存在时，`scripts/rlp_paths.py` 会按既有规则 fail closed。
+优先级：路线级 > 项目级（新根/旧根同层，先找到先生效）> 2.0.x 平铺回退位置。
+两个运行根同时存在时，`scripts/rlp_paths.py` 会按既有规则 fail closed；
+从平铺位置迁移 = 把文件移入运行根的 `domain/`，不做静默双读冲突。
 
 ```sh
 python3 scripts/domain_profile.py load --state <route>/research-state.json --profile mri-reconstruction

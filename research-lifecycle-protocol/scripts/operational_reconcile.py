@@ -295,7 +295,7 @@ def _project_root(route_dir: pathlib.Path) -> pathlib.Path:
 def _human_status_path(route_dir: pathlib.Path, route: str) -> Tuple[pathlib.Path, pathlib.Path]:
     """Return the human STATUS.md path and the root used for relative write reporting.
 
-    Canonical state lives in `<project>/.research-idea-pipeline/routes/<R>/`; the human view
+    Canonical state lives in `<project>/.research-lifecycle-protocol/routes/<R>/`; the human view
     lives in `<project>/routes/<R>/STATUS.md`.  Tests and installed fixtures may use a plain
     `<root>/<R>/research-state.json`, in which case STATUS.md sits next to the state.
     """
@@ -568,6 +568,22 @@ def reconcile(state_path: pathlib.Path, *, apply: bool = False,
     `evidence_outcome.apply()` transaction, and projections are only rebuilt.
     """
     state_path = pathlib.Path(state_path).expanduser().resolve()
+    # Runtime storage gate (v2.1.0): a legacy-only project pauses formal operations
+    # with a machine-readable migration state instead of writing the legacy root.
+    # Read-only inspection is unaffected; the migration tool uses its own APIs.
+    try:
+        import rlp_paths as _rlp
+    except ImportError:                                  # pragma: no cover - shipped module
+        _rlp = None
+    if _rlp is not None:
+        _project = _rlp.project_root_from_state(state_path)
+        _report = _rlp.runtime_status(_project)
+        if _report["status"] == _rlp.RUNTIME_STATUS_AMBIGUOUS:
+            raise _rlp.AmbiguousStorageRoot(_report["reason"])
+        if _report["status"] == _rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+            raise _rlp.MigrationRequired(_report["reason"])
+        if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
+            raise _rlp.InvalidStorageRoot(_report["reason"])
     route_dir = state_path.parent
     route = route_dir.name
     report = sc.check_file(state_path)
@@ -617,7 +633,7 @@ def reconcile(state_path: pathlib.Path, *, apply: bool = False,
         target = ready[0]
         payloads = target.pop("_payloads", {})
         result = eo.apply(state, payloads["packet"], payloads["analysis"], payloads["audit"],
-                          timestamp=timestamp)
+                          timestamp=timestamp, state_path=state_path)
         if result.get("status") == "PASS":
             _atomic_write_json(state_path, result["state"])
             writes.append(_rel(state_path, route_dir))

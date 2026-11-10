@@ -1641,6 +1641,26 @@ def project_context(state_path: Path, cognition_dir: Optional[Path] = None) -> D
             index_on_disk = parsed if isinstance(parsed, dict) else None
         except (json.JSONDecodeError, UnicodeDecodeError):
             index_on_disk = None
+    # v2.1.0 storage gate: every preset/resume entry resolves the runtime storage
+    # matrix first. A legacy-only project pauses with a machine-readable migration
+    # state instead of running formal research inside the legacy root.
+    try:
+        import rlp_paths as _rlp
+    except ImportError:                                  # pragma: no cover - shipped module
+        _rlp = None
+    if _rlp is not None:
+        try:
+            _project = _rlp.project_root_from_state(state_path)
+        except _rlp.LayoutError:
+            _project = None
+        if _project is not None:
+            _report = _rlp.runtime_status(_project)
+            if _report["status"] == _rlp.RUNTIME_STATUS_AMBIGUOUS:
+                raise _rlp.AmbiguousStorageRoot(_report["reason"])
+            if _report["status"] == _rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+                raise _rlp.MigrationRequired(_report["reason"])
+            if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
+                raise _rlp.InvalidStorageRoot(_report["reason"])
     return {
         "state_path": state_path, "route_dir": state_path.parent, "cognition_dir": cognition_dir,
         "state": state, "revisions": revisions, "cards": cards, "scheduler": scheduler,
@@ -1941,6 +1961,33 @@ def _assurance_dependencies(state: Dict[str, Any], pending: Sequence[str]) -> Li
     return sorted(dependent)
 
 
+def _attribution_review_check(state: Dict[str, Any], action: Any,
+                              ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Run the optional structured-attribution review on the first queued action."""
+    try:
+        import domain_guard as dg
+        import domain_profile as dp
+    except ImportError:                                  # pragma: no cover - shipped module
+        return None
+    route_dir = ctx.get("route_dir")
+    if route_dir is None:
+        return None
+    try:
+        profile, report = dp.active_profile(
+            ctx.get("state_path") or Path(route_dir) / "research-state.json",
+            state=state)
+    except dp.rlp.AmbiguousStorageRoot:
+        return None
+    if not profile or not report.ok:
+        return None
+    try:
+        return dg.review_diagnosis_action(state, action, route_dir)
+    except Exception as exc:                             # a broken review must fail closed
+        return {"hold": True, "escalate": True,
+                "hold_reason": "tag_attribution_review_error",
+                "reason": f"归因审查异常：{type(exc).__name__}: {exc}"}
+
+
 def _tag_loop_check(state: Dict[str, Any], action: Any, ctx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Run the optional domain Trivial Attribution Guard on the first queued action.
 
@@ -1957,8 +2004,9 @@ def _tag_loop_check(state: Dict[str, Any], action: Any, ctx: Dict[str, Any]) -> 
     if route_dir is None:
         return None
     try:
-        profile, report = dp.active_profile(ctx.get("state_path") or
-                                            Path(route_dir) / "research-state.json")
+        profile, report = dp.active_profile(
+            ctx.get("state_path") or Path(route_dir) / "research-state.json",
+            state=ctx.get("state"))
     except dp.rlp.AmbiguousStorageRoot as exc:
         return {"tag_class": "HOLD", "reason": f"存储根歧义：{exc}",
                 "fingerprint": None, "review_required": True, "notes": [], "hold": True,
@@ -2193,6 +2241,17 @@ def _loop_step(ctx: Dict[str, Any], *,
                 override["preempted_diagnosis"] = scheduler_first
                 override["preempt_reason"] = impact[0].message
                 return override
+        # Structured-attribution review (4.1/4.2): a diagnosis queued without the
+        # minimal attribution declaration is annotated once per state_version and
+        # escalates to a bounded hold from the second occurrence. Non-diagnosis
+        # actions are never touched; a fully declared action goes to TAG below.
+        attribution_review = _attribution_review_check(state, actions[0], ctx)
+        if attribution_review and attribution_review.get("hold"):
+            return {"phase": "HOLD", "step": "HOLD",
+                    "action": f"归因审查：{attribution_review['reason']}",
+                    "blocked": False, "hold": True,
+                    "hold_reason": attribution_review.get("hold_reason"),
+                    "attribution_review": attribution_review, "pending_r10": []}
         # Trivial Attribution Guard (domain profile, optional). A queued diagnosis whose
         # attribution was already classified REPEATED_ATTRIBUTION — same structural
         # fingerprint, no new evidence — is not dispatched again; the loop moves to the
@@ -2240,6 +2299,8 @@ def _loop_step(ctx: Dict[str, Any], *,
                 "action": f"按 Scheduler 选择下一项合法动作：{dispatched}",
                 "blocked": False, "hold": False, "pending_r10": [],
                 "assurance": guarantee, "assurance_pending": pending,
+                "attribution_review": (attribution_review or {}).get(
+                    "attribution_review"),
                 "dispatched_action": dispatched,
                 "scheduler_first_action": scheduler_first,
                 "strategy_overrode_scheduler": overrode,
@@ -2533,21 +2594,38 @@ def _handle_research_loop(ctx: Dict[str, Any], apply: bool) -> Dict[str, Any]:
                 writes.append(cg.SCHEDULER_NAME)
             except OSError as exc:
                 write_failure = f"scheduler_telemetry_unwritable: {type(exc).__name__}"
-        if write_failure is None and apply and (step.get("tag") or {}).get("tag_class") \
-                not in (None, "VALIDITY_BLOCKER"):
-            # Persist the TAG enforcement so the next round (and an audit) sees that the
-            # repeated diagnosis was withheld. Control-plane only: <route>/domain/.
-            try:
-                import domain_guard as tag_guard
-                event = dict(step["tag"])
-                event.pop("transition_menu", None)
-                event["event_kind"] = "loop_preempted"
-                event["preempted_action"] = step["tag"].get("preempted_action")
-                record = tag_guard.append_event(ctx["route_dir"], event)
-                writes.append(str(tag_guard.events_path(ctx["route_dir"]).relative_to(
-                    ctx["route_dir"])))
-            except Exception as exc:
-                write_failure = f"tag_event_unwritable: {type(exc).__name__}"
+    if write_failure is None and apply and (step.get("tag") or {}).get("tag_class") \
+            not in (None, "VALIDITY_BLOCKER"):
+        # TAG enforcement transaction — separate from the dispatch transaction above
+        # (a preempted step has no dispatched_action, and must never borrow one).
+        # Persists that the repeated diagnosis was withheld; control-plane only
+        # (<route>/domain/). Idempotent: the same logical preemption (same state,
+        # action, fingerprint, verdict) maps to one event_id, so a retried apply
+        # returns DUPLICATE instead of appending a second copy.
+        try:
+            import domain_guard as tag_guard
+            tag = step["tag"]
+            event = {k: v for k, v in tag.items() if k != "transition_menu"}
+            event["event_kind"] = "loop_preempted"
+            event["preempted_action"] = tag.get("preempted_action")
+            event["route"] = cg.route_of(ctx["state_path"])
+            event["state_version"] = ctx["state"].get("state_version")
+            event["state_digest"] = cg.digest_of(ctx["state"])
+            key = {k: event.get(k) for k in
+                   ("route", "state_version", "state_digest", "preempted_action",
+                    "fingerprint", "tag_class", "event_kind")}
+            record, status = tag_guard.append_event_once(ctx["route_dir"], event,
+                                                         idempotency_key=key)
+            rel = str(tag_guard.events_path(ctx["route_dir"])
+                      .relative_to(ctx["route_dir"]))
+            if status == "APPENDED" and rel not in writes:
+                writes.append(rel)
+        except tag_guard.ChainDamaged as exc:
+            # A chain that went bad between the step decision and the writeback is
+            # a diagnosable failure, never a silent skip.
+            write_failure = f"tag_event_chain_damaged: {exc}"
+        except OSError as exc:
+            write_failure = f"tag_event_unwritable: {type(exc).__name__}: {exc}"
     if write_failure:
         status = "HOLD"
         policy_delta = {"status": "none", "level": None, "policy_id": None, "scope": None}

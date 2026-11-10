@@ -55,7 +55,7 @@ python3 scripts/preset_router.py run --preset research-loop --state <state>   # 
 
 ```sh
 python3 scripts/evidence_outcome.py assurance-store \
-  --state .research-idea-pipeline/routes/C/research-state.json \
+  --state .research-lifecycle-protocol/routes/C/research-state.json \
   --experiment X-result --reviewer R7 \
   --check integrity=PASS:"audit 摘要与 source-ref 已逐项核对，来源未改写" \
   --check claim_calibration=PASS:"C1 由 T2 支持证据升级，scope 与冻结范围一致" \

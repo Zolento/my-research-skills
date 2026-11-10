@@ -401,9 +401,9 @@ def compatibility_audit(
 def _infer_project_root(state_path: Path) -> Path:
     """Infer the project root from either documented storage layout.
 
-    Legacy projects keep `<root>/.research-idea-pipeline/`; new projects use
-    `<root>/.research-lifecycle-protocol/`. Both are read through the same resolver so a
-    legacy state is never re-bootstrapped or moved.
+    Legacy projects keep `<root>/.research-idea-pipeline/` as a migration source only;
+    new and migrated projects use `<root>/.research-lifecycle-protocol/`. Both layouts
+    are recognized read-only; formal continuation requires the migrated new root.
     """
     return rlp.project_root_from_state(state_path)
 
@@ -656,6 +656,18 @@ def render_report(handoff: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 def _take(state_path: Path, project_root: Optional[Path]) -> int:
+    # v2.1.0 storage gate: a legacy-only project must migrate its control root before
+    # any formal continuation. detect() stays read-only; take() would write the legacy
+    # root, which is no longer a legal runtime location.
+    import rlp_paths as _rlp
+    _project = _rlp.project_root_from_state(Path(state_path).expanduser().resolve())
+    _status = _rlp.runtime_status(_project)["status"]
+    if _status == _rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+        raise _rlp.MigrationRequired(
+            "legacy-only project: migrate the control root before Cold Handoff "
+            "(python3 scripts/migrate_project_root.py inspect --project ...)")
+    if _status == _rlp.RUNTIME_STATUS_AMBIGUOUS:
+        raise _rlp.AmbiguousStorageRoot(_rlp.runtime_status(_project)["reason"])
     state_before = cg.state_fingerprint(state_path)
     audit = compatibility_audit(state_path, project_root)
     route_dir = state_path.parent

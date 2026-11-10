@@ -69,7 +69,7 @@ python3 <skill>/scripts/refs_index.py --refs-dir docs/refs --check
 |---|---|
 | 当前状态 | [STATUS.md](STATUS.md) |
 | 材料目录 | [INDEX.md](INDEX.md) |
-| 机器状态 | `.research-idea-pipeline/routes/<R>/research-state.json` |
+| 机器状态 | `.research-lifecycle-protocol/routes/<R>/research-state.json` |
 | 项目总览 | `../README.md` |
 | 路线总表 | `../INDEX.md` |
 

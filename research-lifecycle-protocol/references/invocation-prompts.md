@@ -90,8 +90,8 @@ Router 负责解析（显式 id > 别名 > 意图词 + 入口 > 意图词 > Loop
 **不得执行全新 Bootstrap（`B0`—`B6`）**，只能走 Legacy Research Handoff。
 
 ```sh
-python3 scripts/legacy_handoff.py detect --state .research-idea-pipeline/routes/<R>/research-state.json
-python3 scripts/legacy_handoff.py take   --state .research-idea-pipeline/routes/<R>/research-state.json
+python3 scripts/legacy_handoff.py detect --state .research-lifecycle-protocol/routes/<R>/research-state.json
+python3 scripts/legacy_handoff.py take   --state .research-lifecycle-protocol/routes/<R>/research-state.json
 ```
 
 `detect` 判定 `bootstrap_forbidden`；`take` 执行**只读**兼容性审计并重建认知记忆，

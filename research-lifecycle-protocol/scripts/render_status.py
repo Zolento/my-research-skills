@@ -40,7 +40,7 @@ EXIT_OK = 0
 EXIT_HARD = 3
 EXIT_ENV = 4
 
-STATE_REL = ".research-idea-pipeline/routes/{route}/research-state.json"
+STATE_REL = ".research-lifecycle-protocol/routes/{route}/research-state.json"
 STATUS_REL = "routes/{route}/STATUS.md"
 
 
@@ -166,8 +166,9 @@ def main(argv: List[str] | None = None) -> int:
         root = pathlib.Path(args.root).resolve()
         try:
             state_path = rlp.default_state_path(root, args.route)
-        except rlp.AmbiguousStorageRoot as exc:
-            return _fail(str(exc), "hard")
+        except (rlp.AmbiguousStorageRoot, rlp.MigrationRequired,
+                rlp.InvalidStorageRoot) as exc:
+            return _fail(f"{type(exc).__name__}: {exc}", "hard")
         out_path = pathlib.Path(args.out) if args.out else root / STATUS_REL.format(route=args.route)
     elif args.state:
         state_path = pathlib.Path(args.state).resolve()

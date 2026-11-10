@@ -315,13 +315,13 @@ class TestMalformedArtifact(unittest.TestCase):
 
 
 class TestRouteMode(unittest.TestCase):
-    REF = ".research-idea-pipeline/routes/T/assurance/structural-equivalence/H1.json"
+    REF = ".research-lifecycle-protocol/routes/T/assurance/structural-equivalence/H1.json"
 
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.project = pathlib.Path(self.tmp.name)
-        self.route = self.project / ".research-idea-pipeline" / "routes" / "T"
+        self.route = self.project / ".research-lifecycle-protocol" / "routes" / "T"
         (self.route / "assurance" / "structural-equivalence").mkdir(parents=True)
         self.artifact = _load(TEMPLATE)
         self.artifact["candidate"] = "H1"
@@ -425,7 +425,7 @@ class TestRouteMode(unittest.TestCase):
     def test_unknown_target_hits_eq2(self) -> None:
         self.state["assurance"][0]["target"] = "H7"
         self.state["assurance"][0]["audit_ref"] = \
-            ".research-idea-pipeline/routes/T/assurance/structural-equivalence/H7.json"
+            ".research-lifecycle-protocol/routes/T/assurance/structural-equivalence/H7.json"
         (self.route / "assurance" / "structural-equivalence" / "H7.json").write_text(
             json.dumps({**self.artifact, "candidate": "H7"}, ensure_ascii=False),
             encoding="utf-8")

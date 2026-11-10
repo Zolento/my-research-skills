@@ -102,9 +102,16 @@ class TestTenScenarios(ScenarioBase):
                              "the loop must offer the method-transition menu")
 
     def test_2_real_operator_error_is_repaired_not_suppressed(self):
-        """真正算子错误：进入完整性修复，TAG 永不阻断。"""
+        """真正算子错误（canonical failed 实验）：进入完整性修复，TAG 永不阻断。"""
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("experiments", []).append(
+            {"id": "X11", "status": "failed", "stage": "X2", "claim_targeted": [],
+             "parent": None, "preregistration": {"frozen_at_state_version": 0}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
         declaration = self.harness.declaration("coil_sensitivity_error")
         declaration["validity_findings"] = ["CSM 相位与已知几何不符（回代残差系统性偏高）"]
+        declaration["validity_evidence_refs"] = ["X11"]
         path = self.harness.route / "declaration.json"
         path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
         verdict = json.loads(self._classify(path, record=True).stdout)
@@ -175,10 +182,20 @@ class TestTenScenarios(ScenarioBase):
         self.assertTrue(any(item.startswith("DP14") for item in problems), problems)
 
     def test_7_verified_information_limit_bounds_the_search_space(self):
-        """已验证严格信息极限：保留范围内负结论，不虚构可恢复性。"""
+        """已验证严格信息极限（证据支持的数学不可能性）：保留范围内负结论。"""
+        state = json.loads(self.harness.state_path.read_text(encoding="utf-8"))
+        state.setdefault("evidence", []).append(
+            {"id": "E9", "kind": "experiment", "scope": "≥20x", "supports": [],
+             "contradicts": [], "epistemic_status": "Observed",
+             "source_ref": "X9 oracle impossibility proof", "verification_tier": "T2",
+             "depends_on": [], "validity": {"status": "valid", "reason": "已按预注册",
+                                            "since_state_version": 0}})
+        self.harness.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                           encoding="utf-8")
         declaration = self.harness.declaration("undersampling_information")
-        declaration["physical_limit"] = {"verified": True,
-                                         "scope": "≥20x，直径 <1.5px 微血管不可见"}
+        declaration["physical_limit"] = {
+            "verified": True, "limit_type": "mathematical_impossibility",
+            "scope": "≥20x，直径 <1.5px 微血管不可见", "source_refs": ["E9"]}
         path = self.harness.route / "declaration.json"
         path.write_text(json.dumps(declaration, ensure_ascii=False), encoding="utf-8")
         verdict = json.loads(self._classify(path, record=True).stdout)

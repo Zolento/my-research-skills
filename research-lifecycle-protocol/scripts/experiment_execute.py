@@ -429,6 +429,18 @@ def main(argv=None):
     def read(path): return json.loads(path.read_text(encoding='utf-8'))
     try:
         state=read(args.state)
+        # v2.1.0 storage gate: managed execution is formal research — a legacy-only
+        # project must migrate its control root first (scheduler-check stays read-only).
+        if args.command in ('issue','run'):
+            import rlp_paths as _rlp
+            try:
+                _project=_rlp.project_root_from_state(Path(args.state).expanduser().resolve())
+            except _rlp.LayoutError:
+                _project=None   # bare fixture layout: not a real project, nothing to gate
+            _report=_rlp.runtime_status(_project) if _project else {'status':_rlp.RUNTIME_STATUS_NEW_PROJECT,'reason':None}
+            if _report['status']==_rlp.RUNTIME_STATUS_AMBIGUOUS: raise _rlp.AmbiguousStorageRoot(_report['reason'])
+            if _report['status']==_rlp.RUNTIME_STATUS_MIGRATION_REQUIRED: raise _rlp.MigrationRequired(_report['reason'])
+            if _report['status']==_rlp.RUNTIME_STATUS_INVALID: raise _rlp.InvalidStorageRoot(_report['reason'])
         if args.command == 'scheduler-check': result=eg.scheduler_check(state,read(args.scheduler))
         else:
             ledger=Ledger(args.ledger or args.state.parent/'.execution',read(args.policy) if args.policy else None)

@@ -43,7 +43,7 @@
 Server ID 变化 → 目录整体不命中（等价于整库缓存失效）；
 PDF 内容变化 → 指纹变化 → 新文件、旧文本不再被读取。
 
-缓存根目录默认 `.research-idea-pipeline/zotero-fulltext-cache/`，
+缓存根目录默认 `.research-lifecycle-protocol/zotero-fulltext-cache/`，
 该路径已在 `research-lifecycle-protocol/.gitignore` 中被忽略（`git check-ignore` 实测通过），
 **绝不**把受版权保护的全文放进版本库。
 """
@@ -1041,14 +1041,14 @@ def search_pdf_pages(
 def default_cache_root() -> Path:
     """默认缓存根目录。
 
-    默认 `<组件根>/.research-idea-pipeline/zotero-fulltext-cache`，该路径已被
+    默认 `<组件根>/.research-lifecycle-protocol/zotero-fulltext-cache`，该路径已被
     `research-lifecycle-protocol/.gitignore` 忽略（缓存全文绝不进版本库）。
     可用环境变量 `RESEARCH_ZOTERO_FULLTEXT_CACHE` 覆盖。
     """
     override = _clean(os.environ.get(CACHE_ROOT_ENV))
     if override:
         return Path(override).expanduser()
-    return Path(__file__).resolve().parent.parent / ".research-idea-pipeline" / "zotero-fulltext-cache"
+    return Path(__file__).resolve().parent.parent / ".research-lifecycle-protocol" / "zotero-fulltext-cache"
 
 
 def _safe_component(value: Any) -> str:

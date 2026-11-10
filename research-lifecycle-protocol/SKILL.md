@@ -26,7 +26,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.0.0"
+  version: "2.1.0"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -52,15 +52,6 @@ Agent 生命周期、沙箱、工具执行与外部调度，两者保持职责�
 
 ---
 
-
-# Research Lifecycle Protocol（顶会研究创意流水线）
-
-一套面向 CVPR / ICML / NeurIPS / MICCAI 投稿的**科研搜索系统**，不是文档流水线。
-以 **Research State 为中心**，同时运行 **Discovery Loop**（扩大候选、保多样性）与
-**Assurance Loop**（对抗审核、修复、可复现），共 15 个 R 阶段（R0—R14）。
-
-**本 Skill 只做编排与串联。** 子代理的角色设定、评分维度、审查视角沿用统一角色库
-（见 [references/roles.md](references/roles.md)），不在各 R 阶段内重新定义。
 
 ---
 
@@ -645,7 +636,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
 ├── experiments/A/<XID>/   # ★ 实验注册表：想做什么（pre-registration）
 ├── results/A/<XID>/       # ★ 观察到什么（observation）
 ├── shared/                # 极小：无法归入 src/docs/configs 的多路线资产
-└── .research-idea-pipeline/routes/A/research-state.json   # 机器状态（不入 docs）
+└── .research-lifecycle-protocol/routes/A/research-state.json   # 机器状态（不入 docs）
 ```
 
 **八条硬性规则：**
@@ -680,7 +671,7 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    用 `-r<NN>` 是因为 `-review.md`/`-review-2.md` 在 `ls`/`sort` 下**轮次顺序是反的**。
    一轮覆盖多份文档时挂主文档 ID，其余写 frontmatter 的 `also_reviewed`。
 5. **参考文献集中：** 论文元数据/笔记/缓存一律放 **`docs/refs/`**（脚本默认
-   `--local-dir ./docs/refs`）；机器状态放 `.research-idea-pipeline/`，日志放 `logs/`
+   `--local-dir ./docs/refs`）；机器状态放 `.research-lifecycle-protocol/`（旧项目先迁移，见 references/identity-and-compatibility.md），日志放 `logs/`
    ——**都不进 docs 正文**。
 6. **PDF 必须入索引：** `docs/refs/` 下的每个 PDF 都要在 **`docs/refs/index.json`**
    里有一条记录（字段见 [literature-policy.md](references/literature-policy.md) §7.1）。
@@ -691,8 +682,8 @@ Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
    | 档 | 落盘位置 | 例 |
    |---|---|---|
    | **交付物** | `routes/<R>/docs/`（扁平，不分子目录） | `anchor` / proposal / experiment-plan / narrative / review |
-   | **中间产物** | `.research-idea-pipeline/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 |
-   | **机器状态** | `.research-idea-pipeline/routes/<R>/research-state.json` | **R1 常驻状态**（就地覆盖，不按阶段切分） |
+   | **中间产物** | `.research-lifecycle-protocol/routes/<R>/<被审ID>-r<NN>/` | 子代理**原始**评审件、草稿、检索原始结果 |
+   | **机器状态** | `.research-lifecycle-protocol/routes/<R>/research-state.json` | **R1 常驻状态**（就地覆盖，不按阶段切分） |
 
    - 子代理的**原始评审件**属于**中间产物**：**不进 `docs/`**，也**不得**为了塞进去而在
      `routes/<R>/docs/` 下建子目录（该目录内不分子目录）。
@@ -873,11 +864,11 @@ C5.status  = Supported     ← 保持不动，不因"停研究"而降级
 **三层，一个方向：**
 
 ```text
-Canonical  .research-idea-pipeline/routes/<R>/research-state.json   ← 唯一权威
-Event      .research-idea-pipeline/routes/<R>/cognition/model-revisions.jsonl
+Canonical  .research-lifecycle-protocol/routes/<R>/research-state.json   ← 唯一权威
+Event      .research-lifecycle-protocol/routes/<R>/cognition/model-revisions.jsonl
            结构断言 + canonical 指针，append-only                  ← 不承载支持度
-Derived    .research-idea-pipeline/routes/<R>/cognition/index.json
-           .research-idea-pipeline/routes/<R>/cognition/context-brief.md
+Derived    .research-lifecycle-protocol/routes/<R>/cognition/index.json
+           .research-lifecycle-protocol/routes/<R>/cognition/context-brief.md
            可由前两层重建                                         ← 永不是权威
 ```
 
@@ -918,9 +909,9 @@ state 的视图）；R14 只读 Context Brief。详见该政策 §8。
 **机械闸门 `CM1`—`CM10`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
 
 ```sh
-python3 scripts/cognition.py build --state .research-idea-pipeline/routes/<R>/research-state.json
-python3 scripts/cognition.py check --state .research-idea-pipeline/routes/<R>/research-state.json
-python3 scripts/cognition.py brief --state .research-idea-pipeline/routes/<R>/research-state.json --budget 4000
+python3 scripts/cognition.py build --state .research-lifecycle-protocol/routes/<R>/research-state.json
+python3 scripts/cognition.py check --state .research-lifecycle-protocol/routes/<R>/research-state.json
+python3 scripts/cognition.py brief --state .research-lifecycle-protocol/routes/<R>/research-state.json --budget 4000
 ```
 
 退出码同仓库约定：`0` 通过 / `1` 参数错误 / `3` 硬违规 / `4` 环境不满足。
@@ -1396,7 +1387,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 - **R11：** `result → claim update → uncertainty update → EIG 回填 → next experiment` **五步**，缺一不可。
   第 3 步的判据是「**有没有有意义的 state delta**」，不是「有没有关掉一条 `U`」：
   `uncertainty` 可 `high → medium → low` 而 `status` 保持 `open`（两个维度独立，**不得**判不闭环）。
-- **落盘：** `.research-idea-pipeline/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
+- **落盘：** `.research-lifecycle-protocol/routes/<R>/research-state.json`（就地覆盖，不按阶段切分）；
   EIG 对照写同目录的 `scheduler.json`（telemetry，由 execution gate 检查来源和状态）。
 - **维护 vs 科学更新：** 投影刷新、STATUS 重渲染、索引与日志归档属于 A 类，可自动执行；
   outcome / claim / assurance / failure / decision 属于 B 类，必须过 R9.O / R10 / R11 / R7。
@@ -1415,7 +1406,7 @@ teammate，例如 Agent Teams）。然后按三种情形处理：
 
 **衔接图见 §0 的双循环图。** 三条回写规则：
 
-1. **R1 是唯一状态载体**：`.research-idea-pipeline/routes/<R>/research-state.json`，**就地覆盖**，
+1. **R1 是唯一状态载体**：`.research-lifecycle-protocol/routes/<R>/research-state.json`（唯一运行时控制根；旧项目先迁移），**就地覆盖**，
    不按阶段切分快照（旧的 `state-<mode>-<ts>.json` 口径已作废）。
 2. **改 `claims[].status` 默认只能经 R10。** **唯一例外**：R8 挂证据时可做**证据驱动的单向升级**（`ungrounded` → `partially-supported` / `supported`）；**降级与否决**（`contradicted` / `killed`）**仍只能经 R10**。
    Discovery（R3—R6）与 Assurance（R7）都不得直接改 ——
@@ -1738,7 +1729,7 @@ for f in examples/structural-equivalence/*.json; do
   python3 scripts/structural_equivalence_check.py --artifact "$f" || exit 1
 done
 #    真实项目里还要跑路线级交叉校验：
-#    python3 scripts/structural_equivalence_check.py --route .research-idea-pipeline/routes/<R>
+#    python3 scripts/structural_equivalence_check.py --route .research-lifecycle-protocol/routes/<R>
 
 # 8) Rhetorical Realization —— 受限算子与 adversarial counterexamples
 python3 -m unittest discover -s scripts -p 'test_rhetorical_realization.py'

@@ -1821,6 +1821,59 @@ def resolve_artifacts(state: Dict[str, Any], route_dir: Any, hypothesis_id: str 
 # Loop-facing transition
 # ---------------------------------------------------------------------------
 
+def domain_candidate_review(state: Dict[str, Any], candidates: Sequence[Dict[str, Any]],
+                            route_dir: Any) -> Optional[Dict[str, Any]]:
+    """MMS domain validation inside the I2M candidate path (RLP v2.0.1 §7.2).
+
+    Active only when the route declares a domain profile. Runs the same
+    `domain_mms.candidate_errors` checker the CLI uses, so the domain contract cannot
+    be bypassed by authoring candidates through I2M instead of the standalone tool.
+    A damaged TAG log fails closed here too (T18). Returns None when inactive.
+    """
+    if route_dir is None:
+        return None
+    try:
+        import domain_guard as domain_guard_module
+        import domain_mms as domain_mms_module
+        import domain_profile as domain_profile_module
+    except ImportError:                                   # pragma: no cover - shipped
+        return None
+    from pathlib import Path as _Path
+    state_path = _Path(route_dir).expanduser() / "research-state.json"
+    try:
+        profile_id, report = domain_profile_module.active_profile(state_path, state=state)
+    except domain_profile_module.rlp.AmbiguousStorageRoot as exc:
+        return {"blocking": True, "errors": [f"MM-root: 存储根歧义：{exc}"],
+                "notes": [], "profile": None}
+    if not profile_id:
+        return None
+    if not report.ok:
+        return {"blocking": True,
+                "errors": [f"MM-config: 已声明的领域配置非法："
+                           + "；".join(report.hard_messages()[:2])],
+                "notes": [], "profile": profile_id}
+    records, problems = domain_guard_module.load_events(route_dir)
+    if problems:
+        return {"blocking": True,
+                "errors": [f"MM-log: TAG 事件链损坏：{'；'.join(problems[:2])}"],
+                "notes": [], "profile": profile_id}
+    blocking: List[str] = []
+    advisory: List[str] = []
+    for index, candidate in enumerate(candidates if isinstance(candidates, list) else []):
+        if not isinstance(candidate, dict):
+            continue
+        cid = str(candidate.get("candidate_id") or f"candidate[{index}]")
+        for error in domain_mms_module.candidate_errors(
+                candidate, profile_config=report.config, state=state,
+                tag_records=records, route_dir=route_dir):
+            if error.startswith("MM3b-review"):
+                advisory.append(f"{cid}: {error}")
+            else:
+                blocking.append(f"{cid}: {error}")
+    return {"blocking": bool(blocking), "errors": blocking, "notes": advisory,
+            "profile": profile_id}
+
+
 def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = None,
                insight: Optional[Dict[str, Any]] = None,
                contract: Optional[Dict[str, Any]] = None,
@@ -1895,6 +1948,19 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                     "blocked": False, "hold": False,
                     "i2m": {"readiness": readiness, "path": path, "synthesis": outcome,
                             "decision": decision}}
+        # Domain candidate validation (MMS) — between Candidate and Preference. Runs the
+        # same checks as the standalone CLI, so an active MRI profile cannot be bypassed
+        # by authoring candidates directly through I2M (v2.0.1 §7.2).
+        domain_review = domain_candidate_review(state, outcome.get("candidates") or [],
+                                                route_dir) if route_dir is not None else None
+        if domain_review and domain_review.get("blocking"):
+            return {"phase": "I2M", "stage": "synthesis", "step": "Synthesize",
+                    "action": ("领域候选验证未通过（MMS " +
+                               str(domain_review.get("profile")) + "）："
+                               "按诊断补全候选的具体性后再冻结设计契约"),
+                    "blocked": True, "hold": False,
+                    "i2m": {"readiness": readiness, "path": path, "synthesis": outcome,
+                            "domain_review": domain_review, "decision": decision}}
         # The preference is not a gate, but it does determine the recommended artifact: the
         # contract skeleton is built from the candidate the comparison preferred.
         judgement = (outcome.get("taste") or {}).get("judgement")
@@ -1942,6 +2008,9 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                                state_version=state.get("state_version"))
         skeleton = contract_from_candidate(chosen, insight=insight,
                                            rules_digest=_text(insight.get("rules_digest")))
+        if domain_review is not None and domain_review.get("notes"):
+            skeleton = dict(skeleton or {})
+            skeleton["domain_review_notes"] = domain_review["notes"]
         return {"phase": "I2M", "stage": "contract", "step": "Synthesize",
                 "action": f"按比较偏好冻结 {chosen.get('candidate_id')} 的设计契约"
                           "（其余候选保留为备选，不删除）",
@@ -1955,7 +2024,9 @@ def transition(state: Dict[str, Any], *, scheduler: Optional[Dict[str, Any]] = N
                         "calibration": (calibration or {}).get("signals", []),
                         "candidate_id": chosen.get("candidate_id"),
                         "preferred_over": (outcome.get("taste") or {}).get("alternatives") or [],
-                        "contract_skeleton": skeleton, "decision": decision}}
+                        "contract_skeleton": skeleton, "decision": decision,
+                        "domain_review": (domain_review if domain_review is not None
+                                          else None)}}
     problems = design_contract_errors(state, contract)
     if problems:
         return {"phase": "I2M", "stage": "contract", "step": "HOLD",

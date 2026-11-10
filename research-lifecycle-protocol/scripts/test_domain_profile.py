@@ -38,15 +38,20 @@ def minimal_config() -> dict:
         "gt": {"available": False, "usage": "none"},
         "ssl": {"type": "ssdu",
                 "split": {"input": "theta", "loss": "lambda",
-                          "held_out_validation": "omega_val"},
+                          "held_out_validation": "omega_val",
+                          "measurement_identity": {"fields": "subject/slice/volume/acquisition", "mask_sharing_allowed": True}},
                 "acs": {"usage": "frozen_protocol"}},
         "model_selection": {"protocol": "omega_val_only", "uses_gt": False},
         "frozen": {"components": ["ct-fm backbone", "fbs 100 steps"],
                    "forbidden_changes": ["主干权重", "推理算法"]},
         "metrics": {"primary": {"name": "nmse_global", "threshold": 0.02,
+                                "direction": "lower_is_better",
+                                "preregistration_ref": "X1",
                                 "frozen_before_results": True,
                                 "frozen_at_state_version": 3},
                     "structural": [{"name": "vessel_mip_connectivity", "threshold": 0.05,
+                                    "direction": "higher_is_better",
+                                    "preregistration_ref": "X1",
                                     "frozen_before_results": True,
                                     "frozen_at_state_version": 3}]},
         "resources": {"gpu_hours_budget": 12},
@@ -58,11 +63,18 @@ class Route:
 
     def __init__(self, root: pathlib.Path, *, legacy: bool = True):
         self.root = root
-        storage = rlp.LEGACY_STORAGE_ROOT if legacy else rlp.STORAGE_ROOT
+        storage = rlp.STORAGE_ROOT if legacy else rlp.STORAGE_ROOT
         self.route = root / storage / "routes" / "A"
         self.route.mkdir(parents=True, exist_ok=True)
         self.state_path = self.route / "research-state.json"
-        self.state_path.write_text(json.dumps({"state_version": 5}), encoding="utf-8")
+        state = {"state_version": 5, "experiments": [
+            {"id": "X1", "status": "running", "parent": None, "stage": "X2",
+             "claim_targeted": [],
+             "preregistration": {"frozen_at_state_version": 3}}]}
+        # the on-disk state binds the frozen metric contract (real R8 sequence)
+        state = dp.bind_metric_contract(minimal_config(), state)
+        self.state_path.write_text(json.dumps(state, ensure_ascii=False),
+                                   encoding="utf-8")
 
     def declare(self, config: dict, level: str = "route") -> pathlib.Path:
         base = self.route if level == "route" else self.root
@@ -90,7 +102,9 @@ class TestLoader(unittest.TestCase):
     def test_valid_declaration_loads_from_the_route(self):
         self.route.declare(minimal_config())
         report = dp.load(self.route.route, "mri-reconstruction",
-                         state={"state_version": 5})
+                         state=dp.bind_metric_contract(
+                             minimal_config(),
+                             json.loads(self.route.state_path.read_text(encoding="utf-8"))))
         self.assertTrue(report.active)
         self.assertEqual(report.level, "route")
         self.assertTrue(report.ok, report.hard_messages())
@@ -102,7 +116,7 @@ class TestLoader(unittest.TestCase):
         self.assertEqual(report.level, "project")
         # A project-level declaration lives at the project root, outside both storage roots.
         self.assertTrue(report.config_path.endswith("domain/mri-reconstruction.json"))
-        self.assertNotIn(rlp.LEGACY_STORAGE_ROOT, report.config_path)
+        self.assertNotIn(rlp.STORAGE_ROOT, report.config_path)
 
     def test_declared_but_invalid_config_fails_closed(self):
         config = minimal_config()
@@ -110,7 +124,9 @@ class TestLoader(unittest.TestCase):
         config["gt"]["usage"] = "full"
         self.route.declare(config)
         report = dp.load(self.route.route, "mri-reconstruction",
-                         state={"state_version": 5})
+                         state=dp.bind_metric_contract(
+                             config,
+                             json.loads(self.route.state_path.read_text(encoding="utf-8"))))
         self.assertFalse(report.ok)
         rules = {item.rule for item in report.findings}
         self.assertIn("DP7", rules)
@@ -126,7 +142,7 @@ class TestLoader(unittest.TestCase):
 
     def test_ambiguous_dual_root_fails_closed_before_profiles_are_read(self):
         self.route.declare(minimal_config())
-        (self.route.root / rlp.STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
+        (self.route.root / rlp.LEGACY_STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
         with self.assertRaises(rlp.AmbiguousStorageRoot):
             dp.discover(self.route.route, "mri-reconstruction")
         with self.assertRaises(rlp.AmbiguousStorageRoot):

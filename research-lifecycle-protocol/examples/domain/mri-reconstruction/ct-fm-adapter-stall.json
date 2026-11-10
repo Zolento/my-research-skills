@@ -1,0 +1,31 @@
+{
+  "_schema": "research-idea-pipeline/replay-pack@1",
+  "task": "cross_domain_generative_prior",
+  "decision_point": "冻结 CT-FM 主干 + FBS 条件下，adapter 容量扩展带来的收益已饱和",
+  "primary_anchor": "performance",
+  "visible": {
+    "failures": [
+      {"id": "F1", "kind": "unsupported",
+       "finding": "加大 adapter 参数量的假设未获支持（等容量对照无差异）"},
+      {"id": "F2", "kind": "deprioritized",
+       "finding": "继续调大网络的方向在第二轮对照中再次无差异"}
+    ],
+    "prior_declarations": [
+      {"mechanism": "data_scarcity", "scope": "ct-fm frozen fbs",
+       "assumptions": ["目标域无 GT"], "evidence_refs": ["F1"]}
+    ]
+  },
+  "hidden_after": [
+    "后续改变训练 exposure 与 sample supply 的真实结果",
+    "后验自蒸馏的有限收益结论"
+  ],
+  "probe": {
+    "kind": "diagnosis",
+    "declaration": {"mechanism": "data_scarcity", "scope": "ct-fm frozen fbs",
+                    "assumptions": ["目标域无 GT"], "evidence_refs": ["F1"]}
+  },
+  "expected": {
+    "no_fallbacks": ["data_scarcity"],
+    "allow": ["REPEATED_ATTRIBUTION", "METHOD_TRANSITION_READY"]
+  }
+}

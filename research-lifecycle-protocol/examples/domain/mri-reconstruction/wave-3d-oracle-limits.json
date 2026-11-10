@@ -1,0 +1,26 @@
+{
+  "_schema": "research-idea-pipeline/replay-pack@1",
+  "task": "wave_3d_structure",
+  "decision_point": "Oracle 检测功效实验已给出条件性限制后，是否继续重复噪声诊断",
+  "primary_anchor": "structure",
+  "visible": {
+    "failures": [
+      {"id": "F1", "kind": "unsupported",
+       "finding": "在当前采样与噪声配置下，弱血管检出功效实验显示特定直径范围不可见"}
+    ],
+    "prior_declarations": [
+      {"mechanism": "snr_limit", "scope": "wave 3d slab",
+       "assumptions": ["高斯噪声"], "evidence_refs": ["F1"]}
+    ]
+  },
+  "hidden_after": ["限制适用范围的后续边界实验"],
+  "probe": {
+    "kind": "diagnosis",
+    "declaration": {"mechanism": "snr_limit", "scope": "wave 3d slab",
+                    "assumptions": ["高斯噪声"], "evidence_refs": ["F1"]}
+  },
+  "expected": {
+    "no_fallbacks": ["snr_limit"],
+    "allow": ["REPEATED_ATTRIBUTION", "PHYSICAL_LIMIT_WITH_SCOPE"]
+  }
+}

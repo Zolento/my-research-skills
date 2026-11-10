@@ -97,6 +97,49 @@ def failure_count_for_mechanism(state: Dict[str, Any], mechanism: str) -> int:
     return count
 
 
+def _scope_tokens(scope: str) -> set:
+    """Normalised tokens of a scope string, for a conservative overlap test."""
+    import re as _re
+    return {tok for tok in _re.split(r"[\s，,;；/、+]+", (scope or "").lower()) if tok}
+
+
+def _scopes_disjoint(a: str, b: str) -> bool:
+    """Conservative disjointness: both scopes non-empty with no shared token.
+
+    Never used to auto-reject — only to downgrade a rejection to a review (7.4).
+    """
+    ta, tb = _scope_tokens(a), _scope_tokens(b)
+    return bool(ta) and bool(tb) and not (ta & tb)
+
+
+def structural_candidate_digest(candidate: Dict[str, Any]) -> str:
+    """The mathematical identity of a method candidate (name-independent)."""
+    math_change = candidate.get("mathematical_change") if \
+        isinstance(candidate.get("mathematical_change"), dict) else {}
+    return cg.digest_of({"direction": candidate.get("direction"),
+                         "mechanism": candidate.get("target_failure_mechanism"),
+                         "changes_object": math_change.get("changes_object"),
+                         "changed_rule": math_change.get("changed_rule")})
+
+
+def duplicate_candidate_errors(candidate: Dict[str, Any],
+                               route_dir: Any) -> List[str]:
+    """MM9 — a structurally identical archived candidate is a rename, not a new
+    method. Structural comparison only (direction/mechanism/changes object & rule);
+    near-misses are left to review rather than keyword-matched.
+    """
+    problems: List[str] = []
+    digest_ = structural_candidate_digest(candidate)
+    for existing in _existing_candidates(route_dir):
+        if isinstance(existing, dict) and \
+                structural_candidate_digest(existing) == digest_:
+            problems.append(
+                f"MM9: 候选与已归档候选 {existing.get('candidate_id') or '?'} "
+                "数学结构完全相同（方向/机制/改变对象/改变规则）；更换名称不构成新方法")
+            break
+    return problems
+
+
 def physical_limit_for(records: Sequence[Dict[str, Any]], mechanism: str) -> Optional[Dict[str, Any]]:
     """The latest verified physical-limit verdict recorded for a mechanism."""
     latest = None
@@ -175,7 +218,8 @@ def _text(value: Any) -> str:
 
 def candidate_errors(candidate: Any, *, profile_config: Optional[Dict[str, Any]] = None,
                      state: Optional[Dict[str, Any]] = None,
-                     tag_records: Sequence[Dict[str, Any]] = ()) -> List[str]:
+                     tag_records: Sequence[Dict[str, Any]] = (),
+                     route_dir: Any = None) -> List[str]:
     """Mechanical rules MM1–MM8 plus the repeat/limit guards (MM3a/MM3b/MM8a).
 
     ``tag_records`` are the route's TAG events (see ``domain_guard.load_events``); the
@@ -184,8 +228,12 @@ def candidate_errors(candidate: Any, *, profile_config: Optional[Dict[str, Any]]
     problems: List[str] = []
     if not isinstance(candidate, dict):
         return ["候选顶层必须是对象"]
-    if candidate.get("_schema") != CANDIDATE_SCHEMA:
-        problems.append("MM1: _schema 必须是 " + CANDIDATE_SCHEMA)
+    if candidate.get("_schema") not in (CANDIDATE_SCHEMA,
+                                        "research-idea-pipeline/method-candidate@1"):
+        # I2M candidates keep their own schema; the domain review runs on them in place
+        # so the same checks cannot be bypassed by switching artifact kinds.
+        problems.append("MM1: _schema 必须是 " + CANDIDATE_SCHEMA +
+                        " 或 research-idea-pipeline/method-candidate@1")
 
     direction = _text(candidate.get("direction"))
     if direction not in DIRECTION_IDS:
@@ -204,13 +252,26 @@ def candidate_errors(candidate: Any, *, profile_config: Optional[Dict[str, Any]]
             problems.append(
                 f"MM3a: 机制 {mechanism} 已有 {count} 条独立失败记录；换名重试被拒绝——"
                 "候选必须声明 scope_change_justification（新作用域/新机制假设）")
-    # MM3b — a verified physical limit bounds what may be claimed, not what may be tried.
+    # MM3b — a verified physical limit bounds what may be claimed, not what may be
+    # tried. The candidate must justify its scope against the limit's recorded scope;
+    # when the two scopes are structurally disjoint the guard downgrades to a review
+    # note instead of auto-rejecting (7.4: a limit proven for one sampling regime must
+    # not veto another regime's candidate).
     limit = physical_limit_for(tag_records, mechanism) if mechanism else None
     if limit is not None and not _text(candidate.get("scope_justification")):
-        problems.append(
-            f"MM3b: 机制 {mechanism} 存在已验证的物理限制（适用范围："
-            f"{limit.get('scope') or '未记录'}）；候选必须声明 scope_justification，"
-            "证明目标在该范围之外，不得在已验证不可恢复范围内虚构改进")
+        limit_scope = str((limit.get("physical_limit") or {}).get("scope") or
+                          limit.get("scope") or "")
+        candidate_scope = _text(candidate.get("scope"))
+        if _scopes_disjoint(limit_scope, candidate_scope):
+            problems.append(
+                f"MM3b-review: 机制 {mechanism} 存在物理限制记录，但其适用范围"
+                f"（{limit_scope or '未记录'}）与候选作用域（{candidate_scope or '未声明'}）"
+                "结构上不相交：不自动否决，交审查确认作用域关系")
+        else:
+            problems.append(
+                f"MM3b: 机制 {mechanism} 存在已验证的物理限制（适用范围："
+                f"{limit_scope or '未记录'}）；候选必须声明 scope_justification，"
+                "证明目标在该范围之外，不得在已验证不可恢复范围内虚构改进")
 
     math_change = candidate.get("mathematical_change")
     if not isinstance(math_change, dict):
@@ -259,6 +320,8 @@ def candidate_errors(candidate: Any, *, profile_config: Optional[Dict[str, Any]]
         if isinstance(boundary, dict) and boundary.get("uses_gt_for_selection") is True:
             problems.append("MM8: ssl_boundary_compliance.uses_gt_for_selection 不得为 true")
 
+    if route_dir is not None:
+        problems.extend(duplicate_candidate_errors(candidate, route_dir))
     anchor = _text(candidate.get("anchor_alignment"))
     contract = state.get("contract") if isinstance(state, dict) and         isinstance(state.get("contract"), dict) else {}
     anchor_name = _text(contract.get("primary_anchor"))
@@ -300,16 +363,22 @@ def _selftest() -> int:
                         "undersampling": {"pattern": "vd"}, "noise": {"model": "gaussian"}},
         "gt": {"available": False, "usage": "none"},
         "ssl": {"type": "ssdu", "split": {"input": "theta", "loss": "lambda",
-                                          "held_out_validation": "omega_val"},
+                                          "held_out_validation": "omega_val",
+                                          "measurement_identity": {"fields": "subject/slice/volume/acquisition", "mask_sharing_allowed": True}},
                 "acs": {"usage": "frozen"}},
         "model_selection": {"protocol": "omega_val", "uses_gt": False},
         "frozen": {"components": ["backbone"], "forbidden_changes": []},
         "metrics": {"primary": {"name": "nmse", "threshold": 0.02,
+                                "direction": "lower_is_better",
+                                "preregistration_ref": "X1",
                                 "frozen_before_results": True,
                                 "frozen_at_state_version": 1}},
         "resources": {"gpu_hours_budget": 1},
     }
-    expect("profile 配置合法（供 MM 用）", not dp.validate(config, state={"state_version": 2}))
+    state2 = dp.bind_metric_contract(config, {"state_version": 2, "experiments": [
+        {"id": "X1", "status": "running", "parent": None, "stage": "X2",
+         "claim_targeted": [], "preregistration": {"frozen_at_state_version": 1}}]})
+    expect("profile 配置合法（供 MM 用）", not dp.validate(config, state=state2))
 
     good = {
         "_schema": CANDIDATE_SCHEMA, "direction": "prior_posterior_adaptation",
@@ -326,7 +395,8 @@ def _selftest() -> int:
         "anchor_alignment": "microvascular structure recovery (primary_anchor)",
         "mechanism_evidence": "",
     }
-    state = {"state_version": 2, "contract": {"primary_anchor": "structure recovery"}}
+    state = {"state_version": 2, "contract": {"primary_anchor": "structure recovery"},
+             "experiments": state2["experiments"]}
     expect("完整候选通过", not candidate_errors(good, profile_config=config, state=state),
            str(candidate_errors(good, profile_config=config, state=state)))
     bad = json.loads(json.dumps(good))

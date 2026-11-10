@@ -4,7 +4,8 @@
 
 ## 1. 任务形态
 
-- 3D Wave MRI / Wave-TOF，20-coil wave 算子，固定 z slab，高加速欠采样。
+- 3D Wave MRI / Wave-TOF，20-coil wave 算子（**20 是线圈数，不是加速倍数**；
+  加速倍数由项目契约声明），固定 z slab，高加速欠采样。
 - INR / CNN / 3D local-global 结构建模；微血管与弱对比度结构恢复。
 - 自监督拆分：Θ 输入、Λ 损失、Ω_val 模型选择（见 `../ssl-contract.md`）；
   Stage1 anchor 期间采集协议冻结。
@@ -34,9 +35,11 @@
 
 ## 4. 高频平凡归因（TAG 重点）
 
-本任务的历史高频重复归因：`undersampling_information`（"20 倍加速信息不够"）、
+本任务的历史高频重复归因：`undersampling_information`（"欠采样信息不够"；
+本任务的具体加速倍数以项目契约为准，下文引用的历史表述为该项目的原话样例）、
 `noise_level`、`snr_limit`、`conditioning`（"3D 大核病态"）、`ill_posedness`。
-其中只有**带 oracle/理论证据**的不可恢复结论才构成 `PHYSICAL_LIMIT_WITH_SCOPE`；
+其中只有**带 oracle/理论证据**（带 `limit_type` 与来源，见 `../attribution-guard.md`）
+的不可恢复结论才构成 `PHYSICAL_LIMIT_WITH_SCOPE`；
 其余同一指纹重复出现时按 TG4 处理，转 MMS 菜单或带新证据的判别实验。
 
 冻结项：wave 算子、z slab、Θ/Λ/Ω_val 拆分、Stage1 anchor、采样协议。

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""test_identity_compat.py — the rename boundary must stay real and testable.
+"""test_identity_compat.py — the rename boundary and the storage matrix.
 
-The skill was renamed to `research-lifecycle-protocol`. Three things must never drift:
+Two things must never drift:
 
-1. the frontmatter/install identity uses the new name only;
-2. the machine protocol namespace stays `research-idea-pipeline/...@1`, because existing
-   canonical states, ledgers and replay fixtures carry those ids;
-3. a legacy project (`.research-idea-pipeline/`) still loads without migration, and a
-   project with two runtime roots fails closed instead of silently choosing one.
+1. the identity boundary: the frontmatter/install identity uses the new skill name
+   only; the machine protocol namespace stays `research-idea-pipeline/...@1`;
+2. the storage matrix (v2.1.0): `.research-lifecycle-protocol/` is the ONLY runtime
+   root. The legacy `.research-idea-pipeline/` is a migration source — normal runtime
+   must raise MIGRATION_REQUIRED, both roots fail closed (AMBIGUOUS), an
+   unrecognizable new root fails closed (INVALID_STORAGE_ROOT), and a fresh project
+   resolves NEW_PROJECT without creating anything.
 
-These tests use the real CLI entry points where a runtime consumer exists, not just the
-helper functions.
+Read-only compat inspection (legacy_handoff.detect, migration tooling) still works on
+legacy roots through `inspect_legacy_root` / `resolve_storage_root`.
 """
 
 from __future__ import annotations
@@ -85,58 +87,92 @@ class TestIdentity(unittest.TestCase):
         self.assertEqual(rlp.SCHEMA_NAMESPACE, "research-idea-pipeline")
 
 
-class TestStorageRootResolution(unittest.TestCase):
+class TestStorageMatrix(unittest.TestCase):
+    """§2.1 — the runtime behaviour for every storage-root configuration."""
 
-    def test_new_project_uses_the_new_root_without_creating_it(self):
+    def test_both_roots_absent_resolves_new_project_without_creating_anything(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            resolved = rlp.resolve_storage_root(project)
-            self.assertEqual(resolved.kind, "new")
-            self.assertEqual(resolved.root.name, rlp.STORAGE_ROOT)
-            self.assertFalse(resolved.root.exists(), "resolution must not create directories")
+            report = rlp.runtime_status(project)
+            self.assertEqual(report["status"], rlp.RUNTIME_STATUS_NEW_PROJECT)
+            resolved = rlp.resolve_runtime_root(project)
+            self.assertEqual(resolved.root, project / rlp.STORAGE_ROOT)
+            self.assertFalse(resolved.root.exists(),
+                             "resolution must not create directories")
 
-    def test_current_root_is_detected(self):
+    def test_ready_project_uses_the_new_root(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            (project / rlp.STORAGE_ROOT).mkdir()
-            resolved = rlp.resolve_storage_root(project)
-            self.assertEqual(resolved.kind, "current")
+            write_state(project / rlp.STORAGE_ROOT / "routes" / "A")
+            report = rlp.runtime_status(project)
+            self.assertEqual(report["status"], rlp.RUNTIME_STATUS_READY)
+            resolved = rlp.resolve_runtime_root(project)
+            self.assertEqual(resolved.root, project / rlp.STORAGE_ROOT)
             self.assertFalse(resolved.is_legacy)
 
-    def test_legacy_project_keeps_its_root_and_gains_no_new_one(self):
+    def test_legacy_only_project_requires_migration_and_writes_nothing(self):
+        """旧项目：MIGRATION_REQUIRED 是工程控制平面状态，暂停正式运行。"""
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
             write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
-            resolved = rlp.resolve_storage_root(project)
-            self.assertEqual(resolved.kind, "legacy")
-            self.assertTrue(resolved.is_legacy)
-            self.assertFalse((project / rlp.STORAGE_ROOT).exists(),
-                             "a legacy project must not sprout a second root")
+            report = rlp.runtime_status(project)
+            self.assertEqual(report["status"], rlp.RUNTIME_STATUS_MIGRATION_REQUIRED)
+            self.assertIn("migrate", report["reason"])
+            with self.assertRaises(rlp.MigrationRequired):
+                rlp.resolve_runtime_root(project)
+            with self.assertRaises(rlp.MigrationRequired):
+                rlp.default_state_path(project, "A")
+            self.assertEqual(report["status"], rlp.MigrationRequired.STATUS)
 
-    def test_both_roots_fail_closed_instead_of_picking_one(self):
+    def test_both_roots_fail_closed_as_ambiguous(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
             write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
             (project / rlp.STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
+            report = rlp.runtime_status(project)
+            self.assertEqual(report["status"], rlp.RUNTIME_STATUS_AMBIGUOUS)
             with self.assertRaises(rlp.AmbiguousStorageRoot):
-                rlp.resolve_storage_root(project)
-            report = rlp.inspect_project(project)
-            self.assertEqual(report["storage_kind"], "ambiguous")
-            self.assertIsNone(report["storage_root"])
-            self.assertIn("two canonical storage roots", report["ambiguous_reason"])
+                rlp.resolve_runtime_root(project)
             checked = rlp.main(["check", "--project", str(project)])
             self.assertEqual(checked, rlp.EXIT_LAYOUT)
 
-    def test_default_state_path_honours_the_existing_root(self):
+    def test_an_unrecognizable_new_root_fails_closed_as_invalid(self):
+        """新目录存在但不完整 → INVALID_STORAGE_ROOT，禁止静默修复或重建。"""
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
+            (project / rlp.STORAGE_ROOT).mkdir()
+            report = rlp.runtime_status(project)
+            self.assertEqual(report["status"], rlp.RUNTIME_STATUS_INVALID)
+            with self.assertRaises(rlp.InvalidStorageRoot):
+                rlp.resolve_runtime_root(project)
+
+    def test_the_new_root_is_the_only_runtime_default(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = pathlib.Path(temp)
+            path = rlp.default_state_path(project, "A")
+            self.assertEqual(path,
+                             project / rlp.STORAGE_ROOT / "routes" / "A" / STATE_NAME)
+
+    def test_runtime_status_is_machine_readable_and_stable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = pathlib.Path(temp)
+            report = rlp.runtime_status(project)
+            for key in ("project_root", "new_root", "legacy_root",
+                        "new_root_exists", "legacy_root_exists", "status", "reason"):
+                self.assertIn(key, report)
+
+
+class TestInspectionAPIs(unittest.TestCase):
+    """Read-only inspection keeps working on legacy roots (migration / compat tools)."""
+
+    def test_inspect_legacy_root_describes_the_legacy_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = pathlib.Path(temp)
+            self.assertIsNone(rlp.inspect_legacy_root(project))
             write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
-            path = rlp.default_state_path(project, "A")
-            self.assertEqual(path, project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A" / STATE_NAME)
-        with tempfile.TemporaryDirectory() as temp:
-            project = pathlib.Path(temp)
-            path = rlp.default_state_path(project, "A")
-            self.assertEqual(path, project / rlp.STORAGE_ROOT / "routes" / "A" / STATE_NAME)
+            legacy = rlp.inspect_legacy_root(project)
+            self.assertIsNotNone(legacy)
+            self.assertTrue(legacy.is_legacy)
 
     def test_project_root_from_state_accepts_both_layouts_and_plain_fixtures(self):
         for root_name in (rlp.STORAGE_ROOT, rlp.LEGACY_STORAGE_ROOT):
@@ -149,26 +185,37 @@ class TestStorageRootResolution(unittest.TestCase):
             plain = write_state(project / "route-fixture" / "A")
             self.assertEqual(rlp.project_root_from_state(plain), plain.parent.resolve())
 
-    def test_project_root_from_state_rejects_an_unknown_control_directory(self):
+    def test_ambiguity_is_reported_even_from_a_legacy_state_path(self):
         with tempfile.TemporaryDirectory() as temp:
-            state = write_state(pathlib.Path(temp) / ".wrong-root" / "routes" / "A")
-            with self.assertRaises(rlp.LayoutError):
+            project = pathlib.Path(temp)
+            state = write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
+            (project / rlp.STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
+            with self.assertRaises(rlp.AmbiguousStorageRoot):
                 rlp.project_root_from_state(state)
 
-    def test_cli_resolve_reports_the_frozen_protocol_namespace(self):
+    def test_cli_resolve_reports_the_matrix(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
             write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
             proc = run("rlp_paths.py", "resolve", "--project", str(project))
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            report = json.loads(proc.stdout)
-            self.assertEqual(report["skill_name"], rlp.SKILL_NAME)
-            self.assertEqual(report["storage_kind"], "legacy")
-            self.assertEqual(report["schema_namespace"], "research-idea-pipeline")
-            self.assertTrue(report["schema_namespace_frozen"])
+            self.assertEqual(proc.returncode, rlp.EXIT_LAYOUT, proc.stdout)
+            payload = json.loads(proc.stdout)
+            self.assertEqual(payload["runtime_status"], "MIGRATION_REQUIRED")
+            self.assertEqual(payload["schema_namespace"], "research-idea-pipeline")
+            self.assertTrue(payload["schema_namespace_frozen"])
+
+    def test_cli_check_hints_at_the_migration_tool(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = pathlib.Path(temp)
+            write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
+            proc = run("rlp_paths.py", "check", "--project", str(project))
+            self.assertEqual(proc.returncode, rlp.EXIT_LAYOUT)
+            self.assertIn("MIGRATION_REQUIRED", proc.stderr)
+            self.assertIn("migrate_project_root.py", proc.stderr)
 
 
-class TestLegacyProjectStillRuns(unittest.TestCase):
+class TestLegacyReadonlyCompat(unittest.TestCase):
+    """只读兼容检查仍然可用——但不等于旧根可以继续承担日常运行。"""
 
     def test_legacy_state_passes_the_state_gate(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -177,17 +224,12 @@ class TestLegacyProjectStillRuns(unittest.TestCase):
             proc = run("state_check.py", "--check", str(state))
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
-    def test_new_root_state_passes_the_same_gate(self):
-        with tempfile.TemporaryDirectory() as temp:
-            project = pathlib.Path(temp)
-            state = write_state(project / rlp.STORAGE_ROOT / "routes" / "A")
-            proc = run("state_check.py", "--check", str(state))
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-
     def test_cognition_rebuild_modifies_only_derived_files(self):
+        """派生投影重建：新根上正常工作且 canonical 逐字节不变；
+        旧根项目按存储矩阵被暂停（派生写入也是运行时写入）。"""
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            route = project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
+            route = project / rlp.STORAGE_ROOT / "routes" / "A"
             state = write_state(route)
             before = state.read_bytes()
             built = run("cognition.py", "build", "--state", str(state))
@@ -197,18 +239,15 @@ class TestLegacyProjectStillRuns(unittest.TestCase):
             self.assertEqual(state.read_bytes(), before,
                              "canonical state must be byte-identical after projection rebuild")
             self.assertTrue((route / cg.COGNITION_DIRNAME / "index.json").is_file())
-            self.assertFalse((project / rlp.STORAGE_ROOT).exists())
 
-    def test_render_status_resolves_the_legacy_root_from_the_project_root(self):
+    def test_derived_writes_on_a_legacy_project_are_gated(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            write_state(project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A")
-            out = project / "routes" / "A" / "STATUS.md"
-            out.parent.mkdir(parents=True)
-            proc = run("render_status.py", "--root", str(project), "--route", "A",
-                       "--out", str(out))
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-            self.assertIn("STATUS", out.read_text(encoding="utf-8") + "STATUS")
+            route = project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
+            state = write_state(route)
+            built = run("cognition.py", "build", "--state", str(state))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn("MIGRATION_REQUIRED", built.stderr)
 
     def test_legacy_handoff_detect_is_read_only(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -218,27 +257,24 @@ class TestLegacyProjectStillRuns(unittest.TestCase):
             proc = run("legacy_handoff.py", "detect", "--state", str(state))
             self.assertIn(proc.returncode, (0, 3), proc.stdout + proc.stderr)
             self.assertEqual(state.read_bytes(), before)
-            self.assertFalse((project / rlp.STORAGE_ROOT).exists())
 
-    def test_operational_reconcile_finds_the_project_root_behind_a_legacy_route(self):
+    def test_operational_reconcile_finds_the_project_root_behind_any_route(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
             route = project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
             write_state(route)
             self.assertEqual(op._project_root(route), project.resolve())
 
-    def test_ambiguity_is_not_hidden_by_the_reconciler(self):
+    def test_the_reconciler_gates_a_legacy_only_project(self):
+        """正式运行入口在旧根项目上必须给出迁移需求，而不是继续写旧根。"""
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
             route = project / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
             write_state(route)
-            (project / rlp.STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
-            self.assertRaises(rlp.AmbiguousStorageRoot, op._project_root, route)
+            with self.assertRaises(rlp.MigrationRequired):
+                op.reconcile(route / STATE_NAME)
 
-
-class TestStateGateStillSeesTheFrozenNamespace(unittest.TestCase):
-
-    def test_the_ruleset_is_unchanged_by_the_rename(self):
+    def test_the_state_ruleset_is_unchanged_by_the_rename(self):
         report = sc.check_state(lh._legacy_state())
         self.assertEqual(report.violations, [], f"unexpected violations: {report.violations}")
         self.assertEqual(report.shape, [])

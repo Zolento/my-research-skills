@@ -10,12 +10,12 @@ authoritative state.
 
 Three layers, one direction of authority:
 
-    Canonical    .research-idea-pipeline/routes/<R>/research-state.json
+    Canonical    .research-lifecycle-protocol/routes/<R>/research-state.json
                  + frozen preregistration + raw evidence            ← sole authority
-    Event        .research-idea-pipeline/routes/<R>/cognition/model-revisions.jsonl
+    Event        .research-lifecycle-protocol/routes/<R>/cognition/model-revisions.jsonl
                  structural assertions + canonical pointers        ← append-only, no epistemics
-    Derived      .research-idea-pipeline/routes/<R>/cognition/index.json
-                 .research-idea-pipeline/routes/<R>/cognition/context-brief.md
+    Derived      .research-lifecycle-protocol/routes/<R>/cognition/index.json
+                 .research-lifecycle-protocol/routes/<R>/cognition/context-brief.md
                  rebuildable from the two layers above             ← never authoritative
 
 **Support levels are computed, never declared.** A revision event may name a
@@ -2526,6 +2526,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         state_path, Path(args.cognition).expanduser() if args.cognition else None)
     try:
         if args.command == "build":
+            # v2.1.0 storage gate: cognitive projections are derived writes — a
+            # legacy-only project must migrate before any projection is refreshed.
+            try:
+                import rlp_paths as _rlp
+            except ImportError:
+                _rlp = None
+            if _rlp is not None and getattr(args, "state", None):
+                _project = _rlp.project_root_from_state(Path(args.state).expanduser().resolve())
+                _report = _rlp.runtime_status(_project)
+                if _report["status"] == _rlp.RUNTIME_STATUS_AMBIGUOUS:
+                    raise _rlp.AmbiguousStorageRoot(_report["reason"])
+                if _report["status"] == _rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+                    raise _rlp.MigrationRequired(_report["reason"])
+                if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
+                    raise _rlp.InvalidStorageRoot(_report["reason"])
             return op_build(state_path, cognition_dir)
         if args.command == "validate":
             return op_validate(state_path, cognition_dir)

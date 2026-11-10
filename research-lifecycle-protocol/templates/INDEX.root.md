@@ -3,7 +3,7 @@
 用法：复制到项目根目录 INDEX.md，按实际内容填写。
 职责：**跨路线总表** —— 每条路线一行，投影 route-registry.json。
       单条路线的细节不要写在这里，写到 routes/<R>/INDEX.md。
-机器真相：.research-idea-pipeline/project/route-registry.json。
+机器真相：.research-lifecycle-protocol/project/route-registry.json。
 -->
 
 # <项目名> — 根 INDEX（路线总表）
