@@ -66,3 +66,12 @@
 - 遗留：TAG classify 的机制枚举仍是封闭集合（新机制登记 other_declared 待审）；
   指标契约的 GT 来源验证只覆盖 config/protocol 类来源中的机器记录，
   checkpoint 选择记录的深度验证需要 Execution Manifest 落地后的第二阶段。
+
+
+## 2026-11-10 v2.1.0 合并与发布
+
+- main 已合并本分支：merge commit `cdabc9a`（`.dev/` 未进 main）。
+- tag `research-lifecycle-protocol/v2.1.0`（annotated `2ca9445` → cdabc9a）已推送。
+- 本机 `~/.agents/skills/research-lifecycle-protocol/` 已刷新为 v2.1.0（与发布树字节一致）。
+- 下一步（真实项目迁移）：逐项目 inspect → plan → migrate --apply → verify → Resume；
+  Mesh 插件硬编码旧路径的协同修复仍待外部处理。
