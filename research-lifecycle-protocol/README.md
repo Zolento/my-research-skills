@@ -39,7 +39,7 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
 **Current release: v2.2.0** — Context & Architecture Optimization: `SKILL.md` shrinks from
-156 KB to 27 KB, context loads in three tiers (L0/L1/L2) from machine-readable dependency
+156 KB to 28 KB, context loads in three tiers (L0/L1/L2) from machine-readable dependency
 declarations, and chapters load by stable section id. No scientific rule changed.
 2.1.1 hardened the migration transaction; 2.1.0 unified the control-root storage;
 2.0.1 fixed domain evidence qualification. Capability documentation below is version-free; historical

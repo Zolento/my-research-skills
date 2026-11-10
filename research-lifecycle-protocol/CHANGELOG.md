@@ -73,7 +73,7 @@ See `docs/releases/v2.0.1.md`.
 
 ## 2.2.0 — 2026-11-10
 
-Context & Architecture Optimization. `SKILL.md` 156 KB → 27 KB；三级上下文
+Context & Architecture Optimization. `SKILL.md` 156 KB → 28 KB；三级上下文
 （L0/L1/L2）、机器可读的上下文依赖声明、章节级加载、Research Context Packet、
 子 Agent 最小任务契约、上下文基线与基准工具。**不改科研规则**。
 详见 `docs/releases/v2.2.0.md`、`docs/context-baseline.md`、`docs/context-benchmark.md`、
@@ -100,7 +100,7 @@ Context & Architecture Optimization. `SKILL.md` 156 KB → 27 KB；三级上下�
 - `preset-registry.json` 每个预设新增 `context` 依赖声明；`start-project` 走 `entry_context`。
 
 ### Changed
-- `SKILL.md` 重构为 L0 常驻核心（156,565 → 27,500 bytes 量级），保留全部硬约束与被外部
+- `SKILL.md` 重构为 L0 常驻核心（156,565 → 28,037 bytes，−82%），保留全部硬约束与被外部
   引用的锚点（§0.1 / §0.2 / §1.6 / §1.7 / §3.1.0）。
 - `preset_router.load_preset_context()`：`loaded` 只记实际读取的正文，
   脚本引用改名 `referenced_scripts`，并附 `load_semantics`。
