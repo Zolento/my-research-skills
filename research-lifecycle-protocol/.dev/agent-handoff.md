@@ -75,3 +75,15 @@
 - 本机 `~/.agents/skills/research-lifecycle-protocol/` 已刷新为 v2.1.0（与发布树字节一致）。
 - 下一步（真实项目迁移）：逐项目 inspect → plan → migrate --apply → verify → Resume；
   Mesh 插件硬编码旧路径的协同修复仍待外部处理。
+
+
+## 2026-11-10 v2.1.1 迁移安全补丁
+
+- 提交：04a20b6（维护锁+写入入口闸门）→ fc6f87e（迁移事务：源一致性/全量回滚守卫/
+  文档提交事务/journal-recover/备份边界）→ 9e2bf48（文档与发布说明）。
+- 关键读数：全量 2278 tests OK (skipped=4)；test_migration_transaction.py 31 项全绿；
+  `release_check.py` PASS（版本 2.1.1 一致）。
+- 维护锁只覆盖 RLP 自身写入入口；外部 Mesh/训练脚本/第三方插件不受保护，
+  `migrate --apply` 因此要求 `--assume-writers-quiesced`。
+- 回滚后项目回到 MIGRATION_REQUIRED（灾难恢复，不是恢复正常科研执行）。
+- 未合并 main、未打 tag。待用户确认后合并并发布 v2.1.1。
