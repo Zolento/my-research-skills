@@ -33,7 +33,7 @@ class TestRenderStatus(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="render-status-"))
         self.route = "T"
-        state_dir = self.tmp / ".research-idea-pipeline" / "routes" / self.route
+        state_dir = self.tmp / ".research-lifecycle-protocol" / "routes" / self.route
         state_dir.mkdir(parents=True)
         self.state_path = state_dir / "research-state.json"
         shutil.copyfile(TEMPLATE, self.state_path)

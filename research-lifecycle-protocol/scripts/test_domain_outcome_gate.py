@@ -36,7 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 def bound_project(temp: pathlib.Path, config: dict) -> pathlib.Path:
     """A legacy-root route whose state has the frozen metric contract bound at R8."""
-    route = temp / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
+    route = temp / rlp.STORAGE_ROOT / "routes" / "A"
     route.mkdir(parents=True, exist_ok=True)
     state0, packet, analysis, audit = fixture("positive")
     state0 = dp.bind_metric_contract(config, state0)
@@ -113,7 +113,7 @@ class OutcomeGateBase(unittest.TestCase):
         self.state0, self.packet, self.analysis, self.audit = bound_project(
             pathlib.Path(self.tmp.name), self.config)
         self.state_path = (pathlib.Path(self.tmp.name) /
-                           rlp.LEGACY_STORAGE_ROOT / "routes" / "A" /
+                           rlp.STORAGE_ROOT / "routes" / "A" /
                            "research-state.json")
 
     def grounded_sources(self, nmse_value=0.05, nmse_baseline=0.10,

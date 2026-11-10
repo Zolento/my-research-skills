@@ -48,7 +48,7 @@ class Project:
     def __init__(self, root: pathlib.Path, route: str = "A", state: dict | None = None):
         self.root = root
         self.route = route
-        self.route_dir = root / ".research-idea-pipeline" / "routes" / route
+        self.route_dir = root / ".research-lifecycle-protocol" / "routes" / route
         self.route_dir.mkdir(parents=True, exist_ok=True)
         self.state_path = self.route_dir / cg.STATE_NAME
         payload = state if state is not None else lh._legacy_state()

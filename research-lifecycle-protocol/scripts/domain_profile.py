@@ -14,8 +14,10 @@ A domain profile extends the Research Lifecycle Protocol with field-specific rul
 3. **Fail closed when declared.** A declared but invalid config is a hard error (exit 3):
    a domain contract that cannot be parsed must not silently degrade to "no domain rules".
 
-Storage roots are resolved through :mod:`rlp_paths`, so legacy projects
-(``.research-idea-pipeline/``) load with the same code path as new projects.
+Storage roots are resolved through :mod:`rlp_paths`. New projects use
+``.research-lifecycle-protocol/`` exclusively; a legacy-only project is a migration
+source (MIGRATION_REQUIRED) and its configs are read only by the migration/audit
+tools.
 
 Rules (``DP1``–``DP10``) below are mechanical. Anything that cannot be decided
 mechanically is left to the agent and the existing gates.

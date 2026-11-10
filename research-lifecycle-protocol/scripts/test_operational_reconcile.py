@@ -171,7 +171,7 @@ class TestProjectLayoutProjections(unittest.TestCase):
     def test_status_is_written_to_the_human_route_not_the_canonical_one(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            route = project / ".research-idea-pipeline" / "routes" / "A"
+            route = project / ".research-lifecycle-protocol" / "routes" / "A"
             route.mkdir(parents=True)
             state = teo.fixture("positive")[0]
             state_path = route / "research-state.json"
@@ -186,7 +186,7 @@ class TestProjectLayoutProjections(unittest.TestCase):
     def test_a_prepared_bundle_is_found_under_the_project_results_dir(self):
         with tempfile.TemporaryDirectory() as temp:
             project = pathlib.Path(temp)
-            route = project / ".research-idea-pipeline" / "routes" / "A"
+            route = project / ".research-lifecycle-protocol" / "routes" / "A"
             route.mkdir(parents=True)
             state, packet, analysis, audit = teo.fixture("positive")
             state_path = route / "research-state.json"

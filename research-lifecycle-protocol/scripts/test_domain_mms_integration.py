@@ -76,7 +76,7 @@ class Harness:
 
     def __init__(self, temp: str, *, with_profile: bool = True):
         self.root = pathlib.Path(temp)
-        self.route = self.root / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
+        self.route = self.root / rlp.STORAGE_ROOT / "routes" / "A"
         self.route.mkdir(parents=True, exist_ok=True)
         self.state_path = self.route / "research-state.json"
         self.state = self._state()

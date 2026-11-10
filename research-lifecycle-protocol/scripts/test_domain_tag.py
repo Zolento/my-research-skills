@@ -64,7 +64,7 @@ class LoopHarness:
 
     def __init__(self, temp: str):
         self.root = pathlib.Path(temp)
-        self.route = self.root / rlp.LEGACY_STORAGE_ROOT / "routes" / "A"
+        self.route = self.root / rlp.STORAGE_ROOT / "routes" / "A"
         self.route.mkdir(parents=True, exist_ok=True)
         # Real R8 sequence: bind the frozen metric contract into the preregistration
         # BEFORE the outcome transaction exists, then re-derive the packet's experiment

@@ -63,9 +63,44 @@ EXIT_ENV = 4
 class AmbiguousStorageRoot(ValueError):
     """Both the new and the legacy runtime roots exist for one project."""
 
+    STATUS = "AMBIGUOUS_STORAGE_ROOT"
+
+
+class MigrationRequired(ValueError):
+    """Only the legacy root exists: the project must migrate before formal runs.
+
+    This is an engineering control-plane state, not a research failure — it must not
+    enter Failure Memory, trigger replanning or restart experiments.
+    """
+
+    STATUS = "MIGRATION_REQUIRED"
+
+
+class InvalidStorageRoot(ValueError):
+    """The new root exists but carries no recognizable control-plane content.
+
+    The runtime never silently repairs or rebuilds a broken control root.
+    """
+
+    STATUS = "INVALID_STORAGE_ROOT"
+
 
 class LayoutError(ValueError):
     """A path does not match the documented route layout."""
+
+    STATUS = "INVALID_LAYOUT"
+
+
+#: Stable status tokens for the storage matrix (§2.1 of the storage spec).
+RUNTIME_STATUS_READY = "READY"
+RUNTIME_STATUS_NEW_PROJECT = "NEW_PROJECT"
+RUNTIME_STATUS_MIGRATION_REQUIRED = "MIGRATION_REQUIRED"
+RUNTIME_STATUS_AMBIGUOUS = "AMBIGUOUS_STORAGE_ROOT"
+RUNTIME_STATUS_INVALID = "INVALID_STORAGE_ROOT"
+
+#: Content that makes an existing new root recognizable. An empty directory is
+#: INVALID_STORAGE_ROOT — the runtime never silently repairs a control root.
+_ROOT_MARKERS = ("routes", "project", "meta", "runtime", "cache")
 
 
 @dataclass(frozen=True)
@@ -84,16 +119,95 @@ def _root_kind(path: pathlib.Path) -> Optional[str]:
     return None
 
 
-def resolve_storage_root(project_root: pathlib.Path) -> StorageRoot:
-    """Resolve which runtime root a project owns.
+def _is_recognizable_root(path: pathlib.Path) -> bool:
+    """Does an existing root directory carry recognizable control-plane content?"""
+    try:
+        entries = {entry.name for entry in path.iterdir()}
+    except OSError:
+        return False
+    return bool(entries & set(_ROOT_MARKERS)) or \
+        any(name.endswith(".json") for name in entries)
 
-    Resolution order:
-    1. both present  -> AmbiguousStorageRoot (never pick one silently);
-    2. new present   -> the new root;
-    3. legacy present-> the legacy root, read/write compatible, never migrated;
-    4. neither       -> the new root, as the default for a new project.
 
+def runtime_status(project_root: pathlib.Path) -> Dict[str, Any]:
+    """The machine-readable storage matrix (stable status tokens).
+
+    | 现场 | 状态 | 运行行为 |
+    |---|---|---|
+    | 两根都不存在 | NEW_PROJECT | 初始化使用新根 |
+    | 只有新根（有可识别内容） | READY | 正常加载与执行 |
+    | 只有新根（空/不可识别） | INVALID_STORAGE_ROOT | 禁止静默修复或重建 |
+    | 只有旧根 | MIGRATION_REQUIRED | 暂停正式运行，先迁移 |
+    | 两根同时存在 | AMBIGUOUS_STORAGE_ROOT | fail closed |
+    """
+    project = pathlib.Path(project_root).resolve()
+    current = project / STORAGE_ROOT
+    legacy = project / LEGACY_STORAGE_ROOT
+    current_exists = current.is_dir()
+    legacy_exists = legacy.is_dir()
+    base = {"project_root": str(project), "new_root": str(current),
+            "legacy_root": str(legacy), "new_root_exists": current_exists,
+            "legacy_root_exists": legacy_exists}
+    if current_exists and legacy_exists:
+        return {**base, "status": RUNTIME_STATUS_AMBIGUOUS,
+                "reason": f"both {STORAGE_ROOT}/ and {LEGACY_STORAGE_ROOT}/ exist; "
+                          "two canonical storage roots are not allowed"}
+    if current_exists:
+        if not _is_recognizable_root(current):
+            return {**base, "status": RUNTIME_STATUS_INVALID,
+                    "reason": f"{RUNTIME_STATUS_INVALID}: {STORAGE_ROOT}/ exists but "
+                              "carries no recognizable control-plane content; the "
+                              "runtime never silently repairs or rebuilds it"}
+        return {**base, "status": RUNTIME_STATUS_READY, "reason": None}
+    if legacy_exists:
+        return {**base, "status": RUNTIME_STATUS_MIGRATION_REQUIRED,
+                "reason": f"{RUNTIME_STATUS_MIGRATION_REQUIRED}: only "
+                          f"{LEGACY_STORAGE_ROOT}/ exists; formal research runs are "
+                          "paused until the project migrates "
+                          "(scripts/migrate_project_root.py)"}
+    return {**base, "status": RUNTIME_STATUS_NEW_PROJECT, "reason": None}
+
+
+def resolve_runtime_root(project_root: pathlib.Path) -> StorageRoot:
+    """The ONLY runtime resolver: returns the new root or raises.
+
+    Raises AmbiguousStorageRoot (both roots), MigrationRequired (legacy only) or
+    InvalidStorageRoot (new root without recognizable content). Normal research
+    execution must call this — never read or write the legacy root as runtime state.
     No directory is created here.
+    """
+    report = runtime_status(project_root)
+    if report["status"] == RUNTIME_STATUS_AMBIGUOUS:
+        raise AmbiguousStorageRoot(report["reason"])
+    if report["status"] == RUNTIME_STATUS_MIGRATION_REQUIRED:
+        raise MigrationRequired(report["reason"])
+    if report["status"] == RUNTIME_STATUS_INVALID:
+        raise InvalidStorageRoot(report["reason"])
+    return StorageRoot(pathlib.Path(project_root).resolve(),
+                       pathlib.Path(project_root).resolve() / STORAGE_ROOT,
+                       "current" if report["status"] == RUNTIME_STATUS_READY else "new",
+                       False)
+
+
+def inspect_legacy_root(project_root: pathlib.Path) -> Optional[StorageRoot]:
+    """Migration/audit/compat-inspection API: describe the legacy root if present.
+
+    Read-only. Does not raise for the storage matrix; returns None when no legacy
+    root exists. Never used as a runtime write base.
+    """
+    project = pathlib.Path(project_root).resolve()
+    legacy = project / LEGACY_STORAGE_ROOT
+    if not legacy.is_dir():
+        return None
+    return StorageRoot(project, legacy, "legacy", True)
+
+
+def resolve_storage_root(project_root: pathlib.Path) -> StorageRoot:
+    """Legacy-aware inspection resolver (migration / compat tools only).
+
+    Runtime code must use :func:`resolve_runtime_root`. This function keeps the
+    v2.0.x dual-root behaviour for read-only compatibility inspection and raises on
+    the ambiguous layout.
     """
     project = pathlib.Path(project_root).resolve()
     current = project / STORAGE_ROOT
@@ -130,7 +244,9 @@ def project_root_from_state(state_path: pathlib.Path) -> pathlib.Path:
     control = routes_dir.parent
     if _root_kind(control):
         project = control.parent
-        resolve_storage_root(project)          # fail closed if both roots exist
+        report = runtime_status(project)
+        if report["status"] == RUNTIME_STATUS_AMBIGUOUS:
+            raise AmbiguousStorageRoot(report["reason"])
         return project
     raise LayoutError(
         f"{path} sits under a routes/ directory whose parent is neither "
@@ -145,9 +261,22 @@ def route_dir_from_state(state_path: pathlib.Path) -> pathlib.Path:
 
 
 def default_state_path(project_root: pathlib.Path, route: str) -> pathlib.Path:
-    """Canonical state path for a route, honouring an existing legacy root."""
-    resolved = resolve_storage_root(project_root)
+    """Canonical state path for a route under the ONLY runtime root.
+
+    Raises MigrationRequired / AmbiguousStorageRoot / InvalidStorageRoot — normal
+    runtime never reads or writes the legacy root.
+    """
+    resolved = resolve_runtime_root(project_root)
     return resolved.root / "routes" / route / "research-state.json"
+
+
+def ensure_runtime_root(project_root: pathlib.Path) -> StorageRoot:
+    """Gate for write entries (loop / reconcile / execution / projections).
+
+    Raises the storage-matrix errors instead of letting a legacy project continue
+    formal research. Read-only tools and the migration tool must NOT call this.
+    """
+    return resolve_runtime_root(project_root)
 
 
 def inspect_project(project_root: pathlib.Path) -> dict:
@@ -164,6 +293,8 @@ def inspect_project(project_root: pathlib.Path) -> dict:
         kind = "ambiguous"
         root = None
         legacy = None
+    matrix = runtime_status(project)
+    legacy_root = inspect_legacy_root(project)
     return {
         "skill_name": SKILL_NAME,
         "skill_abbreviation": SKILL_ABBREVIATION,
@@ -175,6 +306,10 @@ def inspect_project(project_root: pathlib.Path) -> dict:
         "storage_kind": kind,
         "legacy_layout": legacy,
         "ambiguous_reason": ambiguous,
+        "runtime_status": matrix["status"],
+        "runtime_reason": matrix["reason"],
+        "legacy_root_present": legacy_root is not None,
+        "legacy_root_path": str(legacy_root.root) if legacy_root else None,
         "new_root_default": STORAGE_ROOT,
         "legacy_root": LEGACY_STORAGE_ROOT,
     }
@@ -202,13 +337,22 @@ def _cmd_resolve(args: argparse.Namespace) -> int:
         print(f"[env] {exc}", file=sys.stderr)
         return EXIT_ENV
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
-    return EXIT_LAYOUT if report["storage_kind"] == "ambiguous" else EXIT_OK
+    status = report["runtime_status"]
+    if status in (RUNTIME_STATUS_AMBIGUOUS, RUNTIME_STATUS_INVALID,
+                  RUNTIME_STATUS_MIGRATION_REQUIRED):
+        return EXIT_LAYOUT
+    return EXIT_OK
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
     report = inspect_project(pathlib.Path(args.project))
-    if report["storage_kind"] == "ambiguous":
-        print(f"[FAIL] {report['ambiguous_reason']}", file=sys.stderr)
+    status = report["runtime_status"]
+    if status in (RUNTIME_STATUS_AMBIGUOUS, RUNTIME_STATUS_INVALID,
+                  RUNTIME_STATUS_MIGRATION_REQUIRED):
+        print(f"[FAIL] {status}: {report['runtime_reason']}", file=sys.stderr)
+        if status == RUNTIME_STATUS_MIGRATION_REQUIRED:
+            print("[hint] python3 scripts/migrate_project_root.py inspect "
+                  "--project <project>", file=sys.stderr)
         return EXIT_LAYOUT
     print(f"[ok] {SKILL_NAME}: storage={report['storage_kind']} "
           f"root={report['storage_root']} schema_namespace={SCHEMA_NAMESPACE} (frozen)")

@@ -63,7 +63,7 @@ class Route:
 
     def __init__(self, root: pathlib.Path, *, legacy: bool = True):
         self.root = root
-        storage = rlp.LEGACY_STORAGE_ROOT if legacy else rlp.STORAGE_ROOT
+        storage = rlp.STORAGE_ROOT if legacy else rlp.STORAGE_ROOT
         self.route = root / storage / "routes" / "A"
         self.route.mkdir(parents=True, exist_ok=True)
         self.state_path = self.route / "research-state.json"
@@ -116,7 +116,7 @@ class TestLoader(unittest.TestCase):
         self.assertEqual(report.level, "project")
         # A project-level declaration lives at the project root, outside both storage roots.
         self.assertTrue(report.config_path.endswith("domain/mri-reconstruction.json"))
-        self.assertNotIn(rlp.LEGACY_STORAGE_ROOT, report.config_path)
+        self.assertNotIn(rlp.STORAGE_ROOT, report.config_path)
 
     def test_declared_but_invalid_config_fails_closed(self):
         config = minimal_config()
@@ -142,7 +142,7 @@ class TestLoader(unittest.TestCase):
 
     def test_ambiguous_dual_root_fails_closed_before_profiles_are_read(self):
         self.route.declare(minimal_config())
-        (self.route.root / rlp.STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
+        (self.route.root / rlp.LEGACY_STORAGE_ROOT / "routes" / "A").mkdir(parents=True)
         with self.assertRaises(rlp.AmbiguousStorageRoot):
             dp.discover(self.route.route, "mri-reconstruction")
         with self.assertRaises(rlp.AmbiguousStorageRoot):

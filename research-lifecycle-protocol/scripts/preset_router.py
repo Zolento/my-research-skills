@@ -1641,6 +1641,26 @@ def project_context(state_path: Path, cognition_dir: Optional[Path] = None) -> D
             index_on_disk = parsed if isinstance(parsed, dict) else None
         except (json.JSONDecodeError, UnicodeDecodeError):
             index_on_disk = None
+    # v2.1.0 storage gate: every preset/resume entry resolves the runtime storage
+    # matrix first. A legacy-only project pauses with a machine-readable migration
+    # state instead of running formal research inside the legacy root.
+    try:
+        import rlp_paths as _rlp
+    except ImportError:                                  # pragma: no cover - shipped module
+        _rlp = None
+    if _rlp is not None:
+        try:
+            _project = _rlp.project_root_from_state(state_path)
+        except _rlp.LayoutError:
+            _project = None
+        if _project is not None:
+            _report = _rlp.runtime_status(_project)
+            if _report["status"] == _rlp.RUNTIME_STATUS_AMBIGUOUS:
+                raise _rlp.AmbiguousStorageRoot(_report["reason"])
+            if _report["status"] == _rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+                raise _rlp.MigrationRequired(_report["reason"])
+            if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
+                raise _rlp.InvalidStorageRoot(_report["reason"])
     return {
         "state_path": state_path, "route_dir": state_path.parent, "cognition_dir": cognition_dir,
         "state": state, "revisions": revisions, "cards": cards, "scheduler": scheduler,
