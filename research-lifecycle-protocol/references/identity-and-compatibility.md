@@ -243,3 +243,19 @@ npx skills add "Zolento/my-research-skills#research-lifecycle-protocol/dev@resea
 4. 有真实的旧状态 fixture 作为回归证据。
 
 仅仅因为 Skill 改名，不构成修改协议命名空间或运行目录的理由。
+
+## Cold Handoff 与 Research Resume 的入口分类
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §0.31。
+
+两个**完全不同**的操作，不要混用（判定见 `scripts/legacy_handoff.py:resume_decision`）：
+| 场景 | 操作 | 说明 |
+|---|---|---|
+| 无 canonical state | Bootstrap | 按 §0.3 执行 |
+| 有历史但未完成接管 / 真实不兼容迁移 | **Cold Handoff**（`legacy_handoff.py take`）| 一次性：兼容性审计、投影重建、接管报告、可回滚；**不伪造预注册**，canonical state 无损 |
+| 已有有效 state（含 `/loop` 每轮唤醒、`continue-research`、会话恢复、上下文压缩后重载）| **Research Resume** | 直接读 canonical state + 认知投影 + Scheduler + 已有方法产物，继续未完成的科研行动 |
+| state 不可读 / 真实证据异常 | Recover / HOLD | 走既有恢复链，**不得**通过重建 state 绕过 |
+**已有 `research-state.json` ≠ 需要完整接管**；`state_version` 增长、缺少派生报告都**不**构成重新
+接管的理由。职责边界：Legacy Handoff 只做一次性接管；Research Recovery 恢复当前科研状态；
+Context Drift Recovery 处理投影漂移；Cognition 维护可重建记忆；Scheduler/I2M 决定下一步行动。

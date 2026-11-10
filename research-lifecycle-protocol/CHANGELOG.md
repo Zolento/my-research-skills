@@ -71,6 +71,56 @@ See `docs/releases/v2.0.1.md`.
 - `SKILL.md`: single introduction; the skill is defined as a stateful research
   lifecycle protocol, not an idea pipeline.
 
+## 2.2.0 — 2026-11-10
+
+Context & Architecture Optimization. `SKILL.md` 156 KB → 27 KB；三级上下文
+（L0/L1/L2）、机器可读的上下文依赖声明、章节级加载、Research Context Packet、
+子 Agent 最小任务契约、上下文基线与基准工具。**不改科研规则**。
+详见 `docs/releases/v2.2.0.md`、`docs/context-baseline.md`、`docs/context-benchmark.md`、
+`docs/rule-relocation-matrix.md`、`docs/context-architecture.md`。
+
+> 版本号在更名（`research-idea-pipeline` → `research-lifecycle-protocol`）时重新起算；
+> 下表里 `research-idea-pipeline/v2.2.0`、`v2.3.x` 属于旧名时期的历史迭代。
+
+### Added
+- `scripts/context_planner.py`：纯函数式上下文计划器，七个加载状态，四类独立预算，
+  超预算不静默截断。
+- `scripts/section_index.py` + `references/section-index.json`：稳定章节索引（66 文档 / 977 节），
+  可从正文重建，`check` 判红漂移。
+- `scripts/context_profile.py`：六层上下文测量（static / loaded / visible / duplicate /
+  estimate / calls），明确拒绝把估算当实测。
+- `scripts/context_packet.py`：13 项研究上下文包，绑定 state_version / digest / 证据摘要 /
+  Skill 版本 / Domain 摘要，失效可检测且禁止清空或重新 Bootstrap。
+- `scripts/subagent_context.py` + `references/subagent-context.md`：五个角色契约与五条
+  权限不变量（裁剪不得扩张权限）。
+- `references/anchor-policy.md`、`references/insight-to-method-policy.md`、
+  `references/reference-index.md`、`references/execution-checklist.md`、
+  `references/design-rationale.md`、`references/development-selfcheck.md`：原 `SKILL.md`
+  内容的权威落点。
+- `preset-registry.json` 每个预设新增 `context` 依赖声明；`start-project` 走 `entry_context`。
+
+### Changed
+- `SKILL.md` 重构为 L0 常驻核心（156,565 → 27,500 bytes 量级），保留全部硬约束与被外部
+  引用的锚点（§0.1 / §0.2 / §1.6 / §1.7 / §3.1.0）。
+- `preset_router.load_preset_context()`：`loaded` 只记实际读取的正文，
+  脚本引用改名 `referenced_scripts`，并附 `load_semantics`。
+- `release_check.step_readwrite_parity`：改为 `policy ↔ phase-*.md` 逐格比对；
+  新增 `step_stage_index_parity`（阶段集合齐备 + 读写列不得回流到 L0）。
+- `release_check` 新增 `step_context_architecture`：依赖声明、章节索引、子 Agent 契约、
+  L0 上限（40,000 bytes）与 13 个硬约束标记。
+- frontmatter 的「24 条机械硬规则」更正为 31 条（S1—S7 + V1—V24）。
+
+### Fixed
+- `PE17` 在 `policy_evolution.py` 与测试中使用但规则表未定义 → 补入 `skill-rsi-policy.md`。
+- R12 两条独有规则（叙事被淘汰 ≠ 科学被证伪；`已证实`/`已证伪` **不得用来**描述修辞方案）
+  迁入 `phase-r12-narrative.md`，避免随 §4 删除而丢失。
+- 三处与 `literature-policy` / `project-layout` 冲突的「记入根 INDEX 的 Warnings」表述
+  在迁移时**未搬运**，矛盾随重复一起消失。
+- 迁移引入的 18 个文件悬空相对链接已机械修复。
+
+### Compatibility
+- 不需要迁移任何项目的 canonical state。新增的只有可重建的派生索引。
+
 ## 2.1.1 — 2026-11-10
 
 Storage migration safety patch (transaction integrity). See `docs/releases/v2.1.1.md`.
@@ -224,6 +274,7 @@ R7 Assurance 作者工具），并完成发布元数据统一与 R7 `--output` �
 | 2.0.0 | `research-idea-pipeline/v2.0.0` | `4303b6c5` | 2026-10-06 | chore: main 不包含开发文档（docs/ 属开发产物，与 skill 交付无关） |
 | 2.1.0 | `research-idea-pipeline/v2.1.0` | `e797af15` | 2026-10-07 | Merge branch 'research-idea-pipeline-dev' into main — research-idea-pi |
 | 2.1.1 | `research-idea-pipeline/v2.1.1` | `fd2b63ea` | 2026-10-07 | release(research-idea-pipeline): v2.1.1 |
+| 2.2.0 | `research-lifecycle-protocol/v2.2.0` | dev | 2026-11-10 | release(research-lifecycle-protocol): v2.2.0 — Context & Architecture Optimization |
 | 2.2.0 | `research-idea-pipeline/v2.2.0` | `a889ce38` | 2026-10-08 | docs(research-idea-pipeline): 移除已失效的网络不可用自述（SSH/DNS 已恢复） |
 | 2.3.0 | `research-idea-pipeline/v2.3.0` | `4baf4585` | 2026-10-09 | Merge feat/cognitive-insight-engine: Cognitive Insight Engine (R0—R14  |
 | 2.3.1 | `research-idea-pipeline/v2.3.1` | `ba9b9cbc` | 2026-10-09 | Merge feat/cognitive-insight-engine: Research Preset Library v2.3.1（共同 |

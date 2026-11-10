@@ -336,3 +336,54 @@ first operation. No automatic expansion of controls or repeated documents.
 STOP_DIAGNOSIS recommends REDESIGN/T8 (R5.1 once then R3/R6); PIVOT_RECOMMENDED
 recommends R14. These are scheduler eligibility statuses, not new R10/R14 enums.
 State changes without new evidence/decision value do not reset these limits.
+
+## Discovery Loop 与 Assurance Loop 的分工
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §各阶段的分工。
+
+> **等价旧口号：** R3 决定"做不做"，R8 决定"做什么"，R12 决定"怎么讲"，
+> R7 + R10 决定"做得对不对"。
+| 维度 | Discovery Loop（R3—R6） | Assurance Loop（R7 / R10 / R13） |
+|---|---|---|
+| 对象 | `hypotheses[]` 候选群体 | `claims[]` / `evidence[]` / `experiments[]` |
+| 可行性 | 概念可行性：结构是否成立 | 工程可行性：做法能否跑通、变量是否可控 |
+| 正确性 | 不判 | 方法正确性：推导 / 实现 / 指标 / 统计是否成立 |
+| 创新性 | 产出发散度（QD archive 的 niche 覆盖） | 是否**实质复现**已有工作（防复现） |
+| 复现性 | 不涉及（不派 S-Repro） | 必查（S-Repro + 防复现检查） |
+| 深度 | 广：population + 隔离 islands | 深：六攻击面 + 交叉质询 + 硬门禁 |
+**Discovery 只管扩大与保多样性，Assurance 只管会不会被推翻。** 两者**都不允许直接改
+`claims[].status`** —— 改 claim 状态**默认只能经 R10**（例外见 §1.6：R8 的证据驱动单向升级），这是防"自己给自己判分"的结构性措施。
+**做得很扎实的复现仍是拒稿理由。**
+**解析细则（配合上表四层）：**
+1. 第 3 层的 `phase=` 写法：`R0|R1|…|R14`（大小写不敏感；逗号分隔或 `R3-R6` 区间均可），
+按上述顺序依次执行这些阶段。
+2. 第 1 / 2 层命中时**不得**再要求用户选阶段 —— 入口自己决定跑什么
+（`start-project` 只跑 `B0`—`B6`；`explore` 跑 `R3`—`R6`；`audit` 跑 `R7`/`R10`/`R13`）。
+3. 第 4 层才反问；反向推断（从意图猜阶段序号）**不是**允许的捷径。
+4. 阶段之外的参数按该阶段的输入约定解析（见下）。
+5. **写回义务：** 每个阶段收尾**必须**更新 World Model 的对应字段（读/写列见上表），
+并跑 `python3 scripts/state_check.py <state.json>`，**硬违规须为 0**。
+6. **档位参数（可选）**：若 `$ARGUMENTS` 含 `writing=asd-ste100`，或用户在自然语言里
+显式要求「用 asd-ste100 档」，本次调用按 **asd-ste100** 执行（见 §1.3 与
+[writing-policy.md](../references/writing-policy.md) §1）。未声明即走默认档；
+**Agent 不得自行升档**，声明也**不跨轮继承**。
+**启动前置动作（每次调用都做）：**
+> **若是已有代码 / 实验 / 文献 / 结论的存量项目，先做接管摸底** ——
+> 按 [references/project-intake.md](../references/project-intake.md) 的 9 个维度盘点，**不得从零开始**，
+> **项目里已有的信息不得重复询问用户**；只有「缺失且会实质影响科研判断」的信息才集中提问（一次问完）。
+0. **先确认锚定点（核心目标）** —— 见 §0.1。**项目主锚点未声明前不得开工。**
+1. **读项目根目录的 `AGENTS.md`**（若存在）—— 其布局、命名、公用部分约定优先于本
+Skill 默认约定。**并校验它引用的文件是否都存在**：缺失项记入根 `INDEX.md` 的
+Warnings。**悬空引用会让后续所有"按 AGENTS.md 办"的动作失效**，所以发现即记。
+2. **确定路线**（`routes/A` / `routes/B` / …）。用户未指定时反问；若只有一条路线则用它。
+3. **读该路线的 `README.md` / `STATUS.md` / `INDEX.md`**：`README` 是路线身份证，
+`STATUS` 是当前状态（state 投影），`INDEX` 是材料目录。
+4. 若路线或三件套不存在，按
+[references/project-layout.md](../references/project-layout.md) §7 的检查清单手工建立
+（目录 + `README.md` / `STATUS.md` / `INDEX.md`）后再开工。
+> **与 `AGENTS.md` 冲突时的裁决：** `AGENTS.md` 的**纪律性条款**（如"必须改进最终任务
+> 性能""禁止在证明性工作上停留"）**优先于任何既有路线的锚定契约**。冲突时按 **§0.2
+> 锚点变更单**处理：为该路线申请新方向，**或**按项目主锚点重定位（`anchor_role` +
+> 可证伪的 `serves`）。**不得用路线自述的 `core_goal` 去抵消 `AGENTS.md` 的纪律。**
+> 详细约定见 [references/project-layout.md](../references/project-layout.md)。

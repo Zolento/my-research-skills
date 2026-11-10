@@ -1,5 +1,58 @@
 # Agent Handoff — research-lifecycle-protocol/dev（branch-local）
 
+## 最新一轮：v2.2.0 Context & Architecture Optimization（2026-11-10）
+
+**状态：开发完成，停在 dev 分支，未合并 main、未打 tag、未发布、未刷新全局安装。**
+
+起始 HEAD：`f02b340`（main 基线 `787b1d9`）。目标版本 2.2.0（dev 侧 metadata 已 bump）。
+
+### 本轮做了什么
+
+| 阶段 | 交付 |
+|---|---|
+| A 基线 | `scripts/context_profile.py`（六层测量）+ `docs/context-baseline.md` + 一次真实 Harness 观测 |
+| B L0 精简 | `SKILL.md` 156,565 → 28,037 bytes（−82%）+ `docs/rule-relocation-matrix.md` |
+| C 加载链路 | registry `context` 声明 + `scripts/context_planner.py` + `scripts/section_index.py` + `references/section-index.json` |
+| D 研究记忆 | `scripts/context_packet.py`（13 项，绑定 5 项，可检测失效） |
+| E 子 Agent | `scripts/subagent_context.py` + `references/subagent-context.md`（5 角色，5 条权限不变量） |
+| F 回归 | 2325 tests OK（skipped=4）、`release_check` PASS、MRI replay 4/4、安装副本 smoke PASS |
+
+### 实测读数
+
+- 每次调用协议上下文：平均 129,426 → 37,855 字符（−71%）；工具调用 4.08 → 3.42，无场景上升。
+- 子 Agent 上下文：123,449 → 16,881 字符（−86%）。
+- `SKILL.md`：156,565 → 28,037 bytes（−82%）。**未达 10—15 KB 目标**，理由与组成见
+  `docs/context-benchmark.md` §5；`release_check` 用 40,000 bytes 作为回归上限。
+- 科学能力：**L3 未验证**。行为回归与 Replay 只支持 L1/L2。
+
+### 本轮修掉的既有缺陷
+
+- `PE17` 长期未定义（代码与测试在用）→ 补入 `skill-rsi-policy.md` 规则表。
+- R12 两条独有规则随 §4 删除无处安放 → 迁入 `phase-r12-narrative.md`。
+- `SKILL.md` 三处「记入根 INDEX 的 Warnings」与既有权威冲突 → 迁移时未搬运。
+- frontmatter「24 条机械硬规则」→ 更正为 31 条（S1—S7 + V1—V24）。
+- 迁移引入的 18 个文件悬空相对链接 → 机械修复（24 处 docs 链接另修）。
+
+### 已知未修复（下一轮候选）
+
+1. 约 20 处 `.research-idea-pipeline/routes/...` 仍作正常落盘路径出现于 9 个 phase 文档
+   （与 v2.1.0 单根政策冲突）。涉及科学落盘路径，需逐条核对。
+2. `roles.md` 六攻击面 vs `invocation-prompts` / `phase-r7` 八攻击面表述冲突。
+3. `research-state-policy` §5 表与其后说明条目对 R12 写入口径不一致。
+4. `preset-policy` 仍有一处旧预设名 `self-evolution.md`（实际为 `strategy-evolution.md`）。
+5. L0 仍比 10—15 KB 目标大 13 KB；继续压缩需要删规则或删被外部引用的锚点。
+
+### 恢复本工作的最小步骤
+
+```bash
+cd research-lifecycle-protocol
+python3 scripts/release_check.py          # 唯一判据
+python3 scripts/context_planner.py check  # 依赖声明
+python3 scripts/section_index.py check    # 章节索引
+```
+
+---
+
 ## 当前目标
 
 1. ✅ 更名 `research-idea-pipeline` → `research-lifecycle-protocol`（目录/frontmatter/

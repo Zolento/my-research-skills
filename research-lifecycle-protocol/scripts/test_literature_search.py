@@ -392,8 +392,12 @@ class BottleneckRetrievalTests(unittest.TestCase):
 
     def test_trigger_tables_have_the_same_ids_and_levels(self):
         root = SCRIPTS.parent
-        paths = [root / "SKILL.md", root / "README.md", root / "references" / "literature-policy.md",
+        # v2.2.0：`SKILL.md` 不再复制 T1—T8 表（重复的规则表就是第二个漂移源）。
+        # 比较对象改为仍然承载该表的副本；L0 只保留「按 T1—T8 扩检」的指针。
+        paths = [root / "README.md", root / "references" / "literature-policy.md",
                  root / "references" / "phase-r2-r5-field-mapping-retrieval.md"]
+        self.assertIn("T1—T8", (root / "SKILL.md").read_text(encoding="utf-8"),
+                      "L0 必须仍然指出扩检等级体系存在")
         expected = {f"T{n}": "L3" if n in (1, 4, 6) else "L2"
                     for n in range(1, 9)}
         for path in paths:

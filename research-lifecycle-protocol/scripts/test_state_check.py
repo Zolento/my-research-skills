@@ -884,14 +884,25 @@ class TestTableIntegrity(unittest.TestCase):
             self.assertEqual(len(cells), 6, f"policy {stage} 列数 {len(cells)}")
 
     def test_skill_stage_table_has_effect_column(self) -> None:
+        """v2.2.0 起 §4 是**能力索引**（阶段 / 名称 / 能做什么），读写单元格已下沉。
+
+        原先是 7 列（含读、写），因此既能查「作用列空」，也会顺带比对读写格。
+        读写格现在只有 `research-state-policy` §5 一个权威（`release_check` 的
+        `step_readwrite_parity` 与 `step_stage_index_parity` 共同守着），这里保留
+        **作用列必须真实存在且不等于名称**这一条：名字不是能力说明。
+        """
         rows = self._rows("SKILL.md", "| Phase | 名称 |", "\n\n")
-        self.assertTrue(rows, "SKILL §0 读不到阶段行")
-        self.assertEqual(len(rows), 15, "SKILL §0 应恰好 15 个阶段行（表被切开了？）")
+        self.assertTrue(rows, "SKILL §4 读不到阶段行")
+        self.assertEqual(len(rows), 15, "SKILL §4 应恰好 15 个 R 阶段行（R0—R14）")
+        skill = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("| **R9.O** |", skill, "SKILL §4 缺 R9.O 行")
         for stage, cells in rows:
-            self.assertEqual(len(cells), 7, f"SKILL {stage} 列数 {len(cells)}")
-            name, effect, read = cells[2].strip(), cells[3].strip(), cells[4].strip()
+            self.assertEqual(len(cells), 5, f"SKILL {stage} 列数 {len(cells)}")
+            name, effect = cells[2].strip(), cells[3].strip()
+            self.assertTrue(name, f"SKILL {stage} 名称列空")
             self.assertTrue(effect, f"SKILL {stage} 作用列空")
-            self.assertNotEqual(effect, read, f"SKILL {stage} 作用列被读列覆盖")
+            self.assertNotEqual(effect, name, f"SKILL {stage} 作用列被名称覆盖")
+            self.assertGreater(len(effect), 4, f"SKILL {stage} 作用列过于敷衍")
 
     def test_policy_file_column_points_to_real_file(self) -> None:
         rows = self._rows("references/research-state-policy.md", "| 阶段 | 读什么", "\n\n>")
@@ -1222,13 +1233,19 @@ class TestReadWriteTableParity(unittest.TestCase):
         text = (self.ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8")
         return self._parse(text, self.POLICY_ANCHOR)
 
-    def test_skill_matches_policy(self) -> None:
-        skill = self._parse((self.ROOT / "SKILL.md").read_text(encoding="utf-8"),
-                            self.SKILL_ANCHOR)
+    def test_skill_stage_set_covers_policy(self) -> None:
+        """`SKILL.md` 不再复制读写单元格，但**不得漏掉任何阶段**。
+
+        读写格漂移由 `release_check.step_readwrite_parity`（policy ↔ phase 文档）承担，
+        这里守的是「L0 的能力索引覆盖了 policy 的每一个阶段」—— 复制消失，覆盖不变。
+        """
+        skill_text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        stages = set(re.findall(r"^\| \*\*(R\d+(?:\.O)?)\*\*", skill_text, re.M))
         policy = self._policy()
-        self.assertTrue(skill and policy, "读/写表解析失败（表头或阶段行找不到）")
-        for stage in sorted(set(skill) & set(policy)):
-            self.assertEqual(skill[stage], policy[stage], f"SKILL §0 的 {stage} 行与 policy §5 不一致")
+        self.assertTrue(stages, "SKILL §4 读不到阶段行")
+        self.assertTrue(policy, "policy §5 读/写表解析失败")
+        missing = sorted(set(policy) - stages)
+        self.assertEqual(missing, [], f"SKILL §4 漏掉了阶段：{missing}")
 
     def test_every_phase_table_matches_policy(self) -> None:
         policy = self._policy()
@@ -1533,7 +1550,8 @@ class TestReleaseGateWording(unittest.TestCase):
         self.assertIn("**verdict 只看 exit code 与最后一行**", text)
 
     def test_skill_design_note_does_not_claim_r12_uses_the_reverse_score(self) -> None:
-        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        # v2.2.0 把设计依据整体迁到 references/design-rationale.md；断言随权威位置移动。
+        text = (self.ROOT / "references" / "design-rationale.md").read_text(encoding="utf-8")
         start = text.index("10. **为什么 R7 / R10 / R13 也必须做极性归一化？**")
         note = text[start:text.index("11. **为什么要给", start)]
         self.assertIn("**R12 已不使用该反向分**", note)
@@ -1692,10 +1710,13 @@ class TestSemanticInvariants(unittest.TestCase):
                          {"generations", "viable", "killed", "dormant"})
 
     def test_r12_maps_narrative_outcomes_to_status_sections(self) -> None:
-        text = self._read("SKILL.md")
-        section = text[text.index("### R12 — 叙事"):text.index("### R7 / R10 / R13")]
-        self.assertIn("Most important negative findings", section)
-        self.assertIn("Strongest supported findings", section)
+        # 映射的权威位置是 phase-r12 的 D9.4.4；L0 保留一句话复述。
+        text = self._read("references/phase-r12-narrative.md")
+        self.assertIn("Most important negative findings", text)
+        self.assertIn("Strongest supported findings", text)
+        skill = self._read("SKILL.md")
+        self.assertIn("Most important negative findings", skill)
+        self.assertIn("Strongest supported findings", skill)
 
     def test_global_checklist_scopes_venue_standards_to_r12_r13(self) -> None:
         text = self._read("SKILL.md")
@@ -1820,11 +1841,22 @@ class TestReleaseCheckGate(unittest.TestCase):
         self.assertTrue(ok, detail)
 
     def test_readwrite_step_detects_a_cell_drift(self) -> None:
-        ok, _ = self._mutate("SKILL.md",
-                             "`literature` / `assumptions` / `failures` / `contract.constraints`",
-                             "`literature` / `assumptions` / `failures`",
+        ok, _ = self._mutate("references/phase-r8-evidence-contract.md",
+                             "`claims[].contract` / `claims[].status`",
+                             "`claims[].contract`",
                              self.rc.step_readwrite_parity)
         self.assertFalse(ok, "读写格漂移时该步骤必须 FAIL")
+
+    def test_stage_index_step_detects_a_missing_stage(self) -> None:
+        ok, _ = self._mutate("SKILL.md", "| **R14** |", "| **RX14** |",
+                             self.rc.step_stage_index_parity)
+        self.assertFalse(ok, "阶段缺失时该步骤必须 FAIL")
+
+    def test_stage_index_step_detects_the_read_write_table_coming_back(self) -> None:
+        ok, _ = self._mutate("SKILL.md", "| Phase | 名称 | 能做什么 |",
+                             "| Phase | 名称 | 能做什么 | 读 | 写 |",
+                             self.rc.step_stage_index_parity)
+        self.assertFalse(ok, "读写单元格回流到 L0 时该步骤必须 FAIL")
 
     def test_referenced_scripts_step_passes_on_current_tree(self) -> None:
         ok, detail = self.rc.step_referenced_scripts_exist()

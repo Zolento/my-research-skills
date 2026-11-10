@@ -3725,7 +3725,17 @@ def load_preset_context(preset_id: str, root: Optional[Path] = None
         "contract_sections": [section for section in CONTRACT_SECTIONS
                               if section in contract_text],
         "contract_text": contract_text,
-        "loaded_references": [f"scripts/{name}.py" for name in preset["reuses"]],
+        # `referenced` / `referenced_scripts` 只是**路径**：本函数没有读取这些脚本的源码，
+        # 因此不得把它们放进 `loaded`。`loaded` 只记真正读过并返回正文的文件。
+        "referenced": [f"scripts/{name}.py" for name in preset["reuses"]],
+        "referenced_scripts": [f"scripts/{name}.py" for name in preset["reuses"]],
+        "loaded_paths": [SHARED_CONTRACT_NAME, preset["protocol"]],
+        "load_semantics": {
+            "loaded": "已实际读取并返回正文（只含共享契约与选中的这一个协议）",
+            "referenced": "只给路径，未读正文；不得声称相应规则已进入上下文",
+            "not_loaded": "本次未加载的其余预设",
+            "full_plan": "逐任务的必需/条件/深层集合见 scripts/context_planner.py plan",
+        },
         "not_loaded": [item for item in PRESET_IDS if item != preset_id],
         "protocol_chars": len(protocol_text),
         "protocol_text": protocol_text,

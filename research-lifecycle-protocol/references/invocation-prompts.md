@@ -255,3 +255,38 @@ stop rules，并通过 planning 与 post-update Assurance；缺审计则 HOLD。
    `continue-research` 按 §2 区分咨询与执行，不因阶段结束重复请求已有授权。
 4. **状态纪律不因入口而放松。** 任何入口都不得编造状态条目
    （判据见 [SKILL.md](../SKILL.md) §0.3：每条必须能指回真实来源）。
+
+## Bootstrap 编排 B0—B6（从 L0 迁入）
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §0.3。
+
+**结论：第一次在本项目调用本 Skill 时，只允许执行下面这一个 Bootstrap 序列；不得自动跑 `R3`—`R14`。**
+```text
+B0 Repo Intake              ─▶ 按 project-intake.md 盘点（已有信息不得重复询问）
+B1 Existing Asset Discovery ─▶ 从已有代码 / 实验 / 文献 / 笔记中提取**真实**状态
+B2 Minimal R0 Contract      ─▶ 只写 contract（+ 模板骨架，含 state_version: 0）
+B3 Bootstrap R1             ─▶ 建 World Model 骨架（**必须稀疏**）
+B4 R2 Field Snapshot        ─▶ 领域地图快照（**不做穷尽检索**）
+B5 Initial Uncertainty Map  ─▶ 只在**有依据**时写 uncertainties[]
+B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用户确认**
+```
+> **`first invocation = observe before intervene`。**
+> 首次运行的价值在于**看清现状**，不在于推进研究。
+> **B6 之后必须停** —— 由用户决定下一步跑哪些阶段（见 §0 的 `phase` 参数）。
+**B3 的稀疏纪律（本序最重要的一条）：**
+> **`State completeness is not a goal; grounded completeness is.`**
+> **稀疏的真实状态优于编造的完整状态。**
+| 类别 | 首次运行的态度 |
+|---|---|
+| `contract` / `literature` / 已观测的 `evidence` / 已知 `experiments` / 已知 `failures` | **积极填**（这些在项目里真实存在） |
+| `claims` / `assumptions` / `uncertainties` | **谨慎提取**（须有原文 / 代码 / 数据支撑） |
+| `hypotheses` / 未来 `experiments` | **不要为了完整而生成** —— 除非项目里**已经有**这些内容 |
+**判据：** 首次运行结束时，**每一条 state 条目都必须能指回一个真实来源**
+（文件、代码、数据、实验记录或用户原话）。**指不回去的条目 = 编造**，
+必须删除，或改记为 `uncertainties[]`（`importance: medium`，说明"尚需确认"）。
+> **反面模式（必须避免）：** 为了"看起来完整"而一口气生成 `claims 12 / evidence 30 /
+> assumptions 15 / hypotheses 10` —— 其中大半是猜的。**那会让整份 World Model 失去可信度。**
+**四个用户入口**（用户不需要知道 `R` 编号）：见
+[references/invocation-prompts.md](../references/invocation-prompts.md)。
+---

@@ -140,7 +140,10 @@ class TestPolicyCodeParity(unittest.TestCase):
 
     def test_documented_nn_ranges_match_checker(self) -> None:
         expected = [key for key in seq.RULES if key.startswith("NN")]
-        paths = [ROOT / "SKILL.md", POLICY, TEMPLATE,
+        # v2.2.0：规则号区间表在 `references/reference-index.md`（L0 已下沉资源索引）。
+        paths = [ROOT / "references" / "reference-index.md",
+                 ROOT / "references" / "section-index.json",
+                 POLICY, TEMPLATE,
                  ROOT / "references" / "phase-r7-r10-r13-assurance-repair-review.md"]
         for path in paths:
             ranges = re.findall(r"`?(NN1)`?—`?(NN\d+)`?", path.read_text())
@@ -930,11 +933,19 @@ class TestRegistrationAndPackaging(unittest.TestCase):
         self.assertEqual(listed, seq.RULES)
 
     def test_new_assets_are_registered_in_skill(self) -> None:
+        """新资产必须登记在**完整资源目录**里，且 L0 必须指向该目录。
+
+        v2.2.0 把 §2 的 19 KB 资源索引下沉到 `references/reference-index.md`。
+        登记义务没有消失，位置变了：查得到（目录里有）＋找得到（L0 指向它）。
+        """
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("references/reference-index.md", skill,
+                      "L0 未指向完整资源目录")
+        index = (ROOT / "references" / "reference-index.md").read_text(encoding="utf-8")
         for rel in ("references/structural-equivalence-policy.md",
                     "templates/structural-equivalence-audit.template.json",
                     "scripts/structural_equivalence_check.py"):
-            self.assertIn(rel, skill, f"SKILL.md §2 资源索引未登记 {rel}")
+            self.assertIn(rel, index, f"reference-index 未登记 {rel}")
 
     def test_every_fixture_is_registered_in_readme(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
