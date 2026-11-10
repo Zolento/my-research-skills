@@ -668,6 +668,12 @@ def _take(state_path: Path, project_root: Optional[Path]) -> int:
             "(python3 scripts/migrate_project_root.py inspect --project ...)")
     if _status == _rlp.RUNTIME_STATUS_AMBIGUOUS:
         raise _rlp.AmbiguousStorageRoot(_rlp.runtime_status(_project)["reason"])
+    # cooperative maintenance lock: Cold Handoff writes the control plane
+    with _rlp.maintenance_guard(_project):
+        return _take_locked(state_path, project_root)
+
+
+def _take_locked(state_path: Path, project_root: Optional[Path]) -> int:
     state_before = cg.state_fingerprint(state_path)
     audit = compatibility_audit(state_path, project_root)
     route_dir = state_path.parent

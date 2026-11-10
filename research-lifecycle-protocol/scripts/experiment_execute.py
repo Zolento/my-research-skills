@@ -427,6 +427,7 @@ def main(argv=None):
         if command == 'scheduler-check': p.add_argument('--scheduler',type=Path,required=True)
     args=parser.parse_args(argv)
     def read(path): return json.loads(path.read_text(encoding='utf-8'))
+    _guard=None
     try:
         state=read(args.state)
         # v2.1.0 storage gate: managed execution is formal research — a legacy-only
@@ -441,6 +442,10 @@ def main(argv=None):
             if _report['status']==_rlp.RUNTIME_STATUS_AMBIGUOUS: raise _rlp.AmbiguousStorageRoot(_report['reason'])
             if _report['status']==_rlp.RUNTIME_STATUS_MIGRATION_REQUIRED: raise _rlp.MigrationRequired(_report['reason'])
             if _report['status']==_rlp.RUNTIME_STATUS_INVALID: raise _rlp.InvalidStorageRoot(_report['reason'])
+            # cooperative maintenance lock: managed execution is a control-plane write
+            # (bare fixture layouts have no project root and no control root to guard)
+            if _project is not None:
+                _guard=_rlp.maintenance_guard(_project); _guard.__enter__()
         if args.command == 'scheduler-check': result=eg.scheduler_check(state,read(args.scheduler))
         else:
             ledger=Ledger(args.ledger or args.state.parent/'.execution',read(args.policy) if args.policy else None)
@@ -452,6 +457,15 @@ def main(argv=None):
             else: result=run(state,args.experiment,read(args.manifest),read(args.receipt),ledger,args.execute,scheduler=read(args.scheduler))
     except (OSError,UnicodeError,ValueError,TypeError,KeyError,AttributeError) as exc:
         result={'status':'INVALID','errors':[str(exc)]}
+    except Exception as exc:
+        if type(exc).__name__ == 'MaintenanceInProgress':
+            result={'status':'INVALID','errors':[str(exc)]}
+        else:
+            raise
+    finally:
+        if _guard is not None:
+            try: _guard.__exit__(None, None, None)
+            except Exception: pass
     print(json.dumps(result,ensure_ascii=False,indent=2,allow_nan=False))
     return 0 if result['status'] in ('PASS','PILOT_ONLY') else 4 if result['status']=='INVALID' else 3
 

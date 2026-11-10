@@ -36,9 +36,13 @@ Exit codes: 0 resolved, 3 ambiguous/invalid layout, 4 environment or usage error
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
+import os
 import pathlib
 import sys
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -89,6 +93,144 @@ class LayoutError(ValueError):
     """A path does not match the documented route layout."""
 
     STATUS = "INVALID_LAYOUT"
+
+
+#: Project-level maintenance control directory and its stable lock file. The lock is
+#: the cooperation point between a running migration and RLP's own write entries.
+MAINTENANCE_DIR = ".rlp-migration"
+MAINTENANCE_LOCK_NAME = "control.lock"
+
+
+class MaintenanceInProgress(RuntimeError):
+    """A migration (or rollback) holds the project maintenance lock.
+
+    Raised by RLP write entries so a cooperating writer never writes the control
+    plane while it is being migrated. External writers that do not use this lock are
+    NOT covered — the migration tool reports that limitation explicitly.
+    """
+
+    STATUS = "MAINTENANCE_IN_PROGRESS"
+
+
+def maintenance_lock_path(project_root: pathlib.Path) -> pathlib.Path:
+    return pathlib.Path(project_root).expanduser().resolve() / MAINTENANCE_DIR / \
+        MAINTENANCE_LOCK_NAME
+
+
+def _read_lock_owner(project_root: pathlib.Path) -> Optional[Dict[str, Any]]:
+    path = maintenance_lock_path(project_root)
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return value if isinstance(value, dict) and value else None
+
+
+def maintenance_status(project_root: pathlib.Path) -> Dict[str, Any]:
+    """Read-only view: is the maintenance lock currently held, and by whom?
+
+    Detection opens the lock file and tries a non-blocking exclusive lock, then
+    releases it immediately. This is a best-effort inspection for reports; writers
+    must still go through :func:`maintenance_guard` to be actually excluded.
+    """
+    path = maintenance_lock_path(project_root)
+    if not path.is_file():
+        return {"held": False, "path": str(path), "owner": None}
+    handle = None
+    try:
+        handle = os.open(str(path), os.O_RDONLY)
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {"held": True, "path": str(path),
+                    "owner": _read_lock_owner(project_root)}
+        finally:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        return {"held": False, "path": str(path),
+                "owner": _read_lock_owner(project_root)}
+    except OSError:
+        return {"held": None, "path": str(path),
+                "owner": _read_lock_owner(project_root)}
+    finally:
+        if handle is not None:
+            os.close(handle)
+
+
+@contextlib.contextmanager
+def maintenance_guard(project_root: pathlib.Path):
+    """Hold a SHARED maintenance lock for one control-plane write.
+
+    Cooperating RLP writers take this guard; a migration holds the EXCLUSIVE lock for
+    its whole transaction, so a guarded write fails with MaintenanceInProgress instead
+    of racing the migration. Non-cooperating writers (external Mesh workers, training
+    scripts, third-party plugins) do not take this lock and are not excluded — the
+    migration report lists them explicitly.
+    """
+    path = maintenance_lock_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            owner = _read_lock_owner(project_root)
+            raise MaintenanceInProgress(
+                "项目正在维护（迁移或回滚进行中）：暂停控制平面写入"
+                + (f"；持有者：{owner}" if owner else "")) from exc
+        try:
+            yield
+        finally:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
+        os.close(handle)
+
+
+@contextlib.contextmanager
+def maintenance_exclusive(project_root: pathlib.Path, *, owner: Dict[str, Any]):
+    """Hold the EXCLUSIVE maintenance lock for a whole migration transaction.
+
+    Writes owner metadata (migration id, pid, command, start time) into the lock file
+    so an interrupted run and cooperating writers can see who holds it.
+    """
+    path = maintenance_lock_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            current = _read_lock_owner(project_root)
+            raise MaintenanceInProgress(
+                "另一个迁移/回滚正在持有维护锁"
+                + (f"：{current}" if current else "")) from exc
+        payload = {"pid": os.getpid(), "started_at":
+                   time.strftime("%Y-%m-%dT%H:%M:%S"), **owner}
+        os.ftruncate(handle, 0)
+        os.lseek(handle, 0, os.SEEK_SET)
+        os.write(handle, json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+        os.fsync(handle)
+        try:
+            yield payload
+        finally:
+            try:
+                os.ftruncate(handle, 0)
+                os.fsync(handle)
+            except OSError:
+                pass
+            try:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
+        os.close(handle)
 
 
 #: Stable status tokens for the storage matrix (§2.1 of the storage spec).

@@ -3491,6 +3491,26 @@ def run_preset(
     freeze = sf.SourceFreeze(route_dir=None, context=f"preset:{preset_id}")
     freeze.__enter__()
     handler_error: Optional[str] = None
+    # Cooperative maintenance lock (v2.1.1): while a migration/rollback holds the
+    # exclusive lock, RLP write entries refuse to touch the control plane. External
+    # writers do not take this lock — the migration tool says so explicitly.
+    try:
+        import rlp_paths as _rlp
+        maintenance = _rlp.maintenance_guard(Path(context["route_dir"]).resolve().parent)
+        maintenance.__enter__()
+    except ImportError:                                  # pragma: no cover - shipped
+        maintenance = None
+    except _rlp.MaintenanceInProgress as exc:
+        freeze.__exit__(None, None, None)
+        return ({"_schema": SCHEMA_ROUTER, "preset_id": preset_id, "status": "HOLD",
+                 "protocol": preset["protocol"], "entry": preset["entry"],
+                 "execution_scope": preset["execution_scope"],
+                 "reused": list(preset["reuses"]),
+                 "observed": {"maintenance": _rlp.maintenance_status(
+                     Path(context["route_dir"]).resolve().parent)},
+                 "decision": {}, "steps": [], "writes": [], "changed_decision": None,
+                 "next_action": None, "hold_reason": "maintenance_in_progress"},
+                [Diagnostic("PR11", "maintenance", str(exc))], EXIT_ENV)
     try:
         payload = handler(context, apply)
     except (cg.CognitionError, OSError) as exc:
@@ -3505,6 +3525,8 @@ def run_preset(
                    "decision": {}, "steps": [], "writes": [], "changed_decision": None,
                    "next_action": None, "hold_reason": "handler_error"}
     finally:
+        if maintenance is not None:
+            maintenance.__exit__(None, None, None)
         freeze.__exit__(None, None, None)
     integrity: Dict[str, Any] = dict(freeze.result or {})
     payload["source_integrity"] = integrity
