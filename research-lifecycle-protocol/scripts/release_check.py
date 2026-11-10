@@ -228,17 +228,55 @@ def _parse_rw_table(text: str, anchor: str):
     return rows
 
 
+def _parse_stage_names(text: str, anchor: str):
+    """解析 `| **R0** | 名称 | ... |` 形式的阶段表，返回 {stage: 归一化名称}。"""
+    if anchor not in text:
+        return {}
+    lines = text[text.index(anchor):].split("\n")
+    out = {}
+    started = False
+    for line in lines:
+        if line.strip().startswith("|---") or line.strip().startswith("| ---"):
+            started = True
+            continue
+        if not started:
+            continue
+        if not line.strip().startswith("|"):
+            if out:
+                break
+            continue
+        cells = [cell.strip() for cell in line.split("|")]
+        if len(cells) < 4:
+            continue
+        match = re.match(r"^\*\*(R\d+(?:\.O)?)\*\*", cells[1].replace(" ", ""))
+        if not match:
+            continue
+        # 阶段名可能紧跟粗体（policy §5：`**R0** Research Contract`），
+        # 也可能单独占一列（SKILL §4：`| **R0** | research-contract |`）。
+        trailing = re.sub(r"^\s*\*\*R\d+(?:\.O)?\*\*\s*", "", cells[1]).strip().strip("*")
+        out[match.group(1)] = trailing or cells[2]
+    return out
+
+
+def _norm_stage_name(value: str) -> str:
+    """把 `Research Contract` 与 `research-contract` 归一成同一形状。"""
+    text = value.strip().strip("*_`").strip()
+    text = re.sub(r"\s+", "-", text)
+    return text.lower()
+
+
 def step_readwrite_parity() -> Tuple[bool, str]:
+    """读写契约的**唯一权威**是 `research-state-policy` §5，各 phase 文件逐格对齐。
+
+    `SKILL.md` 不再复制读写单元格：v2.2.0 起它只保留能力索引（名称与一句话），
+    单元格级比对改为 policy ↔ phase 文档。原先 SKILL 与 policy 的比对随重复一起消失，
+    由此**消除**了一处漂移源，而不是放宽检查。
+    """
     policy = _parse_rw_table((ROOT / "references" / "research-state-policy.md").read_text(encoding="utf-8"),
                              "| 阶段 | 读什么")
-    skill = _parse_rw_table((ROOT / "SKILL.md").read_text(encoding="utf-8"), "| Phase | 名称 |")
-    if not policy or not skill:
+    if not policy:
         return False, "读写表解析失败（表头或阶段行找不到）"
     checked = 0
-    for stage in sorted(set(skill) & set(policy)):
-        if skill[stage] != policy[stage]:
-            return False, f"SKILL §0 的 {stage} 行与 policy §5 不一致"
-        checked += 1
     for path in sorted((ROOT / "references").glob("phase-*.md")):
         text = path.read_text(encoding="utf-8")
         if "## 读 / 写 World Model" not in text:
@@ -248,9 +286,48 @@ def step_readwrite_parity() -> Tuple[bool, str]:
             if rows[stage] != policy[stage]:
                 return False, f"{path.name} 的 {stage} 行与 policy §5 不一致"
             checked += 1
-    if checked < 20:
-        return False, f"只比对到 {checked} 行（解析器失效？）"
-    return True, f"{checked} 行逐格一致"
+    if checked < len(policy):
+        return False, f"只比对到 {checked} 行，少于 policy 的 {len(policy)} 行（解析器失效？）"
+    return True, f"{checked} 行逐格一致（policy ↔ phase 文档）"
+
+
+def step_stage_index_parity() -> Tuple[bool, str]:
+    """`SKILL.md` §4 的能力索引必须覆盖 R0—R14，且**不得重新长出读写单元格表**。
+
+    v2.2.0 把逐阶段读写单元格下沉为 `research-state-policy` §5 的**唯一权威**，
+    `SKILL.md` 只保留「阶段 + 名称 + 一句话能力」。本步检查两件事：
+
+    1. **阶段集合完整**：R0—R14 加 R9.O 共 16 行，名称非空且唯一，按序排列。
+    2. **重复表没有回来**：§4 的表头里不得出现「读」「写」列。若有人把读写表再复制回
+       L0，两处就会各自漂移 —— 那正是本轮消除的问题。
+    """
+    skill_text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    names = _parse_stage_names(skill_text, "| Phase | 名称 |")
+    if not names:
+        return False, "SKILL.md §4 阶段表解析失败（表头或阶段行找不到）"
+    expected = [f"R{n}" for n in range(15)]
+    # R9.O 紧跟 R9
+    expected.insert(10, "R9.O")
+    missing = sorted(set(expected) - set(names))
+    extra = sorted(set(names) - set(expected))
+    if missing or extra:
+        return False, f"阶段集合不完整：缺 {missing}，多 {extra}"
+    empty = [stage for stage, name in names.items() if not name.strip()]
+    if empty:
+        return False, f"阶段名称为空：{empty}"
+    if list(names) != expected:
+        return False, f"阶段顺序不符合 R0—R14：{list(names)}"
+    dupes = [name for name in set(names.values()) if list(names.values()).count(name) > 1]
+    if dupes:
+        return False, f"阶段名重复：{dupes}"
+
+    # §4 的表头不得含「读」「写」列：读写契约只允许存在于 policy §5。
+    section = skill_text[skill_text.index("| Phase | 名称 |"):]
+    header = section.split("\n", 1)[0]
+    if "读" in header or "写" in header:
+        return False, "§4 表头重新出现了「读 / 写」列：读写表必须只留在 policy §5"
+    return True, (f"{len(expected)} 个阶段齐备、名称唯一、按序；"
+                  f"读写单元格未回流到 L0")
 
 
 def step_referenced_scripts_exist() -> Tuple[bool, str]:
@@ -1016,6 +1093,80 @@ def step_preset_library() -> Tuple[bool, str]:
                   "keeps science untouched")
 
 
+#: L0 常驻核心的**回归上限**。v2.2.0 把 SKILL.md 从 156 KB 降到约 27 KB；
+#: 这个上限的作用是防止它悄悄长回去。超过就说明有人在把细节重新塞回 L0。
+L0_BUDGET_BYTES = 40_000
+
+#: L0 必须常驻的硬约束标记。删掉任何一条都会让「精简」变成「丢规则」。
+L0_REQUIRED_MARKERS: Tuple[Tuple[str, str], ...] = (
+    ("唯一科学事实源", "canonical Research State 是唯一科学事实源"),
+    ("禁止重新 Bootstrap", "已有项目不得重新 Bootstrap"),
+    ("用户授权不可由 Agent 自行升级", "授权只能由用户给"),
+    ("GT-free", "自监督训练不得使用 GT"),
+    ("执行门禁", "实验必须过它自己的门"),
+    ("不得把「路线终止」等同于「科学真理被否定」", "R14 不判科学真伪"),
+    ("相关性不得写成因果性", "结论不得超出证据范围"),
+    ("子 Agent 不得绕过已有状态写入权限", "子 Agent 权限不因裁剪而扩张"),
+    ("冻结", "冻结协议 / 预算 / 锚点不得自行修改"),
+    ("没读规则", "未加载规则不等于不受约束，不得假装审查完成"),
+    ("只有用户能授权", "改锚点只有用户能做"),
+    ("loaded", "loaded 与 referenced 必须区分"),
+    ("blocked_missing", "缺必需上下文不得继续"),
+)
+
+
+def step_context_architecture() -> Tuple[bool, str]:
+    """v2.2.0 上下文架构：依赖声明、章节索引、计划器、子 Agent 契约、L0 回归上限。"""
+    import context_planner as cplan
+    import section_index as sindex
+    import subagent_context as sacon
+
+    ok, problems = cplan.check()
+    if not ok:
+        return False, "context 依赖声明不合法：" + problems[0]
+
+    ok, detail = sindex.check_index()
+    if not ok:
+        return False, f"章节索引：{detail}"
+
+    ok, problems = sacon.check()
+    if not ok:
+        return False, "子 Agent 契约越界：" + problems[0]
+
+    skill_text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    size = len(skill_text.encode("utf-8"))
+    if size > L0_BUDGET_BYTES:
+        return False, (f"SKILL.md 为 {size} bytes，超过 L0 上限 {L0_BUDGET_BYTES}；"
+                       f"细节应下沉到 references")
+    missing = [label for marker, label in L0_REQUIRED_MARKERS if marker not in skill_text]
+    if missing:
+        return False, f"L0 丢失硬约束：{missing}"
+
+    entries = ("start-project", "continue-research", "explore", "audit")
+    for entry in entries:
+        registry = cplan.load_registry()
+        preset = next((item["preset_id"] for item in registry["presets"]
+                       if item["entry"] == entry), None)
+        payload = cplan.plan(entry=entry, preset_id=preset, authorization="read_only")
+        if payload.get("status") != "PASS":
+            return False, (f"入口 {entry} 无法规划："
+                           f"{payload.get('problems') or payload.get('blocked_missing')}")
+        if not payload.get("gates_remaining"):
+            return False, f"入口 {entry} 的计划没有声明剩余门禁"
+
+    loaded = cplan.execute(cplan.plan(entry="continue-research",
+                                      preset_id="research-loop",
+                                      authorization="execute"))
+    if not loaded.get("loaded"):
+        return False, "execute 之后 loaded 仍为空：loaded/referenced 语义失效"
+    if set(loaded["loaded_paths"]) - {item["path"] for item in loaded["required"]}:
+        return False, "loaded 里出现了没有在 required 声明的内容"
+
+    return True, (f"SKILL.md {size} bytes ≤ {L0_BUDGET_BYTES}；"
+                  f"16 预设依赖声明合法；章节索引一致；子 Agent 契约无越权；"
+                  f"四入口可规划且 loaded/referenced 分离")
+
+
 def step_release_metadata() -> Tuple[bool, str]:
     """One release version across SKILL.md, both READMEs, CHANGELOG and the release notes."""
     import re
@@ -1132,7 +1283,8 @@ STEPS = (
     ("离线测试（含 golden path / parity / linter / deprecated / links）", step_tests),    ("state_check --selftest", step_selftest),
     ("模板自身通过校验", step_template),
     ("规则表逐字比对（S1—S7 + V1—V24）", step_rule_table_parity),
-    ("三方读写表逐格比对", step_readwrite_parity),
+    ("读写契约逐格比对（policy ↔ phase 文档）", step_readwrite_parity),
+    ("阶段能力索引（R0—R14 齐备，读写表未回流）", step_stage_index_parity),
     ("文档引用的脚本存在", step_referenced_scripts_exist),
     ("Structural Equivalence（EQ1—EQ13 + NN1—NN14）自检 + 模板 + fixture", step_structural_equivalence),
     ("Rhetorical Realization（RE1–RE5）来源与正文", step_rhetorical_realization),
@@ -1146,6 +1298,8 @@ STEPS = (
     ("Skill-RSI（轨迹/策略生命周期/源码冻结/反事实/消融）", step_skill_rsi),
     ("Research Preset Library（16 预设/Router/触发/适配器）", step_preset_library),
     ("Domain Profiles（registry/契约文档/TAG 循环消费/DP·TG·MM selftests）", step_domain_profiles),
+    ("Context 架构（依赖声明/章节索引/计划器/子 Agent 契约/L0 上限）",
+     step_context_architecture),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )
 

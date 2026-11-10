@@ -1,0 +1,12 @@
+{
+  "_comment": "一次真实 Harness 注入的实测记录。由 scripts/context_profile.py --observation 消费。单次观测，不是统计量。",
+  "skill": "research-lifecycle-protocol",
+  "version": "2.1.1",
+  "harness": "DeepSeek Harness Web GUI（会话内 Skill 注入，skill 工具返回 skill_content 块）",
+  "observed_at": "2026-11-10T18:03:22+08:00",
+  "injected_bytes": 154495,
+  "visible_bytes": 84026,
+  "elided_bytes": 70469,
+  "note": "注入内容是 SKILL.md 的正文（frontmatter 未注入）；格式化包装 370 bytes；正文 154125 bytes。工具输出额度不足时在 skill_instructions 中间省略 70469 bytes，模型只看到 54.4%。证据：Harness 回显 'Omitted 70469 bytes'，并给出 154495 bytes 的完整落盘文件。",
+  "scope_limit": "该省略由工具输出额度触发，不是 Skill 特有行为。它支持的结论只有一条：≥154 KB 的 Skill 正文在单次加载中不会被完整送达模型。"
+}

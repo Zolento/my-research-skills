@@ -631,3 +631,76 @@ python3 scripts/literature_search.py -q "..." --zotero-url http://127.0.0.1:2311
 失败 / 代理）+ 缓存更新记录 + 范围扩大记录 + **逐检索式的负检索记录** +
 **饱和判定与尽职调查等级达成情况**（§3）。
 
+
+## 检索阶梯与来源纪律（从 L0 迁入）
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §1.1。
+
+```
+Step 0: 先尝试 web search，打开论文、作者实现与官方资料
+记录查询与发现 URL，核验原始页面，再用标题、标识符和机制术语驱动后续检索
+工具不可用或失败 → 记录状态并继续；明确离线请求 → 跳过
+Step 1: 搜索本地文献库（默认由 Zotero 本地 API 提供）
+地址：--zotero-url → 环境变量 ZOTERO_LOCAL_API → 默认 http://127.0.0.1:23119/api
+前置：Zotero `Settings → Advanced` 勾选
+探测可达 → 用 Zotero（默认）；探测失败 → 自动回落 ./docs/refs/papers/*.json
+并打印警告，不失败；--local-format auto（默认）/ zotero（强制，不可用报错）/ refs（强制跳过 Zotero）
+命中 → 纳入结果，标注 sources=["local"] —— 但流程继续，不得在此返回
+★ Zotero 是本地库的后端，provenance 仍是 local；源枚举 local|arxiv|openalex|crossref
+不变，不得把 Zotero 计入在线源
+★ 端点、授权、错误码、附件协议见 references/zotero-local-api.md（按需读，不必每次加载）
+Step 2: 调用全部启用源（arxiv / openalex / crossref）
+★ 即使 Step 1 已命中，只要触发下述任一条件，本步必须执行
+★ 单源失败【不终止】检索：该源标记 unavailable，其余源照常
+命中 → 拉取元数据与摘要，缓存到 docs/refs/cache/<source>/，标注 sources=[<source>]
+Step 3: 信息不足 → 仅补充缺失字段，不重复拉取已有内容
+Step 4: 饱和判定 → 未达饱和则扩大范围继续检索
+```
+**web search 的执行与来源纪律见 [literature-policy.md](../references/literature-policy.md) §1.1。**
+网页发现不替代多源核验。脚本不调用 web search，由 agent 前置执行。
+**Zotero 能力与读写边界（要点；细节按需读 [zotero-local-api.md](../references/zotero-local-api.md)）：**
+| 能力 | 入口 | 默认语义 |
+|---|---|---|
+| 原生全文检索（第二层） | `literature_search.py --zotero-fulltext` | 只读；命中只能标 `indexed_fulltext` |
+| PDF 页码级抽取 | `zotero_fulltext.py` | 只读；`page_verified` 只来自真实 PDF 页面 |
+| 定向深读与证据锚点 | `zotero_deepread.py` | 只读 |
+| 文献 CRUD / 标签 / 分类 / 笔记 | `zotero_crud.py` | **写需用户明确请求** |
+| 删除文献 | `zotero_crud.delete_paper` | 默认 dry-run；Local API 的 DELETE 是**永久抹除** |
+四个语义入口（`start-project` / `continue-research` / `explore` / `audit`）**只读**。
+不得因为发现了一篇有价值的论文就自动改动真实 Zotero 库。
+未授权时写操作抛错，**不得**静默改到 refs 后端写入。
+**⚠️ 强制扩检触发条件（命中任一即必须查**全部启用源**并扩大范围）：**
+| # | 触发条件 | 最低等级 |
+|---|---|---|
+| T1 | **创新性声明**（"首次提出 / 没人做过 / 首个 / 该方向空白"） | **L3 穷尽** |
+| T2 | **理论不清**（证不出来、假设无法验证、收敛性说不清） | L2 强化 |
+| T3 | **可行性不确定**（能不能做、资源够不够、是否已有不可能性结果） | L2 强化 |
+| T4 | 新颖性判定（**R7 / R12 的 `S-Lit`**、R7 / R10 / R13 的 `S-Nov`） | **L3 穷尽**（**例外：R3—R6 的 §R3.7 概念级快筛 = L2**，只有写进文档的「首次提出」声称才回到 L3，见 §4 R3—R6） |
+| T5 | 本地命中不足（< 用户下限，或 < 5 条） | L2 强化 |
+| T6 | 用户要求"尽可能多 / 彻底查" | **L3 穷尽** |
+| T7 | 任何将写进文档的"现有工作尚未……"式论断 | L2 强化 |
+| T8 | 方法瓶颈：已观察到性能平台、候选反复失败，或诊断不再改变方法决定且缺少新干预 | L2 强化 |
+**遇到卡点时第一动作是检索，不是硬推：** 理论说不清、证不出来、不确定能不能做时，
+必须先检索 ① 该问题本身是否已有定理/反例/不可能性结果 ② 所用工具在其他领域的处理
+③ **负结果文献**。方法瓶颈按 [literature-policy.md](../references/literature-policy.md) §2.3 与 R5.1 补检索并交接方法干预。检索后仍无解，写入 `INDEX.md` 的 Warnings 并标注待核实。
+**禁止推断：** 本地未命中 ≠ 不存在；arxiv 本轮未命中 ≠ 无人研究过；429 中断 ≠ 检索完整。
+未完成 L3 前，文档中只能写 **"据本次检索未见（检索式见附录）"**，
+**不得**使用"首次提出"。**证据等级与措辞的权威定义见
+[evidence-policy.md](../references/evidence-policy.md)。**
+**429 处理：** 捕获限流错误后按指数退避等待 `10s → 20s → 40s → 80s → 160s`，
+最多重试 5 次；**重试期间不得发起任何新的 arxiv 请求**；5 次后仍失败则返回本地
+记录"检索未达饱和"**。
+**代理环境识别：** 发起 arxiv 请求前，先解析 `arxiv.org` / `export.arxiv.org`。
+**若解析到本地 IP**（回环 / 私有网段 / 链路本地 / `0.0.0.0`，例如 Clash 的
+`198.18.x.x` fake-IP），说明**可能存在代理环境**——DNS 已被 hosts 文件或本地代理
+（Clash / Surge / 镜像站）接管，你访问的不是 arxiv 官方。此时必须：
+1. 在报告中**单列「代理环境提示」段**，写明解析到的**具体 IP 与判定类型**；
+2. **不得**据此判定"在线源不可用"或"无人在研究"（代理缓存/镜像可能不完整）；
+3. 代理链路上的 **429 未必是 arxiv 官方限流**，退避照常执行但结论中必须注明该不确定性；
+4. 若本次检索用于支撑创新性声明，把"经代理环境检索"记入 INDEX.md 的 **Warnings**。
+> **只告警，不阻断。** 代理环境下的结果仍可用，但**可信度需重新评估**——更应依赖
+> 饱和判据（连续两轮零新增）与负检索记录来支撑结论。
+完整规范（含 L1/L2/L3 尽职调查等级、饱和判据与代理环境识别）见
+[references/literature-policy.md](../references/literature-policy.md)（§6.1），实现见
+[scripts/literature_search.py](../scripts/literature_search.py)。

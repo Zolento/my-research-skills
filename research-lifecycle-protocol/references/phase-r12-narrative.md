@@ -893,6 +893,11 @@ RHETORICALLY_FRAGILE 和 INCOMPLETE 必须随推荐保留，不用高 overall sc
 
 - 叙事里的每句声称必须能落回 `Ci ← Ej`；找不到的删除或标 `[待补]`。
 - **`failures[]` 里的失败不得在叙事中消失**（`state_check.py` V4 是它的机械前置）。
+- **叙事被淘汰 ≠ 科学被证伪。最优叙事被选 ≠ 科学被证实。**
+  被淘汰的是**表达方案**，不是命题；被选中的是**当前证据下最强的表达**，不是新的证据。
+- **「已证实」/「已证伪」不得用来描述修辞方案或路线取舍。**
+  这两个词只属于证据层（见 [evidence-policy.md](evidence-policy.md)），
+  不描述 frozen hierarchy、D4b 候选或 D9 推荐结果。
 - Wave 3 将拆成 **R12-pre**（只能写「若 H 被验证，可能成立的 thesis 是…」，**不得决定研究方向**）
   与 **R12-post**（只读已核实的 claim graph / evidence ledger / boundary / negative findings）。
 

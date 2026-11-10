@@ -1057,3 +1057,91 @@ human docs contain knowledge-worthy events.
 
 > **DI-8 的验收：** 本表每个「人类入口」都必须真实存在。
 > 机器状态可以复杂，但**每一个都必须有一个合理的人类入口**，且**不要求人直接阅读**。
+
+## 项目组织与落盘规则的 L0 表述
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §1.4。
+
+**各路线产出的文档放该路线自己的 `routes/<R>/docs/`（扁平）；根目录 `docs/` 是跨路线共享区，
+至少保证有 `refs/`。根目录有 `README.md` 与 `INDEX.md`；每条路线有 `README.md`、
+`STATUS.md`、`INDEX.md` 三件套。**
+```
+<项目根目录>/
+├── AGENTS.md              # 共享契约；存在则优先遵循
+├── README.md              # ★ 根级：项目总览（研究问题、路线列表、怎么跑）
+├── docs/                  # ★ 跨路线共享区（不放路线文档）
+│   ├── refs/              # ★ 必需：参考文献库 papers/ cache/<source>/ index.json
+│   ├── decisions/         # ★ 项目级重大决策 DEC<NNN>-<slug>.md
+│   ├── notes/             # 可选：跨路线共享笔记（按 AGENTS.md）
+│   └── latex/             # 可选：跨路线共享 LaTeX（按 AGENTS.md）
+├── routes/                # ★ 所有科研路线集中于此（DI-2）
+│   └── A/
+│       ├── README.md      # ★ 路线身份证：这条路线是什么（低频变更）
+│       ├── STATUS.md      # ★ 当前状态人类摘要（research-state.json 的投影）
+│       ├── INDEX.md       # ★ 资产目录 + 时间线（不再承载当前状态）
+│       └── docs/          # ★ 本路线文档（扁平）
+│           ├── A005-narrative.md      # R12：一次调用一份，内含各 idea 小节
+│           └── A003-review-r01.md     # 审阅挂被审 ID；零填充轮次
+├── src/                   # ★ canonical implementation（唯一；route 不复制代码，DI-6）
+├── configs/routes/A/      # route 之间的差异用 config 表达
+├── experiments/A/<XID>/   # ★ 实验注册表：想做什么（pre-registration）
+├── results/A/<XID>/       # ★ 观察到什么（observation）
+├── shared/                # 极小：无法归入 src/docs/configs 的多路线资产
+└── .research-lifecycle-protocol/routes/A/research-state.json   # 机器状态（不入 docs）
+```
+**八条硬性规则：**
+1. **文档按路线分离、各自扁平：** 产出放 `routes/<R>/docs/`，**该目录内不再按类型分子目录**。
+**根 `docs/` 是跨路线共享区**——本 Skill **只保证 `refs/` 存在**，`notes/`、`latex/`
+等由项目与 `AGENTS.md` 决定。**唯一硬约束：路线文档不得放根 `docs/`。**
+每条路线必须有 `README.md` / `STATUS.md` / `INDEX.md`。三者回答不同问题、
+更新频率不同：
+| 文件 | 回答 | 更新频率 |
+|---|---|---|
+| `routes/<R>/README.md` | 这条路线**是什么**、为什么存在 | **很低** |
+| `routes/<R>/STATUS.md` | **现在做到哪、下一步是什么** | **很高** |
+| `routes/<R>/INDEX.md` | 这条路线**有哪些材料** | 中等 |
+**三者都是人类视图（DI-4），必须可从 `research-state.json` 投影。**
+**`STATUS.md` 由 `scripts/render_status.py` 生成，禁止手改。**
+**INDEX 不再承载 已证实 / 已证伪 / TODO / Bugs / Warnings；当前状态一律进 STATUS。**
+每次产出后更新所在路线的 `INDEX.md`（资产）；状态变化先写回 state，
+再重新生成 `STATUS.md`；跨路线层面的变化同步更新根 `INDEX.md`（路线总表投影）。
+3. **文件名前缀 = 文档 ID**（不再是路径隔离）：前缀仍**必需** —— 审阅要挂靠、跨路线
+引用要唯一。序号按路线独立递增、**永不复用**。
+**文件名只能由 `<R><NNN>-<slug>.md` 决定，`slug` 只取
+[project-layout.md](../references/project-layout.md) §2.1 表的封闭枚举。**
+实际路线必然产生枚举外的派生物（大纲、实验卡、数学合并、执行方案…）。它们
+**一律归到最接近的枚举 `slug`**，原始语义写 frontmatter 的**自由字段 `subtype:`**
+（**不参与文件名**），并在路线 `INDEX.md` 文档表加一列 `subtype`。
+**禁止自创 slug** —— 那会让"文件名可预测"这条保证失效，序号也会被派生物吃光。
+4. **审阅挂被审 ID、轮次零填充：** `<被审ID>-review-r01.md`、`-r02.md`（**不占新序号**）。
+用 `-r<NN>` 是因为 `-review.md`/`-review-2.md` 在 `ls`/`sort` 下**轮次顺序是反的**。
+一轮覆盖多份文档时挂主文档 ID，其余写 frontmatter 的 `also_reviewed`。
+5. **参考文献集中：** 论文元数据/笔记/缓存一律放 **`docs/refs/`**（脚本默认
+`--local-dir ./docs/refs`）；机器状态放 `.research-lifecycle-protocol/`（旧项目先迁移，见 references/identity-and-compatibility.md），日志放 `logs/`
+——**都不进 docs 正文**。
+6. **PDF 必须入索引：** `docs/refs/` 下的每个 PDF 都要在 **`docs/refs/index.json`**
+里有一条记录（字段见 [literature-policy.md](../references/literature-policy.md) §7.1）。
+**索引进版本库，PDF 不进**。新增/替换/删除 PDF 后**必须重建索引**
+（`python3 scripts/refs_index.py`，校验 `--check`）；**未入索引的 PDF 视为不存在**。
+7. **落盘分三档，别把中间产物塞进 `docs/`：**
+| 档 | 落盘位置 | 例 |
+|---|---|---|
+| **交付物** | `routes/<R>/docs/`（扁平，不分子目录） | `anchor` / proposal / experiment-plan / narrative / review |
+- 子代理的**原始评审件**属于**中间产物**：**不进 `docs/`**，也**不得**为了塞进去而在
+`routes/<R>/docs/` 下建子目录（该目录内不分子目录）。
+- **正式 review 必须自带摘要**（结论 + 评分 + 关键证据 + 交叉质询记录），放进 `docs/`。
+- **原始件不得被当作结论引用**——引用一律指向 review 正文（`<被审ID>-review-rNN.md`）。
+- 中间产物可随时删除；删掉不影响交付物的完整性（因为 review 自带摘要）。
+8. **正文形式遵守受控中文：** 落盘**之前**跑
+`python scripts/ste_lint_zh.py --disable synonym-rotation <文件>`，**硬违规为 0**。
+档位按 [writing-policy.md](../references/writing-policy.md) §1 判定
+**用户显式声明 asd-ste100 时改按该档执行** —— 命令换成
+`python scripts/ste_lint_zh.py --max-chars 25 <文件>`，且**不得自行升档**）。
+**⚠️ 不得为了过 linter 而删情态**（「可能 / 初步」是内容）。
+> **slug 只能取：** `anchor` / `field-map` / `discovery` / `theory` / `evidence` /
+> `proposal` / `experiment-plan` / `result-analysis` / `decision` / `narrative` / `review`。
+> **R12 一次调用一份 `<R><NNN>-narrative.md`**（不再每个 idea 一份）。
+> 完整规范见 [references/project-layout.md](../references/project-layout.md)
+> （含**八条 DI invariant**、三文件职责、`XID`、route fork 门槛、手工建骨架清单）。
+---

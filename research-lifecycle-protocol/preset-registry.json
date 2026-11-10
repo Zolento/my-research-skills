@@ -13,7 +13,62 @@
         "继续自动科研",
         "按现有授权持续跑 loop",
         "continue autonomous research"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/research-loop.md",
+          "shared-contract.md"
+        ],
+        "conditional": [
+          {
+            "when": "literature_search",
+            "load": [
+              "references/literature-policy.md"
+            ]
+          },
+          {
+            "when": "evidence_qualification",
+            "load": [
+              "references/evidence-outcome-analysis.md",
+              "references/evidence-policy.md"
+            ]
+          },
+          {
+            "when": "method_synthesis",
+            "load": [
+              "references/insight-to-method-policy.md"
+            ]
+          },
+          {
+            "when": "experiment_issue_or_run",
+            "load": [
+              "references/execution-identifiability.md"
+            ]
+          },
+          {
+            "when": "domain_declared",
+            "load": [
+              "domain-profiles/<profile>/PROFILE.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/operational-autonomy-policy.md",
+          "references/scientific-communication-policy.md",
+          "references/scheduler-policy.md#next_action_policy",
+          "references/research-state-policy.md#5. 写入时机",
+          "references/phase-r9-r11-experiment-loop.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "paradigm-escape",
@@ -26,7 +81,48 @@
         "跳出当前思路",
         "换一个完全不同的数学建模角度",
         "escape local paradigm"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/paradigm-escape.md",
+          "shared-contract.md",
+          "references/phase-r3-r6-discovery.md"
+        ],
+        "conditional": [
+          {
+            "when": "literature_search",
+            "load": [
+              "references/literature-policy.md"
+            ]
+          },
+          {
+            "when": "structural_novelty_judgment",
+            "load": [
+              "references/structural-equivalence-policy.md"
+            ]
+          },
+          {
+            "when": "anchor_dispute",
+            "load": [
+              "references/anchor-policy.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/scientific-value-adaptive-discovery.md",
+          "references/phase-r2-r5-field-mapping-retrieval.md",
+          "references/roles.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "research-recovery",
@@ -39,7 +135,49 @@
         "恢复之前的科研工作",
         "上下文没了，恢复项目状态",
         "resume research context"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/research-recovery.md",
+          "shared-contract.md",
+          "references/cognitive-memory-policy.md#lifecycle",
+          "references/cognitive-memory-policy.md#Read / write protocol"
+        ],
+        "conditional": [
+          {
+            "when": "next_action_selection",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          },
+          {
+            "when": "cold_handoff",
+            "load": [
+              "references/legacy-handoff.md"
+            ]
+          },
+          {
+            "when": "storage_migration_required",
+            "load": [
+              "references/identity-and-compatibility.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/research-state-policy.md#5. 写入时机",
+          "references/phase-r9-r11-experiment-loop.md",
+          "references/scheduler-policy.md#next_action_policy"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "scientific-replanning",
@@ -52,7 +190,52 @@
         "重新规划当前路线",
         "这条路线被否证了，重新制定计划",
         "replan research"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/scientific-replanning.md",
+          "shared-contract.md"
+        ],
+        "conditional": [
+          {
+            "when": "literature_search",
+            "load": [
+              "references/literature-policy.md"
+            ]
+          },
+          {
+            "when": "anchor_change",
+            "load": [
+              "references/anchor-policy.md"
+            ]
+          },
+          {
+            "when": "claim_or_contribution_reframing",
+            "load": [
+              "references/claim-first-policy.md"
+            ]
+          },
+          {
+            "when": "next_action_selection",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/phase-r3-r6-discovery.md",
+          "references/scientific-value-adaptive-discovery.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "research-audit",
@@ -65,7 +248,55 @@
         "审查论文方案",
         "找出当前实验的致命缺陷",
         "audit my method"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/research-audit.md",
+          "shared-contract.md",
+          "references/phase-r7-r10-r13-assurance-repair-review.md",
+          "references/evidence-policy.md",
+          "references/scoring-policy.md"
+        ],
+        "conditional": [
+          {
+            "when": "literature_search",
+            "load": [
+              "references/literature-policy.md"
+            ]
+          },
+          {
+            "when": "structural_equivalence",
+            "load": [
+              "references/structural-equivalence-policy.md"
+            ]
+          },
+          {
+            "when": "venue_calibration",
+            "load": [
+              "references/venue-standards.md"
+            ]
+          },
+          {
+            "when": "reviewer_roster",
+            "load": [
+              "references/roles.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/claim-first-policy.md",
+          "references/evidence-outcome-analysis.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "research-review",
@@ -78,7 +309,38 @@
         "现在研究进展怎么样",
         "总结当前真实发现，不要执行",
         "review research progress"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/research-review.md",
+          "shared-contract.md",
+          "references/deep-research-summary.md"
+        ],
+        "conditional": [
+          {
+            "when": "wording_grade",
+            "load": [
+              "references/evidence-policy.md"
+            ]
+          },
+          {
+            "when": "report_shape",
+            "load": [
+              "references/scientific-communication-policy.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/research-state-policy.md#5. 写入时机"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "context-drift-recovery",
@@ -91,7 +353,44 @@
         "Skill 规则丢了，恢复上下文",
         "上下文压缩以后重新确认规则",
         "recover from context drift"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/context-drift-recovery.md",
+          "shared-contract.md",
+          "references/cognitive-memory-policy.md#lifecycle"
+        ],
+        "conditional": [
+          {
+            "when": "next_action_selection",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          },
+          {
+            "when": "state_reload_needed",
+            "load": [
+              "references/research-state-policy.md#5. 写入时机"
+            ]
+          },
+          {
+            "when": "read_write_protocol",
+            "load": [
+              "references/cognitive-memory-policy.md#Read / write protocol"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/prediction-anomaly-competition.md"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "stagnation-breaker",
@@ -104,7 +403,47 @@
         "一直在重复归因",
         "检查是不是陷入局部最优",
         "detect scientific stagnation"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/stagnation-breaker.md",
+          "shared-contract.md",
+          "references/insight-to-method-policy.md"
+        ],
+        "conditional": [
+          {
+            "when": "mechanism_attribution",
+            "load": [
+              "domain-profiles/mri-reconstruction/attribution-guard.md"
+            ]
+          },
+          {
+            "when": "method_candidate",
+            "load": [
+              "domain-profiles/mri-reconstruction/mechanism-search.md"
+            ]
+          },
+          {
+            "when": "loop_health",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/skill-rsi-policy.md",
+          "references/scientific-value-adaptive-discovery.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "experiment-failure-recovery",
@@ -117,7 +456,41 @@
         "训练 OOM 了",
         "实验 NaN 了，检查并恢复",
         "recover failed experiment"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/experiment-failure-recovery.md",
+          "shared-contract.md",
+          "references/execution-identifiability.md"
+        ],
+        "conditional": [
+          {
+            "when": "outcome_qualification",
+            "load": [
+              "references/evidence-outcome-analysis.md"
+            ]
+          },
+          {
+            "when": "domain_declared",
+            "load": [
+              "domain-profiles/<profile>/PROFILE.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/phase-r9-r11-experiment-loop.md",
+          "references/operational-autonomy-policy.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "evidence-conflict-repair",
@@ -130,7 +503,41 @@
         "实验结果和 evidence 对不上",
         "修复 claim 和 memory 冲突",
         "repair evidence conflict"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/evidence-conflict-repair.md",
+          "shared-contract.md",
+          "references/evidence-outcome-analysis.md",
+          "references/evidence-policy.md"
+        ],
+        "conditional": [
+          {
+            "when": "frozen_prediction_involved",
+            "load": [
+              "references/prediction-anomaly-competition.md"
+            ]
+          },
+          {
+            "when": "claim_status_change",
+            "load": [
+              "references/phase-r7-r10-r13-assurance-repair-review.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/research-state-policy.md#5. 写入时机"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "resource-recovery",
@@ -143,7 +550,37 @@
         "GPU 不够了",
         "环境崩溃，恢复执行",
         "recover resource block"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/resource-recovery.md",
+          "shared-contract.md"
+        ],
+        "conditional": [
+          {
+            "when": "next_action_selection",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          },
+          {
+            "when": "execution_gate",
+            "load": [
+              "references/execution-identifiability.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/operational-autonomy-policy.md"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "memory-consolidation",
@@ -156,7 +593,32 @@
         "整理认知记忆",
         "State 更新后刷新 Cognitive Memory",
         "consolidate research memory"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/memory-consolidation.md",
+          "shared-contract.md",
+          "references/cognitive-memory-policy.md#lifecycle"
+        ],
+        "conditional": [
+          {
+            "when": "projection_validation",
+            "load": [
+              "references/research-state-policy.md#引用完整性"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/prediction-anomaly-competition.md"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "loop-health-check",
@@ -169,7 +631,44 @@
         "检查科研 loop 健康度",
         "有在真正推进科研吗",
         "check research loop health"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/loop-health-check.md",
+          "shared-contract.md",
+          "references/operational-autonomy-policy.md"
+        ],
+        "conditional": [
+          {
+            "when": "memory_freshness",
+            "load": [
+              "references/cognitive-memory-policy.md#lifecycle"
+            ]
+          },
+          {
+            "when": "stagnation_check",
+            "load": [
+              "references/insight-to-method-policy.md"
+            ]
+          },
+          {
+            "when": "next_action_selection",
+            "load": [
+              "references/scheduler-policy.md#next_action_policy"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/scheduler-policy.md"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "strategy-evolution",
@@ -182,7 +681,38 @@
         "根据历史结果改进探索策略",
         "让策略记忆真正影响下一轮决策",
         "evolve exploration strategy"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/strategy-evolution.md",
+          "shared-contract.md",
+          "references/skill-rsi-policy.md"
+        ],
+        "conditional": [
+          {
+            "when": "replay_evaluation",
+            "load": [
+              "references/discovery-replay.md"
+            ]
+          },
+          {
+            "when": "value_or_taste",
+            "load": [
+              "references/scientific-value-adaptive-discovery.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/prediction-anomaly-competition.md"
+        ],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "hypothesis-rebalance",
@@ -195,7 +725,46 @@
         "所有 idea 都一样",
         "重新平衡假设组合",
         "rebalance hypothesis portfolio"
-      ]
+      ],
+      "context": {
+        "required": [
+          "presets/hypothesis-rebalance.md",
+          "shared-contract.md",
+          "references/scientific-value-adaptive-discovery.md"
+        ],
+        "conditional": [
+          {
+            "when": "literature_search",
+            "load": [
+              "references/literature-policy.md"
+            ]
+          },
+          {
+            "when": "structural_novelty_judgment",
+            "load": [
+              "references/structural-equivalence-policy.md"
+            ]
+          },
+          {
+            "when": "population_edit",
+            "load": [
+              "references/phase-r3-r6-discovery.md"
+            ]
+          }
+        ],
+        "deep_references": [
+          "references/claim-first-policy.md"
+        ],
+        "domain_extensions": [
+          "mri-reconstruction"
+        ],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
     },
     {
       "preset_id": "discovery-replay",
@@ -208,7 +777,70 @@
         "做一次历史研究回放",
         "检验自进化策略是否真的更好",
         "evaluate discovery replay"
+      ],
+      "context": {
+        "required": [
+          "presets/discovery-replay.md",
+          "shared-contract.md",
+          "references/discovery-replay.md"
+        ],
+        "conditional": [
+          {
+            "when": "strategy_attribution",
+            "load": [
+              "references/skill-rsi-policy.md"
+            ]
+          }
+        ],
+        "deep_references": [],
+        "domain_extensions": [],
+        "forbidden": [
+          "presets/*.md（除本预设）",
+          "scripts/*.py 源码全文",
+          "references/ 全语料",
+          "整份 research-state-policy / venue-standards（按章节取）"
+        ]
+      }
+    }
+  ],
+  "context_schema": "research-idea-pipeline/context-declarations@1",
+  "entry_context": {
+    "start-project": {
+      "required": [
+        "shared-contract.md",
+        "references/invocation-prompts.md",
+        "references/phase-r0-contract.md"
+      ],
+      "conditional": [
+        {
+          "when": "existing_assets",
+          "load": [
+            "references/project-intake.md"
+          ]
+        },
+        {
+          "when": "cold_handoff",
+          "load": [
+            "references/legacy-handoff.md"
+          ]
+        },
+        {
+          "when": "storage_migration_required",
+          "load": [
+            "references/identity-and-compatibility.md"
+          ]
+        }
+      ],
+      "deep_references": [
+        "references/project-layout.md",
+        "references/anchor-policy.md"
+      ],
+      "domain_extensions": [],
+      "forbidden": [
+        "presets/*.md（Bootstrap 不走 Preset）",
+        "references/ 全语料",
+        "scripts/*.py 源码全文"
       ]
     }
-  ]
+  }
 }

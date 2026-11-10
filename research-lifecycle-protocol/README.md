@@ -38,10 +38,11 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v2.0.0** — the Research Lifecycle Protocol rename plus the MRI
-reconstruction domain profile. The 2.0.1 line hardens domain evidence qualification
-and the TAG/MMS execution paths; 2.1.0 unified the project control-root storage and shipped the
-migration tool; 2.1.1 (this branch) hardens the migration transaction. Capability documentation below is version-free; historical
+**Current release: v2.2.0** — Context & Architecture Optimization: `SKILL.md` shrinks from
+156 KB to 28 KB, context loads in three tiers (L0/L1/L2) from machine-readable dependency
+declarations, and chapters load by stable section id. No scientific rule changed.
+2.1.1 hardened the migration transaction; 2.1.0 unified the control-root storage;
+2.0.1 fixed domain evidence qualification. Capability documentation below is version-free; historical
 iterations (v1.2.0—v2.3.3 under the former name) are recorded in [CHANGELOG.md](CHANGELOG.md)
 and the release notes live under [docs/releases/](docs/releases/).
 

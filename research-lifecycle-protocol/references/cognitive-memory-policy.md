@@ -229,3 +229,98 @@ violation, `4` environment not satisfied.
 - [ ] Failure memory with its stop rules and retry conditions is present in the brief.
 - [ ] The brief is inside the context budget and its truncation is explicit.
 - [ ] `scripts/state_check.py --check <state>` still exits 0 with the same violations as before.
+
+## 认知记忆的 L0 表述
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §1.8。
+
+> **记录事实 ≠ 积累理解。** Research State 回答「我们目前认为世界是什么样」；
+> 认知记忆回答「我们持有哪些机制、它们如何被证据改写、下一位执行者必须先恢复什么」。
+**定位：** 它是**已有系统的认知增强层**，不是第 16 个阶段，不是第九类一等对象，
+也不是第二份事实来源。权威定义见
+[cognitive-memory-policy.md](../references/cognitive-memory-policy.md)。
+**三层，一个方向：**
+```text
+Canonical  .research-lifecycle-protocol/routes/<R>/research-state.json   ← 唯一权威
+结构断言 + canonical 指针，append-only                  ← 不承载支持度
+可由前两层重建                                         ← 永不是权威
+```
+**四条硬边界（违反即与 §1.6 / §1.7 冲突）：**
+1. **支持度是算出来的，不是声明的。** 机制的支持等级由 canonical 事实推出
+（`speculative` / `hypothesis` / `literature_supported` / `experiment_supported` /
+`refuted`）。修订事件**不得**声明 `epistemic_status`、支持等级或 Claim 状态（`CM2`）；
+自评只被记成冲突（`CM7`），不被采用。
+2. **认知记忆不写 canonical。** 它不写 `claims[].status`、不写 `contract`、不写锚点、
+不写 `evidence[]` / `failures[]`。构建前后对 `research-state.json` 做字节比对（`CM0`）。
+3. **失效即过期。** 引用的证据或对象 `validity` 变成 `stale` / `invalid` / `pending` 时，
+派生条目自动标记过期、退出 hot memory，并保留原因；不补写推测。
+4. **记忆不等于事实。** 每条机制必须带支持等级、适用范围与来源引用。Context Brief
+不得把推测写成结论。
+**记忆生命周期：** `Recall → Reason → Test → Revise → Consolidate → Recall`。
+每次启动先恢复：研究契约与目标 / 仍有效的机制 / 未解释异常 / 被否证机制及其边界 /
+未完成的机制竞争 / 上一轮决策与未完成操作。**三级加载，不得无差别注入全部历史：**
+| 层 | 内容 | 选择依据 |
+|---|---|---|
+| **Hot** | 与当前焦点挂钩的机制、高重要度未复现异常、开放竞争、失败约束、上一轮决策 | 引用与焦点集相交 |
+| **Warm** | 被否证 / 被削弱的机制与相关历史 | 非 hot，但有支持理由 |
+| **Cold** | 其余一切，含全部过期条目 | 只给 id 与过期原因 |
+焦点集取自 canonical：`open` 且 `importance ∈ {critical, high}` 的 `U` 及其判别测试、
+存活的 `C`、`planned` / `running` 的 `X`、存活候选、`ACCEPTED_LIMITATION` 的 `repairs[].targets`。
+另有去重（同一 canonical 锚点集合 = 实质等价解释，`CM9`）、来源引用、版本检查和
+上下文预算（`--budget`，默认 6000 字符，截断必须显式标注）。
+**读写协议（逐阶段）：** R3—R6 写 `mechanism_*` / `competition_*` 并读策略先验；
+R8 写 `prediction_freeze`；R9.O 写 `anomaly_record` / `prediction_assessment`；
+R10 写 `mechanism_refute` / `mechanism_weaken` / `mechanism_reactivate`；
+R11 写 `mechanism_merge` / `mechanism_revise` 后重建；R12 / R13 **只读**（叙事与审阅是
+state 的视图）；R14 只读 Context Brief。详见该政策 §8。
+**机械闸门 `CM1`—`CM10`**（与 `S`/`V` 命名空间分离，`C` 不与 Claim 前缀冲突）：
+```sh
+python3 scripts/cognition.py build --state .research-lifecycle-protocol/routes/<R>/research-state.json
+python3 scripts/cognition.py check --state .research-lifecycle-protocol/routes/<R>/research-state.json
+python3 scripts/cognition.py brief --state .research-lifecycle-protocol/routes/<R>/research-state.json --budget 4000
+```
+退出码同仓库约定：`0` 通过 / `1` 参数错误 / `3` 硬违规 / `4` 环境不满足。
+**不新增 state 槽位**：S1—S7 / V1—V24、state 模板与 `state_check.py` 一律不变。
+**预测必须可判定（Phase 2）。** `preregistration.outcomes[].criterion` 把「什么算预测成立」
+在冻结时写成机器可读判据（`quantitative` / `directional` / `discrete`）。
+没有判据的结果只能返回 `UNTESTABLE`，**不得宣告预测成立或失败**；
+执行无效只能返回 `INVALID_EXECUTION`，不是异常；没有预注册的观察只能是
+`EXPLORATORY_ANOMALY`。
+**冻结的 `outcomes[]` 是完整判定集合**：观测包是「关于它」的证据，不是「要判定哪些结果」的
+清单。只提交一部分只能得到 `PARTIALLY_ASSESSED`，**永远不能读成「全部预测成立」**；
+`execution.validity=UNKNOWN` 时比较结果保留在 `diagnostic_outcome_class`，
+但**不占据科学判定栏**、不是合格证据，也不得触发 R10/R11 状态迁移
+（`evidence_transition_allowed`）。
+**互斥分支必须由预注册打开，不能由观测包声明。** 只有在冻结时写入
+`outcome_mode: "branch"` + `branch_rule`（`selector` / `quantity` / `branches` 完整划分），
+且分支判据**可证互斥**时，比较器才进入 branch mode；所选分支由冻结规则作用于**原始观测**
+导出，packet 里的 `observed_outcome` 只是必须与之一致的声明。未声明 mode 的预注册一律按
+completeness 判定（旧项目无需迁移）；分支规则缺失、冲突、不可验证或事后追加时，
+**不得产生 `PREDICTION_HELD`**，未选分支也要以可核验的排除条件记录（`PC10`）。
+**证据资格只有一个入口。** `qualify_evidence` 的 `PQ1`—`PQ8` 同时检查执行有效性、
+预注册冻结与判据形状、判定集合完整性或合法 branch mode、**观测包 schema 与结构校验
+（`PQ4` 直接消费观测校验器的完整结论：schema 错误 / 缺字段 / 类型非法 / 来源缺失 /
+摘要不符一律 fail closed）**、分支选择的可追溯性、实验与预测绑定、终态收据、时间顺序与
+事后篡改（含不可核验的冻结 `PC5`）。**任何一项不过就 fail closed**
+（`evidence_eligible: false`）：不得标记 `QUALIFIED_EVIDENCE`、不得授权 Claim 状态升级、
+不得用于机制否证或 Insight 认证；诊断性比较照常保留。Insight 只有绑定到**具体预测**（evidence 必须带 `prediction_ref`，
+或该实验只冻结了一个结果）、具有合格判定、方向一致的证据、**范围覆盖**（字符串 scope 规范化
+精确相等；结构化 `scope_region` 按约束子集判定，禁止子串包含与外推）与**已通过**的结构等价
+审计时才能成为 `evidence_supported_insight`（`PC11`）。
+机制竞争必须逐对检验**可比性 → 冲突 → 分辨率 → 预先声明的判别规则**：
+不同观测变量、不同测量口径、区间重叠、`noise/√n` 吃掉间隔、间隔小于 `min_separation`、
+没有 `discrimination_rule`，**都不能算可区分**。判别干预必须可执行（`planned` / `running`）。
+只有 `DISTINGUISHABLE` / `CONDITIONALLY_DISTINGUISHABLE` / `NOT_DISTINGUISHABLE` /
+`INSUFFICIENT_INFORMATION` 四值，且**不接受文本相似度或 LLM 自评分**。行为切换与
+Insight Card 规则见
+[prediction-anomaly-competition.md](../references/prediction-anomaly-competition.md)。
+**科学价值不等于 EIG（Phase 3）。** 研究候选的**决策价值**与**发现潜力**分开判断，
+每个维度都带 canonical 依据与不确定性，**没有总分**（`SV1` 拒绝任何聚合分数）。
+科学品味分成**用户所有**（`contract`，agent 只读）与**证据校准**（从真实结果归纳，
+可修订）两部分；自动学习**只影响探索建议**，不得改锚点（`SV3`）。
+探索策略复用既有 `P1`—`P6` / `local` 与 QD archive：算子只能 `encouraged` /
+`neutral` / `discouraged` / `dormant`，**没有永久封禁**，降级必须有范围与重启条件，
+且至少两次独立失败（`SV5`）。规则见
+[scientific-value-adaptive-discovery.md](../references/scientific-value-adaptive-discovery.md)。
+---

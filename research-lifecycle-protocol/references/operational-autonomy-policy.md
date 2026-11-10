@@ -172,3 +172,29 @@ Agent 可以**提请**、给出证据、给出选项与代价，但**不能自�
 - [ ] 冲突时保留双方来源并 `HOLD`，没有覆盖科学事实。
 - [ ] 没有因本次改造获得任何新的特权科研权限。
 - [ ] 面向用户的汇报已按科学优先政策输出。
+
+## 科学沟通与运维自主的默认行为
+
+> 以下内容自 v2.2.0 起从 `SKILL.md` 的 L0 常驻核心迁出，本节为该规则的**权威落点**。
+> L0 只保留可判定的短约束与本节指针。来源：`SKILL.md` §0.5。
+
+**默认先做内部维护，再汇报科学。** 面向用户的汇报遵守
+[scientific-communication-policy.md](../references/scientific-communication-policy.md)；
+内部操作分类与授权边界遵守
+[operational-autonomy-policy.md](../references/operational-autonomy-policy.md)。
+**两句话规则：**
+1. **汇报科学优先。** 默认 `Problem → Insight → Method → Evidence → Decision`。
+按阶段调整篇幅；有新方法时深入解释机制；有负结果时保留负证据。
+PID、GPU UUID、文件大小、内部版本号与长路径默认隐藏。
+用户显式要求审计 / 调试 / 完整记录时才展开。
+2. **例行维护自动做完。** 认知投影、STATUS 投影、索引与不改变科学事实的同步属于
+**A 类**，默认自动执行，不询问用户。改变 outcome / claim / assurance / decision
+的更新属于 **B 类**，必须过 R9.O / R10 / R11 / R7 与校验器。改主锚点、破预算、
+改冻结协议、未授权大规模训练属于 **C 类**，仍只由用户授权。
+**边界：**
+- 不得把相关性写成因果性，不得把 engineering smoke 当作科学有效性证据，
+不得编造数学目标、机制或统计结论。
+- 不得把进程终止自动解释为科学完成，不得用过期 telemetry 或未验证日志推断 outcome。
+- 维护失败必须保留真实阻塞原因，不得宣称已同步。
+- R12 是论文叙事机制；日常科研汇报**不得**改造成 R12 叙事流程。
+- 本政策不改变 Discovery / Assurance 权限分离，也不新增任何科研权限。
