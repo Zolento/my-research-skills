@@ -151,6 +151,39 @@ def _fail(message: str, kind: str = "env") -> int:
 
 
 def main(argv: List[str] | None = None) -> int:
+    """CLI entry: gate the control-plane write on the storage matrix + maintenance lock."""
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("state", nargs="?")
+    probe.add_argument("--root")
+    probe.add_argument("--route")
+    known, _ = probe.parse_known_args(argv)
+    project = None
+    if known.root:
+        project = pathlib.Path(known.root).resolve()
+    elif known.state:
+        try:
+            project = rlp.project_root_from_state(
+                pathlib.Path(known.state).expanduser().resolve())
+        except rlp.LayoutError:
+            project = None
+    if project is None:
+        return _main(argv)
+    try:
+        report = rlp.runtime_status(project)
+        if report["status"] == rlp.RUNTIME_STATUS_AMBIGUOUS:
+            raise rlp.AmbiguousStorageRoot(report["reason"])
+        if report["status"] == rlp.RUNTIME_STATUS_MIGRATION_REQUIRED:
+            raise rlp.MigrationRequired(report["reason"])
+        if report["status"] == rlp.RUNTIME_STATUS_INVALID:
+            raise rlp.InvalidStorageRoot(report["reason"])
+        with rlp.maintenance_guard(project):
+            return _main(argv)
+    except (rlp.AmbiguousStorageRoot, rlp.MigrationRequired,
+            rlp.InvalidStorageRoot, rlp.MaintenanceInProgress) as exc:
+        return _fail(f"{type(exc).__name__}: {exc}", "hard")
+
+
+def _main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="把 research-state.json 投影为路线 STATUS.md（幂等；--check 校验是否过期）")
     parser.add_argument("state", nargs="?",

@@ -1,7 +1,29 @@
 # Identity and Compatibility（命名、协议与落盘兼容）
 
 > 本文件区分三件经常被混为一谈的事：**Skill 名称**、**机器协议标识**、**项目运行目录**。
-> 2.0.0 的重命名只改第一件。后两件是数据契约，改名会破坏已有项目。
+> 重命名只改第一件。后两件是数据契约，改名会破坏已有项目。
+
+## 0. 当前存储规则（v2.1.0 起生效，优先于本文其余历史说明）
+
+**所有正式科研运行统一使用 `<project>/.research-lifecycle-protocol/`。**
+它是唯一的运行时控制根。
+
+旧根 `<project>/.research-idea-pipeline/` 只允许下列用途：
+
+- **只读审计**（`state_check`、`legacy_handoff detect`、迁移工具 `inspect`）；
+- **显式迁移**（用户对具体项目执行 `migrate_project_root.py`）；
+- **历史兼容**（旧证据、哈希链、冻结预注册中的旧路径原样保留）；
+- **灾难恢复**（`rollback` 之后旧根重新成为迁移来源）。
+
+迁移工具**已存在**，但**绝不自动执行**：`start-project` / `continue-research` /
+Resume 遇到旧根只输出 `MIGRATION_REQUIRED` 与迁移命令。
+
+**旧项目在迁移完成前不能执行正式科研操作**（Research Loop、受管执行、认知投影写入、
+STATUS 写入、Cold Handoff 都会被闸门拒绝）。只读检查与迁移预检仍然可用。
+
+迁移期间的停写边界：RLP 自身写入入口受维护锁保护；外部写入者（DSH Research Mesh
+worker、训练/结果收集进程、第三方脚本）**不获取该锁**，工具无法证明其静止，必须由
+操作者在 `--apply` 时确认。RLP 不声称跨系统强制互斥。
 
 ## 1. 三层命名
 
@@ -9,7 +31,7 @@
 |---|---|---|---|
 | Skill 身份 | `research-idea-pipeline` | `research-lifecycle-protocol`（RLP） | **是**：frontmatter `name`、安装 slug、仓库目录、开发分支 |
 | 机器协议标识 | `research-idea-pipeline/...@1` | 不变 | **否**：冻结为不透明协议标识 |
-| 项目运行目录 | `.research-idea-pipeline/` | 新项目用 `.research-lifecycle-protocol/`；旧项目保留旧根 | **否**：旧根继续有效，绝不自动迁移 |
+| 项目运行目录 | `.research-idea-pipeline/` | `.research-lifecycle-protocol/`（**唯一运行时控制根**，见 §0） | **否**：旧根只作迁移/审计/灾难恢复来源，不作为正式运行目录 |
 
 历史发行 tag（例如 `research-idea-pipeline/v1.1.0`）属于发布历史，不改名、不删除。
 新版本 tag 使用 `research-lifecycle-protocol/vX.Y.Z`。
@@ -51,10 +73,12 @@ API 分层：
   —— 只返回新根；旧根场景抛出对应错误（异常类带稳定 `STATUS` 标记）。
 - **历史迁移路径**：`inspect_legacy_root(project_root)` /
   `resolve_storage_root(...)` —— 专供迁移、审计和只读兼容检查使用。
-- **运行入口闸门**：Research Loop（`project_context`）、`operational_reconcile`、
-  `experiment_execute issue/run`、`cognition build`、`render_status --root` 与
-  `legacy_handoff take` 都先过存储矩阵；只读工具（`state_check`、
-  `legacy_handoff detect`、迁移工具）不受限。
+- **运行入口闸门**：Research Loop（`preset_router.run_preset` / `project_context`）、
+  `operational_reconcile`、`experiment_execute issue/run`、`cognition build`、
+  `render_status` 与 `legacy_handoff take` 先过存储矩阵，再持**共享维护锁**：
+  迁移/回滚期间这些入口拒绝写入并返回 `MAINTENANCE_IN_PROGRESS`。只读工具
+  （`state_check`、`legacy_handoff detect`、迁移工具 `inspect`/`plan`）不受限。
+  外部写入者不获取该锁，见 §0 与 §5.1。
 
 `MIGRATION_REQUIRED` 是**工程控制平面的迁移状态**，不是科研机制失败：
 不计入 Failure Memory，不触发科学重规划，不重启实验。
@@ -83,12 +107,12 @@ python3 scripts/rlp_paths.py check   --project <project-root>
 时退出码 3，并提示迁移命令；`resolve` 输出 JSON（含 `runtime_status` 与
 `schema_namespace`——恒为 `research-idea-pipeline`，标记 `frozen: true`）。
 
-## 4. 旧项目兼容检查
+## 4. 旧项目兼容检查（只读，迁移前）
 
-升级 Skill 后，对旧项目执行以下只读检查。全部通过才继续科研动作。
+升级 Skill 后，先对旧项目做**只读**检查；这些命令不会写控制平面，也不会改变科研状态。
 
 ```sh
-# 1) 身份与根解析
+# 1) 身份与根解析（旧根会返回 MIGRATION_REQUIRED 与迁移提示）
 python3 scripts/rlp_paths.py check --project <project>
 
 # 2) canonical state 不因升级而失效
@@ -97,16 +121,22 @@ python3 scripts/state_check.py --check <project>/.research-idea-pipeline/routes/
 # 3) 只读接管审计（不重新 Bootstrap）
 python3 scripts/legacy_handoff.py detect --state <project>/.research-idea-pipeline/routes/A/research-state.json
 
-# 4) 认知投影可从磁盘重建
-python3 scripts/cognition.py build --state <project>/.research-idea-pipeline/routes/A/research-state.json
-python3 scripts/cognition.py check --state <project>/.research-idea-pipeline/routes/A/research-state.json
-
-# 5) 人读视图与 canonical state 一致
-python3 scripts/render_status.py --root <project> --route A --check
+# 4) 迁移预检（只读）
+python3 scripts/migrate_project_root.py inspect --project <project>
 ```
 
-上述命令中，第 4 步会写派生投影，但**不得**修改 `research-state.json`。
-第 2、3、5 步是只读或幂等校验。
+**会写控制平面的命令在旧根上会被拒绝**（`MIGRATION_REQUIRED`）：
+`cognition.py build`、`render_status.py`（写 STATUS）、`legacy_handoff.py take`、
+Research Loop 与受管执行。它们只能在迁移完成后运行——这是有意的：
+旧根不再是运行时根，向其写入会产生第二份控制平面。
+
+迁移完成后，同样的检查在新根上执行：
+
+```sh
+python3 scripts/cognition.py build --state <project>/.research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/cognition.py check --state <project>/.research-lifecycle-protocol/routes/A/research-state.json
+python3 scripts/render_status.py --root <project> --route A --check
+```
 
 兼容性硬要求：
 
@@ -117,17 +147,54 @@ python3 scripts/render_status.py --root <project> --route A --check
 5. 不在旧项目里创建第二个 canonical state，也不创建第二个运行根。
 6. 不改写原始实验产物或历史摘要。
 
-## 5. 迁移是可选的，且必须人工决定
+## 5. 迁移：正式工具，绝不自动执行
 
-本版本**不提供**自动迁移。如果项目确实要改用新根：
+迁移是正式科研运行的前置条件，但**是否迁移、迁移哪个项目、何时迁移**由用户决定。
+工具不会自动发现项目，也不允许无人值守执行。
 
-1. 先停掉所有执行与调度，备份整个旧根。
-2. 用 `state_check.py`、`legacy_handoff.py detect`、`cognition.py check` 核对旧根完整。
-3. 复制（不是移动）旧根到新根，逐项复核字节一致性。
-4. 确认没有第二个根后，再更新项目自己的入口文档。
-5. 旧根保留为归档，直到用户明确批准删除。
+```sh
+# 1) 只读预检：存储矩阵、durable 清单、科研资产指纹、路径依赖、维护锁状态
+python3 scripts/migrate_project_root.py inspect --project <project>
 
-迁移失败时回滚方式：删除新根、恢复旧根。**不要**在迁移中途重新 Bootstrap。
+# 2) 只读计划：迁移 ID、备份目的地、磁盘容量、待重写文档
+python3 scripts/migrate_project_root.py plan --project <project> --backup-root <dir>
+
+# 3) 停止所有写入者（RLP 会话/Loop/Mesh/执行器/监控），确认备份目录可写
+# 4) 执行迁移（必须显式确认外部写入者已静止）
+python3 scripts/migrate_project_root.py migrate --project <project> \
+  --backup-root <dir> --apply --assume-writers-quiesced [--rewrite <doc>...]
+
+# 5) 按迁移记录校验（不是重新生成一份 manifest 就当成功）
+python3 scripts/migrate_project_root.py verify --project <project> --migration-id <id>
+
+# 6) 恢复科研：入口自动 Research Resume（旧根已归档，不再是运行时根）
+```
+
+事务保证（v2.1.1）：
+
+| 保证 | 机制 |
+|---|---|
+| 并发迁移互斥 | `.rlp-migration/control.lock` 独占锁；RLP 写入入口共享锁，迁移期间拒绝写入 |
+| 源目录不被静默改变 | 预检/备份后/staging 后/cutover 前四次快照比对；变化即 `SOURCE_CHANGED_DURING_MIGRATION` |
+| 备份可验证 | 逐文件类型/大小/SHA-256/符号链接/manifest；备份后才允许切换 |
+| 历史记录不改写 | Research State、预注册、证据、收据、TAG 链、决策轨迹字节不变 |
+| 回滚守卫 | 完整 durable manifest 比对；任何迁移后写入 → `ROLLBACK_REFUSED_NEW_WORK` |
+| 文档重写可恢复 | cutover 后才提交，逐文件原子替换并记录原字节与 journal |
+
+**失败处理**：`inspect`/`plan` 只读；失败时旧根与备份保留，报告给出 `status` 与
+`errors`。中断用 `recover`（默认只读，`--apply` 只执行可证安全的动作）；回滚用
+`rollback --migration-id`。**回滚是灾难恢复**：完成后项目回到 `MIGRATION_REQUIRED`，
+不是恢复正常科研执行。
+
+不允许：把备份放进被迁移的控制根、用 `mv` 手工迁移、用全局字符串替换"清理"历史路径、
+在迁移后已产生新写入时强行回滚。
+
+## 5.1 外部集成缺口（DSH Research Mesh）
+
+RLP 侧契约已指向新控制根；Mesh 插件是外部仓库，本轮不修改其 Schema。若插件配置
+（例如 `rsi.skillPath`、canonical root、worker 只读路径）仍硬编码旧目录，需要插件侧
+协同修复：把项目根/控制根配置改为 `.research-lifecycle-protocol/`，并让 worker 只读该
+根。迁移期间不得启动 Mesh。
 
 ## 6. 安装与卸载
 
@@ -160,7 +227,8 @@ npx skills add "Zolento/my-research-skills#research-lifecycle-protocol/dev@resea
 |---|---|
 | Skill 身份 | `SKILL.md` 的 `name` 为 `research-lifecycle-protocol`；catalog 只出现该名称 |
 | 机器协议 | 所有 `research-idea-pipeline/...@1` 常量保持不变 |
-| 旧项目 | 旧根下 state 通过 `state_check`，`cognition check` 无漂移，预算与账本不变 |
+| 旧项目 | 旧根只读可审计（`state_check`/`detect`/`inspect`）；正式运行需先迁移，写入入口返回 `MIGRATION_REQUIRED` |
+| 迁移 | 备份经 manifest 校验；源快照四次一致；新根与安装 manifest 逐文件相等；回滚被新写入拒绝 |
 | 双根 | 同时存在时 `rlp_paths.py check` 退出码 3，运行流程拒绝继续 |
 | 历史 | 旧 tag 与 release notes 保留；新 tag 前缀为新名称 |
 | 其他组件 | `academic-figure-draft-architect/` 与 `scientific-manuscript-reviser/` 无改动 |

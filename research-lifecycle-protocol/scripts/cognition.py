@@ -2541,6 +2541,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     raise _rlp.MigrationRequired(_report["reason"])
                 if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
                     raise _rlp.InvalidStorageRoot(_report["reason"])
+                # cooperative maintenance lock: derived projections are control-plane writes
+                with _rlp.maintenance_guard(_project):
+                    return op_build(state_path, cognition_dir)
             return op_build(state_path, cognition_dir)
         if args.command == "validate":
             return op_validate(state_path, cognition_dir)

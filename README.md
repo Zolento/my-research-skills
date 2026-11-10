@@ -55,7 +55,7 @@ npx skills add "Zolento/my-research-skills#<分支>@<skill>" -g -y
 ## 版本与发布
 
 每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-lifecycle-protocol`
-当前为 **2.1.0**）。2.0.0 = 正式更名（原 `research-idea-pipeline`）+ MRI 重建领域协议；2.0.1 = 领域证据资格与执行链路修复；2.1.0 = 项目存储规范统一与安全迁移工具；
+当前为 **2.1.1**）。2.0.0 = 正式更名（原 `research-idea-pipeline`）+ MRI 重建领域协议；2.0.1 = 领域证据资格与执行链路修复；2.1.0 = 项目存储规范统一与安全迁移工具；2.1.1 = 迁移事务安全补丁（维护锁/源一致性/全量回滚守卫/文档提交事务）；
 机器协议 id 与旧项目运行目录保持兼容，见
 `research-lifecycle-protocol/references/identity-and-compatibility.md`。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
 的提交上；tag 消息里写清 merge commit、升级注意、验收读数与安装结果。

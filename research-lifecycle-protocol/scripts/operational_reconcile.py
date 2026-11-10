@@ -584,6 +584,17 @@ def reconcile(state_path: pathlib.Path, *, apply: bool = False,
             raise _rlp.MigrationRequired(_report["reason"])
         if _report["status"] == _rlp.RUNTIME_STATUS_INVALID:
             raise _rlp.InvalidStorageRoot(_report["reason"])
+        # cooperative maintenance lock: refuse control-plane writes during a migration
+        with _rlp.maintenance_guard(_project):
+            return _reconcile_locked(state_path, apply=apply, outcome_root=outcome_root,
+                                     timestamp=timestamp)
+    return _reconcile_locked(state_path, apply=apply, outcome_root=outcome_root,
+                             timestamp=timestamp)
+
+
+def _reconcile_locked(state_path: pathlib.Path, *, apply: bool,
+                      outcome_root: Optional[pathlib.Path],
+                      timestamp: Optional[str]) -> Dict[str, Any]:
     route_dir = state_path.parent
     route = route_dir.name
     report = sc.check_file(state_path)

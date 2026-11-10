@@ -189,7 +189,8 @@ class MigratedTestBase(unittest.TestCase):
 
     def migrate(self, *extra: str) -> subprocess.CompletedProcess:
         return run_tool("migrate", "--project", str(self.project),
-                        "--backup-root", str(self.backup_root), "--apply", *extra)
+                        "--backup-root", str(self.backup_root), "--apply",
+                        "--assume-writers-quiesced", *extra)
 
     def assertSameAssets(self, before: dict, after: dict):
         self.assertEqual(before.keys(), after.keys())
@@ -208,8 +209,9 @@ class TestHappyPath(MigratedTestBase):
         report = json.loads(proc.stdout)
         self.assertEqual(proc.returncode, 0)
         self.assertEqual(report["status"], "MIGRATION_REQUIRED")
-        self.assertEqual(len(report["legacy_routes"]), 2)
-        self.assertTrue(report["legacy_inventory"]["file_count"] > 8)
+        self.assertEqual(len(report["semantic_fingerprint"]["routes"]), 2)
+        self.assertTrue(report["source_snapshot"]["entry_count"] > 8)
+        self.assertFalse(report["maintenance"]["held"])
         self.assertTrue(any(dep["path"].endswith("INDEX.md")
                             for dep in report["path_dependencies"]["runtime_writable"]))
         self.assertTrue(any("research-state" in dep["path"] or "scheduler" in
@@ -328,8 +330,9 @@ class TestHappyPath(MigratedTestBase):
         rollback = json.loads(run_tool(
             "rollback", "--project", str(self.project),
             "--migration-id", report["migration_id"]).stdout)
-        self.assertEqual(rollback["status"], "REFUSED")
-        self.assertIn("新工作", "".join(rollback["errors"]))
+        self.assertEqual(rollback["status"], "ROLLBACK_REFUSED_NEW_WORK")
+        self.assertTrue(rollback["differences"])
+        self.assertIn("新的写入", "".join(rollback["errors"]))
         # the new root is untouched
         self.assertTrue((self.project / rlp.STORAGE_ROOT).is_dir())
 
@@ -373,18 +376,20 @@ class TestFailureInjection(MigratedTestBase):
             self.assertEqual(report["status"], "MIGRATED")
 
     def test_an_interrupted_migration_is_recoverable(self):
-        """迁移中断（journal 有 started 无 terminal）→ recover 给出明确行动。"""
+        """迁移中断（journal 有 started 无 terminal）→ recover 只在可证安全时清理。"""
         import migrate_project_root as mp
-        # simulate: journal started, staging leftovers exist, no cutover
         mp._journal_append(self.project, {"event": "started", "migration_id": "sim-1",
                                           "backup": "x"})
-        staging = self.project / ".rlp-migration-sim-1" / "staging"
+        staging = mp.work_dir(self.project, "sim-1") / "staging"
         staging.mkdir(parents=True)
         (staging / "junk").write_text("x", encoding="utf-8")
         proc = run_tool("recover", "--project", str(self.project))
         report = json.loads(proc.stdout)
-        self.assertTrue(report["interrupted"])
         self.assertEqual(report["action"], "clean_staging")
+        self.assertTrue(staging.exists(), "recover without --apply must not delete")
+        proc = run_tool("recover", "--project", str(self.project), "--apply")
+        report = json.loads(proc.stdout)
+        self.assertEqual(report["performed"], "clean_staging")
         self.assertFalse(staging.exists())
         self.assertTrue((self.project / rlp.LEGACY_STORAGE_ROOT).is_dir())
 
@@ -393,9 +398,12 @@ class TestFailureInjection(MigratedTestBase):
         report = json.loads(self.migrate().stdout)
         # simulate a crash right after the cutover: journal lost its terminal entries
         journal = mp.journal_path(self.project)
-        entries = [e for e in mp._journal_read(self.project)
+        all_entries, problems = mp._journal_read(self.project)
+        self.assertEqual(problems, [])
+        entries = [e for e in all_entries
                    if e.get("migration_id") == report["migration_id"]]
-        kept = [e for e in entries if e.get("event") == "cut_over"]
+        kept = [e for e in entries
+                if e.get("event") in ("cutover_started", "new_root_installed")]
         journal.write_text("".join(json.dumps(e, ensure_ascii=False, sort_keys=True) + "\n"
                                    for e in kept), encoding="utf-8")
         proc = run_tool("recover", "--project", str(self.project))

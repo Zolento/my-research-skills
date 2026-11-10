@@ -71,6 +71,35 @@ See `docs/releases/v2.0.1.md`.
 - `SKILL.md`: single introduction; the skill is defined as a stateful research
   lifecycle protocol, not an idea pipeline.
 
+## 2.1.1 — 2026-11-10
+
+Storage migration safety patch (transaction integrity). See `docs/releases/v2.1.1.md`.
+
+### Added
+- Cooperative maintenance lock (`.rlp-migration/control.lock`, `flock`) held
+  exclusively by migrate/rollback; RLP write entries hold it shared and refuse
+  control-plane writes during maintenance (`MAINTENANCE_IN_PROGRESS`).
+- Four-point source-stability check; `SOURCE_CHANGED_DURING_MIGRATION`.
+- Full durable control-plane manifest (type/size/SHA-256/symlink/mode); rollback
+  compares the whole plane and refuses with `ROLLBACK_REFUSED_NEW_WORK`.
+- Journal lifecycle states and corruption detection (`JOURNAL_CORRUPT`), explicit
+  recovery actions, `--apply`-gated safe recovery.
+- Document rewrite transaction: staged bytes, post-cutover per-file atomic commits,
+  journal records and byte-exact restoration.
+
+### Changed
+- `migrate --apply` requires `--assume-writers-quiesced`; external writers are listed
+  as unprotected instead of implied to be stopped.
+- `verify` compares against the manifests recorded during the migration, not a fresh
+  self-generated manifest.
+- Backup boundary and symlink handling hardened (no follow-out-of-root, no backup
+  inside a control root).
+
+### Compatibility
+- Machine protocol namespace unchanged; journal schema moves to `@2` while v2.1.0
+  journals remain readable.
+- Rollback returns the project to `MIGRATION_REQUIRED` — never to normal execution.
+
 ## 2.1.0 — 2026-11-10
 
 Project storage unification and safe legacy migration. Released on the
