@@ -429,8 +429,8 @@ SCENARIOS: Tuple[Dict[str, Any], ...] = (
             "所以一个自监督任务会连带读到采集与评价协议全文。"
         ),
         "hard_constraints": (
-            "GT-free 训练不得使用 GT", "SSL Loss 改善不等于重建质量提高",
-            "阈值冻结（DP7）", "独立 Ω_val 可用于 GT-free 模型选择",
+            "自监督权重更新不得使用 GT", "SSL Loss 改善不等于重建质量提高",
+            "阈值冻结（DP7）", "使用完整 val GT 选模，禁止 GT-free 训练路线",
         ),
         "unused_sections": ("7. 设计依据", "8. 规则变更自检清单", "R12 — 叙事",
                             "1.1 文献检索", "1.4 项目组织与文档落盘"),

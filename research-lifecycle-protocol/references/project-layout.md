@@ -31,6 +31,9 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 | 存在 `AGENTS.md` | **遵循它的约定**；与本文件冲突时以 `AGENTS.md` 为准（用户显式约定 > Skill 默认） |
 | 不存在 | 使用本文件的默认约定 |
 
+MRI 重建项目启动时须将[MRI 训练硬约束](../domain-profiles/mri-reconstruction/training-policy.md)
+同步到项目根 `AGENTS.md`。若既有条款或冻结协议冲突，向用户报告并暂停受影响训练。
+
 `AGENTS.md` 规定的典型内容：目录结构、命名规则、公用代码放哪、测试与提交规范、
 哪些目录由谁写。**多代理/多人协作时，它是唯一的共享契约**——所有成员先读后写。
 

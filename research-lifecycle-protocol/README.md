@@ -38,9 +38,11 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v2.2.0** — Context & Architecture Optimization: `SKILL.md` shrinks from
-156 KB to 28 KB, context loads in three tiers (L0/L1/L2) from machine-readable dependency
-declarations, and chapters load by stable section id. No scientific rule changed.
+**Current release: v2.3.0** — MRI reconstruction now follows a mandatory
+[training policy](domain-profiles/mri-reconstruction/training-policy.md). Bootstrap
+syncs the policy to project-root `AGENTS.md`. Managed MRI training verifies the
+policy and the bound training protocol before it can launch.
+2.2.0 introduced the three-tier context architecture and stable section loading.
 2.1.1 hardened the migration transaction; 2.1.0 unified the control-root storage;
 2.0.1 fixed domain evidence qualification. Capability documentation below is version-free; historical
 iterations (v1.2.0—v2.3.3 under the former name) are recorded in [CHANGELOG.md](CHANGELOG.md)

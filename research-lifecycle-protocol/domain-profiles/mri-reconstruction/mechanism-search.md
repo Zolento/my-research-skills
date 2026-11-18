@@ -43,7 +43,7 @@ R8 冻结预注册（既有证据与可识别性规则不变）
 6. 为什么这种差异在当前 MRI 任务中有意义？（写进候选说明）
 7. 什么控制组排除容量/预算等平凡因素？（`control_condition.capacity_matched: true`）
 8. 什么实验会否定这个机制？（`expected_effect.falsification_test`）
-9. 预期改善是否符合严格自监督边界？（`ssl_boundary_compliance`；GT-free 项目必填）
+9. 预期改善是否符合严格自监督边界？（参照[自监督信息边界](ssl-contract.md)，用完整 val GT 选模）
 10. 成功判据是否与主锚点一致？（`anchor_alignment` 引用项目主锚点）
 
 其中 1/3/4/5/7/8/9/10 由 `MM1—MM8` 机械检查；2/6 由证据资格与 R7 审查把关。
@@ -59,7 +59,7 @@ R8 冻结预注册（既有证据与可识别性规则不变）
 | MM5 | `expected_effect` 必须有可证伪预测、冻结判据与否定实验 |
 | MM6 | 必须声明等容量/等预算对照；只扩大容量的改进不得写成机制创新 |
 | MM7 | 必须指认最接近工作并写明实质差异；核心机制重合时必须如实指出 |
-| MM8 | GT-free 项目的 `ssl_boundary_compliance` 必填且不得用 GT 做选择；`anchor_alignment` 必须引用主锚点 |
+| MM8 | 审计历史 GT-free 配置时要求 `ssl_boundary_compliance`；历史配置的选择不能用 GT。当前训练按完整 val GT 选模。`anchor_alignment` 必须引用主锚点 |
 
 ## 4. 与 I2M 的整合（不建平行流水线）
 

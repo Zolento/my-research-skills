@@ -30,7 +30,8 @@ y_Ω = A_Ω x + ε
 | 文件 | 回答的问题 | 主要机械规则 |
 |---|---|---|
 | [acquisition-contract.md](acquisition-contract.md) | 物理模型与采集边界是什么？哪些被冻结？ | DP1—DP10（`domain_profile.py`） |
-| [ssl-contract.md](ssl-contract.md) | 自监督信息边界：什么能进输入/损失/选择？ | DP 系列 + GT-free 边界 |
+| [training-policy.md](training-policy.md) | 所有 MRI 项目的训练、验证、选模与测试硬约束 | `mri_training.py` 与项目级实现审查 |
+| [ssl-contract.md](ssl-contract.md) | 自监督权重更新和验证各自的信息边界 | DP 系列 |
 | [evaluation-policy.md](evaluation-policy.md) | 改进用什么衡量？阈值何时冻结？ | DP 系列（阈值冻结） |
 | [attribution-guard.md](attribution-guard.md) | 哪些归因是重复的、不能改变决策的？ | TG1—TG9（`domain_guard.py`） |
 | [mechanism-search.md](mechanism-search.md) | 下一步该探索哪个机制？方法候选是否具体？ | MM1—MM8（`domain_mms.py`） |
@@ -77,13 +78,14 @@ y_Ω = A_Ω x + ε
     "undersampling": {"pattern": "variable_density", "acceleration": 10},
     "noise": {"model": "gaussian", "level_known": false}
   },
-  "gt": {"available": false, "usage": "none"},
+  "gt": {"available": true, "usage": "validation_only"},
   "ssl": {
     "type": "ssdu",
-    "split": {"input": "theta", "loss": "lambda", "held_out_validation": "omega_val"},
+    "split": {"input": "theta", "loss": "lambda", "held_out_validation": "val",
+              "measurement_identity": {"fields": "subject/volume/slice/acquisition", "mask_sharing_allowed": true}},
     "acs": {"usage": "frozen_protocol"}
   },
-  "model_selection": {"protocol": "omega_val_only", "uses_gt": false},
+  "model_selection": {"protocol": "full_val_gt", "uses_gt": true},
   "frozen": {"components": ["ct-fm backbone", "fbs 100 steps"],
              "forbidden_changes": ["主干权重", "推理算法"]},
   "metrics": {

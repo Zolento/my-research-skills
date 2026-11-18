@@ -21,6 +21,7 @@ import time
 
 import evidence_outcome as eo
 import execution_gate as eg
+import mri_training
 import state_check as sc
 
 
@@ -176,19 +177,24 @@ def argv_launch_error(cwd, argv, bound_paths, manifest):
     return None
 
 
-def manifest_binding(state, experiment, manifest):
+def manifest_binding(state, experiment, manifest, *, state_path=None):
     errors = eg.schema_errors(manifest, 'execution-manifest.schema.json')
     if errors: raise ValueError('INVALID_MANIFEST: ' + '; '.join(errors))
     cwd = Path(manifest['cwd']).resolve()
     if not cwd.is_dir(): raise ValueError('EXECUTION_CWD_MISSING')
     bindings = []; kinds = set(); paths = set()
+    configs = []
     for item in manifest['files']:
         path = Path(item['path']); path = path if path.is_absolute() else cwd / path
         path = path.resolve(); data = path.read_bytes()
         if str(path) in paths: raise ValueError('DUPLICATE_MANIFEST_FILE')
         paths.add(str(path)); kinds.add(item['kind'])
         bindings.append({'kind': item['kind'], 'path': str(path), 'sha256': hashlib.sha256(data).hexdigest()})
-        if item['kind'] == 'config' and json.loads(data).get('execution_design') != config_binding(experiment['execution_protocol']): raise ValueError('CONFIG_PROTOCOL_MISMATCH')
+        if item['kind'] == 'config':
+            config = json.loads(data)
+            if not isinstance(config, dict) or config.get('execution_design') != config_binding(experiment['execution_protocol']):
+                raise ValueError('CONFIG_PROTOCOL_MISMATCH')
+            configs.append(config)
         if item['kind'] == 'data_split' and json.loads(data).get('data_split') != experiment['data_split']: raise ValueError('SPLIT_PROTOCOL_MISMATCH')
         if item['kind'] == 'preregistration' and json.loads(data) != experiment['preregistration']: raise ValueError('PREREGISTRATION_FILE_MISMATCH')
     if kinds != {'code','config','data_split','preregistration'}: raise ValueError('MISSING_CONTENT_BINDING')
@@ -202,13 +208,18 @@ def manifest_binding(state, experiment, manifest):
         local = cwd / arg
         if local.is_file() and str(local.resolve()) not in paths: raise ValueError('UNBOUND_COMMAND_FILE: ' + arg)
     engine = {str(path.relative_to(eg.ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted((eg.ROOT/'schemas').glob('*.json'))}
-    for name in ('execution_gate.py','experiment_execute.py','evidence_outcome.py','state_check.py'):
+    for name in ('execution_gate.py','experiment_execute.py','mri_training.py','domain_profile.py','evidence_outcome.py','state_check.py'):
         engine['scripts/'+name] = hashlib.sha256((eg.ROOT/'scripts'/name).read_bytes()).hexdigest()
-    return {'state_digest': eo.digest(state), 'experiment_id': experiment['id'],
+    binding = {'state_digest': eo.digest(state), 'experiment_id': experiment['id'],
             'experiment_design': {k: experiment.get(k) for k in ('stage','claim_targeted','hypothesis_targeted','alternative_targeted','code_commit','data_split','seed','metric','outcome_protocol')},
             'protocol_digest': eo.digest(experiment['execution_protocol']),
             'preregistration_digest': eo.digest(experiment['preregistration']),
             'manifest_digest': eo.digest(manifest), 'files': bindings, 'engine': engine}
+    if state_path is not None:
+        mri = mri_training.execution_binding(Path(state_path), state, configs)
+        if mri is not None:
+            binding['mri_training'] = mri
+    return binding
 
 
 def execution_review_digest(state, experiment, manifest):
@@ -246,7 +257,7 @@ def diagnostic_for(state, x, ledger):
     return matches[-1]['seal'], []
 
 
-def issue(state, experiment_id, manifest, ledger, now=None, scheduler=None):
+def issue(state, experiment_id, manifest, ledger, now=None, scheduler=None, *, state_path=None):
     now = time.time() if now is None else now
     x = eo.index(state, 'experiments')[experiment_id]
     family = eg.family_key(state, x)
@@ -279,7 +290,7 @@ def issue(state, experiment_id, manifest, ledger, now=None, scheduler=None):
         binding = None
         if gate['status'] != 'HOLD':
             try:
-                binding = manifest_binding(state, x, manifest)
+                binding = manifest_binding(state, x, manifest, state_path=state_path)
                 if x['execution_protocol']['scientific_review']['execution_digest'] != execution_review_digest(state,x,manifest): raise ValueError('EXECUTION_REVIEW_MISMATCH: review the actual argv and file contents')
             except (OSError, ValueError, TypeError) as exc: gate = {'status':'HOLD','errors':[str(exc)]}
         ledger.append({'kind':'preflight','family':family,'mode':(x.get('execution_protocol') or {}).get('mode'),'gate_kind':gate_kind,'result':gate})
@@ -296,7 +307,7 @@ def issue(state, experiment_id, manifest, ledger, now=None, scheduler=None):
         return {'status':gate['status'], 'errors':[], 'receipt':receipt}
 
 
-def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None, scheduler=None):
+def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None, scheduler=None, *, state_path=None):
     now = time.time() if now is None else now
     with ledger.locked():
         value = dict(receipt); seal = value.pop('seal', '')
@@ -317,7 +328,7 @@ def run(state, experiment_id, manifest, receipt, ledger, execute=False, now=None
             diagnosis_event = next(e for e in ledger.events if e['seal'] == issue_event['diagnosis_seal'])
             if any(e.get('kind') == 'diagnosis' and e.get('key') == diagnosis_event['key'] and e['result']['status'] == 'STOP_DIAGNOSIS' for e in ledger.events): return {'status':'HOLD','errors':['STOP_DIAGNOSIS']}
         x = eo.index(state,'experiments')[experiment_id]
-        try: binding = manifest_binding(state, x, manifest)
+        try: binding = manifest_binding(state, x, manifest, state_path=state_path)
         except (OSError, ValueError, TypeError) as exc: return {'status':'HOLD','errors':[str(exc)]}
         if binding != receipt['binding']: return {'status':'HOLD','errors':['RECEIPT_CONTENT_MISMATCH']}
         gate = eg.peig(state, experiment_id)
@@ -452,9 +463,9 @@ def main(argv=None):
             if args.command == 'diagnose': result=diagnose(state,read(args.diagnostic),ledger)
             elif args.command == 'issue':
                 if args.output.exists(): raise ValueError('Receipt output exists; choose a new path')
-                result=issue(state,args.experiment,read(args.manifest),ledger,scheduler=read(args.scheduler))
+                result=issue(state,args.experiment,read(args.manifest),ledger,scheduler=read(args.scheduler),state_path=args.state)
                 if 'receipt' in result: write_new(args.output,result.pop('receipt'));result['receipt_path']=str(args.output)
-            else: result=run(state,args.experiment,read(args.manifest),read(args.receipt),ledger,args.execute,scheduler=read(args.scheduler))
+            else: result=run(state,args.experiment,read(args.manifest),read(args.receipt),ledger,args.execute,scheduler=read(args.scheduler),state_path=args.state)
     except (OSError,UnicodeError,ValueError,TypeError,KeyError,AttributeError) as exc:
         result={'status':'INVALID','errors':[str(exc)]}
     except Exception as exc:

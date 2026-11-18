@@ -265,12 +265,17 @@ stop rules，并通过 planning 与 post-update Assurance；缺审计则 HOLD。
 ```text
 B0 Repo Intake              ─▶ 按 project-intake.md 盘点（已有信息不得重复询问）
 B1 Existing Asset Discovery ─▶ 从已有代码 / 实验 / 文献 / 笔记中提取**真实**状态
-B2 Minimal R0 Contract      ─▶ 只写 contract（+ 模板骨架，含 state_version: 0）
+B2 Minimal R0 Contract      ─▶ 写 contract（+ 模板骨架，含 state_version: 0）
 B3 Bootstrap R1             ─▶ 建 World Model 骨架（**必须稀疏**）
 B4 R2 Field Snapshot        ─▶ 领域地图快照（**不做穷尽检索**）
 B5 Initial Uncertainty Map  ─▶ 只在**有依据**时写 uncertainties[]
 B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用户确认**
 ```
+**MRI 重建项目的 B2 必做项。** B0 确认是 MRI 重建后，检查现有项目条款与
+[MRI 训练规则](../domain-profiles/mri-reconstruction/training-policy.md)的冲突。运行
+`python3 scripts/mri_training.py sync-agents <project>` 写入项目根 `AGENTS.md`，保留已有约定。
+有冲突时在 B6 报告具体条款与受影响路线，暂停受影响训练。Bootstrap 不启动训练。
+
 > **`first invocation = observe before intervene`。**
 > 首次运行的价值在于**看清现状**，不在于推进研究。
 > **B6 之后必须停** —— 由用户决定下一步跑哪些阶段（见 §0 的 `phase` 参数）。

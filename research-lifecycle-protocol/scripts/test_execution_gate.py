@@ -232,6 +232,75 @@ class ExecutionTests(unittest.TestCase):
         r=self.issue()['receipt'];scheduler=scheduler_for(self.s);scheduler['next_actions']=[dict(action='R12',type='narrative',target='C1',eig='low',cost='low')]
         result=ex.run(self.s,self.x['id'],self.manifest,r,self.ledger,now=101,scheduler=scheduler)
         self.assertEqual(result['errors'],['SCHEDULER_RECEIPT_MISMATCH'])
+    def test_mri_bootstrap_and_managed_training(self):
+        state_path = self.root / ".research-lifecycle-protocol/routes/R001/research-state.json"
+        state_path.parent.mkdir(parents=True)
+        manifest_path = self.root / "manifest.json"
+        manifest_path.write_text(json.dumps(self.manifest))
+        scheduler_path = self.root / "scheduler.json"
+        scheduler_path.write_text(json.dumps(scheduler_for(self.s)))
+        receipt_path = self.root / "receipt.json"
+
+        def launch(command, *args):
+            proc = subprocess.run([
+                sys.executable, str(ROOT / "scripts/experiment_execute.py"), command,
+                "--state", str(state_path), "--experiment", self.x["id"],
+                "--manifest", str(manifest_path), "--scheduler", str(scheduler_path),
+                "--ledger", str(self.root / "ledger"), *args,
+            ], capture_output=True, text=True)
+            return proc.returncode, json.loads(proc.stdout)
+
+        agents = self.root / "AGENTS.md"
+        agents.write_text("# Existing project instructions\n")
+        sync = [sys.executable, str(ROOT / "scripts/mri_training.py"), "sync-agents", str(self.root)]
+        subprocess.run(sync, capture_output=True, check=True)
+        original = agents.read_bytes()
+        self.assertTrue(original.startswith(b"# Existing project instructions"))
+        subprocess.run(sync, capture_output=True, check=True)
+        self.assertEqual(agents.read_bytes(), original)
+
+        state_path.write_text(json.dumps(self.s))
+        code, result = launch("issue", "--output", str(receipt_path))
+        self.assertEqual(code, 3, result)
+        self.assertIn("MRI_TRAINING_REPORT", result["errors"][0])
+        self.assertFalse(receipt_path.exists())
+
+        config_path = self.root / "config.json"
+        config = json.loads(config_path.read_text())
+        config["mri_training"] = {
+            "budget": "32 optimizer steps", "learning_rate": "0.0001",
+            "optimizer": "Adam", "input": "320×320 multicoil k-space",
+            "output": "320×320 complex image", "selection": "full_val_gt",
+            "best_val_metric": "NMSE",
+        }
+        config_path.write_text(json.dumps(config))
+        protocol = self.x["execution_protocol"]
+        protocol["scientific_review"]["execution_digest"] = ex.execution_review_digest(
+            self.s, self.x, self.manifest
+        )
+        state_path.write_text(json.dumps(self.s))
+
+        domain = state_path.parent / "domain/mri-reconstruction.json"
+        domain.parent.mkdir()
+        domain.write_text(json.dumps({
+            "gt": {"available": False, "usage": "none"},
+            "model_selection": {"protocol": "omega_val_only", "uses_gt": False},
+        }))
+        code, result = launch("issue", "--output", str(receipt_path))
+        self.assertEqual(code, 3, result)
+        self.assertIn("MRI_TRAINING_GT", result["errors"][0])
+        self.assertFalse(receipt_path.exists())
+
+        domain.unlink()
+        code, result = launch("issue", "--output", str(receipt_path))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(launch("run", "--receipt", str(receipt_path))[0], 0)
+
+        agents.write_bytes(original.replace(b"best_val", b"best_other"))
+        code, result = launch("run", "--receipt", str(receipt_path))
+        self.assertEqual(code, 3, result)
+        self.assertIn("MRI_TRAINING_AGENTS", result["errors"][0])
+
     def test_cli_denial_is_nonzero_structured_and_no_output_receipt(self):
         state=self.root/'state.json';manifest=self.root/'manifest.json';self.x['execution_protocol']['risk_controls'][0]['comparison_ids']=[]
         state.write_text(json.dumps(self.s));manifest.write_text(json.dumps(self.manifest));scheduler=self.root/'scheduler.json';scheduler.write_text(json.dumps(scheduler_for(self.s)));receipt=self.root/'receipt.json'
