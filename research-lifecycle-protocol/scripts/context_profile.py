@@ -430,7 +430,7 @@ SCENARIOS: Tuple[Dict[str, Any], ...] = (
         ),
         "hard_constraints": (
             "自监督权重更新不得使用 GT", "SSL Loss 改善不等于重建质量提高",
-            "阈值冻结（DP7）", "使用完整 val GT 选模，禁止 GT-free 训练路线",
+            "阈值冻结（DP7）", "完整 val GT 选模，禁止用自监督 mask split 损失选模",
         ),
         "unused_sections": ("7. 设计依据", "8. 规则变更自检清单", "R12 — 叙事",
                             "1.1 文献检索", "1.4 项目组织与文档落盘"),
