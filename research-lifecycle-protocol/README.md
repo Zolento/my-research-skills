@@ -38,7 +38,9 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v2.3.0** — MRI reconstruction now follows a mandatory
+**Current release: v2.3.1** — MRI evaluation uses stored CSMs for conjugate-weighted coil combination. Self-supervised mask-split losses remain valid for parameter updates. Checkpoint selection uses full validation GT.
+
+MRI reconstruction follows a mandatory
 [training policy](domain-profiles/mri-reconstruction/training-policy.md). Bootstrap
 syncs the policy to project-root `AGENTS.md`. Managed MRI training verifies the
 policy and the bound training protocol before it can launch.

@@ -291,10 +291,24 @@ class ExecutionTests(unittest.TestCase):
         self.assertIn("MRI_TRAINING_GT", result["errors"][0])
         self.assertFalse(receipt_path.exists())
 
-        domain.unlink()
+        profile = {
+            "gt": {"available": True, "usage": "validation_only"},
+            "model_selection": {
+                "protocol": "full_val_gt", "uses_gt": True, "uses_loss_measurements": False,
+            },
+        }
+        domain.write_text(json.dumps(profile))
         code, result = launch("issue", "--output", str(receipt_path))
         self.assertEqual(code, 0, result)
         self.assertEqual(launch("run", "--receipt", str(receipt_path))[0], 0)
+
+        profile["model_selection"]["uses_loss_measurements"] = True
+        domain.write_text(json.dumps(profile))
+        code, result = launch("run", "--receipt", str(receipt_path))
+        self.assertEqual(code, 3, result)
+        self.assertIn("MRI_TRAINING_SELECTION", result["errors"][0])
+        profile["model_selection"]["uses_loss_measurements"] = False
+        domain.write_text(json.dumps(profile))
 
         agents.write_bytes(original.replace(b"best_val", b"best_other"))
         code, result = launch("run", "--receipt", str(receipt_path))

@@ -86,6 +86,8 @@ def execution_binding(state_path: Path, state: dict, configs: list[dict]) -> dic
                 or not isinstance(selection, dict) or selection.get("uses_gt") is not True
                 or selection.get("protocol") == "omega_val_only"):
             raise ValueError("MRI_TRAINING_GT: 已声明的 MRI profile 与完整 val GT 选模规则冲突")
+        if selection.get("uses_loss_measurements") is True:
+            raise ValueError("MRI_TRAINING_SELECTION: 禁止使用自监督 mask split 损失或测量残差选模")
     return {
         "policy_sha256": hashlib.sha256(policy.encode("utf-8")).hexdigest(),
         "profile_sha256": hashlib.sha256(json.dumps(

@@ -20,7 +20,7 @@ ACS 的处理方式（是否进输入、是否冻结、是否单独留出）必�
 |---|---|
 | 训练输入 | 只允许 Θ（加按冻结协议声明的 ACS）；出现 Λ 或 Ω_val 的测量进入输入 → 违规 |
 | 损失 | 只允许 Λ 上的一致性损失；损失引用 Ω_val → **hidden leakage**，违规 |
-| 模型选择 | 对原始 val 全集推理，与对应 GT 计算 PSNR 或 NMSE。禁止用 Ω_val 测量残差或 SSL loss 选模。 |
+| 模型选择 | 对原始 val 全集推理，与对应 GT 计算 PSNR 或 NMSE。禁止用自监督 mask split 损失或测量残差选模。 |
 | GT 参与 | val GT 只进入验证与选模。自监督训练的输入、损失和参数更新禁止访问 GT。 |
 | 泄漏路径 | 数据增强、mask 生成、归一化统计不得使用留出信息；发现即违规 |
 
@@ -41,9 +41,9 @@ Lower SSDU loss ⇏ Better reconstruction
 
 ## 4. 验证与选模
 
-执行[训练规范](training-policy.md)。禁止 GT-free 训练路线和 GT-free 模型选择。
-缺少完整 val GT 或旧冻结协议禁止使用 val GT 时，报告冲突并暂停受影响的训练。
-校验与审计仍可读取此类历史配置和结果。
+执行[训练规范](training-policy.md)。自监督参数更新继续使用约定的输入与留出测量，GT 只进入验证和选模。
+以完整 val GT 的 PSNR 或 NMSE 选 `best_val`，禁止使用自监督 mask split 损失或测量残差选模。
+缺少完整 val GT 时报告选模条件缺失。
 
 ## 5. 与 RLP 核心的衔接
 
