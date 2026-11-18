@@ -14,7 +14,7 @@ Domain Profile 只补充**特定领域的语义、探索约束与评价规则**�
    仍然是唯一科学事实。Profile 配置里的参数只用于**判定规则适用性**。
 2. **不改变全局证据权威。** Evidence Qualification、R7/R8/R9.O/R10/R11/R13 与
    PEIG/AALG 保持最终裁决权。领域规则不能自我证明其方法有效。
-3. **不隐式启用。** 必须由项目契约显式声明；未声明时 RLP Core 行为完全不变。
+3. **Profile 显式启用。** [MRI 重建训练规范](mri-reconstruction/training-policy.md)适用于所有 MRI 重建项目，独立于可选 Profile。
 
 ## 1. 启用方式
 

@@ -1,10 +1,24 @@
 # Changelog — research-lifecycle-protocol
 
-本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.0.0**（2.1.0 开发中，见 2.1.0 条目）。
+本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.3.0**。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
+
+## 2.3.0 — 2026-11-18
+
+### Added
+
+- 所有 MRI 重建路线执行统一的数据划分、尺寸、mask、checkpoint、指标和训练前报告规范。
+- MRI 项目启动时同步项目根 `AGENTS.md`。`issue` 和 `run` 核对已识别 MRI 项目的规则与绑定配置。
+
+### Changed
+
+- 全监督和自监督统一用完整 val GT 的 PSNR 或 NMSE 选 `best_val`，完整 test 用于最终报告。
+- 禁止新增和继续执行 GT-free 训练路线。历史记录可审计，冲突的训练协议须在执行前报告。
+
+详见 [v2.3.0 发布说明](docs/releases/v2.3.0.md)。
 
 ## 2.0.0 — 2026-11-10
 

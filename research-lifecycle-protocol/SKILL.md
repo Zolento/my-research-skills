@@ -26,7 +26,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.2.0"
+  version: "2.3.0"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -202,8 +202,11 @@ Domain Profile 是**可选**规则扩展，默认不激活。在 `<route|project
 （`domain_guard.py` / `domain_profile.py` / `domain_mms.py`）。模型**不必**背诵实现，
 但**必须**知道门禁存在，并且知道「没读规则」不是「不受规则约束」。
 
-**MRI 的 GT-free 边界是硬约束。** 自监督训练不得使用 GT。合法的独立 `Ω_val` 可用于
-GT-free 模型选择。SSL loss 改善**不等于**重建质量提高，全局 NMSE 改善**不等于**微血管恢复。
+**MRI 重建训练规范强制适用。** 识别为 MRI 重建时，即使未启用可选 Domain Profile，也必须在
+项目启动时将[训练硬约束](domain-profiles/mri-reconstruction/training-policy.md)同步到项目根
+`AGENTS.md`，并在每段训练前读规则、检查冲突和报告协议。自监督与全监督统一用完整 val 的 GT
+选 `best_val`，禁止 GT-free 选模及训练路线。自监督权重更新仍遵守其损失信息边界。发现旧冻结
+协议、现有项目指令或数据条件冲突时向用户报告，暂停受影响训练。
 激活判定与按任务切片见 §2.2。规则本体见
 [domain-profiles/mri-reconstruction/PROFILE.md](domain-profiles/mri-reconstruction/PROFILE.md)。
 
@@ -277,7 +280,8 @@ GT-free 模型选择。SSL loss 改善**不等于**重建质量提高，全局 N
 **先判激活，再只取需要的切片。** 读 `<route|project>/domain/*.json`：没有声明 ⇒ 未激活，
 不加载任何领域文档；有声明 ⇒ 只加载 `PROFILE.md` 与**当前任务用得到的那一份**子协议。
 
-MRI 子协议按任务取**一份**：自监督训练 / 模型选择 → `ssl-contract` + `acquisition-contract`；
+MRI 训练任务始终加载[训练规范](domain-profiles/mri-reconstruction/training-policy.md)。
+启用 MRI Profile 时再按任务切片：自监督训练 / 模型选择 → `ssl-contract` + `acquisition-contract`；
 评价与阈值冻结 → `evaluation-policy`；归因与物理限制 → `attribution-guard`（TAG）；
 方法创新 → `mechanism-search`（MMS）；特定变体再加 `variants/` 对应的一份。
 路径与职责见 [references/reference-index.md](references/reference-index.md)。

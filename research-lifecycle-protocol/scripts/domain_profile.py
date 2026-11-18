@@ -60,7 +60,7 @@ PROFILE_DOC_DIR = "domain-profiles"
 
 SSL_TYPES = ("ssdu", "noise2noise", "noise2void", "self_deq", "supervised",
              "other_declared")
-GT_USAGES = ("none", "audit_only", "development", "full")
+GT_USAGES = ("none", "audit_only", "validation_only", "development", "full")
 SPLIT_ROLES = ("input", "loss", "held_out_validation")
 
 
@@ -342,9 +342,9 @@ def validate(config: Any, *, state: Optional[Dict[str, Any]] = None,
     usage = _text(gt.get("usage"))
     if usage not in GT_USAGES:
         findings.append(_finding("DP4", "gt.usage", f"usage 必须是 {GT_USAGES} 之一"))
-    if available is False and usage in ("development", "full"):
+    if available is False and usage in ("validation_only", "development", "full"):
         findings.append(_finding(
-            "DP4", "gt.usage", "gt.available=false 时 usage 不得是 development/full"))
+            "DP4", "gt.usage", "gt.available=false 时 usage 不得是 validation_only/development/full"))
 
     # DP5 — SSL information boundary
     ssl = config.get("ssl")

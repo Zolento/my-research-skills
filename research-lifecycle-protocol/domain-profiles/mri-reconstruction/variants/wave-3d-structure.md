@@ -7,7 +7,7 @@
 - 3D Wave MRI / Wave-TOF，20-coil wave 算子（**20 是线圈数，不是加速倍数**；
   加速倍数由项目契约声明），固定 z slab，高加速欠采样。
 - INR / CNN / 3D local-global 结构建模；微血管与弱对比度结构恢复。
-- 自监督拆分：Θ 输入、Λ 损失、Ω_val 模型选择（见 `../ssl-contract.md`）；
+- 自监督拆分：Θ 输入、Λ 损失、完整 val 集推理并用 GT 选模（见 `../ssl-contract.md`）；
   Stage1 anchor 期间采集协议冻结。
 
 ## 2. 五类区分（本任务的核心归因纪律）
@@ -42,5 +42,5 @@
 的不可恢复结论才构成 `PHYSICAL_LIMIT_WITH_SCOPE`；
 其余同一指纹重复出现时按 TG4 处理，转 MMS 菜单或带新证据的判别实验。
 
-冻结项：wave 算子、z slab、Θ/Λ/Ω_val 拆分、Stage1 anchor、采样协议。
+冻结项：wave 算子、z slab、Θ/Λ 与原始 val/test 划分、Stage1 anchor、采样协议。
 修改任何冻结项 = C 类变更（用户授权），不是探索的默认出口。

@@ -143,6 +143,7 @@ existing REDESIGN/T8/R14 authority. Do not iterate experiment cards to make PEIG
 pass indefinitely. Post-hoc explanations are exploratory; confirm them with an
 independent identifying protocol. Scientific uncertainty remains uncertainty.
 
+For MRI, verify `scripts/mri_training.py sync-agents` and the real `issue` / `run` policy checks through the CLI regression tests.
 The runner covers only its managed entrypoint, not arbitrary external GPU paths.
 It never grants global GPU control. Legacy states remain compatible, with no
 retrospective execution PASS. R9.O retains and verifies managed execution_record;

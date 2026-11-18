@@ -1,0 +1,22 @@
+# MRI 重建训练规范
+
+本规范适用于 RLP 管理的所有 MRI 重建项目与路线，包括全监督、自监督、2D、3D 和逐例优化。项目启动时将下列受管章节写入项目根 `AGENTS.md`。项目已有不同约定、冻结协议或数据不具备所需条件时，向用户列出冲突、影响的路线与训练，暂停受影响的执行。旧训练记录和冻结协议按原样保留。
+
+<!-- BEGIN RLP MRI TRAINING -->
+## MRI 重建训练硬约束
+
+1. **数据划分与统计单位。** 严格使用处理后数据集已经划好的原始 `train`、`val`、`test` 目录。训练使用 `train`，用完整 `val` 选 best，默认用已选的 `best_val` 评估完整 `test` 并报告最终结果。禁止自行重划分、选取 val/test 子集、用子集报告结果或做机制分析。只有网络一次性重建整个 3D volume 时，才按 volume 作为划分与评估单位，并在既有目录上检查 volume 完整性和隔离。普通 2D 切片数据按 slice 评估，无需报告 volume 聚类汇总。
+2. **选模与 GT。** 全监督和自监督统一对完整 `val` 推理，与对应 GT 计算指标。训练前固定按最高 PSNR 或最低 NMSE 选 `best_val`。禁止 GT-free 选模及 GT-free 训练路线，禁止用 SSL loss、独立测量残差或 test GT 选模。自监督的权重更新遵守其自监督损失边界，val GT 只参与验证与选模。缺少完整 val GT 时，报告冲突并暂停该训练。
+3. **Checkpoint。** 无特殊说明，每段训练只维护 `best_val` 和 `latest`。`best_val` 对应已验证的最佳权重，`latest` 对应最近保存的训练状态。两份均须可 resume，保存模型、优化器、进度、最佳验证值和适用的 LR scheduler、AMP scaler、随机数及采样器状态。
+4. **尺寸。** 按已处理数据集的原始空间尺寸读取、输入网络、重建和评估。禁止在训练、验证、测试或网络输入预处理中缩放或裁剪空间尺寸。处理后尺寸为 320 时，按 320 输入与重建。
+5. **采样 mask。** 数据集提供 per-slice mask 时，必须使用与切片配对的原始 mask。除用户另有明确要求，采用 per-slice mask。1D 笛卡尔 mask 默认沿列方向欠采样。禁止擅自旋转 mask 或数据集、改为行欠采样、用共享 mask 替换已提供的 per-slice mask。
+6. **训练前报告。** 启动每段训练前向用户报告 epoch 和/或 optimizer step 预算、学习率及调度、优化器、输入输出及尺寸，并说明数据划分、mask 和 `best_val` 选择指标。记录该协议与对应配置、代码和划分的绑定。发现既有设置冲突或必需信息缺失时，先报告受影响范围，再处理。
+7. **相对 GT 指标。** 在同一空间网格上，使用 CSM 合并后的 GT 单通道复数图像和重建单通道复数图像作配对输入。NMSE 在复数域计算，即 `sum(abs(recon - gt)^2) / sum(abs(gt)^2)`。PSNR、SSIM 在两者的幅值图上计算，数据范围及聚合口径在评估前固定。
+<!-- END RLP MRI TRAINING -->
+
+## 项目启动和执行
+
+- 在 `start-project` 的 B0 识别 MRI 重建任务，在 B2 运行 `python3 scripts/mri_training.py sync-agents <project>`。已有项目在首次按本规范执行训练前同步该章节。同步只管理该章节，保留项目自己的文字。项目已有冲突条款时先向用户明确指出，禁止将写入章节视为已解决冲突。
+- R8/R9 绑定实际训练配置。RLP 的 `issue` / `run` 对有 MRI profile 或根目录受管章节的项目检查规则版本和训练协议。至少一个绑定的 JSON 配置文件必须包含 `mri_training` 对象。键 `budget`、`learning_rate`、`optimizer`、`input`、`output` 为非空文本，填写各训练臂实际设置。键 `selection` 固定为 `full_val_gt`，键 `best_val_metric` 为 `PSNR` 或 `NMSE`。把这些信息在启动训练前报告给用户。已声明 MRI profile 的训练须声明 val GT 可用且用于选模，建议以 `gt.usage: validation_only` 表示仅用于验证与选模。
+- 只运行已选模型的评估入口时，绑定配置可用 `"mri_training": {"mode": "evaluation_only"}`，只读审计可读取历史记录。含权重更新的命令须走训练门禁；科学审查核对实际命令与声明一致。
+- 执行器检查项目规则、GT 选模声明以及已绑定的协议字段。审查训练入口、数据加载、验证与指标实现，核对实际目录、全量评估、尺寸、mask、checkpoint 和指标口径。用实际代码、抽样数据检查和恢复验证的结果作为依据。直接启动训练或使用外部调度器时同样遵循该项目根规则。
