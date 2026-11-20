@@ -2154,12 +2154,12 @@
       ]
     },
     {
-      "bytes": 14227,
-      "chars": 8950,
-      "doc_digest": "47c1a3643968d3bf",
+      "bytes": 16850,
+      "chars": 10427,
+      "doc_digest": "40e01aede28f58a4",
       "doc_id": "references/identity-and-compatibility",
       "path": "references/identity-and-compatibility.md",
-      "section_count": 12,
+      "section_count": 14,
       "sections": [
         {
           "bytes": 277,
@@ -2327,19 +2327,52 @@
           "title": "8. 何时才允许改协议命名空间"
         },
         {
-          "bytes": 1405,
-          "char_end": 8950,
+          "bytes": 1406,
+          "char_end": 8951,
           "char_start": 8115,
-          "chars": 835,
-          "digest": "2241b2ce871a0c6d",
+          "chars": 836,
+          "digest": "dbb4ad8054e61b84",
           "level": 2,
-          "line_end": 261,
+          "line_end": 262,
           "line_start": 247,
           "parent": "identity-and-compatibility-u547du540du3001u534fu8baeu4e0eu843du76d8u517cu5bb9",
           "rule_ids": [],
           "section_id": "cold-handoff-u4e0e-research-resume-u7684u5165u53e3u5206u7c7b",
           "summary": "两个**完全不同**的操作，不要混用（判定见 `scripts/legacy_handoff.py:resume_decision`）：",
           "title": "Cold Handoff 与 Research Resume 的入口分类"
+        },
+        {
+          "bytes": 1775,
+          "char_end": 9972,
+          "char_start": 8951,
+          "chars": 1021,
+          "digest": "80593ed63ea84288",
+          "level": 2,
+          "line_end": 292,
+          "line_start": 263,
+          "parent": "identity-and-compatibility-u547du540du3001u534fu8baeu4e0eu843du76d8u517cu5bb9",
+          "rule_ids": [
+            "V1",
+            "V24"
+          ],
+          "section_id": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
+          "summary": "真实项目里存在一种形态：旧控制根**可读、可追溯**，其中的历史实验违反了**后来才引入**的科研规则",
+          "title": "9. 历史保留迁移：存储完整性与科研合规性分开"
+        },
+        {
+          "bytes": 847,
+          "char_end": 10427,
+          "char_start": 9972,
+          "chars": 455,
+          "digest": "b7b054618bc10a22",
+          "level": 3,
+          "line_end": 306,
+          "line_start": 293,
+          "parent": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
+          "rule_ids": [],
+          "section_id": "9.1-verify-u7684u56dbu8defu4fe1u53f7",
+          "summary": "保留模式下三者成立而门禁不成立时，状态是 **`VERIFIED_WITH_LEGACY_ISSUES`**，",
+          "title": "9.1 `verify` 的四路信号"
         }
       ]
     },
@@ -16999,8 +17032,8 @@
   "regenerate": "python3 scripts/section_index.py build",
   "schema": "research-idea-pipeline/section-index@1",
   "totals": {
-    "chars": 797964,
+    "chars": 799441,
     "docs": 74,
-    "sections": 1012
+    "sections": 1014
   }
 }

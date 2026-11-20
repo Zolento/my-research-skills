@@ -6,6 +6,36 @@
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
 
+## 未发布 — dev 分支（在 2.4.0 之后）
+
+### Added
+
+- **历史保留迁移模式** `--preserve-known-legacy-violations`：把「存储完整性」与「科研状态合规」
+  分开。可读、可追溯但违反当前科研规则的历史状态（如 Outcome Policy 在结果之后才冻结）
+  可以在绑定逐条违规基线与 state digest 后无损搬运；结构损坏、状态不可解析、哈希链损坏
+  在任何模式下仍然拒绝。`verify` 分为 `storage_integrity_ok` /
+  `historical_state_unchanged` / `scientific_gate_ok` / `legacy_violations_preserved`
+  四个信号，保留模式下返回 `VERIFIED_WITH_LEGACY_ISSUES`，不返回 `VERIFIED`。
+- `plan --baseline-out` 与 `migrate --violation-baseline`：迁移决定绑定一份已审阅的清单，
+  基线漂移（含同数量不同条目）一律 `REFUSED`。
+
+### Fixed
+
+- **快照不再静默跳过不可读目录**：`snapshot()` 记录 `unreadable` 并置 `complete=false`；
+  预检与复制都把它当硬失败。旧行为会让迁移在数据缺失的情况下仍报 `MIGRATED` 且 `verify ok`。
+- **备份容量按文件系统分别核对**：`plan` 分别报告 `project_free_bytes` 与 `backup_free_bytes`，
+  两者都要有余量。旧实现只查项目盘，备份盘已满时会在事务中途失败。
+- **回滚不再留下「无控制根」现场**：目标旧根被占用时直接拒绝且不移动任何目录；归档移动失败
+  时把新根放回原位并返回 `ROLLBACK_FAILED`。旧实现会把新根挪到 forward-root 后失败。
+- **被拒的尝试不再遮蔽真实迁移**：`refused` 事件保留为审计记录，但 `journal_state` 只把
+  带生命周期事件的尝试当作「当前尝试」，`_completed_migration` 扫描全部记录。
+- **`--rewrite` 的忽略项会报告**：指向历史证据或不存在文件的请求进入 `rewrites_ignored`，
+  不再静默跳过。`--rewrite` 支持重复指定。
+- **崩溃残留的锁文件可见但不阻塞**：`maintenance_status` 增加 `owner_alive` 与 `stale`。
+  内核会随进程释放 `flock`，残留文件不再被当作活跃持有者，也不被无声忽略。
+- **空旧根不再可迁移**：旧根没有任何可识别的控制平面内容时预检直接拒绝，
+  避免切出一个 `INVALID_STORAGE_ROOT` 的新根。
+
 ## 2.4.0 — 2026-11-20
 
 ### Added

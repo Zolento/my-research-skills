@@ -1,5 +1,43 @@
 # Agent Handoff — research-lifecycle-protocol/dev（branch-local）
 
+## 第三轮：P0/P1 修复 + 迁移器加固 + 历史保留迁移（2026-11-20，2.4.0 之后）
+
+### 读数
+
+- `release_check.py` PASS；迁移四套测试：transaction 55、storage_migration 17、storage_spec 7、
+  legacy_handoff 49，全绿。全量离线 2454+ tests。
+- 虚拟项目 `.rlp-lab` 端到端 0 failure。沙箱演练：带 EO1 债务的旧项目在保留模式下
+  `MIGRATED_WITH_LEGACY_ISSUES`，`storage_integrity_ok=true`、`scientific_gate_ok=false`、
+  `legacy_violations_preserved=true`。
+
+### 交付
+
+| 件 | 说明 |
+|---|---|
+| P0 | SKILL §1.4 两种选模并列表述；CSM `not_applicable` 核对线圈数（profile `coils` 或 `csm.coil_count`，未知即拒绝）；选模协议与 profile `model_selection.protocol` 双向一致 |
+| P1 | `report_ref` 必须真实存在、内容含本次 `selection` 与 `csm.mode`、摘要进入绑定；训练报告过一遍 `report_lint` 并把结果写进绑定（advisory）；`REP-03` 改为值级校验；修正 `rlp_paths.py resolve --project` 示例 |
+| P2 | 删除 `layout_guard` audit 的不可达代码；`report_lint --quiet`；降噪口径写进沟通政策 |
+| 迁移 | `preserve_known_legacy_violations` 模式 + 四路 verify 信号 + 快照完整性/备份容量/回滚/日志/锁残留/空根七项修复 |
+
+### 设计判断
+
+- **D-12 存储迁移与科研合规解耦。** 可读可追溯的历史债务允许无损搬运，但必须绑定逐条基线与
+  state digest，且结果状态是 `VERIFIED_WITH_LEGACY_ISSUES`。绝不返回 `VERIFIED`。
+- **D-13 基线用逐条比对，不用计数。** 同数量不同条目、描述被改都拒绝；staging 阶段再比一次。
+- **D-14 三类结论分开报。** 存储迁移成功 ≠ 科研状态合法 ≠ 路线可继续执行。
+- **D-15 报告 lint 只做结构。** 接进 `report_ref` 绑定是「调用既有 lint」，不新增门禁。
+
+### 真实项目（MoSA）状态
+
+未执行任何 `migrate --apply`。Route A 保持 active，31 条历史违规原样保留，DEC001 未改，
+X92 未改。等待用户许可后再按「Git 状态 → 源快照 → 外部写入者 → 备份位置 → 授权」顺序核对。
+
+### 下一轮候选
+
+1. 真实 MoSA 迁移演练（只读 plan + 备份连通性验证），不切换。
+2. 把 `layout_guard.py check` 接进项目 pre-commit。
+3. `.dev/` 五份记录在合并时按 PROMOTE / KEEP_BRANCH_ONLY / DELETE 处理。
+
 ## 最新一轮：v2.4.0 执行边界与目录合规分离（2026-11-20）
 
 **状态：开发完成，停在 dev 分支，未合并 main、未打 tag、未刷新全局安装。**
