@@ -1,5 +1,19 @@
 # Agent Handoff — research-lifecycle-protocol/dev（branch-local）
 
+## 待办：v2.4.1 之后的文档修订（只在 dev，未进 main）
+
+`docs/releases/v2.4.1.md` 与 `references/identity-and-compatibility.md` §9.1 原写「四路信号中前三个
+成立而门禁不成立」。四路信号的列举顺序里，前三个包含 `scientific_gate_ok`，所以那句话描述了一个
+不可能出现状态。已改为点名：`storage_integrity_ok`、`historical_state_unchanged`、
+`legacy_violations_preserved` 为真，`scientific_gate_ok` 为假。
+
+修订提交 `793c0b2` 只在 `research-lifecycle-protocol/dev`。**没有合进 `main`**：`release_check.py`
+的发布元数据步骤要求 main 的 HEAD 正好等于 tag 指向的提交，任何 post-tag 提交都会让那一步失败
+（实测：`v2.4.1 points at 5b4a52b5, not at the release commit`）。所以 main 仍停在 `5b4a52b`，
+显示旧措辞；这条修订随下一个版本进入 main。tag `research-lifecycle-protocol/v2.4.1` 未动。
+
+下一轮只读预检不受影响。八切点崩溃注入矩阵的缺口仍按发布说明披露，不阻断预检。
+
 ## 第三轮：P0/P1 修复 + 迁移器加固 + 历史保留迁移（2026-11-20，2.4.0 之后）
 
 ### 读数
