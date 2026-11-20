@@ -39,7 +39,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
+import os
 import re
 import subprocess
 import sys
@@ -201,6 +204,240 @@ def _routes_from_registry(payload: Any) -> set:
 
     walk(payload)
     return routes
+
+
+# ---------------------------------------------------------------------------
+# 正式文档 ID（DI-8）：唯一分配 + 独占创建
+# ---------------------------------------------------------------------------
+# 真实事故：两个并行会话各自把同一条路线的新文档编成 F009，第二个写盘时才发现。
+# 这里只做两件事：把「已占用的 ID」算出来，以及用 O_EXCL 建新文件。不建第二套登记库。
+
+DOC_ID_PREFIX = re.compile(r"^([A-Z])(\d{3})-")
+DOC_ID_FILE = re.compile(r"^([A-Z])(\d{3})-([a-z0-9][a-z0-9-]*)\.md$")
+
+
+def doc_dirs(project: Path, control: Path, route: str) -> List[Path]:
+    """一条路线上所有可能存放正式文档的目录（运行时控制根 + 旧根）。"""
+    seen: List[Path] = []
+    # 正式文档住在项目侧 routes/<R>/docs；控制根与旧根里也可能有历史副本。
+    for base in (project, control, project / rlp.LEGACY_STORAGE_ROOT):
+        candidate = base / "routes" / route / "docs"
+        if candidate.is_dir() and candidate not in seen:
+            seen.append(candidate)
+    return seen
+
+
+REVIEW_ID = re.compile(r"^([A-Z])(\d{3})-review-r(\d{2,3})\.md$")
+
+
+def _doc_files(project: Path, control: Path, route: str) -> List[Path]:
+    files: List[Path] = []
+    for directory in doc_dirs(project, control, route):
+        files.extend(sorted(directory.glob("*.md")))
+    return files
+
+
+def _display(project: Path, path: Path) -> str:
+    try:
+        return path.relative_to(project).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def doc_id_index(project: Path, control: Path, route: str) -> Dict[str, List[str]]:
+    """ID → 占用它的**主文档**。
+
+    关联 review（`F003-review-r01.md`）共享主文档的 ID，是合法布局：
+    `F003-theory.md` 与 `F003-review-r01.md` 可以同时存在。review 由
+    :func:`review_index` 单独统计。
+    """
+    index: Dict[str, List[str]] = {}
+    for entry in _doc_files(project, control, route):
+        if REVIEW_ID.match(entry.name):
+            continue
+        match = DOC_ID_PREFIX.match(entry.name)
+        if not match:
+            continue
+        doc_id = match.group(1) + match.group(2)
+        index.setdefault(doc_id, []).append(_display(project, entry))
+    return index
+
+
+def review_index(project: Path, control: Path, route: str
+                 ) -> Dict[str, Dict[str, List[str]]]:
+    """ID → {轮次: [文件名]}。同一轮次出现在多处才是冲突。"""
+    index: Dict[str, Dict[str, List[str]]] = {}
+    for entry in _doc_files(project, control, route):
+        match = REVIEW_ID.match(entry.name)
+        if not match:
+            continue
+        doc_id = match.group(1) + match.group(2)
+        round_no = match.group(3)
+        index.setdefault(doc_id, {}).setdefault(round_no, []).append(
+            _display(project, entry))
+    return index
+
+
+def doc_id_conflicts(project: Path, control: Path, route: str) -> List[Dict[str, Any]]:
+    """只报真正的冲突。
+
+    - `main_duplicate`：两个主文档抢同一个 ID —— BLOCK。
+    - `review_duplicate`：同一轮 review 出现两份 —— BLOCK。
+    - `review_without_main`：只有 review、没有主文档 —— 需要人确认。
+    """
+    conflicts: List[Dict[str, Any]] = []
+    main_ids = doc_id_index(project, control, route)
+    reviews = review_index(project, control, route)
+    for doc_id, files in sorted(main_ids.items()):
+        if len(files) > 1:
+            conflicts.append({"id": doc_id, "route": route, "kind": "main_duplicate",
+                              "severity": "block", "files": files})
+    for doc_id, rounds in sorted(reviews.items()):
+        for round_no, files in sorted(rounds.items()):
+            if len(files) > 1:
+                conflicts.append({"id": doc_id, "route": route,
+                                  "kind": "review_duplicate", "severity": "block",
+                                  "round": round_no, "files": files})
+        if doc_id not in main_ids:
+            conflicts.append({"id": doc_id, "route": route,
+                              "kind": "review_without_main", "severity": "warn",
+                              "files": sorted(name for files in rounds.values()
+                                              for name in files)})
+    return conflicts
+
+
+def occupied_ids(project: Path, control: Path, route: str) -> List[int]:
+    """主文档与 review 共同占用的序号。删掉主文档后 review 仍在，ID 也不能重用。"""
+    numbers = {int(doc_id[1:]) for doc_id in doc_id_index(project, control, route)}
+    numbers |= {int(doc_id[1:]) for doc_id in review_index(project, control, route)}
+    return sorted(numbers)
+
+
+def next_doc_id(project: Path, control: Path, route: str) -> str:
+    """该路线下一个未占用的 ID（只读计算，不创建任何文件）。"""
+    used = occupied_ids(project, control, route)
+    candidate = (max(used) + 1) if used else 1
+    if candidate > 999:
+        raise GuardEnvError(f"路线 {route} 的文档 ID 已用尽（超过 999）")
+    return f"{route}{candidate:03d}"
+
+
+DOC_FILE_NAME = re.compile(r"^([A-Z])(\d{3})-([a-z0-9][a-z0-9-]*)\.md$")
+
+#: 分配 ID 的短时锁。放在控制根里，和迁移用的维护锁分开：两者生命周期完全不同。
+DOC_LOCK_NAME = ".doc-id.lock"
+DOC_LOCK_TIMEOUT = 5.0
+
+
+@contextlib.contextmanager
+def doc_id_lock(control: Path, timeout: float = DOC_LOCK_TIMEOUT):
+    """短时排他锁：覆盖「查最大 ID → 选号 → 建文件」这一小段。"""
+    import time
+    handle = os.open(str(control / DOC_LOCK_NAME), os.O_CREAT | os.O_RDWR, 0o644)
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise GuardEnvError(
+                        f"等待文档 ID 锁超时（{timeout:g}s）：{control / DOC_LOCK_NAME}")
+                time.sleep(0.01)
+        yield
+    finally:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        os.close(handle)
+
+
+def _validate_route(project: Path, control: Path, route: str) -> None:
+    if not re.fullmatch(r"[A-Z]", route or ""):
+        raise GuardEnvError(f"路线编号必须是单个大写字母：{route!r}")
+    routes, source = registered_routes(project, control)
+    if route not in routes:
+        raise GuardEnvError(
+            f"路线 {route} 未注册（来源 {source}）：先按目录规范建 routes/{route}/ 并登记，"
+            "分配器不会为未授权路线创建任何目录")
+
+
+def _doc_directory(project: Path, control: Path, route: str) -> Path:
+    """已存在的路线文档目录；一个都没有就拒绝，不替调用者建目录。"""
+    directories = doc_dirs(project, control, route)
+    if not directories:
+        raise GuardEnvError(
+            f"路线 {route} 没有 docs 目录：先建 routes/{route}/docs/（项目侧优先），"
+            "分配器不创建路线骨架")
+    return directories[0]
+
+
+#: preflight 接受的路线文档 slug（DI-8 枚举）。分配器只造这些名字。
+#: 自由 slug（如 `F009-mist-inr-candidate.md`）能通过 audit，但过不了 preflight，
+#: 所以不在这里自动生成 —— 那是既有规则，本轮不为新工具放宽。
+DOC_SLUGS = ("anchor", "field-map", "discovery", "theory", "evidence", "proposal",
+             "experiment-plan", "result-analysis", "decision", "narrative")
+
+
+def allocate_doc(project: Path, route: str, slug: Any = None,
+                 doc_type: Any = None) -> Dict[str, Any]:
+    """在短时锁内分配 ID 并独占创建骨架文件。
+
+    `slug` 与 `doc_type` 都必须是 DI-8 枚举值；只给 `doc_type` 时用它当 slug。
+    骨架里写好 frontmatter，`preflight` 与 `doc_quality check` 都能直接通过。
+    """
+    project = Path(project).expanduser().resolve()
+    control = control_root(project)
+    candidate = doc_type or slug
+    if slug and doc_type and slug != doc_type:
+        raise GuardEnvError(f"slug 与 type 不一致：{slug} / {doc_type}")
+    if not candidate:
+        raise GuardEnvError("需要 --type（或 --slug），取值：" + ", ".join(DOC_SLUGS))
+    if candidate not in DOC_SLUGS:
+        raise GuardEnvError(
+            f"slug {candidate!r} 不是 DI-8 枚举值；preflight 会拒绝自由 slug。"
+            "可用：" + ", ".join(DOC_SLUGS))
+    _validate_route(project, control, route)
+    directory = _doc_directory(project, control, route)
+    attempts = 0
+    with doc_id_lock(control):
+        if candidate == "anchor":
+            if doc_id_index(project, control, route).get(f"{route}000"):
+                raise GuardEnvError(f"路线 {route} 已有 anchor；一条路线只有一个 000")
+            doc_id = f"{route}000"
+            name = f"{doc_id}-anchor.md"
+            attempts = 1
+            target = directory / name
+            if target.exists():
+                raise GuardEnvError(f"anchor 文件已存在：{target}")
+            handle = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        else:
+            handle = None
+            for _ in range(1000):
+                attempts += 1
+                doc_id = next_doc_id(project, control, route)
+                name = f"{doc_id}-{candidate}.md"
+                if not DOC_FILE_NAME.match(name):
+                    raise GuardEnvError(f"生成的文件名不符合 <R><NNN>-<slug>.md：{name}")
+                target = directory / name
+                if not str(target.resolve()).startswith(str(directory.resolve()) + os.sep):
+                    raise GuardEnvError(f"目标路径逃出文档目录：{target}")
+                try:
+                    handle = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                                     0o644)
+                    break
+                except FileExistsError:
+                    continue
+            if handle is None:
+                raise GuardEnvError("连续 1000 次都拿不到空闲 ID，疑似并发写入失控")
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(
+                f"---\nid: {doc_id}\nroute: {route}\ntype: {candidate}\n"
+                f"subtype: null\nstatus: draft\n---\n\n# {doc_id} \n\n")
+    return {"id": doc_id, "path": str(target), "created": True,
+            "attempts": attempts, "locked": True, "type": candidate}
 
 
 def xid_registered(project: Path, control: Path, route: str, xid: str) -> Tuple[bool, str]:
@@ -737,7 +974,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("action", choices=["preflight", "check", "audit", "selftest",
-                                           "list-kinds"])
+                                           "list-kinds", "doc-ids", "allocate"])
     parser.add_argument("--root", default=".")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--kind", choices=sorted(KINDS))
@@ -748,6 +985,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="正常通过时不打印任何内容（退出码不变，违规仍会打印）")
     parser.add_argument("--summary", action="store_true",
                         help="只打印一行汇总：block / warn 计数")
+    parser.add_argument("--route", help="doc-ids / allocate 使用的路线编号")
+    parser.add_argument("--slug", help="allocate 使用的 DI-8 枚举 slug")
+    parser.add_argument("--type", dest="doc_type",
+                        help="allocate 使用文档类型（等价于 --slug，取 DI-8 枚举值）")
     args = parser.parse_args(argv)
 
     if args.action == "selftest":
@@ -781,6 +1022,39 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    "by_code": counts, "findings": findings}
         report(payload, args, findings)
         return 3 if blocks else 0
+
+    if args.action in ("doc-ids", "allocate"):
+        if not args.route:
+            print("环境错误：需要 --route", file=sys.stderr)
+            return 4
+        try:
+            if args.action == "doc-ids":
+                index = doc_id_index(project, control, args.route)
+                conflicts = doc_id_conflicts(project, control, args.route)
+                payload = {"root": str(project), "route": args.route,
+                           "next": next_doc_id(project, control, args.route),
+                           "used": index, "conflicts": conflicts}
+                if args.json:
+                    print(json.dumps(payload, ensure_ascii=False, indent=2))
+                else:
+                    print(f"路线 {args.route}：下一个可用 ID {payload['next']}")
+                    for doc_id, names in sorted(index.items()):
+                        print(f"  {doc_id}  {', '.join(names)}")
+                    for conflict in conflicts:
+                        print(f"  [冲突] {conflict['id']}: {', '.join(conflict['files'])}")
+                return 3 if conflicts else 0
+            if not args.slug and not args.doc_type:
+                print("环境错误：allocate 需要 --type（或 --slug）", file=sys.stderr)
+                return 4
+            result = allocate_doc(project, args.route, args.slug, args.doc_type)
+        except GuardEnvError as exc:
+            print(f"环境错误：{exc}", file=sys.stderr)
+            return 4
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"已创建 {result['id']}：{result['path']}")
+        return 0
 
     if args.action == "preflight" and not args.path:
         parser.error("preflight 至少需要一个 --path")

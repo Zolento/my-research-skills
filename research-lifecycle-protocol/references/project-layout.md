@@ -491,6 +491,35 @@ routes/<R>/docs/<被审ID>-review-r10.md    # 第 10 轮
 - 多代理并发时，序号分配必须**串行化**（见 §5）。
 - 不要手动跳号、不要复用已删除的号。
 
+**用工具分配，不要手算。** 手算加写盘之间有一个窗口，两个并行会话都读到 `max=8`
+就会都写 `F009`。真实事故已经发生过一次：第二个会话落盘时才发现 ID 被占，只能改号重写。
+
+```bash
+# 只读：看下一个可用 ID 与已占用的 ID
+python3 scripts/layout_guard.py doc-ids --project <项目> --route F
+# 独占创建：短时锁内「查号 → 选号 → 校验路径 → O_EXCL 建文件」
+python3 scripts/layout_guard.py allocate --project <项目> --route F --type theory
+```
+
+**slug 取 DI-8 枚举值**（`anchor`、`field-map`、`discovery`、`theory`、`evidence`、
+`proposal`、`experiment-plan`、`result-analysis`、`decision`、`narrative`）。
+自由 slug（如 `F009-mist-inr-candidate.md`）能过 `audit`，但 `preflight` 会拒绝，
+所以分配器不生成这类名字。这是既有规则，本轮不为新工具放宽：需要自由 slug 的文档
+只能手写，并接受 `preflight` 的判定。
+
+`anchor` 固定拿 `<R>000`，一条路线只有一个。
+
+`doc-ids` 与 `allocate` 都以文件系统为唯一事实来源，不维护第二份 ID 登记表。
+`allocate` 只创建骨架文件（frontmatter + 空标题），正文由写入者填，产物同时通过
+`preflight` 与 `doc_quality.py check`。
+
+**关联 review 共享主文档 ID 是合法的**：`F003-theory.md` 与 `F003-review-r01.md` 可以并存。
+只有两个主文档抢同一个 ID、或同一轮 review 出现两份，才算冲突。只删掉主文档而留下
+review 时，该序号仍然被占用，不会重发。
+
+`doc_quality.py check` 会重复检查 ID 冲突（`DQ-05`，BLOCK），
+所以即使绕开 `allocate` 手写文件，冲突也会在检查时暴露。
+
 ---
 
 ## 3. 文档 frontmatter（必需）

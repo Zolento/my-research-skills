@@ -27,7 +27,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.4.1"
+  version: "2.5.0"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -419,7 +419,8 @@ R12 流程。汇报顺序与操作分类见
 `evidence_outcome.py`、`prediction_compare.py`、`domain_guard.py` / `domain_profile.py` /
 `domain_mms.py`（DP/TG/MM）、`structural_equivalence_check.py`（EQ/NN）、
 `preset_router.py`、`rlp_paths.py`、`cognition.py`、`ste_lint_zh.py`、
-`layout_guard.py`（DI-1—DI-8 路径合规）。
+`layout_guard.py`（DI-1—DI-8 路径合规）、`doc_quality.py`（文档类型分级：
+结构错误 BLOCK、可读性 WARN、科学判断 REVIEW_REQUIRED）。
 
 ---
 

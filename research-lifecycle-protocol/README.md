@@ -38,7 +38,7 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v2.4.1** — the execution boundary is separated from the protocol:
+**Current release: v2.5.0** — the execution boundary is separated from the protocol:
 project-root `AGENTS.md` carries entry points, write scope and file ownership only, while
 `scripts/layout_guard.py` enforces DI-1—DI-8 on real paths (13 path kinds, route/XID
 registration, flat `routes/<R>/docs/`, protected entries and symlink traversal, `AGENTS.md`

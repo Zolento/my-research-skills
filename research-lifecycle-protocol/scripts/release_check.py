@@ -106,6 +106,7 @@ EXPECTED_TEST_SUITES = (
     "test_l3_trust_boundary.py",
     "test_legacy_handoff.py",
     "test_literature_search.py",
+    "test_doc_quality.py",
     "test_layout_guard.py",
     "test_loop_runtime_correctness.py",
     "test_mri_training.py",
@@ -1226,6 +1227,57 @@ def step_layout_guard() -> Tuple[bool, str]:
     return True, (f'layout_guard selftest 通过；模板 {size} B；审计分级与退出码 0/3 正确')
 
 
+def step_doc_quality() -> Tuple[bool, str]:
+    """文档质量协调层：分级、纯语言保护、增量模式、ID 独占创建。"""
+    import tempfile
+    script = pathlib.Path(__file__).resolve().parent / 'doc_quality.py'
+    code, output = _run([str(script), 'selftest'])
+    if code != 0:
+        return False, f'doc_quality selftest 未通过：{(output or "").strip().splitlines()[-1:]}'
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        docs = root / 'routes' / 'F' / 'docs'
+        docs.mkdir(parents=True)
+        (root / 'INDEX.md').write_text('# 索引\n', encoding='utf-8')
+        header = '---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n'
+        body = ('# F001\n\n## 1 结果\n\n零修正与完整修正差 0.00 dB，统计上不可区分。\n\n'
+                '## 2 日志\n\nsha256 `deadbeefdeadbeef` 记录，mtime 22:13，另一个 Agent 写入过。\n')
+        clean = docs / 'F001-evidence.md'
+        clean.write_text(header + body, encoding='utf-8')
+        # 合法文档：噪声记录被降级，不产生 BLOCK
+        code, output = _run([str(script), 'check', '--path', str(clean),
+                             '--root', str(root), '--json'])
+        if code != 0:
+            return False, f'合法的结果文档被判 BLOCK：{output[-200:]}'
+        payload = json.loads(output[output.index('{'):output.rindex('}') + 1])
+        if payload['counts']['BLOCK'] != 0:
+            return False, '合法文档出现 BLOCK 级问题'
+        # 结构错误：坏链接必须判 3，且文件不被改动
+        broken = docs / 'F002-evidence.md'
+        broken.write_text(header.replace('F001', 'F002') +
+                          '# F002\n\n见 [丢失](nope.md)。\n', encoding='utf-8')
+        before = broken.read_bytes()
+        code, _ = _run([str(script), 'check', '--path', str(broken), '--root', str(root)])
+        if code != 3:
+            return False, '坏链接未判 3'
+        if broken.read_bytes() != before:
+            return False, '检查器改动了源文件'
+        # 纯语言修改：改数值必须判 3，改措辞必须放行
+        revised = root / 'revised.md'
+        revised.write_text(header + body.replace('0.00 dB', '0.30 dB'), encoding='utf-8')
+        code, _ = _run([str(script), 'compare', '--before', str(clean), '--after',
+                        str(revised), '--intent', 'prose-only'])
+        if code != 3:
+            return False, '纯语言修改改动了实测数值却未阻断'
+        revised.write_text(header + body.replace('统计上不可区分', '在统计意义上不可区分'),
+                           encoding='utf-8')
+        code, _ = _run([str(script), 'compare', '--before', str(clean), '--after',
+                        str(revised), '--intent', 'prose-only'])
+        if code != 0:
+            return False, '仅改措辞被错误阻断'
+    return True, 'selftest 通过；合法文档 0 BLOCK；坏链接判 3 且不改文件；纯语言保护双向正确'
+
+
 def step_release_metadata() -> Tuple[bool, str]:
     """One release version across SKILL.md, both READMEs, CHANGELOG and the release notes."""
     import re
@@ -1360,6 +1412,7 @@ STEPS = (
     ("Context 架构（依赖声明/章节索引/计划器/子 Agent 契约/L0 上限）",
      step_context_architecture),
     ("Project layout guard（DI-1—DI-8 可执行/模板边界/审计分级）", step_layout_guard),
+    ("Document quality（类型分级/纯语言保护/增量/ID 独占）", step_doc_quality),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )
 
