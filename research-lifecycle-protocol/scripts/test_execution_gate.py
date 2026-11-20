@@ -64,6 +64,18 @@ def managed_run(s,x,m,receipt,ledger,**kwargs):
 
 
 
+def write_training_report(root, selection="full_val_gt", csm="dataset_stored",
+                          name="docs/dev/training-report-2026-11-20.md"):
+    """训练前报告必须是真实文件，内容与绑定配置描述同一套设置（P1-4）。"""
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "# 训练前报告\n\n"
+        f"- 选模协议：{selection}\n- CSM 模式：{csm}\n"
+        "- 优化器 AdamW；学习率 3e-3；预算 32 step\n", encoding="utf-8")
+    return name
+
+
 def full_report(**overrides):
     """Contract v1.0 §10 要求的训练前报告字段（含两种合法选模模式）。"""
     report = {
@@ -274,6 +286,7 @@ class ExecutionTests(unittest.TestCase):
 
         agents = self.root / "AGENTS.md"
         agents.write_text("# Existing project instructions\n")
+        write_training_report(self.root)
         sync = [sys.executable, str(ROOT / "scripts/mri_training.py"), "sync-agents", str(self.root)]
         subprocess.run(sync, capture_output=True, check=True)
         original = agents.read_bytes()
@@ -360,6 +373,7 @@ class ExecutionTests(unittest.TestCase):
                         str(self.root)], capture_output=True, check=True)
         (self.root / "prereg").mkdir()
         (self.root / "prereg/holdout-selection.md").write_text("# 冻结方案\n", encoding="utf-8")
+        write_training_report(self.root, "gt_free_frozen", "dataset_stored")
 
         config_path = self.root / "config.json"
         config = json.loads(config_path.read_text())
@@ -405,6 +419,7 @@ class ExecutionTests(unittest.TestCase):
         (self.root / "AGENTS.md").write_text("# 项目自己的约定\n", encoding="utf-8")
         subprocess.run([sys.executable, str(ROOT / "scripts/mri_training.py"), "sync-agents",
                         str(self.root)], capture_output=True, check=True)
+        write_training_report(self.root, "gt_free_frozen", "dataset_stored")
 
         config_path = self.root / "config.json"
         config = json.loads(config_path.read_text())

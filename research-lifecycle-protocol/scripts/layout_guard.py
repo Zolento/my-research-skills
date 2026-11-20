@@ -781,22 +781,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    "by_code": counts, "findings": findings}
         report(payload, args, findings)
         return 3 if blocks else 0
-        if False:
-            shown: Dict[str, int] = {}
-            for finding in findings:
-                code = finding["code"]
-                shown[code] = shown.get(code, 0) + 1
-                if shown[code] > args.max_per_code:
-                    continue
-                mark = "BLOCK" if finding["severity"] == BLOCK else "WARN "
-                print(f"{mark}  [{code}] {finding['path']}: {finding['message']}")
-            for code, total in sorted(shown.items()):
-                if total > args.max_per_code:
-                    print(f"      [{code}] 另有 {total - args.max_per_code} 项（--max-per-code 调整）")
-            print("按规则汇总：" + ", ".join(
-                f"{code}={total}" for code, total in sorted(shown.items())))
-            print(f"audit: {len(blocks)} block(s), {len(warns)} warning(s)")
-        return 3 if blocks else 0
 
     if args.action == "preflight" and not args.path:
         parser.error("preflight 至少需要一个 --path")

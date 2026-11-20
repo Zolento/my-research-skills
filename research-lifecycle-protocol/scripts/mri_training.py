@@ -97,7 +97,17 @@ def validate_csm(report: Dict[str, Any], project: Path, profile: Any = None) -> 
     summary: Dict[str, Any] = {"mode": mode}
 
     if mode == "not_applicable":
-        summary["declared"] = "not_applicable"
+        # 单线圈例外必须核对线圈数：`not_applicable` 不能用作多线圈项目的逃生门。
+        coils = coil_count(profile, csm)
+        if coils is None:
+            raise ValueError(
+                "MRI_TRAINING_CSM: not_applicable 需要可核对的线圈数："
+                "在领域 profile 声明 acquisition.coils，或在本配置写 csm.coil_count")
+        if coils != 1:
+            raise ValueError(
+                f"MRI_TRAINING_CSM: not_applicable 只适用于单线圈；"
+                f"本项目线圈数为 {coils}，必须使用 dataset_stored 或 joint_estimation")
+        summary.update({"declared": "not_applicable", "coil_count": coils})
     elif mode == "dataset_stored":
         for field in ("source", "sample_identity"):
             if not _text(csm.get(field)):
@@ -137,6 +147,24 @@ def validate_csm(report: Dict[str, Any], project: Path, profile: Any = None) -> 
     return summary
 
 
+def coil_count(profile: Any, csm: Dict[str, Any]) -> Optional[int]:
+    """线圈数来源：领域 profile 的 acquisition.coils，其次训练配置的 csm.coil_count。
+
+    两处都没有时返回 None —— 调用方必须把「无法确认线圈数」当作拒绝条件，
+    不得默认成单线圈。
+    """
+    candidates = []
+    if profile is not None and getattr(profile, "active", False):
+        acquisition = (profile.config or {}).get("acquisition")
+        if isinstance(acquisition, dict):
+            candidates.append(acquisition.get("coils"))
+    candidates.append(csm.get("coil_count"))
+    for value in candidates:
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+            return value
+    return None
+
+
 def csm_declared_in_profile(config: Any) -> Optional[str]:
     """领域 profile 若声明了 `acquisition.coil_sensitivity.mode`，返回它。"""
     if not isinstance(config, dict):
@@ -149,6 +177,50 @@ def csm_declared_in_profile(config: Any) -> Optional[str]:
         return None
     mode = csm.get("mode")
     return mode if isinstance(mode, str) else None
+
+
+def report_lint_status(text: str) -> Dict[str, Any]:
+    """把报告交给已有的结构 lint 检查一次，结果进入绑定摘要。
+
+    这是**调用既有 lint**，不新增科研门禁：它只报告结构与字段完整性（`REP-01`—`REP-07`），
+    不判断科学结论。`status` 随报告内容变化，因此报告被改写会让 receipt 的绑定摘要变化。
+    """
+    try:
+        import report_lint
+    except ImportError:  # 安装副本缺该模块时如实降级，不假装检查过
+        return {"status": "UNAVAILABLE", "blocks": 0, "warns": 0, "rules": []}
+    result = report_lint.lint(text, "training-report")
+    return {"status": result["status"], "blocks": result["blocks"],
+            "warns": result["warns"],
+            "rules": sorted({f["rule"] for f in result["findings"]})}
+
+
+def validate_report_ref(report: Dict[str, Any], project: Path,
+                        selection: str, csm_mode: str) -> Dict[str, Any]:
+    """训练前报告必须真实存在、内容与配置一致，摘要进入绑定。
+
+    `report_ref` 只检查非空等于没有检查：报告可以不存在，或写着另一套配置。
+    这里要求文件存在、可读，并且同时提到本次的 `selection` 与 `csm.mode`；
+    它的 SHA-256 进入执行绑定，报告被改动会让 receipt 失效（RECEIPT_CONTENT_MISMATCH）。
+    """
+    reference = report["report_ref"]
+    path = _resolve_source(project, reference)
+    if path is None:
+        raise ValueError(
+            "MRI_TRAINING_REPORT_REF: report_ref 必须指向已存在的训练前报告文件")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(
+            f"MRI_TRAINING_REPORT_REF: 报告文件不可读（{type(exc).__name__}）") from None
+    missing = [token for token in (selection, csm_mode) if token not in text]
+    if missing:
+        raise ValueError(
+            "MRI_TRAINING_REPORT_REF: 报告内容与配置不一致，缺少 "
+            + "、".join(missing) + "；报告须与绑定配置描述同一套设置")
+    return {"path": reference, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "bytes": len(text.encode("utf-8")),
+            "lint": report_lint_status(text)}
 
 
 def validate_report(report: Dict[str, Any], project: Path,
@@ -169,7 +241,9 @@ def validate_report(report: Dict[str, Any], project: Path,
     if selection not in ("full_val_gt", "gt_free_frozen"):
         raise ValueError(
             "MRI_TRAINING_SELECTION: selection 必须为 full_val_gt 或 gt_free_frozen")
-    summary: Dict[str, Any] = {"selection": selection, "csm": csm}
+    summary: Dict[str, Any] = {"selection": selection, "csm": csm,
+                               "report_ref": validate_report_ref(
+                                   report, project, selection, csm["mode"])}
 
     if selection == "full_val_gt":
         metric = report.get("best_val_metric")
@@ -189,6 +263,10 @@ def validate_report(report: Dict[str, Any], project: Path,
             if (not isinstance(model, dict) or model.get("uses_gt") is not True):
                 raise ValueError(
                     "MRI_TRAINING_GT: full_val_gt 要求 model_selection.uses_gt: true")
+            if model.get("protocol") != "full_val_gt":
+                raise ValueError(
+                    "MRI_TRAINING_SELECTION: 训练配置是 full_val_gt，但领域 profile 的"
+                    f" model_selection.protocol 是 {model.get('protocol')!r}；两者必须一致")
         return selection, summary
 
     # gt_free_frozen —— 事前冻结的无 GT 选择方案
@@ -223,6 +301,10 @@ def validate_report(report: Dict[str, Any], project: Path,
             raise ValueError(
                 "MRI_TRAINING_GT: 领域 profile 的 model_selection.direction 与"
                 " metric_direction 不一致")
+        if model.get("protocol") != "gt_free_frozen":
+            raise ValueError(
+                "MRI_TRAINING_SELECTION: 训练配置是 gt_free_frozen，但领域 profile 的"
+                f" model_selection.protocol 是 {model.get('protocol')!r}；两者必须一致")
     summary.update({field: report[field] for field in GT_FREE_FIELDS})
     return selection, summary
 

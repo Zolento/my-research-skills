@@ -349,6 +349,11 @@ def validate(config: Any, *, state: Optional[Dict[str, Any]] = None,
                 findings.append(_finding(
                     "DP3", "acquisition.coil_sensitivity.source",
                     "dataset_stored 必须声明 CSM 的真实存储来源"))
+            if mode == "not_applicable" and isinstance(coils, int) \
+                    and not isinstance(coils, bool) and coils > 1:
+                findings.append(_finding(
+                    "DP3", "acquisition.coil_sensitivity.mode",
+                    f"not_applicable 只适用于单线圈；声明 coils={coils} 时不得使用该模式"))
 
     # DP4 — GT boundary
     gt = config.get("gt")

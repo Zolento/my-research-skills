@@ -49,7 +49,7 @@ TRAINING = """# 训练启动报告
 ## 02. 数据和物理配置
 | 数据划分 | 维度 | mask | CSM 模式与来源 | 样本配对键 |
 |---|---|---|---|---|
-| train/val/test | 320x320 | 列 mask | dataset_stored，数据集 csmslice | subject/volume/slice/acquisition |
+| train/val/test | 320x320 | 列 mask，ACS 4x4，加速率 4 | dataset_stored，数据集 csmslice | subject/slice |
 输入 [B,C,H,W] k-space，输出 [B,H,W] complex image，FFT 轴向 norm=ortho，
 归一化只用训练测量，learnable 参数为 0。
 
@@ -99,6 +99,31 @@ class OpenerTests(LintCase):
 
 class TrainingReportTests(LintCase):
     def test_complete_training_report_passes(self) -> None:
+        result = self.lint(TRAINING, "training-report")
+        self.assertEqual(result["blocks"], 0, result["findings"])
+
+    def test_field_names_alone_are_not_enough(self) -> None:
+        """P1-6：写了「优化器 / 学习率 / 预算」标题但没有取值，必须判缺项。"""
+        hollow = """## 01. 本轮目的
+验证。
+
+## 02. 数据与物理配置
+| 数据划分 | 维度 | mask | CSM |
+|---|---|---|---|
+| train/val/test | 320x320 | 列 mask | dataset_stored |
+
+## 03. 训练与选模
+| 优化器 | 学习率 | 预算 | 损失 | 选模 | checkpoint |
+|---|---|---|---|---|---|
+| 待定 | 待定 | 待定 | 待定 | 待定 | 待定 |
+"""
+        result = self.lint(hollow, "training-report")
+        messages = " ".join(f["message"] for f in result["findings"])
+        self.assertIn("REP-03", {f["rule"] for f in result["findings"]})
+        self.assertIn("优化器", messages)
+
+    def test_value_level_pass(self) -> None:
+        """写清实际取值则通过，包括 ACS 与加速率、warmup。"""
         result = self.lint(TRAINING, "training-report")
         self.assertEqual(result["blocks"], 0, result["findings"])
 
@@ -163,6 +188,33 @@ class CliTests(LintCase):
             bad = Path(tmp) / "bad.md"
             bad.write_text("## 01. 结论\n已同步 state，审计通过 12 条。\n", encoding="utf-8")
             self.assertEqual(self.run_cli(str(bad))[0], 3)
+
+    def test_quiet_suppresses_success_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "good.md"
+            good.write_text(GOOD, encoding="utf-8")
+            silent = io.StringIO()
+            with contextlib.redirect_stdout(silent):
+                code = rl.main([str(good), "--quiet"])
+            self.assertEqual(code, 0)
+            self.assertEqual(silent.getvalue().strip(), "")
+
+            bad = Path(tmp) / "bad.md"
+            bad.write_text("## 01. 结论\n已同步 state，审计通过 12 条。\n", encoding="utf-8")
+            noisy = io.StringIO()
+            with contextlib.redirect_stdout(noisy):
+                code = rl.main([str(bad), "--quiet"])
+            self.assertEqual(code, 3)
+            self.assertIn("BLOCK", noisy.getvalue())
+
+    def test_quiet_verbose_still_prints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "good.md"
+            good.write_text(GOOD, encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rl.main([str(good), "--quiet", "--verbose"])
+            self.assertTrue(out.getvalue().strip())
 
     def test_missing_file_is_environment_error(self) -> None:
         code, _ = self.run_cli("/nonexistent/report.md")

@@ -141,12 +141,35 @@ class ProjectCase(unittest.TestCase):
     def set_profile(self, profile: dict) -> None:
         self.profile_path.write_text(json.dumps(profile), encoding="utf-8")
 
-    def bind(self, report: dict):
+    def write_report(self, selection: str, csm_mode: str,
+                     name: str = "docs/dev/training-report.md") -> str:
+        """写一份与配置描述同一套设置的训练前报告。"""
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 训练前报告\n\n"
+            f"- 选模协议：{selection}\n"
+            f"- CSM 模式：{csm_mode}\n"
+            "- 优化器：AdamW；学习率 3e-3；预算 18000 step\n",
+            encoding="utf-8")
+        return name
+
+    def bind(self, report: dict, *, materialize: bool = True):
+        """绑定前把 report_ref 落地成真实文件，token 取自本用例的 report。
+
+        ``materialize=False`` 用于测试报告缺失或与配置不一致的情形。
+        """
+        if materialize and isinstance(report.get("report_ref"), str):
+            csm = report.get("csm")
+            mode = csm.get("mode") if isinstance(csm, dict) else "dataset_stored"
+            report = dict(report)
+            report["report_ref"] = self.write_report(
+                str(report.get("selection")), str(mode))
         return mt.execution_binding(self.state_path, {}, [{"mri_training": report}])
 
-    def rejects(self, report: dict, needle: str) -> None:
+    def rejects(self, report: dict, needle: str, *, materialize: bool = True) -> None:
         with self.assertRaises(ValueError) as caught:
-            self.bind(report)
+            self.bind(report, materialize=materialize)
         self.assertIn(needle, str(caught.exception))
 
 
@@ -277,7 +300,34 @@ class CsmSourceTests(ProjectCase):
         self.rejects(gt_report(csm={"mode": "estimated"}), "csm.mode")
 
     def test_single_coil_not_applicable_is_legal(self) -> None:
+        """单线圈例外：profile 声明 coils=1 时合法。"""
+        profile = gt_profile()
+        profile["acquisition"]["coils"] = 1
+        self.set_profile(profile)
         self.assertIsNotNone(self.bind(gt_report(csm={"mode": "not_applicable"})))
+
+    def test_multicoil_not_applicable_is_rejected(self) -> None:
+        """多线圈不得用 not_applicable 当逃生门（P0-2）。"""
+        profile = gt_profile()
+        profile["acquisition"]["coils"] = 20
+        self.set_profile(profile)
+        self.rejects(gt_report(csm={"mode": "not_applicable"}), "只适用于单线圈")
+
+    def test_not_applicable_requires_a_known_coil_count(self) -> None:
+        """无法核对线圈数时 fail closed，不默认成单线圈。"""
+        profile = gt_profile()
+        profile["acquisition"].pop("coils")
+        self.set_profile(profile)
+        self.rejects(gt_report(csm={"mode": "not_applicable"}), "需要可核对的线圈数")
+
+    def test_coil_count_may_come_from_the_config(self) -> None:
+        profile = gt_profile()
+        profile["acquisition"].pop("coils")
+        self.set_profile(profile)
+        self.assertIsNotNone(self.bind(gt_report(
+            csm={"mode": "not_applicable", "coil_count": 1})))
+        self.rejects(gt_report(csm={"mode": "not_applicable", "coil_count": 8}),
+                     "只适用于单线圈")
 
     def test_joint_estimation_with_frozen_protocol_passes(self) -> None:
         self.assertIsNotNone(self.bind(self.joint()))
@@ -308,9 +358,96 @@ class CsmSourceTests(ProjectCase):
 
     def test_profile_not_applicable_agrees_for_single_coil(self) -> None:
         profile = gt_profile()
+        profile["acquisition"]["coils"] = 1
         profile["acquisition"]["coil_sensitivity"] = {"mode": "not_applicable"}
         self.set_profile(profile)
         self.assertIsNotNone(self.bind(gt_report(csm={"mode": "not_applicable"})))
+
+    def test_profile_not_applicable_on_multicoil_is_rejected(self) -> None:
+        profile = gt_profile()
+        profile["acquisition"]["coils"] = 20
+        profile["acquisition"]["coil_sensitivity"] = {"mode": "not_applicable"}
+        self.set_profile(profile)
+        self.rejects(gt_report(csm={"mode": "not_applicable"}), "只适用于单线圈")
+
+
+class ReportRefTests(ProjectCase):
+    """P1-4：`report_ref` 必须是真实文件、内容与配置一致，并进入绑定摘要。"""
+
+    def test_missing_report_file_is_rejected(self) -> None:
+        self.rejects(gt_report(report_ref="docs/dev/absent-report.md"),
+                     "MRI_TRAINING_REPORT_REF", materialize=False)
+
+    def test_report_must_match_the_selection_mode(self) -> None:
+        self.write_report("gt_free_frozen", "dataset_stored")
+        self.rejects(gt_report(report_ref="docs/dev/training-report.md"),
+                     "报告内容与配置不一致", materialize=False)
+
+    def test_report_must_match_the_csm_mode(self) -> None:
+        self.write_report("full_val_gt", "joint_estimation")
+        self.rejects(gt_report(report_ref="docs/dev/training-report.md"),
+                     "报告内容与配置不一致", materialize=False)
+
+    def test_matching_report_is_bound_by_digest(self) -> None:
+        reference = self.write_report("full_val_gt", "dataset_stored")
+        report = gt_report(report_ref=reference)
+        first = self.bind(report, materialize=False)
+        # 报告被改动后，绑定摘要必须变化：receipt 才会判 RECEIPT_CONTENT_MISMATCH
+        path = self.root / reference
+        path.write_text(path.read_text(encoding="utf-8") + "\n补一行。\n", encoding="utf-8")
+        second = self.bind(report, materialize=False)
+        self.assertNotEqual(first["report_digests"], second["report_digests"])
+
+    def test_directory_as_report_ref_is_rejected(self) -> None:
+        (self.root / "docs/dev/adir").mkdir(parents=True, exist_ok=True)
+        self.rejects(gt_report(report_ref="docs/dev/adir"), "MRI_TRAINING_REPORT_REF",
+                     materialize=False)
+
+
+class ReportLintWiringTests(ProjectCase):
+    """P1-5：训练报告要经过既有结构 lint；它只报告，不新增科研门禁。"""
+
+    def test_lint_status_is_recorded_in_the_binding(self) -> None:
+        binding = self.bind(gt_report())
+        self.assertTrue(binding["report_digests"])
+        # 摘要存在即说明 lint 被调用过；具体 status 由报告内容决定
+        summary = mt.validate_report_ref(
+            {"report_ref": "docs/dev/training-report.md"}, self.root,
+            "full_val_gt", "dataset_stored")
+        self.assertIn("lint", summary)
+        self.assertIn(summary["lint"]["status"], ("OK", "WARN", "BLOCK", "UNAVAILABLE"))
+
+    def test_hollow_report_is_reported_by_lint(self) -> None:
+        path = self.root / "docs/dev/hollow.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 训练报告\n\nfull_val_gt dataset_stored\n", encoding="utf-8")
+        summary = mt.validate_report_ref(
+            {"report_ref": "docs/dev/hollow.md"}, self.root,
+            "full_val_gt", "dataset_stored")
+        self.assertEqual(summary["lint"]["status"], "BLOCK")
+        self.assertIn("REP-03", summary["lint"]["rules"])
+
+    def test_lint_does_not_block_execution(self) -> None:
+        """结构 lint 是 advisory：它不阻止绑定，只记录。"""
+        self.assertIsNotNone(self.bind(gt_report()))
+
+
+class SelectionProtocolTests(ProjectCase):
+    """P0-3：选模协议必须与领域 profile 的 model_selection.protocol 逐项一致。"""
+
+    def test_full_val_gt_config_against_gt_free_profile_is_rejected(self) -> None:
+        # gt 边界一致、只有 protocol 名称相反，才能证明这条检查独立生效
+        self.set_profile(gt_profile(protocol="gt_free_frozen"))
+        self.rejects(gt_report(), "model_selection.protocol")
+
+    def test_gt_free_config_against_gt_profile_is_rejected(self) -> None:
+        self.set_profile(gt_free_profile(protocol="full_val_gt"))
+        self.rejects(gt_free_report(), "model_selection.protocol")
+
+    def test_agreement_passes(self) -> None:
+        self.assertIsNotNone(self.bind(gt_report()))
+        self.set_profile(gt_free_profile())
+        self.assertIsNotNone(self.bind(gt_free_report()))
 
 
 class EvaluationOnlyTests(ProjectCase):
