@@ -2154,12 +2154,12 @@
       ]
     },
     {
-      "bytes": 16850,
-      "chars": 10427,
-      "doc_digest": "40e01aede28f58a4",
+      "bytes": 17949,
+      "chars": 11022,
+      "doc_digest": "386412955be09f73",
       "doc_id": "references/identity-and-compatibility",
       "path": "references/identity-and-compatibility.md",
-      "section_count": 14,
+      "section_count": 15,
       "sections": [
         {
           "bytes": 277,
@@ -2360,19 +2360,34 @@
           "title": "9. 历史保留迁移：存储完整性与科研合规性分开"
         },
         {
-          "bytes": 847,
-          "char_end": 10427,
+          "bytes": 744,
+          "char_end": 10386,
           "char_start": 9972,
-          "chars": 455,
-          "digest": "b7b054618bc10a22",
+          "chars": 414,
+          "digest": "3c540a30c42cf909",
           "level": 3,
-          "line_end": 306,
+          "line_end": 305,
           "line_start": 293,
           "parent": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
           "rule_ids": [],
           "section_id": "9.1-verify-u7684u56dbu8defu4fe1u53f7",
           "summary": "保留模式下三者成立而门禁不成立时，状态是 **`VERIFIED_WITH_LEGACY_ISSUES`**，",
           "title": "9.1 `verify` 的四路信号"
+        },
+        {
+          "bytes": 1202,
+          "char_end": 11022,
+          "char_start": 10386,
+          "chars": 636,
+          "digest": "c27c2ec9ef3ccac9",
+          "level": 3,
+          "line_end": 323,
+          "line_start": 306,
+          "parent": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
+          "rule_ids": [],
+          "section_id": "9.2-u8bc1u660eu6750u6599u662fu5f3au5236u9879",
+          "summary": "`verify` 依赖迁移时写下的证据包，缺一份就不能报「完整验证通过」：",
+          "title": "9.2 证明材料是强制项"
         }
       ]
     },
@@ -17032,8 +17047,8 @@
   "regenerate": "python3 scripts/section_index.py build",
   "schema": "research-idea-pipeline/section-index@1",
   "totals": {
-    "chars": 799441,
+    "chars": 800036,
     "docs": 74,
-    "sections": 1014
+    "sections": 1015
   }
 }

@@ -303,4 +303,21 @@ python3 scripts/migrate_project_root.py migrate --project <项目> --backup-root
 不是 `VERIFIED`。它表示「存储搬运成功且历史原样保留」，不表示这些路线科研合规：
 它们在后续执行中仍按原有规则 HOLD。
 
+### 9.2 证明材料是强制项
+
+`verify` 依赖迁移时写下的证据包，缺一份就不能报「完整验证通过」：
+
+| 材料 | 作用 | 缺失时 |
+|---|---|---|
+| `source-snapshot.json` | 迁移前的逐文件摘要 | `VERIFY_FAILED` |
+| `source-fingerprint.json` | 迁移前的科研资产指纹 | `VERIFY_FAILED` |
+| `rewrite-manifest.json` | 重写的原文与结果摘要 | 仅在本次迁移发生过重写时强制 |
+| `violation-baseline.json` | 历史违规清单与摘要 | 保留模式下强制，严格模式不需要 |
+| `installed-manifest.json` / `backup-manifest.json` | 新根与备份的期望状态 | `VERIFY_FAILED` |
+
+旧实现遇到读不到的材料就跳过那项比对，于是删掉一份证据即可让不完整的验证看起来完整。
+现在区分缺失与损坏，两者都计入失败。因此**归档与工作目录是证据，不是垃圾**：
+`.rlp-archive/<id>` 保存回滚所需的原始控制根，`.rlp-migration/<id>` 保存本次校验的证明材料。
+只有在明确决定不再回滚、且已另行备份之后，才由人手动删除。
+
 **三者必须分开读：** 存储迁移成功 ≠ 科研状态合法 ≠ 路线可以继续执行。

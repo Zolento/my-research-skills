@@ -492,9 +492,6 @@ class TestBackupBoundary(TransactionBase):
         self.assertFalse(self.new_root.exists())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 # ---------------------------------------------------------------------------
 # 历史保留迁移：存储完整性与科研合规性解耦
@@ -934,3 +931,129 @@ class TestRollbackStranding(TransactionBase):
         self.assertTrue(result["new_root_restored"])
         self.assertTrue(self.new_root.is_dir())
         self.assertEqual(rlp.runtime_status(self.project)["status"], rlp.RUNTIME_STATUS_READY)
+
+
+class TestVerificationEvidence(TransactionBase):
+    """M-e：验证证明材料是强制项；缺一份就不能报「完整验证通过」。"""
+
+    def _inject_outcome_debt(self) -> None:
+        path = self.legacy / "routes" / "A" / "research-state.json"
+        state = json.loads(path.read_text(encoding="utf-8"))
+        state.setdefault("contract", {}).pop("outcome_policy", None)
+        state["experiments"][0]["outcome_protocol"] = {"frozen": True}
+        path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+    def legacy_migration(self) -> dict:
+        """跑一次历史保留模式的迁移，返回报告。"""
+        self._inject_outcome_debt()
+        payload = self.project / "baseline.json"
+        payload.write_text(json.dumps(
+            {"violation_baseline": mp._state_inventory(self.legacy)["baseline"]}),
+            encoding="utf-8")
+        proc = run_tool("migrate", "--project", self.project, "--backup-root",
+                        self.backup, "--apply", "--assume-writers-quiesced",
+                        "--preserve-known-legacy-violations",
+                        "--violation-baseline", payload)
+        report = json.loads(proc.stdout)
+        self.assertEqual(report["status"], "MIGRATED_WITH_LEGACY_ISSUES",
+                         report.get("errors"))
+        return report
+
+    def evidence_path(self, migration_id: str, name: str) -> pathlib.Path:
+        return mp.manifest_path(self.project, migration_id, name)
+
+    def verify(self, migration_id: str) -> dict:
+        return json.loads(run_tool("verify", "--project", self.project,
+                                   "--migration-id", migration_id).stdout)
+
+    def test_a_missing_baseline_file_fails_verification(self):
+        """基线文件被删 → 不能默认「清单保持一致」。"""
+        report = self.legacy_migration()
+        self.evidence_path(report["migration_id"], "violation-baseline.json").unlink()
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["legacy_violations_preserved"])
+        self.assertEqual(result["evidence"]["violation-baseline.json"], "missing")
+        self.assertTrue(any("violation-baseline.json" in p for p in result["problems"]))
+
+    def test_a_corrupt_baseline_file_fails_verification(self):
+        report = self.legacy_migration()
+        path = self.evidence_path(report["migration_id"], "violation-baseline.json")
+        path.write_text("{not json", encoding="utf-8")
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["evidence"]["violation-baseline.json"], "corrupt")
+        self.assertFalse(result["legacy_violations_preserved"])
+
+    def test_a_baseline_whose_digest_disagrees_fails_verification(self):
+        """文件内容被改但保留了旧摘要 → 自相矛盾，判失败。"""
+        report = self.legacy_migration()
+        path = self.evidence_path(report["migration_id"], "violation-baseline.json")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        route = next(iter(payload["baseline"]["routes"]))
+        payload["baseline"]["routes"][route]["state_digest"] = "0" * 64
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertTrue(any("自相矛盾" in p for p in result["problems"]),
+                        result["problems"])
+
+    def test_a_strict_migration_does_not_require_a_baseline(self):
+        """严格迁移没有基线文件，这是正常的，不构成失败。"""
+        report = self.migrate()
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFIED", result.get("problems"))
+        self.assertNotIn("violation-baseline.json", result["evidence"])
+
+    def test_missing_source_snapshot_fails_verification(self):
+        report = self.migrate()
+        self.evidence_path(report["migration_id"], "source-snapshot.json").unlink()
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertFalse(result["evidence_ok"])
+        self.assertTrue(any("source-snapshot.json" in p for p in result["problems"]))
+
+    def test_missing_source_fingerprint_fails_verification(self):
+        report = self.migrate()
+        self.evidence_path(report["migration_id"], "source-fingerprint.json").unlink()
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertFalse(result["historical_state_unchanged"])
+
+    def test_missing_rewrite_manifest_fails_verification(self):
+        """真的发生过重写的迁移，重写清单就是强制材料。"""
+        (self.project / "README.md").write_text(
+            "旧路径见 .research-idea-pipeline/routes/A", encoding="utf-8")
+        report = json.loads(run_tool(
+            "migrate", "--project", self.project, "--backup-root", self.backup,
+            "--apply", "--assume-writers-quiesced",
+            "--rewrite", "<project>/README.md").stdout)
+        self.assertEqual(report["status"], "MIGRATED", report.get("errors"))
+        (mp.work_dir(self.project, report["migration_id"]) /
+         "rewrite-manifest.json").unlink()
+        result = self.verify(report["migration_id"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["evidence"]["rewrite-manifest.json"], "missing")
+
+    def test_a_migration_without_rewrites_records_an_empty_manifest(self):
+        """没有重写请求时也留一份空清单，证据包齐整。"""
+        report = self.migrate()
+        path = mp.work_dir(self.project, report["migration_id"]) / "rewrite-manifest.json"
+        self.assertTrue(path.is_file())
+        self.assertEqual(json.loads(path.read_text())["files"], [])
+
+    def test_migration_keeps_its_evidence_bundle(self):
+        """成功提示必须要求保留证据，不再建议删除归档与工作目录。"""
+        report = self.migrate()
+        hint = report["resume_hint"]
+        self.assertIn("保留", hint)
+        self.assertNotIn("可删除", hint)
+        self.assertTrue((self.project / ".rlp-archive" / report["migration_id"] /
+                         "legacy-root").is_dir())
+        self.assertTrue((mp.work_dir(self.project, report["migration_id"]) /
+                         "source-snapshot.json").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

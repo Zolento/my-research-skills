@@ -435,6 +435,23 @@ def _load_manifest(path: pathlib.Path) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _evidence(path: pathlib.Path) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """迁移证明材料的三种状态：``ok`` / ``missing`` / ``corrupt``。
+
+    ``verify`` 不能用「读不到就跳过这项比对」的方式通过：那样删掉一份证明材料
+    就能让一份不完整的验证看起来完整。
+    """
+    if not path.is_file():
+        return "missing", None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return "corrupt", None
+    if not isinstance(value, dict):
+        return "corrupt", None
+    return "ok", value
+
+
 # ---------------------------------------------------------------------------
 # Semantic fingerprint (research assets that must not change)
 # ---------------------------------------------------------------------------
@@ -1233,11 +1250,14 @@ def _migrate_transaction(project: pathlib.Path, legacy: rlp.StorageRoot,
                      [f"{d['path']}({d['change']})" for d in changed[:5]])
 
     # 3) document rewrites: staged, never applied before the cutover
-    rewrite_manifest = {"schema": MANIFEST_SCHEMA, "migration_id": migration_id,
-                        "files": []}
     if rewrite:
         rewrite_manifest = _stage_document_rewrites(project, legacy.root, staging_target,
                                                     rewrite, migration_id)
+    else:
+        rewrite_manifest = {"schema": MANIFEST_SCHEMA, "migration_id": migration_id,
+                            "files": [], "ignored": []}
+        _write_json(work_dir(project, migration_id) / "rewrite-manifest.json",
+                    rewrite_manifest)
     _journal_append(project, {"event": STATE_STAGED_VERIFIED,
                               "migration_id": migration_id,
                               "entries": snapshot(staging_target)["entry_count"],
@@ -1369,7 +1389,9 @@ def _migrate_transaction(project: pathlib.Path, legacy: rlp.StorageRoot,
                 ("存储迁移完成；历史科研规则债务逐条保留，相关路线继续按原有门禁 HOLD。"
                  "这不是科研合规证明。" if legacy_issues else
                  "迁移完成且校验通过；新根为唯一运行时控制根。")
-                + "验证无误后可删除 .rlp-migration/<id> 工作目录与 .rlp-archive/<id> 归档。")})
+                + "请保留 .rlp-archive/<id>（回滚所需的原始控制根）与 .rlp-migration/<id>"
+                  "（本次校验的证明材料）；verify 依赖这些材料，缺失即判失败。"
+                  "只有在明确决定不再回滚、并已另行备份之后，才由人手动删除。")})
         return report
     _journal_append(project, {"event": "verify_failed", "migration_id": migration_id,
                               "problems": verify_report["problems"][:5]})
@@ -1425,8 +1447,6 @@ def verify(project_root: pathlib.Path, migration_id: Optional[str] = None
     report["journal_summary"] = _events(entries)
     started = next((e for e in entries if e.get("event") == STATE_STARTED), {})
     legacy_mode = started.get("mode") == LEGACY_VIOLATION_MODE
-    recorded_baseline = _load_manifest(
-        manifest_path(project, migration_id, "violation-baseline.json")) or {}
     report["mode"] = LEGACY_VIOLATION_MODE if legacy_mode else "strict"
     scientific_issues: List[str] = []
     if journal["migration_id"] == migration_id and journal["last_event"] in FAILURE_EVENTS:
@@ -1481,8 +1501,36 @@ def verify(project_root: pathlib.Path, migration_id: Optional[str] = None
                                                     snapshot(backup_root_dir))[:5]:
                     problems.append(f"备份 {difference['path']}: {difference['change']}")
 
+    # ---- 迁移证明材料：缺失或损坏一律失败，不允许「跳过即通过」 ----
+    evidence = {
+        "source-snapshot.json": _evidence(manifest_path(project, migration_id,
+                                                        "source-snapshot.json")),
+        "source-fingerprint.json": _evidence(manifest_path(project, migration_id,
+                                                           "source-fingerprint.json")),
+    }
+    staged_event = next((e for e in entries if e.get("event") == STATE_STAGED_VERIFIED), {})
+    declared_rewrites = int(staged_event.get("rewrites") or 0)
+    rewrite_evidence = _evidence(work_dir(project, migration_id) / "rewrite-manifest.json")
+    if declared_rewrites or rewrite_evidence[0] == "ok":
+        evidence["rewrite-manifest.json"] = rewrite_evidence
+    else:
+        # 早期迁移在没有任何重写请求时不写这份清单；这不算缺证据
+        evidence["rewrite-manifest.json"] = ("not_required", None)
+    if legacy_mode:
+        evidence["violation-baseline.json"] = _evidence(
+            manifest_path(project, migration_id, "violation-baseline.json"))
+    for name, (state, _value) in evidence.items():
+        if state in ("ok", "not_required"):
+            continue
+        problems.append(
+            f"缺少迁移证明 {name}（{state}）：无法证明迁移前的状态，这项比对不允许跳过。"
+            "若工作目录被清理过，需要人工核对，或重新迁移以生成完整证据")
+    report["evidence"] = {name: state for name, (state, _v) in evidence.items()}
+    report["evidence_ok"] = all(state in ("ok", "not_required")
+                                for state, _v in evidence.values())
+
     # rewritten documents must match their staged digests
-    rewrite_manifest = _rewrite_manifest(project, migration_id) or {"files": []}
+    rewrite_manifest = evidence["rewrite-manifest.json"][1] or {"files": []}
     committed = {e.get("file") for e in entries if e.get("event") == "document_committed"}
     for item in rewrite_manifest.get("files", []):
         if item.get("inside_root"):
@@ -1512,25 +1560,42 @@ def verify(project_root: pathlib.Path, migration_id: Optional[str] = None
                 (scientific_issues if legacy_mode else problems).append(message)
             problems.extend(f"路线 {route_name}：{p}"
                             for p in _chain_problems(new_root, route_name)[:3])
-        if source_snapshot is not None:
-            recorded_fp = plan_fingerprint(project, migration_id)
-            if recorded_fp is not None and recorded_fp != fingerprint:
-                problems.append("科研资产指纹与迁移前记录不一致（预算/计数/状态被改变）")
+        recorded_fp = evidence["source-fingerprint.json"][1]
+        if source_snapshot is not None and recorded_fp is not None and \
+                recorded_fp != fingerprint:
+            problems.append("科研资产指纹与迁移前记录不一致（预算/计数/状态被改变）")
 
     # 四路信号分开计算：存储完整、历史不变、科研门禁、违规清单保持
     inventory = _state_inventory(new_root) if new_root.is_dir() else {"routes": {},
                                                                     "fatal": [],
                                                                     "baseline": {"routes": {}}}
     actual_baseline = inventory["baseline"]
-    expected_baseline = (recorded_baseline or {}).get("baseline")
-    violations_preserved = True
+    expected_baseline: Optional[Dict[str, Any]] = None
     baseline_diff: Dict[str, Any] = {}
-    if expected_baseline is not None:
-        baseline_diff = _baseline_diff(expected_baseline, actual_baseline)
-        violations_preserved = _normalize_baseline(expected_baseline) == \
-            _normalize_baseline(actual_baseline)
-        if not violations_preserved:
-            problems.append("历史违规清单与迁移前基线不一致（被删除、掩盖或新增）")
+    violations_preserved = True
+    if legacy_mode:
+        # 保留模式的全部正当性来自「清单与迁移前逐条相等」。基线读不到时，
+        # 这条比对无法执行，结论只能是失败，不能默认成立。
+        violations_preserved = False
+        baseline_state, baseline_entry = evidence.get("violation-baseline.json",
+                                                      ("missing", None))
+        if baseline_state != "ok" or baseline_entry is None:
+            problems.append("历史保留模式缺少违规基线（violation-baseline.json）："
+                            "无法证明历史违规清单被原样保留")
+        else:
+            expected_baseline = baseline_entry.get("baseline")
+            stored_digest = baseline_entry.get("digest")
+            if not isinstance(expected_baseline, dict):
+                problems.append("历史保留模式的基线文件没有 baseline 内容")
+            elif stored_digest != _baseline_digest(expected_baseline):
+                problems.append("历史保留模式的基线文件自相矛盾：记录的摘要与内容不符")
+            else:
+                baseline_diff = _baseline_diff(expected_baseline, actual_baseline)
+                violations_preserved = (
+                    _normalize_baseline(expected_baseline)
+                    == _normalize_baseline(actual_baseline))
+                if not violations_preserved:
+                    problems.append("历史违规清单与迁移前基线不一致（被删除、掩盖或新增）")
     registry_digest_unchanged = True
     registry = new_root / "project" / "route-registry.json"
     source_registry = None
@@ -1541,10 +1606,15 @@ def verify(project_root: pathlib.Path, migration_id: Optional[str] = None
         registry_digest_unchanged = _sha256(registry) == source_registry.get("sha256")
         if not registry_digest_unchanged:
             problems.append("route-registry.json 在迁移中被改动（路线不应被自动归档或改状态）")
+    elif source_registry is None and registry.is_file() and source_snapshot is not None:
+        registry_digest_unchanged = False
+        problems.append("route-registry.json 在迁移后出现，但源快照中没有它"
+                        "（迁移不得创建或改写路线登记）")
 
     report["storage_integrity_ok"] = not problems
     report["historical_state_unchanged"] = (
-        not problems and registry_digest_unchanged and violations_preserved)
+        not problems and report["evidence_ok"] and registry_digest_unchanged
+        and violations_preserved)
     report["scientific_gate_ok"] = bool(inventory["routes"]) and all(
         entry.get("gate_ok") for entry in inventory["routes"].values())
     report["legacy_violations_preserved"] = violations_preserved
@@ -1552,7 +1622,8 @@ def verify(project_root: pathlib.Path, migration_id: Optional[str] = None
     if expected_baseline is not None and not violations_preserved:
         report["baseline_diff"] = baseline_diff
     report["violation_baseline_digest"] = (
-        (recorded_baseline or {}).get("digest") if expected_baseline is not None else None)
+        (evidence.get("violation-baseline.json", ("", None))[1] or {}).get("digest")
+        if expected_baseline is not None else None)
     report["violation_rule_counts"] = {
         route: entry.get("rule_counts")
         for route, entry in inventory["routes"].items() if entry.get("violation_count")}

@@ -19,6 +19,17 @@
 - `plan --baseline-out` 与 `migrate --violation-baseline`：迁移决定绑定一份已审阅的清单，
   基线漂移（含同数量不同条目）一律 `REFUSED`。
 
+### Fixed（第二轮）
+
+- **`verify` 的证明材料改为强制项**：缺 `source-snapshot.json`、`source-fingerprint.json`，
+  或在保留模式下缺 `violation-baseline.json`，一律 `VERIFY_FAILED`。旧实现读不到就跳过该项
+  比对，删掉一份证据即可让不完整的验证通过。基线文件损坏、或摘要与内容自相矛盾，同样失败。
+  `rewrite-manifest.json` 在本次迁移发生过重写时强制；没有重写请求的迁移现在也会写一份空清单。
+- **成功提示不再建议删除归档**：`.rlp-archive/<id>` 与 `.rlp-migration/<id>` 是回滚与校验所需的
+  证据，提示改为要求保留，删除留给人事后决定。
+- **`test_migration_transaction.py` 的测试入口移回文件末尾**：新增测试类曾排在
+  `if __name__ == "__main__"` 之后，直接运行脚本时不会执行。
+
 ### Fixed
 
 - **快照不再静默跳过不可读目录**：`snapshot()` 记录 `unreadable` 并置 `complete=false`；
