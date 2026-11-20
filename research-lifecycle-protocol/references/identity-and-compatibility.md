@@ -259,3 +259,65 @@ npx skills add "Zolento/my-research-skills#research-lifecycle-protocol/dev@resea
 **已有 `research-state.json` ≠ 需要完整接管**；`state_version` 增长、缺少派生报告都**不**构成重新
 接管的理由。职责边界：Legacy Handoff 只做一次性接管；Research Recovery 恢复当前科研状态；
 Context Drift Recovery 处理投影漂移；Cognition 维护可重建记忆；Scheduler/I2M 决定下一步行动。
+
+## 9. 历史保留迁移：存储完整性与科研合规性分开
+
+真实项目里存在一种形态：旧控制根**可读、可追溯**，其中的历史实验违反了**后来才引入**的科研规则
+（典型是 Outcome Policy 在结果产生之后才冻结），按当前规则无法合法补写。旧实现把
+`state_gate_ok=false` 一律当成不可迁移，于是这类项目永远无法完成存储迁移。
+
+现在把两者分开：
+
+| 类别 | 判据 | 严格模式 | 保留模式 |
+|---|---|---|---|
+| **A 存储/结构缺陷** | state 不可读、结构错误、形状门禁失败、哈希链损坏、目录不可读、根身份不明确，或备份与源不一致 | **拒绝** | **仍然拒绝** |
+| **B 科研规则债务** | state 可读可追溯，但 V1—V24 / EO1 / EX1 报违规 | 拒绝 | 允许，并逐条绑定基线 |
+
+```bash
+# 1) 审阅计划：把逐条违规清单落盘
+python3 scripts/migrate_project_root.py plan --project <项目> --backup-root <备份> \
+    --preserve-known-legacy-violations --baseline-out /tmp/baseline.json
+# 2) 用**同一份**已审阅的基线执行
+python3 scripts/migrate_project_root.py migrate --project <项目> --backup-root <备份> \
+    --apply --assume-writers-quiesced --preserve-known-legacy-violations \
+    --violation-baseline /tmp/baseline.json
+```
+
+这不是 `--force`：
+
+- 必须显式给出 `--violation-baseline`，内容与当前旧根计算的清单**逐条相等**。同数量但不同条目也拒绝。
+- 基线发生变化（多一条、少一条、描述改写）→ `REFUSED` 并给出 `diff`。
+- staging 校验阶段再比一次。清单出现删除、掩盖或新增，都在**切换前**阻断。
+- 没有任何债务时使用该模式 → `REFUSED`（模式不是通行证）。
+
+### 9.1 `verify` 的四路信号
+
+| 信号 | 含义 |
+|---|---|
+| `storage_integrity_ok` | 文件逐个一致、备份可重读、无不可读目录、新根可识别 |
+| `historical_state_unchanged` | 语义指纹一致，`route-registry.json` 保持原样（路线不得自动归档），且违规清单与基线相等 |
+| `scientific_gate_ok` | 新根里每条路线是否通过当前科研门禁 |
+| `legacy_violations_preserved` | 违规清单与迁移前**逐条**相等 |
+
+保留模式下三者成立而门禁不成立时，状态是 **`VERIFIED_WITH_LEGACY_ISSUES`**，
+不是 `VERIFIED`。它表示「存储搬运成功且历史原样保留」，不表示这些路线科研合规：
+它们在后续执行中仍按原有规则 HOLD。
+
+### 9.2 证明材料是强制项
+
+`verify` 依赖迁移时写下的证据包，缺一份就不能报「完整验证通过」：
+
+| 材料 | 作用 | 缺失时 |
+|---|---|---|
+| `source-snapshot.json` | 迁移前的逐文件摘要 | `VERIFY_FAILED` |
+| `source-fingerprint.json` | 迁移前的科研资产指纹 | `VERIFY_FAILED` |
+| `rewrite-manifest.json` | 重写的原文与结果摘要 | 仅在本次迁移发生过重写时强制 |
+| `violation-baseline.json` | 历史违规清单与摘要 | 保留模式下强制，严格模式不需要 |
+| `installed-manifest.json` / `backup-manifest.json` | 新根与备份的期望状态 | `VERIFY_FAILED` |
+
+旧实现遇到读不到的材料就跳过那项比对，于是删掉一份证据即可让不完整的验证看起来完整。
+现在区分缺失与损坏，两者都计入失败。因此**归档与工作目录是证据，不是垃圾**：
+`.rlp-archive/<id>` 保存回滚所需的原始控制根，`.rlp-migration/<id>` 保存本次校验的证明材料。
+只有在明确决定不再回滚、且已另行备份之后，才由人手动删除。
+
+**三者必须分开读：** 存储迁移成功 ≠ 科研状态合法 ≠ 路线可以继续执行。

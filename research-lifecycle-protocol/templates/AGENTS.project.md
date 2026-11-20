@@ -24,7 +24,7 @@ state schema、证据等级、指标口径、代码风格清单。那些内容�
    区分安装版与开发版。只加载当前任务需要的 L0/L1、一个 Preset 与领域切片。
 3. 科研工作按 RLP 四个语义入口选择：`start-project` / `continue-research` / `explore` / `audit`。
    已有有效 state 只能 Resume，不得重新 Bootstrap。先用 **Skill 目录下**
-   `python3 scripts/rlp_paths.py resolve <项目根>` 判定存储。需迁移或根不明确时只读 `HOLD`。
+   `python3 scripts/rlp_paths.py resolve --project <项目根>` 判定存储。需迁移或根不明确时只读 `HOLD`。
 4. `.research-lifecycle-protocol/routes/<R>/research-state.json` 是科学事实的唯一机器源。
    实验 issue/run、outcome 与 state 回写必须走 RLP 门禁。`STATUS.md` 由投影生成，不手改结论。
 5. **优先级**：用户当前指令 ＞ 已冻结实验协议 ＞ 本文件的布局与写入范围 ＞ RLP 默认布局。

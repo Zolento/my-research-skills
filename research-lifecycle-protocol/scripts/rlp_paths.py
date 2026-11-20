@@ -128,31 +128,56 @@ def _read_lock_owner(project_root: pathlib.Path) -> Optional[Dict[str, Any]]:
     return value if isinstance(value, dict) and value else None
 
 
+def _pid_alive(pid: Any) -> Optional[bool]:
+    """Is the recorded owner process still alive? ``None`` when it cannot be told."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return None
+    return True
+
+
 def maintenance_status(project_root: pathlib.Path) -> Dict[str, Any]:
     """Read-only view: is the maintenance lock currently held, and by whom?
 
     Detection opens the lock file and tries a non-blocking exclusive lock, then
     releases it immediately. This is a best-effort inspection for reports; writers
     must still go through :func:`maintenance_guard` to be actually excluded.
+
+    A crash leaves the lock **file** behind but not the ``flock`` (the kernel releases it
+    with the process). The file is therefore reported as ``stale`` with
+    ``owner_alive=false`` instead of being treated as an active holder: it must not block
+    the next migration, and it must not be silently ignored either.
     """
     path = maintenance_lock_path(project_root)
     if not path.is_file():
-        return {"held": False, "path": str(path), "owner": None}
+        return {"held": False, "path": str(path), "owner": None,
+                "owner_alive": None, "stale": False}
     handle = None
     try:
         handle = os.open(str(path), os.O_RDONLY)
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            return {"held": True, "path": str(path),
-                    "owner": _read_lock_owner(project_root)}
+            owner = _read_lock_owner(project_root)
+            return {"held": True, "path": str(path), "owner": owner,
+                    "owner_alive": _pid_alive((owner or {}).get("pid")),
+                    "stale": False}
         finally:
             try:
                 fcntl.flock(handle, fcntl.LOCK_UN)
             except OSError:
                 pass
-        return {"held": False, "path": str(path),
-                "owner": _read_lock_owner(project_root)}
+        owner = _read_lock_owner(project_root)
+        alive = _pid_alive((owner or {}).get("pid"))
+        return {"held": False, "path": str(path), "owner": owner,
+                "owner_alive": alive, "stale": owner is not None and alive is False}
     except OSError:
         return {"held": None, "path": str(path),
                 "owner": _read_lock_owner(project_root)}

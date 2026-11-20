@@ -98,7 +98,14 @@ PID、GPU、路径、状态版本与同步动作放后，且只在影响判断�
 python3 scripts/report_lint.py report.md                      # 结果报告
 python3 scripts/report_lint.py report.md --type training-report  # 训练启动通知
 python3 scripts/report_lint.py report.md --json                # 机器读
+python3 scripts/report_lint.py report.md --quiet               # 内部调用：通过时不出声
 ```
+
+**输出降噪的统一口径：** 工具在**内部调用**与**正常通过**时静默或只给一行汇总，
+`HOLD` / `BLOCK` / `FAIL` 保留完整原因，退出码不变。已提供该能力的有
+`layout_guard.py`（`--quiet` / `--summary`）、`report_lint.py`（`--quiet`）、
+`operational_reconcile.py`（`--quiet` / `--summary`）、`state_check.py`（`--quiet`）。
+降噪不得吞掉阻塞信息。只能隐藏成功路径的操作细节。
 
 ## 2. Method-depth 检查
 

@@ -59,21 +59,31 @@ OPERATION_OPENERS = (
 )
 GATE_LOG = re.compile(r"(审计|检查|门禁)[^\n]{0,12}\d+\s*(条|项)[^\n]{0,6}(通过|ok|OK)")
 
-#: REP-03：训练启动通知必须覆盖的 11 项（Contract v1.0 §10）。
-TRAINING_FIELDS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
-    ("数据与划分", ("划分", "train", "val", "test", "数据")),
-    ("维度与尺寸", ("尺寸", "维度", "shape", "网格")),
-    ("mask/ACS/方向", ("mask", "掩膜", "acs", "加速", "方向", "采样")),
-    ("输入输出与线圈", ("输入", "输出", "线圈", "coil")),
-    ("CSM 模式与来源", ("csm", "灵敏度", "csm 模式", "dataset_stored", "joint_estimation",
-                        "not_applicable")),
-    ("算子与归一化", ("算子", "fft", "伴随", "归一化", "norm")),
-    ("优化器", ("优化器", "optimizer", "adam", "sgd")),
-    ("学习率与调度", ("学习率", "lr", "调度", "schedule", "warmup")),
-    ("预算", ("预算", "epoch", "step", "budget")),
-    ("损失", ("损失", "loss")),
-    ("选模协议与指标", ("选模", "选择", "selection", "psnr", "nmse", "指标")),
-    ("checkpoint", ("checkpoint", "检查点", "best_val", "latest")),
+#: REP-03：训练启动通知必须覆盖的 12 项。每项是 (标签, 必须同时命中的模式组)。
+#: 只出现「优化器」三个字不算通过：每一项都要求实际取值。
+_R = lambda pattern: re.compile(pattern, re.I | re.S)  # noqa: E731
+
+TRAINING_FIELDS: Tuple[Tuple[str, Tuple["re.Pattern[str]", ...]], ...] = (
+    ("数据与划分", (_R(r"\b(train|val|test)\b|训练集|验证集|测试集"),
+                    _R(r"划分|数据集|split|目录"))),
+    ("维度与尺寸", (_R(r"\d{2,4}\s*[×xX*]\s*\d{2,4}|\[B\b|shape|尺寸"),)),
+    ("mask/ACS/方向", (_R(r"mask|掩膜|掩码"),
+                       _R(r"列|行|column|row|方向|轴"),
+                       _R(r"acs|加速|acceleration|线数"))),
+    ("输入输出与线圈", (_R(r"输入|输出|input|output"),
+                        _R(r"\[B\b|shape|线圈|coil|复数|complex"))),
+    ("算子与归一化", (_R(r"fft|算子|伴随|adjoint"),
+                      _R(r"归一化|norm|normalization"))),
+    ("优化器", (_R(r"\b(adam|adamw|sgd|rmsprop|adamax|nadam|lamb|lion|adagrad|adadelta)\b"),)),
+    ("学习率与调度", (_R(r"学习率|lr\b|learning[_ ]rate"),
+                      _R(r"\d"),
+                      _R(r"warmup|调度|scheduler|schedule|cosine|step ?lr|gamma"))),
+    ("预算", (_R(r"\d+\s*(step|epoch|轮|次|迭代)|预算|budget"),)),
+    ("损失", (_R(r"损失|loss|objective|\bl1\b|\bl2\b|ssim|hfen|nmae"),)),
+    ("选模协议与指标", (_R(r"full_val_gt|gt_free_frozen"),
+                        _R(r"psnr|nmse|指标|metric"))),
+    ("CSM 模式与来源", (_R(r"dataset_stored|joint_estimation|not_applicable"),)),
+    ("checkpoint", (_R(r"checkpoint|检查点|best_val|latest"),)),
 )
 
 #: REP-04：未证实推断的断言词。
@@ -150,15 +160,14 @@ def lint(text: str, report_type: str = "result") -> Dict[str, object]:
     if len(gate_lines) > 1:
         add("REP-02", WARN, f"正文重复出现 {len(gate_lines)} 行门禁通过日志；正常通过不逐条汇报")
 
-    # REP-03 — 训练启动通知
+    # REP-03 — 训练启动通知（按值核对，不按关键词出现与否）
     if report_type == "training-report":
-        lowered = text.lower()
-        missing = [label for label, keys in TRAINING_FIELDS
-                   if not any(key.lower() in lowered for key in keys)]
+        missing = [label for label, patterns in TRAINING_FIELDS
+                   if not all(pattern.search(text) for pattern in patterns)]
         if missing:
             add("REP-03", BLOCK,
-                "训练启动通知缺项：" + "、".join(missing)
-                + "。补齐内容，不要删字段让检查通过")
+                "训练启动通知缺项或取值不可核对：" + "、".join(missing)
+                + "。补齐实际取值，不要只写字段名，也不要删字段让检查通过")
         if re.search(r"\bN/?A\b", text):
             add("REP-03", WARN, "报告里出现 N/A；缺项要写清缺什么，不要用 N/A 掩盖")
 
@@ -256,13 +265,13 @@ PSNR 提升 0.4 dB，但只在一个 test 划分上成立。
 验证 A 臂。
 
 ## 02. 数据与物理配置
-| 数据划分 | 维度 | mask | CSM |
+| 数据划分 | 维度 | mask | CSM 模式 |
 |---|---|---|---|
-| train/val/test | 320x320 | 列 mask | 有 |
+| train/val/test | 320x320 | 列 mask，ACS 4x4，加速率 4 | dataset_stored |
 输入 [B,C,H,W] k-space，输出 [B,H,W]，FFT 轴向，归一化用测量。
 ## 03. 训练与选模
 | 优化器 | 学习率 | 预算 | 损失 | 选模 | checkpoint |
-| AdamW | 3e-3 | 18000 步 | l1 | full_val_gt PSNR | best_val |
+| AdamW | 3e-3 warmup 3000 | 18000 步 | l1+ssim | full_val_gt PSNR | best_val |
 代码 commit abc，资源已授权。
 """
     result = lint(training, "training-report")
@@ -300,6 +309,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         dest="report_type")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--quiet", action="store_true",
+                        help="通过时不输出（BLOCK 照常输出；退出码不变）")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--list-rules", action="store_true")
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -321,9 +332,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"[env] 无法读取：{type(exc).__name__}: {exc}", file=sys.stderr)
         return 4
     result = lint(text, args.report_type)
-    print(json.dumps(result, ensure_ascii=False, indent=1) if args.json
-          else render(result, args.verbose))
-    return 3 if result["status"] == BLOCK else 0
+    blocked = result["status"] == BLOCK
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=1))
+    elif not (args.quiet and not blocked and not args.verbose):
+        print(render(result, args.verbose))
+    return 3 if blocked else 0
 
 
 if __name__ == "__main__":

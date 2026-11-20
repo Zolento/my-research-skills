@@ -27,7 +27,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.4.0"
+  version: "2.4.1"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -70,7 +70,7 @@ Agent 生命周期、沙箱、工具执行与外部调度，两者职责分离�
 **第二道 · 存储判定。** 先解析运行根，再谈读写。
 
 ```bash
-python3 scripts/rlp_paths.py resolve <project>    # 退出码 3 = 必须先迁移
+python3 scripts/rlp_paths.py resolve --project <project>   # 退出码 3 = 必须先迁移
 ```
 
 | 判定 | 允许的动作 |
@@ -207,10 +207,12 @@ Domain Profile 是**可选**规则扩展，默认不激活。在 `<route|project
 
 **MRI 重建训练规范强制适用。** 识别为 MRI 重建时，即使未启用可选 Domain Profile，也必须在
 项目启动时将[训练硬约束](domain-profiles/mri-reconstruction/training-policy.md)同步到项目根
-`AGENTS.md`，并在每段训练前读规则、检查冲突和报告协议。自监督与全监督统一用完整 val 的 GT
-选 `best_val`；线圈灵敏度默认必须用数据集存储的 CSM，只有显式联合估计灵敏度且已冻结方法
-协议的方法类别例外（评估参考不例外）。自监督训练可以按既定信息边界用 mask split 损失更新权重，禁止用 mask split 损失或
-测量残差选模。发现现有协议、项目指令或数据条件冲突时，向用户报告受影响的环节。
+`AGENTS.md`，并在每段训练前读规则、检查冲突和报告协议。选模只允许两种已确认协议：
+有完整 val GT 时用 `full_val_gt`（PSNR 最大或 complex_NMSE 最小）；真正无 val GT 时用
+**事前冻结**的 `gt_free_frozen`，声明无 GT 的选择指标、方向、来源、范围与停止准则。
+两者不得互相代替。禁止用 mask split 损失或测量残差选模。
+线圈灵敏度默认必须用数据集存储的 CSM，只有显式联合估计灵敏度且已冻结方法协议的方法类别例外
+（评估参考不例外）。发现现有协议、项目指令或数据条件冲突时，向用户报告受影响的环节。
 激活判定与按任务切片见 §2.2。规则本体见
 [domain-profiles/mri-reconstruction/PROFILE.md](domain-profiles/mri-reconstruction/PROFILE.md)。
 
