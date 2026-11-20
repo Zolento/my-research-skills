@@ -76,7 +76,10 @@ y_Ω = A_Ω x + ε
     "forward_operators": ["coil_sensitivity", "fourier", "undersampling_mask"],
     "coils": 20,
     "undersampling": {"pattern": "variable_density", "acceleration": 10},
-    "noise": {"model": "gaussian", "level_known": false}
+    "noise": {"model": "gaussian", "level_known": false},
+    // MRI-10：灵敏度来源。未声明时以训练配置的 csm.mode 为准；
+    // 声明后两者必须一致（mri_training.py 双向核对，DP3 校验形状）。
+    "coil_sensitivity": {"mode": "dataset_stored", "source": "csmslice in dataset"}
   },
   "gt": {"available": true, "usage": "validation_only"},
   "ssl": {

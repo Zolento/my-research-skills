@@ -330,6 +330,26 @@ def validate(config: Any, *, state: Optional[Dict[str, Any]] = None,
                               or coils < 1):
         findings.append(_finding("DP3", "acquisition.coils", "coils 必须是正整数（单线圈可省略）"))
 
+    # DP3a — MRI-10：灵敏度来源声明（仅在声明时校验，未声明不改变既有行为）
+    coil = acq.get("coil_sensitivity")
+    if coil is not None:
+        if not isinstance(coil, dict):
+            findings.append(_finding("DP3", "acquisition.coil_sensitivity", "必须是对象"))
+        else:
+            mode = coil.get("mode")
+            if mode not in ("dataset_stored", "joint_estimation", "not_applicable"):
+                findings.append(_finding(
+                    "DP3", "acquisition.coil_sensitivity.mode",
+                    "必须为 dataset_stored、joint_estimation 或 not_applicable"))
+            elif mode == "joint_estimation" and not _text(coil.get("protocol_ref")):
+                findings.append(_finding(
+                    "DP3", "acquisition.coil_sensitivity.protocol_ref",
+                    "联合估计灵敏度必须指明启动前冻结的方法协议"))
+            elif mode == "dataset_stored" and not _text(coil.get("source")):
+                findings.append(_finding(
+                    "DP3", "acquisition.coil_sensitivity.source",
+                    "dataset_stored 必须声明 CSM 的真实存储来源"))
+
     # DP4 — GT boundary
     gt = config.get("gt")
     if not isinstance(gt, dict):
@@ -402,6 +422,25 @@ def validate(config: Any, *, state: Optional[Dict[str, Any]] = None,
         findings.append(_finding(
             "DP6", "model_selection.uses_loss_measurements",
             "模型选择不得使用损失留出测量（hidden leakage）"))
+    # DP6a — Contract v1.0：两种合法选模协议必须与 GT 边界一致，GT-free 必须自带指标与方向
+    protocol = _text(selection.get("protocol")) and selection.get("protocol").strip()
+    if protocol == "gt_free_frozen":
+        if not _text(selection.get("metric")):
+            findings.append(_finding(
+                "DP6", "model_selection.metric",
+                "GT-free 选模必须声明无 GT 的 metric（与训练配置的 selection_metric 一致）"))
+        if selection.get("direction") not in ("maximize", "minimize"):
+            findings.append(_finding(
+                "DP6", "model_selection.direction",
+                "GT-free 选模必须声明 direction 为 maximize 或 minimize"))
+        if uses_gt is True:
+            findings.append(_finding(
+                "DP6", "model_selection.protocol",
+                "protocol 为 gt_free_frozen 时不得声明 uses_gt: true"))
+    elif uses_gt is True and protocol == "full_val_gt" and available is False:
+        findings.append(_finding(
+            "DP6", "model_selection.protocol",
+            "gt.available=false 时不得声明 full_val_gt 选模"))
 
     # DP7/DP8 — frozen components and forbidden changes
     frozen = config.get("frozen")

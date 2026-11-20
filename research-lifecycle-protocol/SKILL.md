@@ -208,7 +208,8 @@ Domain Profile 是**可选**规则扩展，默认不激活。在 `<route|project
 **MRI 重建训练规范强制适用。** 识别为 MRI 重建时，即使未启用可选 Domain Profile，也必须在
 项目启动时将[训练硬约束](domain-profiles/mri-reconstruction/training-policy.md)同步到项目根
 `AGENTS.md`，并在每段训练前读规则、检查冲突和报告协议。自监督与全监督统一用完整 val 的 GT
-选 `best_val`。自监督训练可以按既定信息边界用 mask split 损失更新权重，禁止用 mask split 损失或
+选 `best_val`；线圈灵敏度默认必须用数据集存储的 CSM，只有显式联合估计灵敏度且已冻结方法
+协议的方法类别例外（评估参考不例外）。自监督训练可以按既定信息边界用 mask split 损失更新权重，禁止用 mask split 损失或
 测量残差选模。发现现有协议、项目指令或数据条件冲突时，向用户报告受影响的环节。
 激活判定与按任务切片见 §2.2。规则本体见
 [domain-profiles/mri-reconstruction/PROFILE.md](domain-profiles/mri-reconstruction/PROFILE.md)。

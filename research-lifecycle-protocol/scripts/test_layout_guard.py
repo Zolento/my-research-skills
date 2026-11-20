@@ -311,6 +311,33 @@ class AuditTests(GuardCase):
         self.assertNotIn(guard.BLOCK, severities)
 
 
+class ManagedBlockTests(GuardCase):
+    """Skill 注入的受管块不计入项目自撰体量。"""
+
+    BLOCK = ("<!-- BEGIN RLP MRI TRAINING -->\n## MRI 硬约束\n" + "x" * 4000
+             + "\n<!-- END RLP MRI TRAINING -->\n")
+
+    def test_managed_block_is_excluded_from_budget(self) -> None:
+        (self.root / "AGENTS.md").write_text("# 边界\n" + self.BLOCK, encoding="utf-8")
+        blocks = [f for f in guard.audit(self.root) if f["code"] == "AGENTS-1"]
+        self.assertEqual(blocks, [], blocks)
+
+    def test_project_text_over_budget_still_blocks(self) -> None:
+        (self.root / "AGENTS.md").write_text("x" * 25000 + self.BLOCK, encoding="utf-8")
+        severities = [f["severity"] for f in guard.audit(self.root) if f["code"] == "AGENTS-1"]
+        self.assertIn(guard.BLOCK, severities)
+
+    def test_block_bytes_measurement(self) -> None:
+        measured = guard.managed_block_bytes(self.BLOCK.encode("utf-8"))
+        self.assertGreater(measured, 4000)
+        self.assertEqual(guard.managed_block_bytes(b"# plain\n"), 0)
+
+    def test_unterminated_block_is_not_exempted(self) -> None:
+        text = "x" * 25000 + "<!-- BEGIN RLP MRI TRAINING -->\n"
+        (self.root / "AGENTS.md").write_text(text, encoding="utf-8")
+        self.assertEqual(guard.managed_block_bytes(text.encode("utf-8")), 0)
+
+
 class CliTests(GuardCase):
     def run_cli(self, *argv: str) -> tuple:
         out = io.StringIO()

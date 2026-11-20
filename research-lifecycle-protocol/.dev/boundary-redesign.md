@@ -81,3 +81,38 @@ DI-1—DI-8 因此退化为建议，且没有任何脚本读项目文件树。�
 3. **未做内容语义检查**：路径合规不等于科学合法性。
 4. **`AGENTS.md` 体量上限未做成 Skill 侧硬门禁**：目前是 guard 的 `AGENTS-1` 规则，
    默认 20 KB；若要更严，改 `layout-policy.json` 的 `agents_max_bytes`。
+
+---
+
+## 8. MRI Contract v1.0 接入（同日第二轮）
+
+按用户协议包实施。核心是两件事：**修掉写死的单一选模模式**，以及**把 CSM 来源变成可判定字段**。
+
+| 变更 | 文件 |
+|---|---|
+| 受管段重写为 Contract v1.0 简版（9 条 + MRI-10） | `domain-profiles/mri-reconstruction/training-policy.md` |
+| 全文副本（逐字，含 2026-11-20 补订） | `docs/contracts/mri-research-contract-v1.0.md` |
+| 两种选模 + CSM 三模式 + profile 交叉核对 | `scripts/mri_training.py` |
+| DP3a：`acquisition.coil_sensitivity` 形状 | `scripts/domain_profile.py` |
+| 40 用例双侧 fixture | `scripts/test_mri_training.py` |
+| GT-free 端到端（真实 `issue`/`run`） | `scripts/test_execution_gate.py` |
+| 报告结构 lint（`REP-01`—`REP-07`） | `scripts/report_lint.py` + 测试 |
+| 编号报告形态 | `references/scientific-communication-policy.md` §1.3 |
+| `--quiet` / `--summary` | `layout_guard.py`、`operational_reconcile.py` |
+| 体量预算只计项目自撰部分 | `layout_guard.py`（`managed_block_bytes`） |
+
+### 判断与理由
+
+- **D-7 GT-free 与 full_val_gt 平权。** 旧代码把 `selection` 写死为 `full_val_gt`，
+  用户批准的 GT-free 方案文档加了也跑不起来 —— 文档与执行器相反，是「规范写了但系统不接受」。
+  修法是让两种模式各有完整校验，而不是关掉检查。
+- **D-8 CSM 例外不延长到评估参考。** 若每个联合估计灵敏度的方法都用自己估的 `S` 合并 GT，
+  参考随方法漂移，跨方法表格不再可比。例外只覆盖方法前向与训练。
+- **D-9 `csm` 用对象而不是字符串。** 第一版写成 `csm: stored`，无法携带来源与配对键，
+  也就无法满足 MRI-10 的报告要求。改为 `mode` + `source` + `sample_identity`，
+  联合估计再加 `protocol_ref` / `eval_reference`。
+- **D-10 体量预算排除受管块。** 受管段从 4.7 KB 涨到 6.4 KB 后，含块总量 13.9 KB。
+  直接调高阈值等于放宽约束；改为**只计项目自撰部分**（模板 7.7 KB 对 12 KB 上限），
+  受管块按 SHA 单独校验。这不是放宽，是把 Skill 注入的东西从项目账上摘出去。
+- **D-11 report_lint 不是门禁。** 它只拦客观缺字段与格式；强断言、指标缺失一类只给 `WARN`，
+  交既有证据资格审核。新增一套科研门禁会与 R7/R10 抢权限。

@@ -82,6 +82,9 @@ DOT_TOLERATED = {".git", ".github", ".gitlab", ".dsh", ".agents", ".agents-home"
 RLP_OWNED_DOT = {rlp.MAINTENANCE_DIR}
 PROTECTED_ROOTS = {"dataset", "store", ".git"}
 
+#: Skill 注入的受管块。与 `mri_training.py` 的 BEGIN/END 标记一致。
+MANAGED_BLOCKS = (("<!-- BEGIN RLP MRI TRAINING -->", "<!-- END RLP MRI TRAINING -->"),)
+
 KINDS = ("code", "script", "test", "config", "route-doc", "project-doc",
          "manuscript", "experiment", "result", "log", "checkpoint", "control",
          "scratch")
@@ -374,6 +377,24 @@ def check_path(project: Path, path: str, kind: Optional[str] = None,
 # 全树审计（存量项目 triage）
 # --------------------------------------------------------------------------- #
 
+def managed_block_bytes(data: bytes) -> int:
+    """Skill 注入的受管块字节数（`BEGIN/END RLP MRI TRAINING`，可有多段同类块）。"""
+    text = data.decode("utf-8", "replace")
+    total = 0
+    for begin, end in MANAGED_BLOCKS:
+        start = 0
+        while True:
+            left = text.find(begin, start)
+            if left < 0:
+                break
+            right = text.find(end, left)
+            if right < 0:
+                break
+            total += len(text[left:right + len(end)].encode("utf-8"))
+            start = right + len(end)
+    return total
+
+
 def audit(project: Path) -> List[Dict[str, str]]:
     project = Path(project).resolve()
     control = control_root(project)
@@ -420,12 +441,19 @@ def audit(project: Path) -> List[Dict[str, str]]:
     warn_at = int(policy.get("agents_warn_bytes", 12000))
     if agents.is_file():
         size = agents.stat().st_size
-        if size > limit:
+        # Skill 托管的块不是项目自己写的内容：它由 mri_training.py 注入并按 SHA 校验，
+        # 手改即违规。体量预算只计**项目自撰部分**，否则「加一段受管规则」就会让
+        # 项目被迫删掉自己的执行边界。这不是放宽阈值，是把被注入的部分排除在计分外。
+        owned = managed_block_bytes(agents.read_bytes())
+        measured = size - owned
+        suffix = f"（已扣除 Skill 受管块 {owned} B，实测项目自撰 {measured} B）" if owned else ""
+        if measured > limit:
             add(BLOCK, "AGENTS-1", "AGENTS.md",
-                f"{size} B 超过上限 {limit} B：AGENTS.md 管执行边界，不承载 RLP 规则副本")
-        elif size > warn_at:
+                f"项目自撰部分 {measured} B 超过上限 {limit} B{suffix}："
+                "AGENTS.md 管执行边界，不承载 RLP 规则副本")
+        elif measured > warn_at:
             add(WARN, "AGENTS-1", "AGENTS.md",
-                f"{size} B 超过告警线 {warn_at} B（含 MRI 受管块时约 10 KB 属正常）")
+                f"项目自撰部分 {measured} B 超过告警线 {warn_at} B{suffix}")
 
     routes_dir = project / "routes"
     if routes_dir.is_dir():
@@ -672,6 +700,39 @@ def _count_by_code(findings: Iterable[Dict[str, str]]) -> Dict[str, int]:
     return counts
 
 
+def report(payload: Dict[str, Any], args: argparse.Namespace,
+           entries: Sequence[Any]) -> None:
+    """统一的输出层：`--json` 机器读、`--quiet` 正常时静默、`--summary` 一行。
+
+    门禁语义不变：`--quiet` 只影响**正常通过**时的可见性，违规与阻塞一律照常打印。
+    """
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=1))
+        return
+    blocked = payload.get("blocked", 0)
+    if args.quiet and not blocked:
+        return
+    if args.summary:
+        if "checked" in payload:
+            print(f"layout_guard: {payload['checked']} path(s), blocked {blocked}")
+        else:
+            print(f"layout_guard: block {blocked}, warn {payload.get('warned', 0)}")
+        return
+    for entry in entries:
+        if isinstance(entry, dict) and "severity" in entry:
+            mark = "BLOCK" if entry["severity"] == BLOCK else "WARN "
+            print(f"{mark}  [{entry['code']}] {entry['path']}: {entry['message']}")
+        elif isinstance(entry, dict):
+            print(f"{'PASS  ' if entry['ok'] else 'BLOCK '}  {entry['path']}: {entry['reason']}")
+    if "checked" in payload:
+        print(f"checked {payload['checked']} path(s); blocked {blocked}")
+    else:
+        counts = payload.get("by_code", {})
+        if counts:
+            print("按规则汇总：" + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+        print(f"audit: {blocked} block(s), {payload.get('warned', 0)} warning(s)")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -683,6 +744,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--max-per-code", type=int, default=5,
                         help="audit 每个规则最多打印几项（默认 5）")
+    parser.add_argument("--quiet", action="store_true",
+                        help="正常通过时不打印任何内容（退出码不变，违规仍会打印）")
+    parser.add_argument("--summary", action="store_true",
+                        help="只打印一行汇总：block / warn 计数")
     args = parser.parse_args(argv)
 
     if args.action == "selftest":
@@ -711,12 +776,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 4
         blocks = [f for f in findings if f["severity"] == BLOCK]
         warns = [f for f in findings if f["severity"] == WARN]
-        if args.json:
-            print(json.dumps({"root": str(project), "blocked": len(blocks),
-                              "warned": len(warns),
-                              "by_code": _count_by_code(findings),
-                              "findings": findings}, ensure_ascii=False, indent=1))
-        else:
+        counts = _count_by_code(findings)
+        payload = {"root": str(project), "blocked": len(blocks), "warned": len(warns),
+                   "by_code": counts, "findings": findings}
+        report(payload, args, findings)
+        return 3 if blocks else 0
+        if False:
             shown: Dict[str, int] = {}
             for finding in findings:
                 code = finding["code"]
@@ -743,13 +808,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"环境错误：{exc}", file=sys.stderr)
         return 4
 
-    failures = 0
+    results = []
     for path in paths:
         ok, reason = check_path(project, path, args.kind, control, policy)
-        print(f"{'PASS  ' if ok else 'BLOCK '}  {path}: {reason}")
-        failures += 0 if ok else 1
-    print(f"checked {len(paths)} path(s); blocked {failures}")
-    return 3 if failures else 0
+        results.append({"path": path, "ok": ok, "reason": reason})
+    payload = {"root": str(project), "checked": len(results),
+               "blocked": sum(1 for item in results if not item["ok"]),
+               "results": results}
+    report(payload, args, results)
+    return 3 if payload["blocked"] else 0
 
 
 if __name__ == "__main__":

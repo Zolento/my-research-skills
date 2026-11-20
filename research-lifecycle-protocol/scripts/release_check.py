@@ -108,6 +108,8 @@ EXPECTED_TEST_SUITES = (
     "test_literature_search.py",
     "test_layout_guard.py",
     "test_loop_runtime_correctness.py",
+    "test_mri_training.py",
+    "test_report_lint.py",
     "test_policy_evolution.py",
     "test_policy_transfer.py",
     "test_operational_reconcile.py",

@@ -33,6 +33,18 @@
 `layout.json` 的投影（D-1）；纯伴随/密度补偿禁令**留在项目**（D-3，残余风险已登记）；
 托管块保留但按 Skill 投影管理（D-4）；不提供 `agents_migrate.py`（D-6）。
 
+### 第二轮：MRI Contract v1.0 接入（同日）
+
+- 受管段重写：9 条 + MRI-10 CSM 来源；全文副本 `docs/contracts/mri-research-contract-v1.0.md`。
+- `mri_training.py`：`full_val_gt` / `gt_free_frozen` 平权；`best_val_metric` ∈ PSNR / complex_NMSE；
+  `csm.mode` 三值 + `source` / `sample_identity` / `protocol_ref` / `eval_reference`；
+  与领域 profile 交叉核对。
+- 新增 `report_lint.py`（REP-01—07）、`test_report_lint.py`、`test_mri_training.py`（40 用例）。
+- `test_execution_gate.py` 增加 GT-free 端到端通过 + 无冻结方案拒绝两条。
+- `layout_guard.py`：体量预算只计项目自撰部分（受管块 6.4 KB 单列）；`--quiet` / `--summary`。
+- 读数：`release_check` PASS；`test_mri_training` 40 OK；虚拟项目 verify 0 failure
+  （AGENTS.md 总计 13949 B，受管块 6179 B，项目自撰 7770 B）。
+
 ### 下一轮候选
 
 1. 逐项目处理 6 个存量项目的 `block`（需用户授权；先登记窄例外还是整改要分项目判断）。
