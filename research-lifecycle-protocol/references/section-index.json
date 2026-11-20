@@ -2154,9 +2154,9 @@
       ]
     },
     {
-      "bytes": 17949,
-      "chars": 11022,
-      "doc_digest": "386412955be09f73",
+      "bytes": 18044,
+      "chars": 11123,
+      "doc_digest": "aa2f76a30b08d1f5",
       "doc_id": "references/identity-and-compatibility",
       "path": "references/identity-and-compatibility.md",
       "section_count": 15,
@@ -2360,29 +2360,29 @@
           "title": "9. 历史保留迁移：存储完整性与科研合规性分开"
         },
         {
-          "bytes": 744,
-          "char_end": 10386,
+          "bytes": 839,
+          "char_end": 10487,
           "char_start": 9972,
-          "chars": 414,
-          "digest": "3c540a30c42cf909",
+          "chars": 515,
+          "digest": "ee49b4cf555241e9",
           "level": 3,
-          "line_end": 305,
+          "line_end": 307,
           "line_start": 293,
           "parent": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
           "rule_ids": [],
           "section_id": "9.1-verify-u7684u56dbu8defu4fe1u53f7",
-          "summary": "保留模式下三者成立而门禁不成立时，状态是 **`VERIFIED_WITH_LEGACY_ISSUES`**，",
+          "summary": "保留模式下 `storage_integrity_ok`、`historical_state_unchanged`、",
           "title": "9.1 `verify` 的四路信号"
         },
         {
           "bytes": 1202,
-          "char_end": 11022,
-          "char_start": 10386,
+          "char_end": 11123,
+          "char_start": 10487,
           "chars": 636,
           "digest": "c27c2ec9ef3ccac9",
           "level": 3,
-          "line_end": 323,
-          "line_start": 306,
+          "line_end": 325,
+          "line_start": 308,
           "parent": "9.-u5386u53f2u4fddu7559u8fc1u79fb-u5b58u50a8u5b8cu6574u6027u4e0eu79d1u7814u5408u",
           "rule_ids": [],
           "section_id": "9.2-u8bc1u660eu6750u6599u662fu5f3au5236u9879",
@@ -17047,7 +17047,7 @@
   "regenerate": "python3 scripts/section_index.py build",
   "schema": "research-idea-pipeline/section-index@1",
   "totals": {
-    "chars": 800036,
+    "chars": 800137,
     "docs": 74,
     "sections": 1015
   }

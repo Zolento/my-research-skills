@@ -299,7 +299,9 @@ python3 scripts/migrate_project_root.py migrate --project <项目> --backup-root
 | `scientific_gate_ok` | 新根里每条路线是否通过当前科研门禁 |
 | `legacy_violations_preserved` | 违规清单与迁移前**逐条**相等 |
 
-保留模式下三者成立而门禁不成立时，状态是 **`VERIFIED_WITH_LEGACY_ISSUES`**，
+保留模式下 `storage_integrity_ok`、`historical_state_unchanged`、
+`legacy_violations_preserved` 为真而 `scientific_gate_ok` 为假时，状态是
+**`VERIFIED_WITH_LEGACY_ISSUES`**，
 不是 `VERIFIED`。它表示「存储搬运成功且历史原样保留」，不表示这些路线科研合规：
 它们在后续执行中仍按原有规则 HOLD。
 
