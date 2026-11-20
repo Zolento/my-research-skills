@@ -1,12 +1,12 @@
 # Changelog — research-lifecycle-protocol
 
-本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.4.0**。
+本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.4.1**。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
 
-## 未发布 — dev 分支（在 2.4.0 之后）
+## 2.4.1 — 2026-11-21
 
 ### Added
 
