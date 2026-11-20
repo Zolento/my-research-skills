@@ -7,6 +7,21 @@
 
 本文件由 v2.2.0 的 L0 精简产生：内容来自 `SKILL.md` §6，未改变任何检查项。
 
+## 0. 落盘文档的机器检查（可选，项目自己决定是否挂）
+
+文档写完后跑一次，重点看 BLOCK；WARN 与 REVIEW_REQUIRED 由人判断要不要改。
+
+```bash
+python3 scripts/doc_quality.py check --path routes/<R>/docs/<文件>.md --root <项目>
+python3 scripts/doc_quality.py check --staged --root <项目>     # 提交前
+python3 scripts/doc_quality.py compare --before a.md --after b.md --intent prose-only
+```
+
+- BLOCK 只覆盖可确认的结构错误（ID 冲突、坏链接、frontmatter 不一致、纯语言修改动了数值）。
+  **没有 BLOCK 不等于文档合格。**
+- 检查器不改文件，也不改历史证据；历史旧路径只报 REVIEW_REQUIRED。
+- 文档合规不替代 `state_check.py`：科研状态是否合法、证据资格是否成立，另由门禁判定。
+
 ## 1. 完整自检清单（每次输出前）
 
 - [ ] phase 已明确，且与该阶段的输入约定一致。

@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -201,6 +202,87 @@ def _routes_from_registry(payload: Any) -> set:
 
     walk(payload)
     return routes
+
+
+# ---------------------------------------------------------------------------
+# 正式文档 ID（DI-8）：唯一分配 + 独占创建
+# ---------------------------------------------------------------------------
+# 真实事故：两个并行会话各自把同一条路线的新文档编成 F009，第二个写盘时才发现。
+# 这里只做两件事：把「已占用的 ID」算出来，以及用 O_EXCL 建新文件。不建第二套登记库。
+
+DOC_ID_PREFIX = re.compile(r"^([A-Z])(\d{3})-")
+DOC_ID_FILE = re.compile(r"^([A-Z])(\d{3})-([a-z0-9][a-z0-9-]*)\.md$")
+
+
+def doc_dirs(project: Path, control: Path, route: str) -> List[Path]:
+    """一条路线上所有可能存放正式文档的目录（运行时控制根 + 旧根）。"""
+    seen: List[Path] = []
+    # 正式文档住在项目侧 routes/<R>/docs；控制根与旧根里也可能有历史副本。
+    for base in (project, control, project / rlp.LEGACY_STORAGE_ROOT):
+        candidate = base / "routes" / route / "docs"
+        if candidate.is_dir() and candidate not in seen:
+            seen.append(candidate)
+    return seen
+
+
+def doc_id_index(project: Path, control: Path, route: str) -> Dict[str, List[str]]:
+    """ID → 占用它的文件名（含 review 文档；不含 figures/ 等子目录）。"""
+    index: Dict[str, List[str]] = {}
+    for directory in doc_dirs(project, control, route):
+        for entry in sorted(directory.glob("*.md")):
+            match = DOC_ID_PREFIX.match(entry.name)
+            if not match:
+                continue
+            doc_id = match.group(1) + match.group(2)
+            index.setdefault(doc_id, [])
+            if entry.name not in index[doc_id]:
+                index[doc_id].append(entry.name)
+    return index
+
+
+def doc_id_conflicts(project: Path, control: Path, route: str) -> List[Dict[str, Any]]:
+    """同一 ID 被多个文件占用 —— 只有真正冲突才报。"""
+    conflicts = []
+    for doc_id, names in sorted(doc_id_index(project, control, route).items()):
+        if len(names) > 1:
+            conflicts.append({"id": doc_id, "route": route, "files": names})
+    return conflicts
+
+
+def next_doc_id(project: Path, control: Path, route: str) -> str:
+    """该路线下一个未占用的 ID（只读计算，不创建任何文件）。"""
+    used = [int(doc_id[1:]) for doc_id in doc_id_index(project, control, route)]
+    candidate = (max(used) + 1) if used else 1
+    if candidate > 999:
+        raise GuardEnvError(f"路线 {route} 的文档 ID 已用尽（超过 999）")
+    return f"{route}{candidate:03d}"
+
+
+def allocate_doc(project: Path, route: str, slug: str) -> Dict[str, Any]:
+    """用独占创建语义建一个新文档骨架。已存在就失败，绝不覆盖。"""
+    project = project.expanduser().resolve()
+    control = control_root(project)
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug):
+        raise GuardEnvError("slug 只能用小写字母、数字与连字符")
+    directories = doc_dirs(project, control, route)
+    directory = directories[0] if directories else control / "routes" / route / "docs"
+    directory.mkdir(parents=True, exist_ok=True)
+    for attempt in range(1000):
+        doc_id = next_doc_id(project, control, route)
+        target = directory / f"{doc_id}-{slug}.md"
+        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+        try:
+            handle = os.open(str(target), flags, 0o644)
+        except FileExistsError:
+            # 另一个会话刚好抢到同一个 ID：重新计算，绝不覆盖别人的文件
+            continue
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(
+                f"---\nid: {doc_id}\nroute: {route}\ntype: null\nsubtype: null\n"
+                f"status: draft\n---\n\n# {doc_id} \n\n")
+        return {"id": doc_id, "path": str(target), "created": True,
+                "attempts": attempt + 1}
+    raise GuardEnvError("连续 1000 次都拿不到空闲 ID，疑似并发写入失控")
 
 
 def xid_registered(project: Path, control: Path, route: str, xid: str) -> Tuple[bool, str]:
@@ -737,7 +819,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("action", choices=["preflight", "check", "audit", "selftest",
-                                           "list-kinds"])
+                                           "list-kinds", "doc-ids", "allocate"])
     parser.add_argument("--root", default=".")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--kind", choices=sorted(KINDS))
@@ -748,6 +830,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="正常通过时不打印任何内容（退出码不变，违规仍会打印）")
     parser.add_argument("--summary", action="store_true",
                         help="只打印一行汇总：block / warn 计数")
+    parser.add_argument("--route", help="doc-ids / allocate 使用的路线编号")
+    parser.add_argument("--slug", help="allocate 使用的小写 slug")
     args = parser.parse_args(argv)
 
     if args.action == "selftest":
@@ -781,6 +865,39 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    "by_code": counts, "findings": findings}
         report(payload, args, findings)
         return 3 if blocks else 0
+
+    if args.action in ("doc-ids", "allocate"):
+        if not args.route:
+            print("环境错误：需要 --route", file=sys.stderr)
+            return 4
+        try:
+            if args.action == "doc-ids":
+                index = doc_id_index(project, control, args.route)
+                conflicts = doc_id_conflicts(project, control, args.route)
+                payload = {"root": str(project), "route": args.route,
+                           "next": next_doc_id(project, control, args.route),
+                           "used": index, "conflicts": conflicts}
+                if args.json:
+                    print(json.dumps(payload, ensure_ascii=False, indent=2))
+                else:
+                    print(f"路线 {args.route}：下一个可用 ID {payload['next']}")
+                    for doc_id, names in sorted(index.items()):
+                        print(f"  {doc_id}  {', '.join(names)}")
+                    for conflict in conflicts:
+                        print(f"  [冲突] {conflict['id']}: {', '.join(conflict['files'])}")
+                return 3 if conflicts else 0
+            if not args.slug:
+                print("环境错误：allocate 需要 --slug", file=sys.stderr)
+                return 4
+            result = allocate_doc(project, args.route, args.slug)
+        except GuardEnvError as exc:
+            print(f"环境错误：{exc}", file=sys.stderr)
+            return 4
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"已创建 {result['id']}：{result['path']}")
+        return 0
 
     if args.action == "preflight" and not args.path:
         parser.error("preflight 至少需要一个 --path")

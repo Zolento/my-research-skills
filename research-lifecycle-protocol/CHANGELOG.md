@@ -1,10 +1,34 @@
 # Changelog — research-lifecycle-protocol
 
-本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.4.1**。
+本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.5.0**。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
+
+## 2.5.0 — 2026-11-21
+
+### Added
+
+- `scripts/doc_quality.py`：中文科研文档的类型感知质量检查协调层。按 frontmatter `type`
+  与文件名推断文档类型，输出 BLOCK / WARN / REVIEW_REQUIRED 三档；
+  支持 `check --path|--changed|--staged`、`compare --intent prose-only`、`selftest`。
+- 纯语言修改的受保护内容比对：公式、带单位数值、指标名、实验 ID、DOI 与 arXiv、
+  摘要值、路径、情态与限定、数据范围。
+- 预注册摘要核对（`DQ-10`）与不可解析时的 `REVIEW_REQUIRED`（`DQ-43`）。
+- `layout_guard.py doc-ids` / `allocate`：文档 ID 只读查询与 `O_EXCL` 独占创建。
+
+### Changed
+
+- 句子规则在整篇文档尺度上的分级对齐：分号、句长、名词化由 hard 改判 WARN；
+  套话仍为 BLOCK；宣传词降为 WARN（词表含「闭环」，在 MRI 与 ADMM 语境是术语）。
+- `references/writing-policy.md` 新增 §10「文档质量分级」；`references/project-layout.md`
+  §2.6 改为用工具分配 ID；`references/execution-checklist.md` 新增 §0 文档检查。
+- `release_check.py` 新增 Document quality 步骤，并把 `test_doc_quality.py` 纳入离线套件。
+
+### Docs
+
+- 新增 `docs/releases/v2.5.0.md`。
 
 ## 2.4.1 — 2026-11-21
 

@@ -55,7 +55,7 @@ npx skills add "Zolento/my-research-skills#<分支>@<skill>" -g -y
 ## 版本与发布
 
 每个 skill 的版本写在它自己 `SKILL.md` frontmatter 的 `metadata.version`（`research-lifecycle-protocol`
-当前为 **2.4.1**）。2.0.0 = 正式更名（原 `research-idea-pipeline`）+ MRI 重建领域协议；2.0.1 = 领域证据资格与执行链路修复；2.1.0 = 项目存储规范统一与安全迁移工具；2.1.1 = 迁移事务安全补丁（维护锁/源一致性/全量回滚守卫/文档提交事务）；2.2.0 = 上下文与架构优化（SKILL.md 156 KB→28 KB、三级加载、章节级加载、子 Agent 最小契约；科研规则不变）；2.3.0 = MRI 重建训练硬约束、项目 AGENTS.md 同步与执行前检查。2.3.1 = 统一 MRI 线圈合并口径，明确自监督训练与选模的边界。2.4.0 = 执行边界与目录合规分离（AGENTS.md 只写执行边界、`layout_guard.py` 执行 DI-1—DI-8、四层分工定稿）。2.4.1 = 历史保留迁移与迁移证据强制（存储完整性与科研合规解耦、四路 `verify` 信号、迁移证明材料强制）。
+当前为 **2.5.0**）。2.0.0 = 正式更名（原 `research-idea-pipeline`）+ MRI 重建领域协议；2.0.1 = 领域证据资格与执行链路修复；2.1.0 = 项目存储规范统一与安全迁移工具；2.1.1 = 迁移事务安全补丁（维护锁/源一致性/全量回滚守卫/文档提交事务）；2.2.0 = 上下文与架构优化（SKILL.md 156 KB→28 KB、三级加载、章节级加载、子 Agent 最小契约；科研规则不变）；2.3.0 = MRI 重建训练硬约束、项目 AGENTS.md 同步与执行前检查。2.3.1 = 统一 MRI 线圈合并口径，明确自监督训练与选模的边界。2.4.0 = 执行边界与目录合规分离（AGENTS.md 只写执行边界、`layout_guard.py` 执行 DI-1—DI-8、四层分工定稿）。2.4.1 = 历史保留迁移与迁移证据强制（存储完整性与科研合规解耦、四路 `verify` 信号、迁移证明材料强制）。2.5.0 = 中文科研文档的类型感知质量检查（`doc_quality.py` 三档分级、纯语言修改的受保护内容比对、文档 ID 独占创建）。
 机器协议 id 与旧项目运行目录保持兼容，见
 `research-lifecycle-protocol/references/identity-and-compatibility.md`。发布以**注释 tag** 标记，命名 `<component>/vX.Y.Z`，打在 merge 进 `main`
 的提交上；tag 消息里写清 merge commit、升级注意、验收读数与安装结果。

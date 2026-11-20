@@ -491,6 +491,22 @@ routes/<R>/docs/<被审ID>-review-r10.md    # 第 10 轮
 - 多代理并发时，序号分配必须**串行化**（见 §5）。
 - 不要手动跳号、不要复用已删除的号。
 
+**用工具分配，不要手算。** 手算加写盘之间有一个窗口，两个并行会话都读到 `max=8`
+就会都写 `F009`。真实事故已经发生过一次：第二个会话落盘时才发现 ID 被占，只能改号重写。
+
+```bash
+# 只读：看下一个可用 ID
+python3 scripts/layout_guard.py doc-ids --project <项目> --route F
+# 独占创建：O_CREAT|O_EXCL，撞车就自动换号，绝不覆盖既有文件
+python3 scripts/layout_guard.py allocate --project <项目> --route F --slug mist-inr-candidate
+```
+
+`doc-ids` 与 `allocate` 都以文件系统为唯一事实来源，不维护第二份 ID 登记表。
+`allocate` 只创建骨架文件（frontmatter + 空标题），正文由写入者填。
+
+`doc_quality.py check` 会重复检查同一路线的 ID 冲突（`DQ-05`，BLOCK），
+所以即使绕开 `allocate` 手写文件，冲突也会在检查时暴露。
+
 ---
 
 ## 3. 文档 frontmatter（必需）

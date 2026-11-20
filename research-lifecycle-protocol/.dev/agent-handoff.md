@@ -14,6 +14,35 @@
 
 下一轮只读预检不受影响。八切点崩溃注入矩阵的缺口仍按发布说明披露，不阻断预检。
 
+## 第四轮：v2.5.0 中文科研文档的类型感知质量检查（2026-11-21）
+
+### 读数
+
+- `release_check.py` PASS；离线 2530 tests（新增 `test_doc_quality.py` 43 例）。
+- 15 份真实 route F 文档：句子层原报 658 条 hard → `doc_quality.py` 判 2 条 BLOCK
+  （都是真实的跨路线裸文件名链接）、315 WARN、4 REVIEW_REQUIRED。
+
+### 判断
+
+- **D-16 分级以确认强度为准，不以严重度为准。** BLOCK 只放机器能确认的结构错误；
+  可读性归 WARN；科学判断归 REVIEW_REQUIRED。
+- **D-17 linter 的 hard 不等于门禁的 hard。** 整篇文档尺度上，分号与句长是 WARN；
+  套话仍为 BLOCK；「闭环」在 MRI 语境是术语，宣传词因此降级。
+- **D-18 纯语言修改是可执行承诺。** compare 抓公式、数值、指标、ID、DOI、摘要、路径、
+  情态、数据范围；用 mode 区分「伪装成润色的科学改动」与「已授权的科学修订」。
+- **D-19 ID 分配用 O_EXCL，不建第二套登记表。** `layout_guard.py allocate` 撞车自动换号。
+
+### 未做
+
+- 不改 R0—R14、Evidence Qualification、Outcome 门禁、Research State schema、真实实验冻结件。
+- 不做对话回复 linter，不碰三家 Hook。
+
+### 下一轮候选
+
+1. 把 `doc_quality.py check --staged` 接进真实项目的 pre-commit。
+2. F008 的两处跨路线链接按 `../../E/docs/` 修正（需项目侧决定）。
+3. 在 route F 上跑一次全量 `check`，把 REVIEW_REQUIRED 逐条过一遍。
+
 ## 第三轮：P0/P1 修复 + 迁移器加固 + 历史保留迁移（2026-11-20，2.4.0 之后）
 
 ### 读数
