@@ -1,5 +1,45 @@
 # Agent Handoff — research-lifecycle-protocol/dev（branch-local）
 
+## 最新一轮：v2.4.0 执行边界与目录合规分离（2026-11-20）
+
+**状态：开发完成，停在 dev 分支，未合并 main、未打 tag、未刷新全局安装。**
+
+### 交付
+
+| 件 | 说明 |
+|---|---|
+| `scripts/layout_guard.py` | DI-1—DI-8 的执行器：`preflight` / `check` / `audit` / `selftest`，退出码 0/3/4 |
+| `scripts/test_layout_guard.py` | 30 用例（允许/拒绝两侧、registry 两形状、XID 三来源、宽模式拒绝、审计分级） |
+| `templates/AGENTS.project.md` | 执行契约模板 6.7 KB，受控中文硬违规 0 |
+| `templates/layout-policy.template.json` | 路径例外骨架（窄模式 + 授权 + 复审条件） |
+| `references/project-layout.md` §0 | 四层分工、优先级拆分、`AGENTS.md` 边界与体量、guard 判定表 |
+| `references/invocation-prompts.md` | B0 增加 `layout_guard.py audit`（不自动整理目录） |
+| `references/project-intake.md` | 盘点第 2 步加路径审计 |
+| `release_check.py` | 新步骤 `Project layout guard` |
+| `docs/releases/v2.4.0.md` + `CHANGELOG.md` | 发布说明与条目；版本 2.4.0 全链一致 |
+
+### 读数
+
+- `release_check.py` **PASS**（25 步）；`test_layout_guard.py` 30 OK；`layout_guard selftest` 0。
+- 虚拟项目 `/home/lenovo/code/myproj/skills-dev/.rlp-lab/rlp-fixture` 端到端 0 failure
+  （clean audit / 6 preflight / check / state_check / render_status / resolve / MRI sync /
+  注入违规判 3 / 恢复判 0）。重建：`python3 .rlp-lab/build_fixture.py --verify`。
+- `AGENTS.md`：模板 6657 B；加 MRI 受管块 10037 B（warn 12000 / block 20480）。
+- 六个存量项目审计（只读）：`block` 合计 596 项，明细见 `.dev/layout-audit-2026-11-20.md`。
+
+### 设计判断
+
+见 [.dev/boundary-redesign.md](boundary-redesign.md) §4。要点：`AGENTS.md` 是执行边界而不是
+`layout.json` 的投影（D-1）；纯伴随/密度补偿禁令**留在项目**（D-3，残余风险已登记）；
+托管块保留但按 Skill 投影管理（D-4）；不提供 `agents_migrate.py`（D-6）。
+
+### 下一轮候选
+
+1. 逐项目处理 6 个存量项目的 `block`（需用户授权；先登记窄例外还是整改要分项目判断）。
+2. 把 `layout_guard.py check` 接进各项目 pre-commit（脚本已可用，强制与否归项目）。
+3. `research-idea-pipeline` 旧目录（skills-dev 根下）仍是 2.x 之前的残留，未处理。
+4. L0 仍 28.9 KB（上限 40 KB）；再加内容前先看 `docs/rule-relocation-matrix.md`。
+
 ## 最新一轮：v2.2.0 Context & Architecture Optimization（2026-11-10）
 
 **状态：开发完成，停在 dev 分支，未合并 main、未打 tag、未发布、未刷新全局安装。**

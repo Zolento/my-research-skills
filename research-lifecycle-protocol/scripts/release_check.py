@@ -106,6 +106,7 @@ EXPECTED_TEST_SUITES = (
     "test_l3_trust_boundary.py",
     "test_legacy_handoff.py",
     "test_literature_search.py",
+    "test_layout_guard.py",
     "test_loop_runtime_correctness.py",
     "test_policy_evolution.py",
     "test_policy_transfer.py",
@@ -1167,6 +1168,62 @@ def step_context_architecture() -> Tuple[bool, str]:
                   f"四入口可规划且 loaded/referenced 分离")
 
 
+def step_layout_guard() -> Tuple[bool, str]:
+    """Project layout gate: DI-1—DI-8 must be executable, not prose."""
+    import tempfile
+    root = pathlib.Path(__file__).resolve().parent.parent
+    guard = root / 'scripts' / 'layout_guard.py'
+    if not guard.is_file():
+        return False, 'scripts/layout_guard.py 缺失：DI-1—DI-8 退回散文'
+    code, output = _run([str(guard), 'selftest'])
+    if code != 0:
+        return False, f'layout_guard selftest 失败：{output.strip().splitlines()[-1:]}'
+    agents = root / 'templates' / 'AGENTS.project.md'
+    if not agents.is_file():
+        return False, 'templates/AGENTS.project.md 缺失'
+    if (root / 'templates' / 'AGENTS.md').exists():
+        return False, ('templates/AGENTS.md 会被 agent 运行时当成指令自动加载；'
+                       '模板必须用 .project.md 后缀')
+    policy = root / 'templates' / 'layout-policy.template.json'
+    if not policy.is_file():
+        return False, 'templates/layout-policy.template.json 缺失'
+    if json.loads(policy.read_text(encoding='utf-8'))['_schema'] != (
+            'research-idea-pipeline/project-layout-policy@1'):
+        return False, 'layout-policy 模板的 _schema 不是 project-layout-policy@1'
+    size = agents.stat().st_size
+    if size > 8_000:
+        return False, f'AGENTS.project.md 为 {size} B，超过 8000 B 的执行边界上限'
+    with tempfile.TemporaryDirectory() as tmp:
+        project = pathlib.Path(tmp) / 'proj'
+        (project / 'routes/A').mkdir(parents=True)
+        for name in ('README.md', 'STATUS.md', 'INDEX.md'):
+            (project / 'routes/A' / name).write_text('# A', encoding='utf-8')
+        control = project / '.research-lifecycle-protocol'
+        (control / 'routes/A/experiments/X021').mkdir(parents=True)
+        (control / 'routes/A/experiments/X021/preregistration.json').write_text(
+            '{}', encoding='utf-8')
+        (project / 'docs/refs').mkdir(parents=True)
+        (project / 'AGENTS.md').write_text('# 执行边界\n', encoding='utf-8')
+        code, output = _run([str(guard), 'audit', '--root', str(project)])
+        if code != 0:
+            return False, f'干净项目的 audit 应通过：{output.strip()[-200:]}'
+        (project / 'R9').mkdir()
+        (project / 'log').mkdir()
+        (control / 'routes/A/research-state.v1.json').write_text('{}', encoding='utf-8')
+        code, output = _run([str(guard), 'audit', '--root', str(project), '--json'])
+        if code != 3:
+            return False, f'含 DI-1/DI-3/ROOT-3 违规的项目必须判 3，实得 {code}'
+        payload = json.loads(output[output.index('{'):output.rindex('}') + 1])
+        missing = {'DI-1', 'DI-3', 'ROOT-3'} - set(payload.get('by_code', {}))
+        if missing:
+            return False, f'audit 漏报：{sorted(missing)}'
+        code, _ = _run([str(guard), 'preflight', '--root', str(project),
+                        '--path', 'routes/A/src/net.py'])
+        if code != 3:
+            return False, 'DI-6 违规路径必须被 preflight 拒绝'
+    return True, (f'layout_guard selftest 通过；模板 {size} B；审计分级与退出码 0/3 正确')
+
+
 def step_release_metadata() -> Tuple[bool, str]:
     """One release version across SKILL.md, both READMEs, CHANGELOG and the release notes."""
     import re
@@ -1300,6 +1357,7 @@ STEPS = (
     ("Domain Profiles（registry/契约文档/TAG 循环消费/DP·TG·MM selftests）", step_domain_profiles),
     ("Context 架构（依赖声明/章节索引/计划器/子 Agent 契约/L0 上限）",
      step_context_architecture),
+    ("Project layout guard（DI-1—DI-8 可执行/模板边界/审计分级）", step_layout_guard),
     ("Release metadata（版本一致性/Schema 版本隔离）", step_release_metadata),
 )
 

@@ -264,6 +264,7 @@ stop rules，并通过 planning 与 post-update Assurance；缺审计则 HOLD。
 **结论：第一次在本项目调用本 Skill 时，只允许执行下面这一个 Bootstrap 序列；不得自动跑 `R3`—`R14`。**
 ```text
 B0 Repo Intake              ─▶ 按 project-intake.md 盘点（已有信息不得重复询问）
+                               + layout_guard.py audit（布局漂移先记录，不擅自整理）
 B1 Existing Asset Discovery ─▶ 从已有代码 / 实验 / 文献 / 笔记中提取**真实**状态
 B2 Minimal R0 Contract      ─▶ 写 contract（+ 模板骨架，含 state_version: 0）
 B3 Bootstrap R1             ─▶ 建 World Model 骨架（**必须稀疏**）
@@ -271,6 +272,11 @@ B4 R2 Field Snapshot        ─▶ 领域地图快照（**不做穷尽检索**�
 B5 Initial Uncertainty Map  ─▶ 只在**有依据**时写 uncertainties[]
 B6 Recommend Next Action    ─▶ 给出下一步建议，**然后停下等用户确认**
 ```
+**B0 的路径审计。** 首次接管时运行
+`python3 scripts/layout_guard.py audit`（`--json` 可机器读）。`block` 项逐条记入盘点结果，
+**不自动整理目录**；`warn` 项记入根 `INDEX.md` 的 Warnings。布局合规不等于科学合法，
+审计结果不得用来代替证据资格判断。
+
 **MRI 重建项目的 B2 必做项。** B0 确认是 MRI 重建后，检查现有项目条款与
 [MRI 训练规则](../domain-profiles/mri-reconstruction/training-policy.md)的冲突。运行
 `python3 scripts/mri_training.py sync-agents <project>` 写入项目根 `AGENTS.md`，保留已有约定。

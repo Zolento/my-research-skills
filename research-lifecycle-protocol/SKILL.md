@@ -4,6 +4,7 @@ description: >-
   有状态的科学研究生命周期协议（Research Lifecycle Protocol，RLP）：以 Research State 为唯一
   科学事实源，运行 Discovery / Assurance 双循环（R0—R14，31 条机械硬规则），覆盖研究契约、
   文献与假设、证据资格、实验预注册与执行、对抗审查、状态回写、科研决策与长期自主探索。
+  项目组织规范由 `layout_guard.py` 机械执行（路径类型、route/XID 登记、`AGENTS.md` 边界）。
   可选的 MRI Reconstruction Domain Profile 增加自监督 MRI 的物理与信息边界、平凡归因守卫
   （TAG）和机制到方法搜索（MMS）。
   A stateful scientific research lifecycle protocol centered on a Research State: a dual
@@ -26,7 +27,7 @@ description: >-
 argument-hint: "<start-project|continue-research|explore|audit> [phase=R0..R14] [domain=mri-reconstruction] [writing=asd-ste100] [领域关键词 | idea | proposal | query]"
 metadata:
   author: research-lifecycle-protocol
-  version: "2.3.1"
+  version: "2.4.0"
   abbreviation: RLP
   upstream-spec: "有状态科学研究生命周期协议（Research Lifecycle Protocol）"
   legacy-name: research-idea-pipeline
@@ -189,6 +190,8 @@ canonical state。无法确定时按只读处理并提问。**资源与预算边
 - 迁移期间的写入入口受**协作式维护锁**保护。该锁**只**覆盖 RLP 自己的写入入口，不覆盖
   DSH Research Mesh worker、训练进程或第三方脚本。因此 `migrate --apply` 强制要求操作者
   确认外部写入者静止。
+- **项目根 `AGENTS.md` 只写执行边界**（入口、写入范围、文件归属、项目事实），不承载本协议
+  的规则副本；布局按它，门禁不按它。路径合规由 `layout_guard.py` 机械判定。
 - canonical state **就地覆盖**，不按阶段切分快照。
 - 历史记录（state 历史、冻结预注册、evidence、receipts、TAG 事件链、决策轨迹）**永不重写**，
   旧记录里的绝对路径**故意保留**。
@@ -412,7 +415,8 @@ R12 流程。汇报顺序与操作分类见
 `state_check.py`（S1—S7 + V1—V24）、`experiment_execute.py`（PEIG/AALG）、
 `evidence_outcome.py`、`prediction_compare.py`、`domain_guard.py` / `domain_profile.py` /
 `domain_mms.py`（DP/TG/MM）、`structural_equivalence_check.py`（EQ/NN）、
-`preset_router.py`、`rlp_paths.py`、`cognition.py`、`ste_lint_zh.py`。
+`preset_router.py`、`rlp_paths.py`、`cognition.py`、`ste_lint_zh.py`、
+`layout_guard.py`（DI-1—DI-8 路径合规）。
 
 ---
 

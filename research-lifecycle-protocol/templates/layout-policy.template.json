@@ -1,0 +1,16 @@
+{
+  "_schema": "research-idea-pipeline/project-layout-policy@1",
+  "_usage": "复制到 <项目根>/.research-lifecycle-protocol/project/layout-policy.json。只登记经用户批准的窄例外；模式必须窄（`paper/*.tex` 可以，`**/*.md`、`*.md`、绝对路径、`../` 一律被拒绝）。本文件不放行科研门禁，只影响 layout_guard.py 的路径判定。",
+  "approved_by": "<用户标识与日期，例如 user 2026-11-20>",
+  "reason": "<为什么需要这些例外；写不出理由就不要登记>",
+  "additional_paths": [
+    "paper/*.tex"
+  ],
+  "additional_doc_subdirs": [
+    "manuscript"
+  ],
+  "allow_top_level": [],
+  "agents_warn_bytes": 12000,
+  "agents_max_bytes": 20480,
+  "revisit": "<什么条件下应撤销这些例外>"
+}

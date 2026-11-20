@@ -38,7 +38,12 @@ suggestion). Policy: [references/preset-policy.md](references/preset-policy.md);
 | Loop-triggered recovery (7) | `evidence-conflict-repair`, `context-drift-recovery`, `memory-consolidation`, `resource-recovery`, `experiment-failure-recovery`, `loop-health-check`, `stagnation-breaker` | `continue-research` / `audit` |
 | Self-evolution (3) | `strategy-evolution`, `hypothesis-rebalance`, `discovery-replay` | `continue-research` / `explore` / `audit` |
 
-**Current release: v2.3.1** — MRI evaluation uses stored CSMs for conjugate-weighted coil combination. Self-supervised mask-split losses remain valid for parameter updates. Checkpoint selection uses full validation GT.
+**Current release: v2.4.0** — the execution boundary is separated from the protocol:
+project-root `AGENTS.md` carries entry points, write scope and file ownership only, while
+`scripts/layout_guard.py` enforces DI-1—DI-8 on real paths (13 path kinds, route/XID
+registration, flat `routes/<R>/docs/`, protected entries and symlink traversal, `AGENTS.md`
+size). Layout may yield to a project; gates may not. MRI evaluation still uses stored CSMs
+for conjugate-weighted coil combination, and checkpoint selection still uses full validation GT.
 
 MRI reconstruction follows a mandatory
 [training policy](domain-profiles/mri-reconstruction/training-policy.md). Bootstrap

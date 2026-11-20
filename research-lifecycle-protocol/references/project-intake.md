@@ -26,7 +26,9 @@
 1. **先确认项目主锚点**（[SKILL.md](../SKILL.md) §0.1）—— 未声明前不得开工，也**不得**用摸底结果
    替用户「定」锚点。
 2. **读根 `AGENTS.md`**（若存在）与根 `README.md` / `INDEX.md`，**并逐个校验其引用的路径是否存在**；
-   悬空引用记入根 `INDEX.md` 的 Warnings。
+   悬空引用记入根 `INDEX.md` 的 Warnings。同时跑一次
+   `python3 scripts/layout_guard.py audit`：`block` 项进盘点结果（**不自动整理目录**），
+   `warn` 项进根 `INDEX.md` 的 Warnings。
 3. **确定路线**（`routes/<R>`），读该路线的 `README.md` / `STATUS.md` / `INDEX.md`
    （身份证、当前状态、材料目录）。
 4. **按 §2 的九个维度盘点**，每条都写清三件事：**看什么 → 落到哪个字段 → 缺失时怎么办**。
