@@ -26,6 +26,25 @@
   §2.6 改为用工具分配 ID；`references/execution-checklist.md` 新增 §0 文档检查。
 - `release_check.py` 新增 Document quality 步骤，并把 `test_doc_quality.py` 纳入离线套件。
 
+### Fixed（发布前正确性审计）
+
+- **纯语言保护的四类漏检**：无单位数值（`PSNR 37.5`）、否定方向（`不支持` → `支持`）、
+  重复出现的受保护内容只改一处，此前都可能放行。受保护清单改为按出现次数比较，
+  并新增「否定方向」类别；`compare` 输出固定带 `semantic_review_required: true`，
+  明确它只证明字面没变。
+- **文档 ID 并发分配**：`O_EXCL` 只保护完整路径，两个进程仍可能拿到同一个 ID。
+  现在在控制根内的短时锁中完成「查号 → 选号 → 校验路径 → 建文件」，
+  并拒绝未注册路线、非法 slug 与不存在的 docs 目录（不再顺手建目录）。
+- **关联 review 被误判为 ID 冲突**：`F003-theory.md` 与 `F003-review-r01.md` 共存是合法布局。
+  现在只在两个主文档抢同一 ID、或同一轮 review 出现两份时报冲突；只有 review 没有主文档
+  时报需要人确认。review 占用的序号不会被重新发出。
+- **`allocate` 与 `preflight` 不一致**：分配器曾生成自由 slug 与 `type: null` 骨架，
+  两者都过不了 `preflight`。现在只接受 DI-8 枚举 slug，骨架写好 `type`，
+  `anchor` 固定拿 `<R>000`。既有自由 slug 规则未放宽。
+- **staged 的项目上下文**：不传 `--root` 时不再跳过项目级检查；链接目标按**索引**判定，
+  目标只在工作区（未 `git add`）或本次提交会删除时报 BLOCK，无法判定时报 REVIEW_REQUIRED；
+  代码围栏里的示例链接不再被当成真链接。
+
 ### Docs
 
 - 新增 `docs/releases/v2.5.0.md`。

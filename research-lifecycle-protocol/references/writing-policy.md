@@ -329,6 +329,10 @@ DOI 与 arXiv、摘要值、路径、情态与限定、数据范围。改动它�
 这不禁止改科学内容。任务本身就是科学修订时用 `--intent scientific-change`，或在明确
 授权下加 `--allow-scientific-change`。它禁止的是把科学改动伪装成语言润色。
 
+**这项检查只证明字面没变，不证明语义等价。** 同义改写、单位换算、条件挪位都可能
+绕过清单比对，所以 `compare` 的输出始终带 `semantic_review_required: true`，
+「仅改语言」的结论仍要人复核。
+
 ### 10.3 什么时候跑
 
 - 写或改正式文档之后：`doc_quality.py check --path <文件>`。

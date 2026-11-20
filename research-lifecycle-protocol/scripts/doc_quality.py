@@ -179,6 +179,14 @@ INLINE_MATH_RE = re.compile(r"(?<!\$)\$(?!\$)[^$\n]{1,200}\$(?!\$)")
 LINK_RE = re.compile(r"!?\[[^\]]*\]\([^)]*\)")
 
 
+def mask_code_only(text: str) -> str:
+    """只掩掉围栏代码与行内代码：示例里的链接不是真链接。"""
+    def blank(match: re.Match) -> str:
+        return re.sub(r"[^\n]", " ", match.group(0))
+    result = FENCE_RE.sub(blank, text)
+    return INLINE_CODE_RE.sub(blank, result)
+
+
 def mask(text: str) -> str:
     """把非散文内容替换成空格，保持长度与换行，行号仍然可用。"""
     def blank(match: re.Match) -> str:
@@ -308,6 +316,21 @@ def check_frontmatter(doc: Doc) -> List[Finding]:
     return findings
 
 
+REVIEW_NAME = re.compile(r"^[A-Z]\d{3}-review-r\d{2,3}\.md$")
+
+
+def check_review_identity(doc: Doc) -> List[Finding]:
+    """review 文件名与 `type` 必须一致：review 不能冒充主文档。"""
+    if not REVIEW_NAME.match(doc.path.name):
+        return []
+    declared = (doc.front.get("type") or "").strip().lower()
+    if declared in ("", "review"):
+        return []
+    return [Finding("DQ-47", WARN, doc.rel, 1,
+                    f"文件名是 review，但 frontmatter type 是 {declared}",
+                    "review 文档写 type: review；主文档换名字，不要靠 type 伪装")]
+
+
 def check_markdown(doc: Doc) -> List[Finding]:
     findings: List[Finding] = []
     fences = sum(1 for line in doc.lines if line.lstrip().startswith("```"))
@@ -325,10 +348,53 @@ def check_markdown(doc: Doc) -> List[Finding]:
     return findings
 
 
-def check_links(doc: Doc) -> List[Finding]:
+class LinkContext:
+    """链接目标的判定来源。
+
+    `worktree` 模式看文件系统；`staged` 模式看**索引**，因为只有进索引的东西才会进本次提交。
+    工作区里有、索引里没有的目标，提交出去就是坏链接。
+    """
+
+    def __init__(self, doc: Doc, repo: Optional[pathlib.Path] = None,
+                 staged: bool = False):
+        self.doc = doc
+        self.repo = repo
+        self.staged = staged
+
+    def state(self, path_part: str) -> Tuple[str, str]:
+        if not self.staged or self.repo is None:
+            target = (self.doc.path.parent / path_part)
+            return ("present", "") if target.exists() else ("absent", "")
+        import posixpath
+        try:
+            rel_doc = self.doc.path.resolve().relative_to(self.repo.resolve()).as_posix()
+        except ValueError:
+            return "unknown", "文档不在仓库内，无法判断提交内容"
+        rel_target = posixpath.normpath(posixpath.join(posixpath.dirname(rel_doc),
+                                                       path_part))
+        if rel_target.startswith("../"):
+            return "unknown", "链接指向仓库之外"
+        if _git_has(self.repo, f":{rel_target}"):
+            return "index", ""
+        if (self.repo / rel_target).exists():
+            return "worktree_only", rel_target
+        if _git_has(self.repo, f"HEAD:{rel_target}"):
+            return "head_only", rel_target
+        return "absent", rel_target
+
+
+def _git_has(repo: pathlib.Path, spec: str) -> bool:
+    proc = subprocess.run(["git", "cat-file", "-e", spec], capture_output=True,
+                          text=True, cwd=str(repo))
+    return proc.returncode == 0
+
+
+def check_links(doc: Doc, context: Optional[LinkContext] = None) -> List[Finding]:
     findings: List[Finding] = []
+    context = context or LinkContext(doc)
     anchors = {slugify(title) for _l, title, _n in headings(doc)}
-    for index, line in enumerate(doc.lines, start=1):
+    scan = mask_code_only(doc.text).split("\n")
+    for index, line in enumerate(scan, start=1):
         for match in re.finditer(r"!?\[[^\]]*\]\(([^)]+)\)", line):
             target = match.group(1).strip()
             if not target or target.startswith(("http://", "https://", "mailto:", "tel:")):
@@ -343,8 +409,23 @@ def check_links(doc: Doc) -> List[Finding]:
             path_part = target.split("#", 1)[0]
             if not path_part:
                 continue
-            resolved = (doc.path.parent / path_part).resolve()
-            if resolved.exists():
+            state, detail = context.state(path_part)
+            if state in ("present", "index"):
+                continue
+            if state == "worktree_only":
+                findings.append(Finding("DQ-45", BLOCK, doc.rel, index,
+                                        f"链接目标只存在于工作区，未纳入本次提交：{detail}",
+                                        "把目标文件一起 git add，或在提交前删掉这条链接"))
+                continue
+            if state == "head_only":
+                findings.append(Finding("DQ-45", BLOCK, doc.rel, index,
+                                        f"链接目标只在 HEAD 中，本次提交会删除它：{detail}",
+                                        "同一次提交里不要一边删目标一边引用它"))
+                continue
+            if state == "unknown":
+                findings.append(Finding("DQ-46", REVIEW, doc.rel, index,
+                                        f"无法确定链接目标是否在本次提交里（{detail}）：{path_part}",
+                                        "机器没确认的事不要当成已通过；人工核对后再提交"))
                 continue
             if "research-idea-pipeline" in path_part:
                 # 旧控制根里的证据是历史事实：迁移后目录可能已经不在，
@@ -603,45 +684,71 @@ def check_prose(doc: Doc) -> List[Finding]:
 # 纯语言修改：受保护内容比对
 # ---------------------------------------------------------------------------
 
+#: 受保护内容。**正则只能发现「字面变了」，不能证明语义等价**：同义改写、量纲换算、
+#: 条件挪位都可能让清单不变而含义改变。所以本模块的输出永远带 `semantic_review_required`。
 PROTECTED_PATTERNS: Tuple[Tuple[str, re.Pattern], ...] = (
-    ("公式", re.compile(r"\$\$.*?\$\$|\\\[.*?\\\]|\\\(.*?\\\)|\\begin\{[a-zA-Z*]+\}.*?\\end\{[a-zA-Z*]+\}|(?<!\$)\$(?!\$)[^$\n]{1,200}\$(?!\$)", re.S)),
-    ("带单位数值", re.compile(r"\d+(?:\.\d+)?\s*(?:dB|%|×|ms|GB|MB|KB|px|mm|cm|Hz|kHz|MHz|T\b|bit|bytes?)")),
+    ("公式", re.compile(
+        r"\$\$.*?\$\$|\\\[.*?\\\]|\\\(.*?\\\)|\\begin\{[a-zA-Z*]+\}.*?"
+        r"\\end\{[a-zA-Z*]+\}|(?<!\$)\$(?!\$)[^$\n]{1,200}\$(?!\$)", re.S)),
+    ("带单位数值", re.compile(
+        r"\d+(?:\.\d+)?\s*(?:dB|%|×|ms|GB|MB|KB|px|mm|cm|Hz|kHz|MHz|T\b|bit|bytes?)")),
+    # 小数与两位以上的整数：单个数字通常是枚举（第 3 节、3 个方法），不作数值保护。
+    ("裸数值", re.compile(r"(?<![\w.§v])(?:\d+\.\d+|\d{2,})(?![\w.])")),
     ("指标名", re.compile(r"\b(?:PSNR|SSIM|NMSE|NRMSE|FID|LPIPS|SNR|CNR)\b[\w().]*")),
     ("实验与文档 ID", re.compile(r"\b(?:X|E|F)\d{1,5}\b|DOC-\d+")),
     ("文献标识", re.compile(r"10\.\d{4,9}/[^\s，。；]+|arXiv:\s?\d{4}\.\d{4,5}")),
     ("摘要值", re.compile(r"\b[0-9a-f]{16,}\b")),
     ("路径", re.compile(r"`[^`\n]*[./][^`\n]*`")),
+    ("否定方向", re.compile(r"(?:不|未|无|非|没有|无法|不能)([\u4e00-\u9fff]{1,4})")),
     ("情态与限定", re.compile(r"必须|不得|仅|除非|当且仅当|至少|至多|总是|从不|保证|可能|约")),
     ("数据范围", re.compile(r"n\s*=\s*\d+|\d+\s*(?:例|个样本|卷|受试者|次运行)")),
 )
 
+#: 版本号与章节号不是实验数值：`v2.5.0`、`§3.2` 变了不算科学内容变化。
+VERSION_LIKE = re.compile(r"(?:\bv\d+(?:\.\d+)+|§\s?\d+(?:\.\d+)*)")
+
+
+def _strip_for_protection(text: str) -> str:
+    """去掉围栏代码、行内代码与 URL：这些位置的数字不是实验结果。"""
+    cleaned = FENCE_RE.sub(lambda match: "\n" * match.group(0).count("\n"), text)
+    cleaned = INLINE_CODE_RE.sub(lambda match: " " * len(match.group(0)), cleaned)
+    cleaned = re.sub(r"https?://\S+", lambda match: " " * len(match.group(0)), cleaned)
+    cleaned = VERSION_LIKE.sub(lambda match: " " * len(match.group(0)), cleaned)
+    return cleaned
+
 
 def extract_protected(text: str) -> Dict[str, List[str]]:
-    """抽出「仅改语言时不允许改变」的东西。逐类返回排好序的清单。"""
-    cleaned = FENCE_RE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    """抽出「仅改语言时不允许改变」的对象。
+
+    **保留重复**：同一个数值出现两次，改掉其中一次必须被发现，所以这里返回列表而不是集合。
+    """
+    cleaned = _strip_for_protection(text)
     result: Dict[str, List[str]] = {}
     for name, pattern in PROTECTED_PATTERNS:
-        items = sorted({re.sub(r"\s+", " ", match.group(0)).strip()
-                        for match in pattern.finditer(cleaned)})
+        items = sorted(re.sub(r"\s+", " ", match.group(0)).strip()
+                       for match in pattern.finditer(cleaned))
         if items:
             result[name] = items
     return result
 
 
 def compare_protected(before: str, after: str) -> List[Dict[str, Any]]:
-    """返回每类受保护内容的增删。空列表表示没有变化。"""
+    """返回每类受保护内容的增删（按出现次数比较，不看顺序）。"""
+    from collections import Counter
     left, right = extract_protected(before), extract_protected(after)
     diffs: List[Dict[str, Any]] = []
     for name in sorted(set(left) | set(right)):
-        old = left.get(name, [])
-        new = right.get(name, [])
-        if old == new:
+        old = Counter(left.get(name, []))
+        new = Counter(right.get(name, []))
+        removed = list((old - new).elements())
+        added = list((new - old).elements())
+        if not removed and not added:
             continue
-        diffs.append({
-            "category": name,
-            "removed": [item for item in old if item not in new][:8],
-            "added": [item for item in new if item not in old][:8],
-        })
+        diffs.append({"category": name,
+                      "removed": sorted(removed)[:8],
+                      "added": sorted(added)[:8],
+                      "removed_count": len(removed),
+                      "added_count": len(added)})
     return diffs
 
 
@@ -650,9 +757,11 @@ def compare_protected(before: str, after: str) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def lint_doc(doc: Doc, project_root: Optional[pathlib.Path],
-             *, prose: bool = True) -> List[Finding]:
+             *, prose: bool = True, link_context: Optional[LinkContext] = None
+             ) -> List[Finding]:
     findings: List[Finding] = []
-    for check in (check_frontmatter, check_markdown, check_links,
+    findings.extend(check_links(doc, link_context))
+    for check in (check_frontmatter, check_markdown, check_review_identity,
                   check_navigation, check_operational_log, check_results_first,
                   check_responsibility_mixing, check_redundancy, check_semantics):
         findings.extend(check(doc))
@@ -792,51 +901,53 @@ def render_human(reports: Sequence[Dict[str, Any]], stream) -> None:
 
 def command_check(args: argparse.Namespace) -> int:
     root = pathlib.Path(args.root).resolve() if args.root else pathlib.Path.cwd()
-    project = root if args.root else None
     repo = git_root(root)
-    targets: List[Tuple[pathlib.Path, Optional[List[Finding]]]] = []
+    # 不传 --root 时也要有项目上下文：staged / changed 模式下仓库根就是项目根的候选。
+    project = pathlib.Path(args.root).resolve() if args.root else (repo or root)
+    targets: List[Tuple[pathlib.Path, Optional[List[Finding]], bool]] = []
     if args.staged or args.changed:
         if repo is None:
             print("[env] 需要 Git 仓库才能做增量检查", file=sys.stderr)
             return EXIT_ENV
         for path in changed_docs(repo, staged=bool(args.staged)):
-            if not path.is_file() and not args.staged:
+            if not args.staged and not path.is_file():
                 continue
-            targets.append((path, baseline_for(repo, path, staged=bool(args.staged))))
+            targets.append((path, baseline_for(repo, path, staged=bool(args.staged)),
+                            bool(args.staged)))
     for raw in args.path:
         path = pathlib.Path(raw)
         path = path if path.is_absolute() else (root / path)
         if not path.is_file():
             print(f"[env] 文件不存在：{path}", file=sys.stderr)
             return EXIT_ENV
-        targets.append((path, None))
+        targets.append((path, None, bool(args.staged)))
     if not targets:
-        print(json.dumps({"_schema": SCHEMA, "status": "NO_TARGETS", "reports": []},
-                         ensure_ascii=False) if args.json else "没有要检查的文档")
+        payload = {"_schema": SCHEMA, "status": "NO_TARGETS", "reports": []}
+        print(json.dumps(payload, ensure_ascii=False) if args.json else "没有要检查的文档")
         return EXIT_OK
 
     reports: List[Dict[str, Any]] = []
-    for path, baseline in targets:
-        if args.staged:
-            rel = path.relative_to(repo).as_posix()
+    for path, baseline, staged in targets:
+        if staged:
             text = current_text(repo, path, staged=True)
             if text is None:
                 continue
-            doc = doc_from_text(text, path)
-            findings = lint_doc(doc, project, prose=not args.no_prose)
-            findings = subtract_findings(findings, baseline)
-            reports.append({"path": str(path), "kind": doc.kind or "unknown",
-                            "doc_id": doc.doc_id,
-                            "findings": [item.as_dict() for item in findings],
-                            "counts": summarize(findings)})
         else:
-            reports.append(report_for(path, project,
-                                      prose=not args.no_prose, baseline=baseline))
+            text = path.read_text(encoding="utf-8")
+        doc = doc_from_text(text, path)
+        context = LinkContext(doc, repo=repo if staged else None, staged=staged)
+        findings = lint_doc(doc, project, prose=not args.no_prose, link_context=context)
+        findings = subtract_findings(findings, baseline)
+        reports.append({"path": str(path), "kind": doc.kind or "unknown",
+                        "doc_id": doc.doc_id,
+                        "findings": [item.as_dict() for item in findings],
+                        "counts": summarize(findings)})
 
     blocks = sum(report["counts"].get(BLOCK, 0) for report in reports)
     payload = {"_schema": SCHEMA,
                "status": "BLOCK" if blocks else "OK",
-               "root": str(root),
+               "root": str(project),
+               "mode": "staged" if args.staged else ("changed" if args.changed else "path"),
                "counts": {BLOCK: sum(r["counts"].get(BLOCK, 0) for r in reports),
                           WARN: sum(r["counts"].get(WARN, 0) for r in reports),
                           REVIEW: sum(r["counts"].get(REVIEW, 0) for r in reports)},
@@ -869,12 +980,15 @@ def command_compare(args: argparse.Namespace) -> int:
         status = "PROSE_ONLY_OK"
     payload = {"_schema": SCHEMA, "command": "compare", "intent": args.intent,
                "status": status, "before": str(before), "after": str(after),
-               "protected_changes": diffs}
+               "protected_changes": diffs,
+               # 清单比对只能证明「字面没变」；同义改写、单位换算、条件挪位都可能绕过它。
+               "semantic_review_required": True,
+               "scope": "字面级检查：证明受保护对象没有被直接改写，不证明语义等价"}
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         if status == "PROSE_ONLY_OK":
-            print("仅改语言：受保护内容没有变化")
+            print("仅改语言：受保护对象的字面没有变化（语义等价仍需人工复核）")
         elif status == "SCIENTIFIC_CHANGE_ALLOWED":
             print("受保护内容有变化，且按明确授权放行：")
         for diff in diffs:
@@ -895,6 +1009,15 @@ def selftest() -> int:
     checks.append(("标题 slug", slugify("3.2 定理一：零初始化") != ""))
     diffs = compare_protected("必须达到 PSNR 32.5 dB", "须达到 PSNR 32.5 dB")
     checks.append(("纯语言改动识别", any("必须" in str(d["removed"]) for d in diffs)))
+    checks.append(("无单位数值改动", compare_protected("PSNR 37.5", "PSNR 38.5") != []))
+    checks.append(("否定方向改动",
+                   compare_protected("结果不支持假设", "结果支持假设") != []))
+    checks.append(("重复数值改一处",
+                   compare_protected("0.12 与 0.12", "0.12 与 0.13") != []))
+    checks.append(("句序与空白不算改动",
+                   compare_protected("A 句。B 句。", "B 句。\n\nA 句。") == []))
+    checks.append(("版本号与章节号不算数值",
+                   compare_protected("版本 v2.5.0 与 §3.2", "版本 v2.5.1 与 §3.3") == []))
     same = compare_protected("必须达到 PSNR 32.5 dB", "必须达到 PSNR 32.5 dB")
     checks.append(("相同文本无差异", same == []))
     failed = [name for name, ok in checks if not ok]

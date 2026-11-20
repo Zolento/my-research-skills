@@ -60,6 +60,9 @@ class Project:
         self.docs = self.control / "routes" / "F" / "docs"
         self.docs.mkdir(parents=True)
         (self.root / "INDEX.md").write_text("# 根索引\n", encoding="utf-8")
+        # 路线注册的既有判据：routes/<R>/README.md 存在（DI-4 三件套）
+        (self.root / "routes" / "F").mkdir(parents=True, exist_ok=True)
+        (self.root / "routes" / "F" / "README.md").write_text("# F\n", encoding="utf-8")
         (self.control / "routes" / "F" / "INDEX.md").write_text("# F 索引\n", encoding="utf-8")
 
     def write(self, name: str, body: str, **front) -> pathlib.Path:
@@ -300,7 +303,7 @@ class TestDocumentIds(DocQualityBase):
         existing = self.project.write("F009-mist-inr-candidate.md", "# F009 原始\n",
                                       type="proposal")
         before = existing.read_text(encoding="utf-8")
-        result = lg.allocate_doc(self.project.root, "F", "second-session")
+        result = lg.allocate_doc(self.project.root, "F", "theory")
         self.assertTrue(result["created"])
         self.assertNotEqual(pathlib.Path(result["path"]).name, existing.name)
         self.assertEqual(existing.read_text(encoding="utf-8"), before,
@@ -349,8 +352,8 @@ $$
     def test_rewriting_chinese_does_not_touch_math(self):
         path = self.mixed_doc()
         text = path.read_text(encoding="utf-8")
-        revised = text.replace("设 $x", "令 $x").replace("等价于不做 TV 正则",
-                                                        "等价于省略 TV 正则")
+        revised = text.replace("设 $x", "令 $x").replace("在 `configs/routes/F/npsf.yaml` 里把",
+                                                        "在 `configs/routes/F/npsf.yaml` 中把")
         target = self.base / "revised.md"
         target.write_text(revised, encoding="utf-8")
         _code, payload = run_json("compare", "--before", str(path), "--after",
@@ -422,7 +425,8 @@ class TestNegativeResults(DocQualityBase):
         _code, payload = run_json("compare", "--before", str(path), "--after",
                                   str(target), "--intent", "prose-only")
         self.assertEqual(payload["status"], "BLOCK")
-        self.assertEqual(payload["protected_changes"][0]["category"], "情态与限定")
+        categories = {item["category"] for item in payload["protected_changes"]}
+        self.assertTrue({"情态与限定", "否定方向"} & categories, categories)
 
 
 # ---------------------------------------------------------------------------
@@ -638,3 +642,373 @@ class TestCheckerInvariants(DocQualityBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# P0-A：纯语言修改的保护漏洞
+# ---------------------------------------------------------------------------
+
+class TestProseProtectionGaps(DocQualityBase):
+    """发布前审查发现的四类漏检。"""
+
+    def compare(self, before: str, after: str, *extra: str) -> tuple[int, dict]:
+        left = self.base / "before.md"
+        right = self.base / "after.md"
+        left.write_text(before, encoding="utf-8")
+        right.write_text(after, encoding="utf-8")
+        return run_json("compare", "--before", str(left), "--after", str(right),
+                        "--intent", "prose-only", *extra)
+
+    def test_a_bare_number_without_units_is_protected(self):
+        code, payload = self.compare("主实验的 PSNR 37.5 是本轮最好成绩。",
+                                     "主实验的 PSNR 38.5 是本轮最好成绩。")
+        self.assertEqual(code, 3)
+        self.assertEqual(payload["protected_changes"][0]["category"], "裸数值")
+
+    def test_a_removed_negation_is_protected(self):
+        code, payload = self.compare("结果不支持该假设。", "结果支持该假设。")
+        self.assertEqual(code, 3)
+        self.assertIn("否定方向", {item["category"] for item in payload["protected_changes"]})
+
+    def test_one_of_two_identical_values_changed_is_protected(self):
+        code, payload = self.compare("两个 seed 的误差都是 0.12。",
+                                     "两个 seed 的误差分别是 0.12 与 0.13。")
+        self.assertEqual(code, 3)
+        self.assertIn("可机械发现", "可机械发现")  # 说明性断言，保持可读
+        numeric = next(item for item in payload["protected_changes"]
+                       if item["category"] == "裸数值")
+        self.assertEqual(numeric["added"], ["0.13"])
+
+    def test_reordering_and_whitespace_is_not_a_change(self):
+        before = "第一条结论是零差异。第二条结论是样本有限。"
+        after = "第二条结论是样本有限。\n\n第一条结论是零差异。"
+        code, payload = self.compare(before, after)
+        self.assertEqual(code, 0, payload["protected_changes"])
+        self.assertEqual(payload["status"], "PROSE_ONLY_OK")
+
+    def test_an_authorised_scientific_edit_still_works(self):
+        code, payload = self.compare("PSNR 37.5", "PSNR 41.2",)
+        self.assertEqual(code, 3)
+        code, payload = self.compare("PSNR 37.5", "PSNR 41.2",
+                                     "--allow-scientific-change")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["status"], "SCIENTIFIC_CHANGE_ALLOWED")
+
+    def test_the_report_never_claims_semantic_equivalence(self):
+        _code, payload = self.compare("读数一致。", "读数完全相同。")
+        self.assertTrue(payload["semantic_review_required"])
+        self.assertIn("不证明语义等价", payload["scope"])
+
+
+# ---------------------------------------------------------------------------
+# P0-B：文档 ID 并发分配
+# ---------------------------------------------------------------------------
+
+CONCURRENT_ALLOCATOR = """
+import json, sys
+sys.path.insert(0, {scripts!r})
+import layout_guard as lg
+result = lg.allocate_doc({project!r}, "F", sys.argv[1])
+print(json.dumps(result))
+"""
+
+
+class TestConcurrentAllocation(DocQualityBase):
+
+    def spawn(self, slug: str) -> subprocess.Popen:
+        script = CONCURRENT_ALLOCATOR.format(scripts=str(SCRIPTS),
+                                             project=str(self.project.root))
+        return subprocess.Popen([sys.executable, "-c", script, slug],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def test_two_processes_with_different_slugs_get_different_ids(self):
+        processes = [self.spawn(slug) for slug in
+                     ("theory", "discovery", "evidence", "proposal")]
+        results = []
+        for process in processes:
+            out, err = process.communicate(timeout=60)
+            self.assertEqual(process.returncode, 0, err[-400:])
+            results.append(json.loads(out.strip().splitlines()[-1]))
+        ids = [item["id"] for item in results]
+        self.assertEqual(len(set(ids)), len(ids),
+                         f"并发分配出现重复 ID：{ids}（锁没有覆盖「查号→建文件」）")
+        for item in results:
+            self.assertTrue(pathlib.Path(item["path"]).is_file())
+
+    def test_the_lock_leaves_no_stale_state(self):
+        self.spawn("theory").communicate(timeout=60)
+        lock = self.project.control / lg.DOC_LOCK_NAME
+        if lock.is_file():
+            import fcntl
+            handle = os.open(str(lock), os.O_RDONLY)
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)   # 能拿到 = 没人持有
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                os.close(handle)
+
+    def test_an_unregistered_route_creates_nothing(self):
+        before = sorted(p.name for p in (self.project.root / "routes").iterdir())
+        with self.assertRaises(lg.GuardEnvError):
+            lg.allocate_doc(self.project.root, "Z", "theory")
+        self.assertEqual(sorted(p.name for p in (self.project.root / "routes").iterdir()),
+                         before)
+        self.assertFalse((self.project.root / "routes" / "Z").exists())
+
+    def test_an_illegal_slug_creates_nothing(self):
+        docs = self.project.control / "routes" / "F" / "docs"
+        before = sorted(p.name for p in docs.iterdir())
+        for slug in ("Bad Slug", "../escape", "UPPER", "", "a/b",
+                     "mist-inr-candidate"):
+            with self.assertRaises(lg.GuardEnvError):
+                lg.allocate_doc(self.project.root, "F", slug)
+        self.assertEqual(sorted(p.name for p in docs.iterdir()), before)
+
+    def test_a_route_without_a_docs_directory_is_refused(self):
+        (self.project.root / "routes" / "G").mkdir()
+        (self.project.root / "routes" / "G" / "README.md").write_text("# G\n",
+                                                                     encoding="utf-8")
+        with self.assertRaises(lg.GuardEnvError):
+            lg.allocate_doc(self.project.root, "G", "theory")
+        self.assertFalse((self.project.root / "routes" / "G" / "docs").exists())
+
+
+# ---------------------------------------------------------------------------
+# P0-C：关联 review 的合法 ID 复用
+# ---------------------------------------------------------------------------
+
+class TestLinkedReviews(DocQualityBase):
+
+    def seed(self, *names: str) -> list[pathlib.Path]:
+        return [self.project.write(name, f"# {name}\n\n正文。\n") for name in names]
+
+    def conflicts(self) -> list[dict]:
+        control = lg.control_root(self.project.root)
+        return lg.doc_id_conflicts(self.project.root, control, "F")
+
+    def test_a_main_doc_and_its_review_share_an_id_without_conflict(self):
+        self.seed("F003-theory.md", "F003-review-r01.md")
+        self.assertEqual(self.conflicts(), [])
+
+    def test_two_main_docs_with_the_same_id_still_conflict(self):
+        self.seed("F003-theory.md", "F003-discovery.md")
+        kinds = {item["kind"]: item for item in self.conflicts()}
+        self.assertIn("main_duplicate", kinds)
+        self.assertEqual(sorted(pathlib.Path(name).name for name in
+                                kinds["main_duplicate"]["files"]),
+                         ["F003-discovery.md", "F003-theory.md"])
+
+    def test_two_reviews_with_the_same_round_conflict(self):
+        """同一轮 review 出现在两个文档目录（项目侧与控制根副本）→ 冲突。"""
+        self.seed("F003-theory.md", "F003-review-r01.md")
+        mirror = self.project.root / "routes" / "F" / "docs"
+        mirror.mkdir(parents=True, exist_ok=True)
+        (mirror / "F003-review-r01.md").write_text("# 副本\n", encoding="utf-8")
+        kinds = {item["kind"]: item for item in self.conflicts()}
+        self.assertIn("review_duplicate", kinds)
+        self.assertEqual(kinds["review_duplicate"]["severity"], "block")
+
+    def test_a_review_without_its_main_doc_needs_confirmation(self):
+        self.seed("F003-review-r01.md")
+        kinds = {item["kind"]: item for item in self.conflicts()}
+        self.assertIn("review_without_main", kinds)
+        self.assertEqual(kinds["review_without_main"]["severity"], "warn")
+
+    def test_the_review_does_not_hide_the_id_from_allocation(self):
+        self.seed("F002-theory.md", "F002-review-r01.md")
+        control = lg.control_root(self.project.root)
+        self.assertEqual(lg.next_doc_id(self.project.root, control, "F"), "F003")
+
+    def test_a_review_alone_keeps_its_number_reserved(self):
+        self.seed("F004-review-r02.md")
+        control = lg.control_root(self.project.root)
+        self.assertEqual(lg.next_doc_id(self.project.root, control, "F"), "F005")
+
+    def test_a_review_may_not_pretend_to_be_a_main_document(self):
+        path = self.project.write("F003-review-r01.md", "# 评审\n", type="theory")
+        report = self.project.check(path)
+        self.assertIn("DQ-47", codes(report))
+
+    def test_doc_quality_does_not_flag_a_legitimate_review(self):
+        main = self.seed("F003-theory.md")[0]
+        self.seed("F003-review-r01.md")
+        report = self.project.check(main)
+        self.assertNotIn("DQ-05", codes(report))
+
+
+# ---------------------------------------------------------------------------
+# P1-D：staged 与项目上下文
+# ---------------------------------------------------------------------------
+
+class TestStagedContext(DocQualityBase):
+
+    def setUp(self):
+        super().setUp()
+        for command in (["git", "init", "-q"],
+                        ["git", "config", "user.email", "t@example.com"],
+                        ["git", "config", "user.name", "t"]):
+            subprocess.run(command, cwd=str(self.project.root), check=True)
+        self.doc = self.project.write("F001-evidence.md", "# F001\n\n正文。\n",
+                                      type="evidence")
+        subprocess.run(["git", "add", "-A"], cwd=str(self.project.root), check=True)
+        subprocess.run(["git", "commit", "-qm", "init"], cwd=str(self.project.root),
+                       check=True)
+
+    def stage(self, *paths: pathlib.Path) -> None:
+        subprocess.run(["git", "add", *map(str, paths)], cwd=str(self.project.root),
+                       check=True)
+
+    def test_staged_check_works_without_an_explicit_root(self):
+        self.doc.write_text("---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n见 [丢失](gone.md)。\n", encoding="utf-8")
+        self.stage(self.doc)
+        proc = subprocess.run([sys.executable, str(SCRIPTS / "doc_quality.py"),
+                               "check", "--staged", "--json"],
+                              capture_output=True, text=True, cwd=str(self.project.root))
+        payload = json.loads(proc.stdout)
+        self.assertEqual(payload["counts"]["BLOCK"], 1, payload)
+        self.assertIn("DQ-06", codes(payload))
+
+    def test_a_target_only_in_the_worktree_blocks_the_commit(self):
+        """目标只存在于工作区、没有进索引：提交出去就是坏链接。"""
+        target = self.project.control / "routes" / "F" / "docs" / "F000-anchor.md"
+        target.write_text("# F000\n", encoding="utf-8")
+        self.doc.write_text("---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n见 [锚点](F000-anchor.md)。\n", encoding="utf-8")
+        self.stage(self.doc)
+        code, payload = run_json("check", "--staged", "--root", str(self.project.root))
+        self.assertEqual(code, 3)
+        self.assertIn("DQ-45", codes(payload))
+        self.assertIn("只存在于工作区", findings(payload, "DQ-45")[0]["message"])
+        self.assertTrue(target.is_file())
+
+    def test_a_target_staged_together_is_accepted(self):
+        target = self.project.write("F000-anchor.md", "# F000\n", type="anchor")
+        self.doc.write_text("---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n见 [锚点](F000-anchor.md)。\n", encoding="utf-8")
+        self.stage(self.doc, target)
+        code, payload = run_json("check", "--staged", "--root", str(self.project.root))
+        self.assertEqual(code, 0, payload)
+        self.assertNotIn("DQ-45", codes(payload))
+
+    def test_a_target_deleted_by_this_commit_is_reported(self):
+        target = self.project.write("F000-anchor.md", "# F000\n", type="anchor")
+        self.stage(target)
+        subprocess.run(["git", "commit", "-qm", "add anchor"], cwd=str(self.project.root),
+                       check=True)
+        target.unlink()
+        self.doc.write_text("---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n见 [锚点](F000-anchor.md)。\n", encoding="utf-8")
+        self.stage(self.doc, target)
+        code, payload = run_json("check", "--staged", "--root", str(self.project.root))
+        self.assertEqual(code, 3)
+        self.assertIn("DQ-45", codes(payload))
+        self.assertIn("会删除", findings(payload, "DQ-45")[0]["message"])
+
+    def test_links_inside_code_fences_are_not_real_links(self):
+        self.doc.write_text(
+            "---\nid: F001\nroute: F\ntype: evidence\nstatus: draft\n---\n\n```markdown\n见 [示例](not-a-real-file.md)。\n```\n\n正文结束。\n",
+            encoding="utf-8")
+        code, payload = run_json("check", "--path", str(self.doc), "--root",
+                                 str(self.project.root))
+        self.assertNotIn("DQ-06", codes(payload))
+        self.assertEqual(code, 0, payload)
+
+    def test_staged_document_ids_are_checked_against_the_project(self):
+        other = self.project.write("F001-other.md", "# F001\n", type="evidence")
+        self.stage(other)
+        code, payload = run_json("check", "--staged", "--root", str(self.project.root))
+        self.assertEqual(code, 3)
+        self.assertIn("DQ-05", codes(payload))
+
+
+# ---------------------------------------------------------------------------
+# 二、门禁一致性
+# ---------------------------------------------------------------------------
+
+class TestGateConsistency(DocQualityBase):
+
+    def test_an_allocated_document_passes_preflight(self):
+        result = lg.allocate_doc(self.project.root, "F", "theory")
+        rel = pathlib.Path(result["path"]).relative_to(self.project.root).as_posix()
+        code, payload = subprocess.run(
+            [sys.executable, str(SCRIPTS / "layout_guard.py"), "preflight",
+             "--root", str(self.project.root), "--path", rel, "--json"],
+            capture_output=True, text=True).returncode, None
+        self.assertEqual(code, 0, "allocate 创建的正式文档必须能过同版本 preflight")
+
+    def test_doc_quality_and_layout_guard_agree_on_a_legal_document(self):
+        path = self.project.write("F001-anchor.md", "# F001\n\n## 1 目标\n\n结论明确。\n",
+                                  type="anchor")
+        report = self.project.check(path)
+        self.assertEqual(report["counts"]["BLOCK"], 0)
+        rel = path.relative_to(self.project.root).as_posix()
+        code = subprocess.run(
+            [sys.executable, str(SCRIPTS / "layout_guard.py"), "preflight",
+             "--root", str(self.project.root), "--path", rel, "--quiet"],
+            capture_output=True, text=True).returncode
+        self.assertEqual(code, 0)
+
+    def test_audit_accepts_a_project_whose_documents_were_allocated(self):
+        (self.project.root / "routes" / "F" / "STATUS.md").write_text("# F 状态\n",
+                                                                    encoding="utf-8")
+        (self.project.root / "routes" / "F" / "INDEX.md").write_text("# F 索引\n",
+                                                                   encoding="utf-8")
+        state = self.project.control / "routes" / "F" / "research-state.json"
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text('{"state_version": 1}\n', encoding="utf-8")
+        lg.allocate_doc(self.project.root, "F", doc_type="anchor")
+        lg.allocate_doc(self.project.root, "F", doc_type="theory")
+        code = subprocess.run(
+            [sys.executable, str(SCRIPTS / "layout_guard.py"), "audit",
+             "--root", str(self.project.root), "--summary"],
+            capture_output=True, text=True).returncode
+        self.assertEqual(code, 0, "分配出来的文档不应让 audit 判 BLOCK")
+
+    def test_the_free_slug_is_the_existing_rule_not_a_new_one(self):
+        """既有 DI-8 允许 <R><NNN>-<任意小写 slug>；这里只验证不冲突，不放宽也不收紧。"""
+        path = self.project.write("F009-mist-inr-candidate.md", "# F009\n", type="proposal")
+        report = self.project.check(path)
+        self.assertEqual(report["counts"]["BLOCK"], 0)
+        rel = path.relative_to(self.project.root).as_posix()
+        code = subprocess.run(
+            [sys.executable, str(SCRIPTS / "layout_guard.py"), "preflight",
+             "--root", str(self.project.root), "--path", rel, "--quiet"],
+            capture_output=True, text=True).returncode
+        self.assertEqual(code, 0)
+
+
+# ---------------------------------------------------------------------------
+# 二（续）：allocate 与 preflight 的枚举一致性
+# ---------------------------------------------------------------------------
+
+class TestAllocateMatchesPreflight(DocQualityBase):
+
+    def preflight(self, rel: str) -> int:
+        return subprocess.run(
+            [sys.executable, str(SCRIPTS / "layout_guard.py"), "preflight",
+             "--root", str(self.project.root), "--path", rel, "--quiet"],
+            capture_output=True, text=True).returncode
+
+    def test_a_free_slug_is_refused_because_preflight_rejects_it(self):
+        """自由 slug 能过 audit，但过不了 preflight；分配器不造这种文件。"""
+        with self.assertRaises(lg.GuardEnvError) as caught:
+            lg.allocate_doc(self.project.root, "F", "mist-inr-candidate")
+        self.assertIn("DI-8 枚举", str(caught.exception))
+
+    def test_an_allocated_theory_document_passes_preflight(self):
+        result = lg.allocate_doc(self.project.root, "F", doc_type="theory")
+        rel = pathlib.Path(result["path"]).relative_to(self.project.root).as_posix()
+        self.assertEqual(self.preflight(rel), 0)
+
+    def test_the_anchor_gets_id_000_and_only_one_is_allowed(self):
+        first = lg.allocate_doc(self.project.root, "F", doc_type="anchor")
+        self.assertEqual(first["id"], "F000")
+        rel = pathlib.Path(first["path"]).relative_to(self.project.root).as_posix()
+        self.assertEqual(self.preflight(rel), 0)
+        with self.assertRaises(lg.GuardEnvError):
+            lg.allocate_doc(self.project.root, "F", doc_type="anchor")
+
+    def test_the_skeleton_reports_its_type(self):
+        result = lg.allocate_doc(self.project.root, "F", doc_type="experiment-plan")
+        text = pathlib.Path(result["path"]).read_text(encoding="utf-8")
+        self.assertIn("type: experiment-plan", text)
+        code, payload = run_json("check", "--path", result["path"], "--root",
+                                 str(self.project.root))
+        self.assertNotIn("DQ-01", codes(payload))
