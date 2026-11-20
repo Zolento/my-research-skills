@@ -22,20 +22,72 @@ XID 注册、`docs/decisions/` 决策记录、路由注册表与 Git 边界。
 
 ---
 
-## 0. AGENTS.md 优先原则（最高优先级）
+## 0. 四层分工：谁拥有什么（最高优先级）
 
-**开工前第一件事：检查项目根目录是否存在 `AGENTS.md`。**
+**开工前第一件事：读项目根 `AGENTS.md`（若存在），并跑一次路径审计。**
+但「读它」不等于「它是规则的来源」。v2.4.0 起，四层各管一件事，不得互相代写：
 
-| 情况 | 行为 |
+| 层 | 载体 | 只管 | 不得承载 |
+|---|---|---|---|
+| **执行边界** | 项目根 `AGENTS.md` | 入口、写入范围、文件归属、交付检查、项目事实 | R 阶段流程、state schema、证据等级、指标公式 |
+| **科研生命周期** | 本 Skill（`SKILL.md` + `references/`） | R0—R14、state、证据资格、审查与决策门禁 | 某个项目的路径与服务器事实 |
+| **具体实验** | 项目契约 + 预注册 + 冻结配置 | 数据划分、判据、预算、指标实现 | 跨项目通用规则 |
+| **目录合规** | [`scripts/layout_guard.py`](../scripts/layout_guard.py) | DI-1—DI-8 的机械判定 | 科学有效性（不是它的职责） |
+
+**为什么必须这样分：** v2.3.1 之前，`AGENTS.md` 既是项目事实的载体，又是本文件规则的副本，
+而优先级规则让副本胜出 —— 于是 DI-1—DI-8 在每个有 `AGENTS.md` 的项目里都退化为建议。
+实测六个真实项目全部漂移：未声明顶层目录、`log/` 与 `logs/` 并存、路线控制目录里 31 份
+`research-state.*.json`、`routes/<R>/docs/figures/`、缺 `STATUS.md`。
+
+### 0.1 优先级：布局可以让，门禁不能让
+
+| 冲突类型 | 裁决 |
 |---|---|
-| 存在 `AGENTS.md` | **遵循它的约定**；与本文件冲突时以 `AGENTS.md` 为准（用户显式约定 > Skill 默认） |
-| 不存在 | 使用本文件的默认约定 |
+| 用户当前指令 | 最高 |
+| 已冻结实验协议 | 高于本文件默认布局 |
+| `AGENTS.md` 声明的布局与写入范围 | 高于本文件默认布局 |
+| **RLP 状态转换、证据资格、强制门禁** | **不受上述顺序影响**；`AGENTS.md` 不能豁免 |
+| `AGENTS.md` 与本文件**重复记述同一条规则** | 视为 `AGENTS.md` 的内容错误：删副本，留指针 |
+
+`AGENTS.md` 里能改的只有「这个项目把东西放哪、谁可以写」；不能改的是「claim 状态怎么升、
+证据要什么资格、实验要不要预注册」。
+
+### 0.2 `AGENTS.md` 的内容边界与体量
+
+采用 [templates/AGENTS.project.md](../templates/AGENTS.project.md)（≤ 6.6 KB）。它只写六节：
+四层分工 / 启动与权威 / 路径与文件归属 / 执行闭环 / 权限与协作 / MRI 受管条款 + 项目配置。
+
+- **体量**：超过 10 KB 审计告警，超过 20 KB 判违规（`AGENTS-1`）。
+  `layout-policy.json` 的 `agents_max_bytes` 可调，但调高必须写理由。
+- **受管块**：MRI 训练硬约束由 `scripts/mri_training.py sync-agents` 写入并校验 SHA，
+  **手改即违规**。它是 Skill 的投影，不是 `AGENTS.md` 的内容。
+- **模板不得命名为 `AGENTS.md`**：模板放 `templates/AGENTS.project.md`。
+  叫 `AGENTS.md` 会被各 agent 运行时当作指令自动加载，等于给每个会话注入一份未填的项目契约。
+
+### 0.3 路径合规由 `layout_guard.py` 判定
+
+```bash
+python3 scripts/layout_guard.py preflight --kind route-doc --path routes/A/docs/A003-proposal.md
+python3 scripts/layout_guard.py check          # Git 新增/暂存新增
+python3 scripts/layout_guard.py audit          # 全树审计，block / warn 分级
+python3 scripts/layout_guard.py selftest
+```
+
+判定的十项：路径类型（13 类 kind）、route 是否登记、XID 是否登记（预注册 / manifest /
+canonical state 三处之一）、`routes/<R>/docs/` 扁平、`docs/` 不得放路线文档、
+`results|logs|checkpoints` 只收裸 XID、`experiments/` 只收三个登记文件、软链接穿越、
+受保护入口（`dataset/` `store/` `.git/` 旧控制根）、`AGENTS.md` 体量。
+
+**例外只能登记在 `.research-lifecycle-protocol/project/layout-policy.json`**（模板见
+[templates/layout-policy.template.json](../templates/layout-policy.template.json)）：
+模式必须窄（`paper/*.tex` 可以；`**/*.md`、`*.md`、绝对路径、`../`、`dataset/*`
+一律被拒绝，退出码 4），必须写授权人与理由。**宽模式等于关掉保护。**
+
+**这只是路径门禁。** 它不判断科学有效性、不判断证据资格、不做沙箱隔离；
+科研门禁仍归 `state_check.py` / `experiment_execute.py` / `evidence_outcome.py`。
 
 MRI 重建项目启动时须将[MRI 训练硬约束](../domain-profiles/mri-reconstruction/training-policy.md)
 同步到项目根 `AGENTS.md`。若既有条款或冻结协议冲突，向用户报告并暂停受影响训练。
-
-`AGENTS.md` 规定的典型内容：目录结构、命名规则、公用代码放哪、测试与提交规范、
-哪些目录由谁写。**多代理/多人协作时，它是唯一的共享契约**——所有成员先读后写。
 
 ---
 
@@ -842,13 +894,16 @@ X021  ⟷  experiments/A/X021-identifiability/
 5. 写 `.research-lifecycle-protocol/project/route-registry.json`（见 §8.1），
    每条路线记 `{name, path, status, primary, parent, forked_from}`。
 
-**每次开工前的契约检查（`AGENTS.md`）：**
+**每次开工前的契约检查（`AGENTS.md` + 路径门禁）：**
 
-1. 读根 `AGENTS.md`（若存在）—— 布局 / 命名 / 公用约定优先于本 Skill 默认约定。
+0. **跑路径审计**：`python3 scripts/layout_guard.py audit`（存量项目首轮必跑）。
+   `block` 级违规当轮改正或登记窄例外；`warn` 级记入根 `INDEX.md` 的 Warnings 待处理。
+1. 读根 `AGENTS.md`（若存在）—— 只采纳它的**布局、写入范围与项目事实**；
+   它若复述了本文件的规则，以本文件为准，并把副本改成指针。
 2. **校验它引用的文件是否都存在**：逐个确认 `AGENTS.md` 里提到的路径。
    **缺失项记入根 `INDEX.md` 的 Warnings**（悬空引用会让"按 AGENTS.md 办"直接失效）。
-3. 若 `AGENTS.md` 的**纪律性条款**与本路线锚定契约冲突，按 `SKILL.md` §0 的裁决规则处理：
-   **纪律性条款优先**，冲突走锚点变更单或重新定位，**不得用路线自述的 `core_goal` 抵消它**。
+3. 若 `AGENTS.md` 的**布局条款**与本路线锚定契约冲突，按 §0.1 的裁决处理：
+   **布局可以让，门禁不能让**；改锚点仍走锚点变更单，**不得用路线自述的 `core_goal` 抵消它**。
 
 **每次新增 / 替换 / 删除 PDF 时：**
 
@@ -888,8 +943,9 @@ X021  ⟷  experiments/A/X021-identifiability/
    `.research-lifecycle-protocol/routes/<R>/experiments/<XID>/preregistration.json` 冻结
    `Outcome → state_delta`，之后不得追改。
 
-**自检：**
+**自检（可机械执行的部分直接跑脚本）：**
 
+- `python3 scripts/layout_guard.py audit` 的 `block` 为 0（或每个例外都有 `layout-policy.json` 条目）；
 - INDEX 里的每个链接都指向真实存在的文件；
 - **每条路线下的文档 ID 前缀与该路线字母一致**（`routes/B/docs/` 下不得出现 `A0xx`）；
 - **根 `docs/` 下没有路线文档**（至少含 `refs/`、`decisions/`；其他共享子目录按 `AGENTS.md`）；

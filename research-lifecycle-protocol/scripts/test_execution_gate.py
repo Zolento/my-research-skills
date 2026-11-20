@@ -63,6 +63,28 @@ def managed_run(s,x,m,receipt,ledger,**kwargs):
     return ex.run(s,x,m,receipt,ledger,scheduler=scheduler_for(s),**kwargs)
 
 
+
+def full_report(**overrides):
+    """Contract v1.0 §10 要求的训练前报告字段（含两种合法选模模式）。"""
+    report = {
+        "budget": "32 optimizer steps",
+        "learning_rate": "3e-3, warmup 3000, StepLR gamma 0.8",
+        "optimizer": "Adam, weight_decay=0",
+        "input": "[B,C,H,W] complex k-space, per-slice column mask",
+        "output": "[B,H,W] complex image",
+        "mask": "per-slice; 2D Cartesian column (W) sampling, ACS 4x4",
+        "csm": {"mode": "dataset_stored", "source": "csmslice field in dataset",
+                "sample_identity": "subject/volume/slice/acquisition"},
+        "normalization": "measurement-only training; GT RMS paired evaluation",
+        "checkpoint": "best_val + latest",
+        "report_ref": "docs/dev/training-report-2026-11-20.md",
+        "selection": "full_val_gt",
+        "best_val_metric": "complex_NMSE",
+    }
+    report.update(overrides)
+    return report
+
+
 class PEIGTests(unittest.TestCase):
     def setUp(self): self.s=fixture()['state'];self.x=self.s['experiments'][-1];self.p=self.x['execution_protocol']
     def gate(self): return eg.peig(self.s,self.x['id'])
@@ -267,12 +289,7 @@ class ExecutionTests(unittest.TestCase):
 
         config_path = self.root / "config.json"
         config = json.loads(config_path.read_text())
-        config["mri_training"] = {
-            "budget": "32 optimizer steps", "learning_rate": "0.0001",
-            "optimizer": "Adam", "input": "320×320 multicoil k-space",
-            "output": "320×320 complex image", "selection": "full_val_gt",
-            "best_val_metric": "NMSE",
-        }
+        config["mri_training"] = full_report()
         config_path.write_text(json.dumps(config))
         protocol = self.x["execution_protocol"]
         protocol["scientific_review"]["execution_digest"] = ex.execution_review_digest(
@@ -314,6 +331,110 @@ class ExecutionTests(unittest.TestCase):
         code, result = launch("run", "--receipt", str(receipt_path))
         self.assertEqual(code, 3, result)
         self.assertIn("MRI_TRAINING_AGENTS", result["errors"][0])
+
+    def test_mri_gt_free_frozen_training_is_legal(self):
+        """Contract v1.0 §2.3：合法 GT-free 冻结选模必须在真实执行路径上通过。
+
+        v2.3.1 把 `selection == "full_val_gt"` 写死，用户批准的 GT-free 方案文档加了也跑不起来。
+        这条测试走 `issue` 的真实入口，不从侧面调用校验函数。
+        """
+        state_path = self.root / ".research-lifecycle-protocol/routes/R001/research-state.json"
+        state_path.parent.mkdir(parents=True)
+        manifest_path = self.root / "manifest.json"
+        manifest_path.write_text(json.dumps(self.manifest))
+        scheduler_path = self.root / "scheduler.json"
+        scheduler_path.write_text(json.dumps(scheduler_for(self.s)))
+        receipt_path = self.root / "receipt.json"
+
+        def launch(command, *args):
+            proc = subprocess.run([
+                sys.executable, str(ROOT / "scripts/experiment_execute.py"), command,
+                "--state", str(state_path), "--experiment", self.x["id"],
+                "--manifest", str(manifest_path), "--scheduler", str(scheduler_path),
+                "--ledger", str(self.root / "ledger"), *args,
+            ], capture_output=True, text=True)
+            return proc.returncode, json.loads(proc.stdout)
+
+        (self.root / "AGENTS.md").write_text("# 项目自己的约定\n", encoding="utf-8")
+        subprocess.run([sys.executable, str(ROOT / "scripts/mri_training.py"), "sync-agents",
+                        str(self.root)], capture_output=True, check=True)
+        (self.root / "prereg").mkdir()
+        (self.root / "prereg/holdout-selection.md").write_text("# 冻结方案\n", encoding="utf-8")
+
+        config_path = self.root / "config.json"
+        config = json.loads(config_path.read_text())
+        config["mri_training"] = full_report(
+            selection="gt_free_frozen",
+            selection_metric="lambda_holdout_nmse",
+            metric_direction="minimize",
+            metric_source="mask-split holdout measurements",
+            selection_scope="full val without GT",
+            stop_rule="no improvement in 10 epochs",
+            selection_source_ref="prereg/holdout-selection.md",
+        )
+        config["mri_training"].pop("best_val_metric")
+        config_path.write_text(json.dumps(config))
+
+        protocol = self.x["execution_protocol"]
+        protocol["scientific_review"]["execution_digest"] = ex.execution_review_digest(
+            self.s, self.x, self.manifest
+        )
+        state_path.write_text(json.dumps(self.s))
+
+        domain = state_path.parent / "domain/mri-reconstruction.json"
+        domain.parent.mkdir()
+        domain.write_text(json.dumps({
+            "gt": {"available": False, "usage": "none"},
+            "model_selection": {"protocol": "gt_free_frozen", "uses_gt": False,
+                                "uses_loss_measurements": False,
+                                "metric": "lambda_holdout_nmse", "direction": "minimize"},
+        }))
+        code, result = launch("issue", "--output", str(receipt_path))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(launch("run", "--receipt", str(receipt_path))[0], 0)
+
+    def test_mri_gt_free_without_frozen_scheme_is_rejected(self):
+        """GT-free 但没冻结方案：必须拒绝，不能静默回退到训练损失或 GT。"""
+        state_path = self.root / ".research-lifecycle-protocol/routes/R001/research-state.json"
+        state_path.parent.mkdir(parents=True)
+        manifest_path = self.root / "manifest.json"
+        manifest_path.write_text(json.dumps(self.manifest))
+        scheduler_path = self.root / "scheduler.json"
+        scheduler_path.write_text(json.dumps(scheduler_for(self.s)))
+        receipt_path = self.root / "receipt.json"
+        (self.root / "AGENTS.md").write_text("# 项目自己的约定\n", encoding="utf-8")
+        subprocess.run([sys.executable, str(ROOT / "scripts/mri_training.py"), "sync-agents",
+                        str(self.root)], capture_output=True, check=True)
+
+        config_path = self.root / "config.json"
+        config = json.loads(config_path.read_text())
+        report = full_report(selection="gt_free_frozen",
+                             selection_metric="lambda_holdout_nmse",
+                             metric_direction="minimize")
+        report.pop("best_val_metric")
+        config["mri_training"] = report
+        config_path.write_text(json.dumps(config))
+        protocol = self.x["execution_protocol"]
+        protocol["scientific_review"]["execution_digest"] = ex.execution_review_digest(
+            self.s, self.x, self.manifest
+        )
+        state_path.write_text(json.dumps(self.s))
+        domain = state_path.parent / "domain/mri-reconstruction.json"
+        domain.parent.mkdir()
+        domain.write_text(json.dumps({
+            "gt": {"available": False, "usage": "none"},
+            "model_selection": {"protocol": "gt_free_frozen", "uses_gt": False,
+                                "metric": "lambda_holdout_nmse", "direction": "minimize"},
+        }))
+        proc = subprocess.run([
+            sys.executable, str(ROOT / "scripts/experiment_execute.py"), "issue",
+            "--state", str(state_path), "--experiment", self.x["id"],
+            "--manifest", str(manifest_path), "--scheduler", str(scheduler_path),
+            "--ledger", str(self.root / "ledger"), "--output", str(receipt_path),
+        ], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 3)
+        self.assertIn("MRI_TRAINING_SELECTION", json.loads(proc.stdout)["errors"][0])
+        self.assertFalse(receipt_path.exists())
 
     def test_cli_denial_is_nonzero_structured_and_no_output_receipt(self):
         state=self.root/'state.json';manifest=self.root/'manifest.json';self.x['execution_protocol']['risk_controls'][0]['comparison_ids']=[]

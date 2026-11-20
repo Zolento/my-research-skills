@@ -1,10 +1,56 @@
 # Changelog — research-lifecycle-protocol
 
-本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.3.1**。
+本文件记录 Research Lifecycle Protocol 的正式发行历史。**当前正式稳定版：2.4.0**。
 版本序列从 1.0.0 重新建立；此前的 v1.x / v2.x 是同一组件的公开开发迭代记录，原样保留、不改写。
 
 格式：`## <version> — <date>`，条目分为 Added / Changed / Fixed / Security / Docs。
 每个版本的权威说明见 `docs/releases/<version>.md`。
+
+## 2.4.0 — 2026-11-20
+
+### Added
+
+- **MRI Research Contract v1.0 接入**：`domain-profiles/mri-reconstruction/training-policy.md`
+  受管段重写为 Contract v1.0 简版（9 条 + MRI-10 CSM 来源），内置原文副本
+  `docs/contracts/mri-research-contract-v1.0.md`。两种合法选模协议 `full_val_gt` /
+  `gt_free_frozen` 均可执行；`best_val_metric` 只收 `PSNR` 与 `complex_NMSE`。
+- `scripts/report_lint.py` + `scripts/test_report_lint.py`：用户报告的结构检查
+  （`REP-01`—`REP-07`），只拦客观缺字段与格式违规，不是科研门禁。
+- `scripts/test_mri_training.py`：40 用例覆盖同步幂等、两种选模、CSM 三模式与 profile 交叉一致。
+- `scripts/layout_guard.py`：项目组织规范（DI-1—DI-8）的执行器。`preflight` / `check` /
+  `audit` / `selftest` 四个动作，13 类路径 kind、route 与 XID 登记核验（预注册 / manifest /
+  canonical state 三处）、`routes/<R>/docs/` 扁平、受保护入口与软链接穿越、`AGENTS.md` 体量。
+- `scripts/test_layout_guard.py`：允许与拒绝两侧的 fixture，含两种真实 registry 形状、
+  三处 XID 登记、宽模式拒绝、审计分级与退出码 0/3/4。
+- `templates/AGENTS.project.md`：项目执行契约模板（≤ 6.6 KB），只写执行边界。
+- `templates/layout-policy.template.json`：路径例外登记骨架（窄模式 + 授权人 + 理由）。
+
+### Changed
+
+- **四层分工定稿**：`AGENTS.md` 管执行边界，RLP 管科研生命周期，项目契约管具体实验，
+  `layout_guard.py` 管目录合规。`references/project-layout.md` §0 重写。
+- **优先级拆分**：布局可以让（用户指令 ＞ 冻结协议 ＞ `AGENTS.md` ＞ RLP 默认布局），
+  **门禁不能让**（state 转换、证据资格、强制门禁不受该顺序影响）。
+- `AGENTS.md` 不再作为规则副本的合法载体：重复记述按内容错误处理，删副本留指针；
+  体量 >10 KB 告警、>20 KB 违规。
+
+### Changed（续）
+
+- 灵敏度来源（MRI-10）：默认强制数据集存储 CSM；只有显式联合估计灵敏度且在启动前冻结
+  方法协议的方法类别例外。例外不覆盖跨方法比较的评估参考。
+- `layout_guard.py` 的 `AGENTS.md` 体量预算改为**只计项目自撰部分**，Skill 注入的受管块
+  按 SHA 单独校验，不计入预算。
+- `layout_guard.py` 与 `operational_reconcile.py` 增加 `--quiet` / `--summary`：
+  正常通过时不出声，HOLD 与阻塞照常输出，退出码不变。
+
+### Fixed
+
+- 六个真实项目的布局漂移此前无任何机制可发现（未声明顶层目录、`log/` 与 `logs/` 并存、
+  控制目录 31 份 `research-state.*.json`、`docs/` 子目录、缺 `STATUS.md`）。`audit` 现在
+  逐项报出并分级。
+- 模板命名为 `AGENTS.md` 会被 agent 运行时当作指令自动加载；模板统一用 `.project.md` 后缀。
+
+详见 [v2.4.0 发布说明](docs/releases/v2.4.0.md)。
 
 ## 2.3.1 — 2026-11-18
 

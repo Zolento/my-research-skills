@@ -772,6 +772,12 @@ def _parser() -> argparse.ArgumentParser:
                         help="perform routine maintenance and commit validated outcome bundles")
     parser.add_argument("--outcome-root", help="directory to scan for prepared outcome bundles")
     parser.add_argument("--timestamp", help="fixed timestamp for an applied transaction (tests)")
+    parser.add_argument("--quiet", action="store_true",
+                        help="正常（OK）时不打印 JSON；HOLD / BLOCKED 照常输出")
+    parser.add_argument("--summary", action="store_true",
+                        help="只打印一行结果；完整 payload 仍可由 --json 取得")
+    parser.add_argument("--json", action="store_true",
+                        help="始终打印完整 JSON（与 --summary / --quiet 互斥时优先）")
     return parser
 
 
@@ -788,7 +794,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         print(f"[env] cannot read input: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_ERROR
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if args.summary and not args.json:
+        applied = "applied" if payload.get("applied") else "preview"
+        print(f"operational_reconcile: {payload['status']} ({applied}, "
+              f"state_version={payload.get('state_version')})")
+    elif not (args.quiet and payload["status"] == "OK"):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     if payload["status"] == "BLOCKED":
         return EXIT_BLOCKED
     if payload["status"] == "HOLD":
